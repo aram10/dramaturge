@@ -1,0 +1,31 @@
+{
+  "targetUrl": "https://your-app.example.com",
+  "appDescription": "Describe your app: what it does, its main features, and user roles.",
+
+  "auth": {
+    "type": "oauth-redirect",
+    "loginUrl": "/login",
+    "credentials": {
+      "email": "${TEST_USER_EMAIL}",
+      "password": "${TEST_USER_PASSWORD}"
+    },
+    "successIndicator": "url:/"
+  },
+
+  "models": {
+    "orchestrator": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5"
+  },
+
+  "exploration": {
+    "maxAreasToExplore": 10,
+    "stepsPerArea": 40,
+    "totalTimeout": 900
+  },
+
+  "output": {
+    "dir": "./webprobe-reports",
+    "format": "markdown",
+    "screenshots": true
+  }
+}
