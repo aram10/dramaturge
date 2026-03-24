@@ -1,0 +1,23 @@
+{
+  "name": "webprobe",
+  "version": "0.1.0",
+  "description": "Autonomous web application QA explorer",
+  "type": "module",
+  "bin": {
+    "webprobe": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.2.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  }
+}
