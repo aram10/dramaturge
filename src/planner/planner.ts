@@ -29,6 +29,8 @@ interface PlannerProposal {
   workerType: WorkerType;
   objective: string;
   reason: string;
+  /** Optional priority hint (e.g. from LLM). Merged with computed priority via max(). */
+  priority?: number;
 }
 
 export class Planner {
@@ -121,25 +123,7 @@ export class Planner {
       return this.proposeTasks(node, graph, mission);
     }
 
-    const priorityCtx: PriorityContext = {
-      visitedWorkerTypes:
-        this.workerTypesPerNode.get(node.id) ?? new Set(),
-    };
-
-    return llmProposals.map((p) => ({
-      id: `task-${randomUUID().slice(0, 8)}`,
-      nodeId: node.id,
-      workerType: p.workerType,
-      objective: p.objective,
-      priority: Math.max(
-        p.priority,
-        computePriority(node, p.workerType, priorityCtx)
-      ),
-      reason: p.reason,
-      retryCount: 0,
-      createdAt: new Date().toISOString(),
-      status: "pending" as const,
-    }));
+    return this.toFrontierItems(node, llmProposals);
   }
 
   /**
@@ -154,17 +138,20 @@ export class Planner {
         this.workerTypesPerNode.get(node.id) ?? new Set(),
     };
 
-    return proposals.map((p) => ({
-      id: `task-${randomUUID().slice(0, 8)}`,
-      nodeId: node.id,
-      workerType: p.workerType,
-      objective: p.objective,
-      priority: computePriority(node, p.workerType, priorityCtx),
-      reason: p.reason,
-      retryCount: 0,
-      createdAt: new Date().toISOString(),
-      status: "pending" as const,
-    }));
+    return proposals.map((p) => {
+      const computed = computePriority(node, p.workerType, priorityCtx);
+      return {
+        id: `task-${randomUUID().slice(0, 8)}`,
+        nodeId: node.id,
+        workerType: p.workerType,
+        objective: p.objective,
+        priority: p.priority != null ? Math.max(p.priority, computed) : computed,
+        reason: p.reason,
+        retryCount: 0,
+        createdAt: new Date().toISOString(),
+        status: "pending" as const,
+      };
+    });
   }
 
   /**

@@ -74,6 +74,14 @@ export function renderJson(result: RunResult): string {
       }))
     ),
     unexploredAreas: result.unexploredAreas,
+    blindSpots: result.blindSpots.map((s) => ({
+      nodeId: s.nodeId ?? null,
+      summary: s.summary,
+      reason: s.reason,
+      severity: s.severity,
+    })),
+    stateGraph: result.stateGraphMermaid ?? null,
+    runConfig: result.runConfig ?? null,
   };
 
   return JSON.stringify(report, null, 2);

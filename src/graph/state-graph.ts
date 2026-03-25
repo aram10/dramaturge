@@ -179,6 +179,28 @@ export class StateGraph {
     return lines.join("\n");
   }
 
+  /**
+   * Render the state graph as a Mermaid flowchart diagram.
+   */
+  toMermaid(): string {
+    const lines: string[] = ["graph TD"];
+    for (const n of this.nodes.values()) {
+      const label = this.mermaidEscape(
+        `${n.pageType}${n.title ? `: ${n.title}` : ""}`
+      );
+      lines.push(`  ${n.id}["${label}"]`);
+    }
+    for (const e of this.edges.values()) {
+      const label = this.mermaidEscape(e.actionLabel);
+      lines.push(`  ${e.fromNodeId} -->|"${label}"| ${e.toNodeId}`);
+    }
+    return lines.join("\n");
+  }
+
+  private mermaidEscape(text: string): string {
+    return text.slice(0, 60).replace(/"/g, "#quot;").replace(/\n/g, " ");
+  }
+
   private findRoot(): StateNode | undefined {
     for (const node of this.nodes.values()) {
       if (node.depth === 0) return node;
