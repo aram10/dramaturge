@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { loadConfig } from "./config.js";
-import { run } from "./runner.js";
 
 const args = process.argv.slice(2);
 
@@ -12,11 +11,14 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+const legacyMode = args.includes("--legacy");
+
 if (args.includes("--help") || args.includes("-h")) {
-  console.log(`Usage: webprobe [--config <path>]
+  console.log(`Usage: webprobe [--config <path>] [--legacy]
 
 Options:
   --config <path>  Path to config file (default: webprobe.config.json)
+  --legacy         Use the v1 flat orchestrator loop instead of the v2 engine
   --help, -h       Show this help message
 
 Environment variables:
@@ -29,7 +31,13 @@ Environment variables:
 
 try {
   const config = loadConfig(configPath);
-  await run(config);
+  if (legacyMode) {
+    const { run } = await import("./runner.js");
+    await run(config);
+  } else {
+    const { runEngine } = await import("./engine.js");
+    await runEngine(config);
+  }
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`Error: ${message}`);
