@@ -34,7 +34,7 @@ export async function authenticate(
         auth.loginUrl,
         auth.credentials,
         auth.successIndicator,
-        models.orchestrator
+        models.planner
       );
   }
 }

@@ -4,6 +4,11 @@ import type { Area, AreaResult } from "../types.js";
 import { actionsToAreas, deduplicateAreas } from "./area-map.js";
 import { exploreArea } from "../worker/worker.js";
 import { join } from "node:path";
+import {
+  captureFingerprint,
+  isDuplicateState,
+  markVisited,
+} from "../graph/fingerprint.js";
 
 export interface OrchestratorResult {
   areaResults: AreaResult[];
@@ -17,6 +22,7 @@ export async function orchestrate(
 ): Promise<OrchestratorResult> {
   const { targetUrl, appDescription, models, exploration } = config;
   const page = stagehand.context.pages()[0];
+  const visitedStates = new Set<string>();
 
   console.log("Discovering navigation structure...");
 
@@ -95,10 +101,31 @@ export async function orchestrate(
         steps: 0,
         findings: [],
         screenshots: new Map(),
+        evidence: [],
+        coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+        pageType: "unknown",
         status: "failed",
         failureReason: `Navigation failed: ${message}`,
       });
       continue;
+    }
+
+    // Fingerprint check: skip if we've already visited this exact state
+    try {
+      const fingerprint = await captureFingerprint(page);
+      if (isDuplicateState(fingerprint, visitedStates)) {
+        console.log(
+          `  Skipping "${area.name}" — duplicate state (fingerprint: ${fingerprint.hash})`
+        );
+        unexploredAreas.push({
+          name: area.name,
+          reason: "duplicate state (same fingerprint as previously visited page)",
+        });
+        continue;
+      }
+      markVisited(fingerprint, visitedStates);
+    } catch {
+      // If fingerprinting fails, proceed anyway — don't block exploration
     }
 
     // Launch worker
@@ -113,8 +140,11 @@ export async function orchestrate(
     );
     areaResults.push(result);
 
+    const coverageInfo = result.coverage.controlsExercised > 0
+      ? `, coverage: ${result.coverage.controlsExercised}/${result.coverage.controlsDiscovered} controls`
+      : "";
     console.log(
-      `  Completed: ${result.findings.length} findings, ${result.steps} steps, status: ${result.status}`
+      `  Completed: ${result.findings.length} findings, ${result.steps} steps, page: ${result.pageType}${coverageInfo}, status: ${result.status}`
     );
 
     // Navigate back to root for next area

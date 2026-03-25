@@ -46,15 +46,33 @@ export function renderJson(result: RunResult): string {
       expected: f.expected,
       actual: f.actual,
       screenshot: f.screenshot ?? null,
+      evidenceIds: f.evidenceIds ?? [],
     })),
     coverage: result.areaResults.map((a) => ({
       name: a.name,
       url: a.url ?? null,
+      pageType: a.pageType,
       steps: a.steps,
       findings: a.findings.length,
+      controls: {
+        discovered: a.coverage.controlsDiscovered,
+        exercised: a.coverage.controlsExercised,
+      },
       status: a.status,
       failureReason: a.failureReason ?? null,
+      fingerprint: a.fingerprint?.hash ?? null,
     })),
+    evidence: result.areaResults.flatMap((a) =>
+      a.evidence.map((ev) => ({
+        id: ev.id,
+        type: ev.type,
+        summary: ev.summary,
+        path: ev.path ?? null,
+        areaName: ev.areaName ?? null,
+        relatedFindingIds: ev.relatedFindingIds,
+        timestamp: ev.timestamp,
+      }))
+    ),
     unexploredAreas: result.unexploredAreas,
   };
 
