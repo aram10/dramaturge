@@ -1,7 +1,17 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
 import { createWorkerTools } from "./tools.js";
 import { buildWorkerSystemPrompt } from "./prompts.js";
-import type { Area, AreaResult, RawFinding, Evidence, PageType } from "../types.js";
+import type {
+  Area,
+  AreaResult,
+  RawFinding,
+  Evidence,
+  PageType,
+  WorkerTask,
+  WorkerResult,
+  FollowupRequest,
+  DiscoveredEdge,
+} from "../types.js";
 import { CoverageTracker } from "../coverage/tracker.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
@@ -99,6 +109,79 @@ export async function exploreArea(
       fingerprint,
       status: "failed",
       failureReason: message,
+    };
+  }
+}
+
+/**
+ * V2 engine-compatible entry point: accepts a WorkerTask, returns a WorkerResult.
+ */
+export async function executeWorkerTask(
+  stagehand: Stagehand,
+  task: WorkerTask,
+  model: string,
+  screenshotDir: string
+): Promise<WorkerResult> {
+  const findings: RawFinding[] = [];
+  const screenshots = new Map<string, Buffer>();
+  const evidence: Evidence[] = [];
+  const coverageTracker = new CoverageTracker();
+  const followupRequests: FollowupRequest[] = [];
+  const discoveredEdges: DiscoveredEdge[] = [];
+  const page = stagehand.context.pages()[0];
+
+  const tools = createWorkerTools(
+    findings,
+    screenshots,
+    evidence,
+    coverageTracker,
+    page,
+    screenshotDir,
+    task.nodeId,
+    followupRequests,
+    discoveredEdges
+  );
+
+  const systemPrompt = buildWorkerSystemPrompt(
+    task.missionContext ?? "",
+    task.objective,
+    undefined,
+    task.pageType
+  );
+
+  const agent = stagehand.agent({
+    mode: "cua",
+    model,
+    systemPrompt,
+    tools: tools as any,
+  });
+
+  try {
+    await agent.execute({
+      instruction: task.objective,
+      maxSteps: task.maxSteps,
+    });
+
+    return {
+      taskId: task.id,
+      findings,
+      evidence,
+      coverageSnapshot: coverageTracker.snapshot(),
+      followupRequests,
+      discoveredEdges,
+      outcome: "completed",
+      summary: `Completed ${task.workerType} task: ${task.objective}`,
+    };
+  } catch (error) {
+    return {
+      taskId: task.id,
+      findings,
+      evidence,
+      coverageSnapshot: coverageTracker.snapshot(),
+      followupRequests,
+      discoveredEdges,
+      outcome: "failed",
+      summary: error instanceof Error ? error.message : String(error),
     };
   }
 }
