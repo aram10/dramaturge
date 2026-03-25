@@ -126,3 +126,130 @@ export interface RunResult {
   unexploredAreas: Array<{ name: string; reason: string }>;
   partial: boolean;
 }
+
+// --- State Graph ---
+
+export interface NavigationHint {
+  url?: string;
+  selector?: string;
+  actionDescription?: string;
+}
+
+export interface StateNode {
+  id: string;
+  url?: string;
+  title?: string;
+  fingerprint: PageFingerprint;
+  pageType: PageType;
+  depth: number;
+  firstSeenAt: string;
+  controlsDiscovered: string[];
+  controlsExercised: string[];
+  navigationHint?: NavigationHint;
+  parentEdgeId?: string;
+  tags: string[];
+  riskScore: number;
+  timesVisited: number;
+}
+
+export interface StateEdge {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  actionLabel: string;
+  navigationHint: NavigationHint;
+  outcome: "success" | "blocked" | "error" | "same-state";
+  timestamp: string;
+}
+
+// --- Frontier ---
+
+export type WorkerType = "navigation" | "form" | "crud";
+
+export type FrontierItemStatus =
+  | "pending"
+  | "in-progress"
+  | "completed"
+  | "blocked";
+
+export interface FrontierItem {
+  id: string;
+  nodeId: string;
+  workerType: WorkerType;
+  objective: string;
+  priority: number;
+  reason: string;
+  retryCount: number;
+  createdAt: string;
+  status: FrontierItemStatus;
+}
+
+// --- Worker Task / Result ---
+
+export interface WorkerTask {
+  id: string;
+  workerType: WorkerType;
+  nodeId: string;
+  objective: string;
+  maxSteps: number;
+  pageType: PageType;
+  missionContext?: string;
+}
+
+export interface DiscoveredEdge {
+  actionLabel: string;
+  navigationHint: NavigationHint;
+  targetFingerprint: PageFingerprint;
+  targetPageType: PageType;
+}
+
+export interface FollowupRequest {
+  type: WorkerType;
+  reason: string;
+  targetNodeId?: string;
+  relatedFindingId?: string;
+}
+
+export interface WorkerResult {
+  taskId: string;
+  findings: RawFinding[];
+  evidence: Evidence[];
+  coverageSnapshot: CoverageSnapshot;
+  followupRequests: FollowupRequest[];
+  discoveredEdges: DiscoveredEdge[];
+  outcome: "completed" | "blocked" | "timed-out" | "failed";
+  summary: string;
+}
+
+// --- Coverage extension ---
+
+export interface BlindSpot {
+  nodeId?: string;
+  summary: string;
+  reason:
+    | "blocked"
+    | "time-budget"
+    | "pruned"
+    | "state-unreachable"
+    | "unknown";
+  severity: "low" | "medium" | "high";
+}
+
+// --- Mission Config ---
+
+export interface MissionConfig {
+  appDescription: string;
+  criticalFlows?: string[];
+  destructiveActionsAllowed: boolean;
+  excludedAreas?: string[];
+  focusModes?: WorkerType[];
+}
+
+// --- Budget Config ---
+
+export interface BudgetConfig {
+  globalTimeLimitSeconds: number;
+  maxStepsPerTask: number;
+  maxFrontierSize: number;
+  maxStateNodes: number;
+}
