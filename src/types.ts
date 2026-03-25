@@ -253,3 +253,52 @@ export interface BudgetConfig {
   maxFrontierSize: number;
   maxStateNodes: number;
 }
+
+// --- Browser Error Capture ---
+
+export interface BrowserConsoleError {
+  level: "error" | "warning";
+  text: string;
+  url: string;
+  timestamp: string;
+}
+
+export interface BrowserNetworkError {
+  method: string;
+  url: string;
+  status: number;
+  statusText: string;
+  timestamp: string;
+}
+
+export interface BrowserPageError {
+  message: string;
+  url: string;
+  timestamp: string;
+}
+
+// --- Checkpoint / Resume ---
+
+export interface Checkpoint {
+  version: 1;
+  savedAt: string;
+  tasksExecuted: number;
+  graphSnapshot: {
+    nodes: StateNode[];
+    edges: StateEdge[];
+  };
+  frontierSnapshot: FrontierItem[];
+  findingsByNode: Record<string, RawFinding[]>;
+  evidenceByNode: Record<string, Evidence[]>;
+  blindSpots: BlindSpot[];
+  completedTaskIds: string[];
+}
+
+// --- LLM Planner Task Proposal ---
+
+export interface LLMTaskProposal {
+  workerType: WorkerType;
+  objective: string;
+  reason: string;
+  priority: number;
+}

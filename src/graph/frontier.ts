@@ -76,6 +76,13 @@ export class FrontierQueue {
     return remaining;
   }
 
+  /**
+   * Return a shallow copy of all items (for checkpoint serialization).
+   */
+  snapshot(): FrontierItem[] {
+    return this.items.map((i) => ({ ...i }));
+  }
+
   /** Binary search insert to maintain descending sort order by priority. */
   private insertSorted(item: FrontierItem): void {
     let lo = 0;

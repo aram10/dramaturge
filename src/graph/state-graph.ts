@@ -133,6 +133,17 @@ export class StateGraph {
     }
   }
 
+  /** Restore a node from a checkpoint (used during resume). */
+  restoreNode(node: StateNode): void {
+    this.nodes.set(node.id, node);
+    this.fingerprintIndex.set(node.fingerprint.hash, node.id);
+  }
+
+  /** Restore an edge from a checkpoint (used during resume). */
+  restoreEdge(edge: StateEdge): void {
+    this.edges.set(edge.id, edge);
+  }
+
   getAllNodes(): StateNode[] {
     return [...this.nodes.values()];
   }

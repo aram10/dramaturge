@@ -9,6 +9,7 @@ import type {
 } from "../types.js";
 import type { StateGraph } from "../graph/state-graph.js";
 import { computePriority, type PriorityContext } from "./priority.js";
+import { proposeLLMTasks } from "../llm.js";
 
 /** Default page-type → worker-type mapping. */
 const PAGE_TYPE_WORKER_MAP: Record<PageType, WorkerType> = {
@@ -36,9 +37,6 @@ export class Planner {
   /**
    * Propose tasks for a newly discovered state node.
    * Uses the deterministic page-type→worker mapping.
-   * The LLM-assisted version will be added in a follow-up — for Phase 2A,
-   * we use the deterministic mapping only to validate the engine loop
-   * before adding the LLM dependency.
    */
   proposeTasks(
     node: StateNode,
@@ -78,6 +76,79 @@ export class Planner {
       });
     }
 
+    return this.toFrontierItems(node, proposals);
+  }
+
+  /**
+   * LLM-assisted task proposal. Calls the planner model to analyze the page
+   * and propose targeted test tasks. Falls back to deterministic if the LLM
+   * call fails or returns no results.
+   */
+  async proposeTasksWithLLM(
+    node: StateNode,
+    graph: StateGraph,
+    plannerModel: string,
+    mission?: MissionConfig
+  ): Promise<FrontierItem[]> {
+    const allowedTypes: WorkerType[] = mission?.focusModes ?? [
+      "navigation",
+      "form",
+      "crud",
+    ];
+
+    const nodeDesc = [
+      `Page type: ${node.pageType}`,
+      node.url ? `URL: ${node.url}` : null,
+      node.title ? `Title: ${node.title}` : null,
+      `Depth: ${node.depth}`,
+      `Controls discovered: ${node.controlsDiscovered.length}`,
+      `Controls exercised: ${node.controlsExercised.length}`,
+      `Times visited: ${node.timesVisited}`,
+      `Risk score: ${node.riskScore}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const llmProposals = await proposeLLMTasks(
+      plannerModel,
+      graph.summary(),
+      nodeDesc,
+      allowedTypes
+    );
+
+    if (!llmProposals) {
+      // LLM failed — fall back to deterministic
+      return this.proposeTasks(node, graph, mission);
+    }
+
+    const priorityCtx: PriorityContext = {
+      visitedWorkerTypes:
+        this.workerTypesPerNode.get(node.id) ?? new Set(),
+    };
+
+    return llmProposals.map((p) => ({
+      id: `task-${randomUUID().slice(0, 8)}`,
+      nodeId: node.id,
+      workerType: p.workerType,
+      objective: p.objective,
+      priority: Math.max(
+        p.priority,
+        computePriority(node, p.workerType, priorityCtx)
+      ),
+      reason: p.reason,
+      retryCount: 0,
+      createdAt: new Date().toISOString(),
+      status: "pending" as const,
+    }));
+  }
+
+  /**
+   * Convert proposal objects to FrontierItems with priority scoring.
+   */
+  private toFrontierItems(
+    node: StateNode,
+    proposals: PlannerProposal[]
+  ): FrontierItem[] {
     const priorityCtx: PriorityContext = {
       visitedWorkerTypes:
         this.workerTypesPerNode.get(node.id) ?? new Set(),
