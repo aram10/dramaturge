@@ -1,7 +1,10 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
 import { createWorkerTools } from "./tools.js";
 import { buildWorkerSystemPrompt } from "./prompts.js";
-import type { Area, AreaResult, RawFinding } from "../types.js";
+import type { Area, AreaResult, RawFinding, Evidence, PageType } from "../types.js";
+import { CoverageTracker } from "../coverage/tracker.js";
+import { captureFingerprint } from "../graph/fingerprint.js";
+import { classifyPage } from "../planner/page-classifier.js";
 
 export async function exploreArea(
   stagehand: Stagehand,
@@ -13,14 +16,38 @@ export async function exploreArea(
 ): Promise<AreaResult> {
   const findings: RawFinding[] = [];
   const screenshots = new Map<string, Buffer>();
+  const evidence: Evidence[] = [];
+  const coverageTracker = new CoverageTracker();
   const page = stagehand.context.pages()[0];
 
-  const tools = createWorkerTools(findings, screenshots, page, screenshotDir);
+  // Classify the page and capture fingerprint before starting the worker
+  let pageType: PageType = "unknown";
+  let fingerprint;
+  try {
+    [pageType, fingerprint] = await Promise.all([
+      classifyPage(page),
+      captureFingerprint(page),
+    ]);
+    console.log(`  Page type: ${pageType}, fingerprint: ${fingerprint.hash}`);
+  } catch {
+    console.warn(`  Could not classify page for "${area.name}"`);
+  }
+
+  const tools = createWorkerTools(
+    findings,
+    screenshots,
+    evidence,
+    coverageTracker,
+    page,
+    screenshotDir,
+    area.name
+  );
 
   const systemPrompt = buildWorkerSystemPrompt(
     appDescription,
     area.name,
-    area.description
+    area.description,
+    pageType
   );
 
   // Cast tools to any to work around Zod v3/v4 type mismatch in Stagehand's .d.ts.
@@ -34,7 +61,7 @@ export async function exploreArea(
 
   try {
     const result = await agent.execute({
-      instruction: `Explore the "${area.name}" area of this application. Interact with all visible elements, test forms, check edge cases, and report any issues you find using the log_finding tool. Take screenshots of anything notable using the take_screenshot tool.`,
+      instruction: `Explore the "${area.name}" area of this application. Interact with all visible elements, test forms, check edge cases, and report any issues you find using the log_finding tool. Take screenshots before logging findings and include the evidenceId. Use mark_control_exercised after each interaction to track coverage.`,
       maxSteps: stepsPerArea,
     });
 
@@ -50,6 +77,10 @@ export async function exploreArea(
       steps: stepCount,
       findings,
       screenshots,
+      evidence,
+      coverage: coverageTracker.snapshot(),
+      pageType,
+      fingerprint,
       status: "explored" as const,
     };
   } catch (error) {
@@ -62,6 +93,10 @@ export async function exploreArea(
       steps: 0,
       findings,
       screenshots,
+      evidence,
+      coverage: coverageTracker.snapshot(),
+      pageType,
+      fingerprint,
       status: "failed",
       failureReason: message,
     };

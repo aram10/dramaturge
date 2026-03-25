@@ -28,7 +28,7 @@ const AuthSchema = z
 
 const ModelsSchema = z
   .object({
-    orchestrator: z.string().default("anthropic/claude-sonnet-4-6"),
+    planner: z.string().default("anthropic/claude-sonnet-4-6"),
     worker: z.string().default("anthropic/claude-haiku-4-5"),
   })
   .default({});

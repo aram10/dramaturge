@@ -23,7 +23,7 @@ export async function run(config: WebProbeConfig): Promise<void> {
   // Initialize Stagehand
   const stagehand = new Stagehand({
     env: "LOCAL",
-    model: config.models.orchestrator,
+    model: config.models.planner,
     localBrowserLaunchOptions: {
       headless: false,
     },

@@ -86,14 +86,46 @@ export function renderMarkdown(result: RunResult): string {
 
   // Coverage Map
   lines.push("## Coverage Map");
-  lines.push("| Area | Steps | Findings | Status |");
-  lines.push("|------|-------|----------|--------|");
+  lines.push("| Area | Page Type | Steps | Findings | Controls (exercised/discovered) | Status |");
+  lines.push("|------|-----------|-------|----------|-------------------------------|--------|");
   for (const area of result.areaResults) {
+    const coverageStr = area.coverage.controlsDiscovered > 0
+      ? `${area.coverage.controlsExercised}/${area.coverage.controlsDiscovered}`
+      : "—";
     lines.push(
-      `| ${area.name} | ${area.steps} | ${area.findings.length} | ${area.status} |`
+      `| ${area.name} | ${area.pageType} | ${area.steps} | ${area.findings.length} | ${coverageStr} | ${area.status} |`
     );
   }
   lines.push("");
+
+  // Coverage Summary
+  const totalControlsDiscovered = result.areaResults.reduce(
+    (sum, a) => sum + a.coverage.controlsDiscovered, 0
+  );
+  const totalControlsExercised = result.areaResults.reduce(
+    (sum, a) => sum + a.coverage.controlsExercised, 0
+  );
+  if (totalControlsDiscovered > 0) {
+    const pct = Math.round((totalControlsExercised / totalControlsDiscovered) * 100);
+    lines.push("## Coverage Summary");
+    lines.push(`- **Controls discovered:** ${totalControlsDiscovered}`);
+    lines.push(`- **Controls exercised:** ${totalControlsExercised} (${pct}%)`);
+    lines.push("");
+  }
+
+  // Evidence Index
+  const allEvidence = result.areaResults.flatMap((a) => a.evidence);
+  if (allEvidence.length > 0) {
+    lines.push("## Evidence Index");
+    lines.push("| ID | Type | Area | Summary | Path |");
+    lines.push("|----|------|------|---------|------|");
+    for (const ev of allEvidence) {
+      lines.push(
+        `| ${ev.id} | ${ev.type} | ${ev.areaName ?? "—"} | ${ev.summary} | ${ev.path ?? "—"} |`
+      );
+    }
+    lines.push("");
+  }
 
   // Unexplored Areas
   if (result.unexploredAreas.length > 0) {
