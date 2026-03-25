@@ -78,6 +78,29 @@ const BudgetSchema = z
   })
   .default({});
 
+const AutoCaptureSchema = z
+  .object({
+    consoleErrors: z.boolean().default(true),
+    networkErrors: z.boolean().default(true),
+    /** Minimum HTTP status code to capture as network error (default: 400). */
+    networkErrorMinStatus: z.number().int().min(400).max(599).default(400),
+  })
+  .default({});
+
+const ConcurrencySchema = z
+  .object({
+    /** Number of parallel browser workers (default: 1 = sequential). */
+    workers: z.number().int().min(1).max(8).default(1),
+  })
+  .default({});
+
+const CheckpointSchema = z
+  .object({
+    /** Save checkpoint every N completed tasks (0 = disabled). */
+    intervalTasks: z.number().int().min(0).default(5),
+  })
+  .default({});
+
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
   appDescription: z.string().min(1),
@@ -87,6 +110,9 @@ export const ConfigSchema = z.object({
   budget: BudgetSchema,
   exploration: ExplorationSchema,
   output: OutputSchema,
+  autoCapture: AutoCaptureSchema,
+  concurrency: ConcurrencySchema,
+  checkpoint: CheckpointSchema,
 });
 
 export type WebProbeConfig = z.infer<typeof ConfigSchema>;
