@@ -17,6 +17,23 @@
     "worker": "anthropic/claude-haiku-4-5"
   },
 
+  "mission": {
+    "criticalFlows": [
+      "Create a new record",
+      "Edit an existing record",
+      "Search and filter the list"
+    ],
+    "destructiveActionsAllowed": false,
+    "focusModes": ["navigation", "form", "crud"]
+  },
+
+  "budget": {
+    "globalTimeLimitSeconds": 900,
+    "maxStepsPerTask": 40,
+    "maxFrontierSize": 200,
+    "maxStateNodes": 50
+  },
+
   "exploration": {
     "maxAreasToExplore": 10,
     "stepsPerArea": 40,
