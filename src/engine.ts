@@ -4,8 +4,9 @@ import { join, resolve } from "node:path";
 import type { WebProbeConfig } from "./config.js";
 import { resolveWorkerModel } from "./config.js";
 import type {
-  BlindSpot,
+  AreaResult,
   Evidence,
+  FrontierItem,
   RawFinding,
   WorkerResult,
   BudgetConfig,
@@ -24,6 +25,339 @@ import { buildRunResult } from "./report/collector.js";
 import { renderMarkdown } from "./report/markdown.js";
 import { renderJson } from "./report/json.js";
 
+// ---------------------------------------------------------------------------
+// Types for internal engine state passed between decomposed functions
+// ---------------------------------------------------------------------------
+
+interface EngineContext {
+  config: WebProbeConfig;
+  budget: BudgetConfig;
+  mission: MissionConfig | undefined;
+  stagehand: Stagehand;
+  page: ReturnType<Stagehand["context"]["pages"]>[number];
+  graph: StateGraph;
+  frontier: FrontierQueue;
+  planner: Planner;
+  navigator: Navigator;
+  globalCoverage: CoverageTracker;
+  screenshotDir: string;
+  /** Findings keyed by the node ID that produced them. */
+  findingsByNode: Map<string, RawFinding[]>;
+  /** Evidence keyed by the node ID that produced it. */
+  evidenceByNode: Map<string, Evidence[]>;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function resolveBudget(config: WebProbeConfig): BudgetConfig {
+  return {
+    globalTimeLimitSeconds:
+      config.budget.globalTimeLimitSeconds ??
+      config.exploration.totalTimeout,
+    maxStepsPerTask:
+      config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
+    maxFrontierSize: config.budget.maxFrontierSize ?? 200,
+    maxStateNodes: config.budget.maxStateNodes ?? 50,
+  };
+}
+
+function buildMission(config: WebProbeConfig): MissionConfig | undefined {
+  if (!config.mission) return undefined;
+  return {
+    ...config.mission,
+    appDescription: config.appDescription,
+    destructiveActionsAllowed:
+      config.mission.destructiveActionsAllowed ?? false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Task processing
+// ---------------------------------------------------------------------------
+
+async function processTask(
+  ctx: EngineContext,
+  item: FrontierItem,
+  taskNumber: number
+): Promise<WorkerResult | null> {
+  const node = ctx.graph.getNode(item.nodeId);
+  console.log(
+    `[${taskNumber}] ${item.workerType} task on ${node.pageType} (${node.url ?? node.id}): ${item.objective}`
+  );
+
+  // Navigate to target state
+  const navResult = await ctx.navigator.navigateTo(
+    item.nodeId,
+    ctx.graph,
+    ctx.page,
+    ctx.stagehand,
+    ctx.config.targetUrl
+  );
+
+  if (!navResult.success) {
+    console.log(`  Navigation failed: ${navResult.reason}`);
+    item.retryCount++;
+    if (item.retryCount >= 2) {
+      ctx.globalCoverage.addBlindSpot({
+        nodeId: item.nodeId,
+        summary: `Unreachable: ${item.objective}`,
+        reason: "state-unreachable",
+        severity: "medium",
+      });
+    } else {
+      ctx.frontier.requeue(item);
+    }
+    return null;
+  }
+
+  // Execute the worker
+  ctx.planner.recordDispatch(item.nodeId, item.workerType);
+  ctx.graph.recordVisit(item.nodeId);
+
+  const model = resolveWorkerModel(ctx.config, item.workerType);
+  return executeWorkerTask(
+    ctx.stagehand,
+    {
+      id: item.id,
+      workerType: item.workerType,
+      nodeId: item.nodeId,
+      objective: item.objective,
+      maxSteps: ctx.budget.maxStepsPerTask,
+      pageType: node.pageType,
+      missionContext: ctx.config.appDescription,
+    },
+    model,
+    ctx.screenshotDir
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Result collection + per-node attribution
+// ---------------------------------------------------------------------------
+
+function collectResults(
+  ctx: EngineContext,
+  nodeId: string,
+  result: WorkerResult
+): void {
+  // Attribute findings and evidence to the node
+  const nodeFindings = ctx.findingsByNode.get(nodeId) ?? [];
+  nodeFindings.push(...result.findings);
+  ctx.findingsByNode.set(nodeId, nodeFindings);
+
+  const nodeEvidence = ctx.evidenceByNode.get(nodeId) ?? [];
+  nodeEvidence.push(...result.evidence);
+  ctx.evidenceByNode.set(nodeId, nodeEvidence);
+
+  // Merge coverage events into global tracker + node
+  for (const event of result.coverageSnapshot.events) {
+    ctx.globalCoverage.recordEvent(event);
+    ctx.graph.addDiscoveredControl(nodeId, event.controlId);
+    if (event.outcome === "worked") {
+      ctx.graph.addExercisedControl(nodeId, event.controlId);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Graph expansion from discovered edges
+// ---------------------------------------------------------------------------
+
+async function expandGraph(
+  ctx: EngineContext,
+  sourceNodeId: string,
+  result: WorkerResult
+): Promise<void> {
+  if (ctx.graph.nodeCount() >= ctx.budget.maxStateNodes) return;
+
+  const sourceNode = ctx.graph.getNode(sourceNodeId);
+
+  for (const edge of result.discoveredEdges) {
+    if (ctx.graph.nodeCount() >= ctx.budget.maxStateNodes) break;
+
+    // Workers report edges with placeholder fingerprints — resolve them
+    let fingerprint = edge.targetFingerprint;
+    let pageType = edge.targetPageType;
+
+    if (fingerprint.hash === "") {
+      // Navigate to the discovered URL to capture real fingerprint
+      const resolved = await resolveEdgeFingerprint(ctx, edge.navigationHint);
+      if (!resolved) continue;
+      fingerprint = resolved.fingerprint;
+      pageType = resolved.pageType;
+
+      // Navigate back to root so subsequent processing stays consistent
+      try {
+        await ctx.page.goto(ctx.config.targetUrl);
+      } catch {
+        // best-effort
+      }
+    }
+
+    const existing = ctx.graph.findByFingerprint(fingerprint);
+    if (!existing) {
+      const newNode = ctx.graph.addNode({
+        fingerprint,
+        pageType,
+        url: edge.navigationHint.url,
+        depth: sourceNode.depth + 1,
+        navigationHint: edge.navigationHint,
+      });
+      graph_addEdge(ctx, sourceNodeId, newNode.id, edge);
+
+      const newTasks = ctx.planner.proposeTasks(
+        newNode,
+        ctx.graph,
+        ctx.mission
+      );
+      ctx.frontier.enqueueMany(newTasks);
+      console.log(
+        `  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`
+      );
+    }
+  }
+}
+
+async function resolveEdgeFingerprint(
+  ctx: EngineContext,
+  hint: { url?: string; selector?: string; actionDescription?: string }
+): Promise<{ fingerprint: Awaited<ReturnType<typeof captureFingerprint>>; pageType: Awaited<ReturnType<typeof classifyPage>> } | null> {
+  try {
+    if (hint.url) {
+      await ctx.page.goto(hint.url);
+    } else if (hint.selector) {
+      await ctx.stagehand.act(
+        `Click the element matching "${hint.selector}"`
+      );
+      await new Promise((r) => setTimeout(r, 500));
+    } else if (hint.actionDescription) {
+      await ctx.stagehand.act(hint.actionDescription);
+      await new Promise((r) => setTimeout(r, 500));
+    } else {
+      return null; // no way to navigate
+    }
+
+    const fingerprint = await captureFingerprint(ctx.page);
+    const pageType = await classifyPage(ctx.page);
+    return { fingerprint, pageType };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`  Could not resolve discovered edge: ${msg}`);
+    return null;
+  }
+}
+
+function graph_addEdge(
+  ctx: EngineContext,
+  fromId: string,
+  toId: string,
+  edge: WorkerResult["discoveredEdges"][number]
+): void {
+  ctx.graph.addEdge(fromId, toId, edge);
+}
+
+// ---------------------------------------------------------------------------
+// Follow-ups + frontier maintenance
+// ---------------------------------------------------------------------------
+
+function routeFollowups(
+  ctx: EngineContext,
+  sourceNodeId: string,
+  result: WorkerResult
+): void {
+  for (const followup of result.followupRequests) {
+    const followupItem = ctx.planner.routeFollowup(followup, sourceNodeId);
+    ctx.frontier.enqueue(followupItem);
+  }
+}
+
+function maintainFrontier(ctx: EngineContext): void {
+  if (ctx.frontier.size() > ctx.budget.maxFrontierSize) {
+    const pruned = ctx.frontier.pruneLowest(0.25);
+    for (const p of pruned) {
+      ctx.globalCoverage.addBlindSpot({
+        nodeId: p.nodeId,
+        summary: `Pruned: ${p.objective}`,
+        reason: "pruned",
+        severity: "low",
+      });
+    }
+    console.log(`  Pruned ${pruned.length} low-priority frontier items`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Report generation — per-node attribution instead of flat "All Areas"
+// ---------------------------------------------------------------------------
+
+function buildAreaResults(ctx: EngineContext): AreaResult[] {
+  const results: AreaResult[] = [];
+
+  for (const node of ctx.graph.getAllNodes()) {
+    const findings = ctx.findingsByNode.get(node.id) ?? [];
+    const evidence = ctx.evidenceByNode.get(node.id) ?? [];
+    if (findings.length === 0 && evidence.length === 0 && node.timesVisited === 0) {
+      continue; // skip nodes that were never visited and have no data
+    }
+
+    results.push({
+      name: node.title ?? `${node.pageType} (${node.id})`,
+      url: node.url,
+      steps: node.timesVisited,
+      findings,
+      screenshots: new Map<string, Buffer>(),
+      evidence,
+      coverage: {
+        controlsDiscovered: node.controlsDiscovered.length,
+        controlsExercised: node.controlsExercised.length,
+        events: [], // per-node events not tracked separately — use global
+      },
+      pageType: node.pageType,
+      fingerprint: node.fingerprint,
+      status: node.timesVisited > 0 ? "explored" : "skipped",
+    });
+  }
+
+  return results;
+}
+
+function writeReports(
+  config: WebProbeConfig,
+  startTime: Date,
+  outputDir: string,
+  areaResults: AreaResult[],
+  remaining: FrontierItem[]
+): void {
+  const runResult = buildRunResult(
+    config.targetUrl,
+    startTime,
+    areaResults,
+    remaining.map((r) => ({
+      name: r.objective,
+      reason: `Not reached (priority: ${r.priority.toFixed(2)})`,
+    })),
+    remaining.length > 0
+  );
+
+  const format = config.output.format;
+  if (format === "markdown" || format === "both") {
+    const md = renderMarkdown(runResult);
+    writeFileSync(join(outputDir, "report.md"), md, "utf-8");
+    console.log(`\nMarkdown report: ${join(outputDir, "report.md")}`);
+  }
+  if (format === "json" || format === "both") {
+    const json = renderJson(runResult);
+    writeFileSync(join(outputDir, "report.json"), json, "utf-8");
+    console.log(`JSON report: ${join(outputDir, "report.json")}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Main engine entry point
+// ---------------------------------------------------------------------------
+
 export async function runEngine(config: WebProbeConfig): Promise<void> {
   const startTime = new Date();
   const timestamp = startTime
@@ -37,16 +371,8 @@ export async function runEngine(config: WebProbeConfig): Promise<void> {
   console.log(`WebProbe v2 starting — target: ${config.targetUrl}`);
   console.log(`Output: ${outputDir}`);
 
-  // Resolve budget with backward compat from exploration fields
-  const budget: BudgetConfig = {
-    globalTimeLimitSeconds:
-      config.budget.globalTimeLimitSeconds ??
-      config.exploration.totalTimeout,
-    maxStepsPerTask:
-      config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
-    maxFrontierSize: config.budget.maxFrontierSize ?? 200,
-    maxStateNodes: config.budget.maxStateNodes ?? 50,
-  };
+  const budget = resolveBudget(config);
+  const mission = buildMission(config);
 
   // Initialize Stagehand
   const stagehand = new Stagehand({
@@ -57,14 +383,21 @@ export async function runEngine(config: WebProbeConfig): Promise<void> {
   });
   await stagehand.init();
 
-  const page = stagehand.context.pages()[0];
-  const graph = new StateGraph();
-  const frontier = new FrontierQueue();
-  const planner = new Planner();
-  const navigator = new Navigator();
-  const globalCoverage = new CoverageTracker();
-  const allFindings: RawFinding[] = [];
-  const allEvidence: Evidence[] = [];
+  const ctx: EngineContext = {
+    config,
+    budget,
+    mission,
+    stagehand,
+    page: stagehand.context.pages()[0],
+    graph: new StateGraph(),
+    frontier: new FrontierQueue(),
+    planner: new Planner(),
+    navigator: new Navigator(),
+    globalCoverage: new CoverageTracker(),
+    screenshotDir,
+    findingsByNode: new Map(),
+    evidenceByNode: new Map(),
+  };
 
   try {
     // Authenticate
@@ -73,10 +406,10 @@ export async function runEngine(config: WebProbeConfig): Promise<void> {
     console.log("Authentication successful.");
 
     // Navigate to root and seed the graph
-    await page.goto(config.targetUrl);
-    const rootFingerprint = await captureFingerprint(page);
-    const rootPageType = await classifyPage(page);
-    const rootNode = graph.addNode({
+    await ctx.page.goto(config.targetUrl);
+    const rootFingerprint = await captureFingerprint(ctx.page);
+    const rootPageType = await classifyPage(ctx.page);
+    const rootNode = ctx.graph.addNode({
       url: config.targetUrl,
       title: rootFingerprint.title,
       fingerprint: rootFingerprint,
@@ -87,107 +420,29 @@ export async function runEngine(config: WebProbeConfig): Promise<void> {
       `Root state: ${rootPageType} (fingerprint: ${rootFingerprint.hash})`
     );
 
-    // Build mission context
-    const mission: MissionConfig | undefined = config.mission
-      ? {
-          ...config.mission,
-          appDescription: config.appDescription,
-          destructiveActionsAllowed:
-            config.mission.destructiveActionsAllowed ?? false,
-        }
-      : undefined;
-
-    // Propose initial tasks
-    const seedTasks = planner.proposeTasks(rootNode, graph, mission);
-    frontier.enqueueMany(seedTasks);
+    // Seed initial tasks
+    const seedTasks = ctx.planner.proposeTasks(rootNode, ctx.graph, mission);
+    ctx.frontier.enqueueMany(seedTasks);
     console.log(`Seeded frontier with ${seedTasks.length} tasks\n`);
 
     // === Main planner loop ===
     const startMs = Date.now();
     let tasksExecuted = 0;
 
-    while (frontier.hasItems()) {
-      // Budget: time check
+    while (ctx.frontier.hasItems()) {
       const elapsedMs = Date.now() - startMs;
       if (elapsedMs > budget.globalTimeLimitSeconds * 1000) {
         console.log("Time budget exhausted.");
         break;
       }
 
-      const item = frontier.dequeueHighest();
+      const item = ctx.frontier.dequeueHighest();
       if (!item) break;
 
-      const node = graph.getNode(item.nodeId);
-      console.log(
-        `[${tasksExecuted + 1}] ${item.workerType} task on ${node.pageType} (${node.url ?? node.id}): ${item.objective}`
-      );
+      const result = await processTask(ctx, item, tasksExecuted + 1);
+      if (!result) continue; // navigation failed — already handled
 
-      // Navigate to target state
-      const navResult = await navigator.navigateTo(
-        item.nodeId,
-        graph,
-        page,
-        stagehand,
-        config.targetUrl
-      );
-
-      if (!navResult.success) {
-        console.log(`  Navigation failed: ${navResult.reason}`);
-        item.retryCount++;
-        if (item.retryCount >= 2) {
-          globalCoverage.addBlindSpot({
-            nodeId: item.nodeId,
-            summary: `Unreachable: ${item.objective}`,
-            reason: "state-unreachable",
-            severity: "medium",
-          });
-        } else {
-          frontier.requeue(item);
-        }
-        continue;
-      }
-
-      // Execute the worker
-      planner.recordDispatch(item.nodeId, item.workerType);
-      node.timesVisited++;
-
-      const model = resolveWorkerModel(config, item.workerType);
-      const result: WorkerResult = await executeWorkerTask(
-        stagehand,
-        {
-          id: item.id,
-          workerType: item.workerType,
-          nodeId: item.nodeId,
-          objective: item.objective,
-          maxSteps: budget.maxStepsPerTask,
-          pageType: node.pageType,
-          missionContext: config.appDescription,
-        },
-        model,
-        screenshotDir
-      );
-
-      // Collect results
-      allFindings.push(...result.findings);
-      allEvidence.push(...result.evidence);
-
-      // Merge coverage events
-      for (const event of result.coverageSnapshot.events) {
-        globalCoverage.recordEvent(event);
-      }
-
-      // Update node coverage data
-      for (const event of result.coverageSnapshot.events) {
-        if (!node.controlsDiscovered.includes(event.controlId)) {
-          node.controlsDiscovered.push(event.controlId);
-        }
-        if (
-          event.outcome === "worked" &&
-          !node.controlsExercised.includes(event.controlId)
-        ) {
-          node.controlsExercised.push(event.controlId);
-        }
-      }
+      collectResults(ctx, item.nodeId, result);
 
       const coverageInfo =
         result.coverageSnapshot.controlsExercised > 0
@@ -197,66 +452,25 @@ export async function runEngine(config: WebProbeConfig): Promise<void> {
         `  ${result.outcome}: ${result.findings.length} findings${coverageInfo}`
       );
 
-      // Expand graph with discovered edges
-      if (graph.nodeCount() < budget.maxStateNodes) {
-        for (const edge of result.discoveredEdges) {
-          if (edge.targetFingerprint.hash === "") continue; // placeholder
-          const existing = graph.findByFingerprint(edge.targetFingerprint);
-          if (!existing) {
-            const newNode = graph.addNode({
-              fingerprint: edge.targetFingerprint,
-              pageType: edge.targetPageType,
-              depth: node.depth + 1,
-              navigationHint: edge.navigationHint,
-            });
-            graph.addEdge(item.nodeId, newNode.id, edge);
-
-            const newTasks = planner.proposeTasks(newNode, graph, mission);
-            frontier.enqueueMany(newTasks);
-            console.log(
-              `  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`
-            );
-          }
-        }
-      }
-
-      // Route follow-up requests
-      for (const followup of result.followupRequests) {
-        const followupItem = planner.routeFollowup(followup, item.nodeId);
-        frontier.enqueue(followupItem);
-      }
-
-      // Prune frontier if it's too large
-      if (frontier.size() > budget.maxFrontierSize) {
-        const pruned = frontier.pruneLowest(0.25);
-        for (const p of pruned) {
-          globalCoverage.addBlindSpot({
-            nodeId: p.nodeId,
-            summary: `Pruned: ${p.objective}`,
-            reason: "pruned",
-            severity: "low",
-          });
-        }
-        console.log(
-          `  Pruned ${pruned.length} low-priority frontier items`
-        );
-      }
+      await expandGraph(ctx, item.nodeId, result);
+      routeFollowups(ctx, item.nodeId, result);
+      maintainFrontier(ctx);
 
       item.status = "completed";
       tasksExecuted++;
 
       // Navigate back to root for next iteration
       try {
-        await page.goto(config.targetUrl);
+        await ctx.page.goto(config.targetUrl);
       } catch {
         console.warn("  Failed to navigate back to root URL.");
       }
     }
 
     // Record remaining frontier as blind spots
-    const remaining = frontier.drain();
+    const remaining = ctx.frontier.drain();
     for (const r of remaining) {
-      globalCoverage.addBlindSpot({
+      ctx.globalCoverage.addBlindSpot({
         nodeId: r.nodeId,
         summary: `Not reached: ${r.objective}`,
         reason: "time-budget",
@@ -264,46 +478,18 @@ export async function runEngine(config: WebProbeConfig): Promise<void> {
       });
     }
 
-    // === Generate reports ===
-    const runResult = buildRunResult(
-      config.targetUrl,
-      startTime,
-      [
-        {
-          name: "All Areas",
-          url: config.targetUrl,
-          steps: tasksExecuted,
-          findings: allFindings,
-          screenshots: new Map<string, Buffer>(),
-          evidence: allEvidence,
-          coverage: globalCoverage.snapshot(),
-          pageType: "dashboard" as const,
-          status: "explored" as const,
-        },
-      ],
-      remaining.map((r) => ({
-        name: r.objective,
-        reason: `Not reached (priority: ${r.priority.toFixed(2)})`,
-      })),
-      remaining.length > 0
-    );
-
-    const format = config.output.format;
-    if (format === "markdown" || format === "both") {
-      const md = renderMarkdown(runResult);
-      writeFileSync(join(outputDir, "report.md"), md, "utf-8");
-      console.log(`\nMarkdown report: ${join(outputDir, "report.md")}`);
-    }
-    if (format === "json" || format === "both") {
-      const json = renderJson(runResult);
-      writeFileSync(join(outputDir, "report.json"), json, "utf-8");
-      console.log(`JSON report: ${join(outputDir, "report.json")}`);
-    }
+    // Generate reports with per-node attribution
+    const areaResults = buildAreaResults(ctx);
+    writeReports(config, startTime, outputDir, areaResults, remaining);
 
     // Summary
-    const blindSpots = globalCoverage.getBlindSpots();
+    const blindSpots = ctx.globalCoverage.getBlindSpots();
+    const totalFindings = [...ctx.findingsByNode.values()].reduce(
+      (sum, f) => sum + f.length,
+      0
+    );
     console.log(
-      `\nDone. ${tasksExecuted} tasks executed, ${allFindings.length} finding(s), ${graph.nodeCount()} states discovered, ${blindSpots.length} blind spot(s).`
+      `\nDone. ${tasksExecuted} tasks executed, ${totalFindings} finding(s), ${ctx.graph.nodeCount()} states discovered, ${blindSpots.length} blind spot(s).`
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

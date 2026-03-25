@@ -73,9 +73,14 @@ export class Navigator {
       if (currentFp.hash === node.fingerprint.hash) {
         return { success: true };
       }
+      // Soft match: same normalized path is "close enough" for dynamic pages
+      // where content changes between visits (timestamps, notifications, etc.)
+      if (currentFp.normalizedPath === node.fingerprint.normalizedPath) {
+        return { success: true };
+      }
       return {
         success: false,
-        reason: `Fingerprint mismatch: expected ${node.fingerprint.hash}, got ${currentFp.hash}`,
+        reason: `Fingerprint mismatch: expected ${node.fingerprint.hash} (${node.fingerprint.normalizedPath}), got ${currentFp.hash} (${currentFp.normalizedPath})`,
       };
     } catch {
       // If fingerprinting fails, assume arrival is OK (best-effort)

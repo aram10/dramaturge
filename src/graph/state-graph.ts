@@ -111,6 +111,28 @@ export class StateGraph {
     return []; // no path found
   }
 
+  /** Increment the visit counter for a node. */
+  recordVisit(nodeId: string): void {
+    const node = this.getNode(nodeId);
+    node.timesVisited++;
+  }
+
+  /** Add a control ID to the node's discovered list (deduped). */
+  addDiscoveredControl(nodeId: string, controlId: string): void {
+    const node = this.getNode(nodeId);
+    if (!node.controlsDiscovered.includes(controlId)) {
+      node.controlsDiscovered.push(controlId);
+    }
+  }
+
+  /** Add a control ID to the node's exercised list (deduped). */
+  addExercisedControl(nodeId: string, controlId: string): void {
+    const node = this.getNode(nodeId);
+    if (!node.controlsExercised.includes(controlId)) {
+      node.controlsExercised.push(controlId);
+    }
+  }
+
   getAllNodes(): StateNode[] {
     return [...this.nodes.values()];
   }
