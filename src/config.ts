@@ -26,10 +26,19 @@ const AuthSchema = z
   ])
   .default({ type: "none" });
 
+const WorkerModelsSchema = z
+  .object({
+    navigation: z.string().optional(),
+    form: z.string().optional(),
+    crud: z.string().optional(),
+  })
+  .optional();
+
 const ModelsSchema = z
   .object({
     planner: z.string().default("anthropic/claude-sonnet-4-6"),
     worker: z.string().default("anthropic/claude-haiku-4-5"),
+    workers: WorkerModelsSchema,
   })
   .default({});
 
@@ -49,11 +58,33 @@ const OutputSchema = z
   })
   .default({});
 
+const MissionSchema = z
+  .object({
+    criticalFlows: z.array(z.string()).optional(),
+    destructiveActionsAllowed: z.boolean().default(false),
+    excludedAreas: z.array(z.string()).optional(),
+    focusModes: z
+      .array(z.enum(["navigation", "form", "crud"]))
+      .optional(),
+  })
+  .optional();
+
+const BudgetSchema = z
+  .object({
+    globalTimeLimitSeconds: z.number().int().min(60).default(900),
+    maxStepsPerTask: z.number().int().min(5).default(40),
+    maxFrontierSize: z.number().int().min(10).default(200),
+    maxStateNodes: z.number().int().min(5).default(50),
+  })
+  .default({});
+
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
   appDescription: z.string().min(1),
   auth: AuthSchema,
   models: ModelsSchema,
+  mission: MissionSchema,
+  budget: BudgetSchema,
   exploration: ExplorationSchema,
   output: OutputSchema,
 });
@@ -109,4 +140,18 @@ export function loadConfig(configPath?: string): WebProbeConfig {
 
   const interpolated = interpolateEnvVars(parsed);
   return ConfigSchema.parse(interpolated);
+}
+
+export function resolveWorkerModel(
+  config: WebProbeConfig,
+  workerType: string
+): string {
+  const perType = config.models.workers;
+  if (perType) {
+    const specific = (perType as Record<string, string | undefined>)[
+      workerType
+    ];
+    if (specific) return specific;
+  }
+  return config.models.worker;
 }
