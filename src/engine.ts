@@ -226,7 +226,7 @@ async function expandGraph(
         depth: sourceNode.depth + 1,
         navigationHint: edge.navigationHint,
       });
-      graph_addEdge(ctx, sourceNodeId, newNode.id, edge);
+      ctx.graph.addEdge(sourceNodeId, newNode.id, edge);
 
       let newTasks: FrontierItem[];
       if (useLLMPlanner) {
@@ -274,15 +274,6 @@ async function resolveEdgeFingerprint(
     console.log(`  Could not resolve discovered edge: ${msg}`);
     return null;
   }
-}
-
-function graph_addEdge(
-  ctx: EngineContext,
-  fromId: string,
-  toId: string,
-  edge: WorkerResult["discoveredEdges"][number]
-): void {
-  ctx.graph.addEdge(fromId, toId, edge);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,12 +342,16 @@ function buildAreaResults(ctx: EngineContext): AreaResult[] {
 }
 
 function writeReports(
-  config: WebProbeConfig,
+  ctx: EngineContext,
   startTime: Date,
-  outputDir: string,
   areaResults: AreaResult[],
   remaining: FrontierItem[]
 ): void {
+  const config = ctx.config;
+  const blindSpots = ctx.globalCoverage.getBlindSpots();
+  const stateGraphMermaid = ctx.graph.nodeCount() > 0 ? ctx.graph.toMermaid() : undefined;
+  const useLLMPlanner = !!process.env.ANTHROPIC_API_KEY;
+
   const runResult = buildRunResult(
     config.targetUrl,
     startTime,
@@ -365,19 +360,34 @@ function writeReports(
       name: r.objective,
       reason: `Not reached (priority: ${r.priority.toFixed(2)})`,
     })),
-    remaining.length > 0
+    remaining.length > 0,
+    blindSpots,
+    stateGraphMermaid,
+    {
+      appDescription: config.appDescription,
+      models: { planner: config.models.planner, worker: config.models.worker },
+      concurrency: config.concurrency.workers,
+      budget: {
+        timeLimitSeconds: ctx.budget.globalTimeLimitSeconds,
+        maxStepsPerTask: ctx.budget.maxStepsPerTask,
+        maxStateNodes: ctx.budget.maxStateNodes,
+      },
+      checkpointInterval: config.checkpoint.intervalTasks,
+      autoCaptureEnabled: config.autoCapture.consoleErrors || config.autoCapture.networkErrors,
+      llmPlannerEnabled: useLLMPlanner,
+    }
   );
 
   const format = config.output.format;
   if (format === "markdown" || format === "both") {
     const md = renderMarkdown(runResult);
-    writeFileSync(join(outputDir, "report.md"), md, "utf-8");
-    console.log(`\nMarkdown report: ${join(outputDir, "report.md")}`);
+    writeFileSync(join(ctx.outputDir, "report.md"), md, "utf-8");
+    console.log(`\nMarkdown report: ${join(ctx.outputDir, "report.md")}`);
   }
   if (format === "json" || format === "both") {
     const json = renderJson(runResult);
-    writeFileSync(join(outputDir, "report.json"), json, "utf-8");
-    console.log(`JSON report: ${join(outputDir, "report.json")}`);
+    writeFileSync(join(ctx.outputDir, "report.json"), json, "utf-8");
+    console.log(`JSON report: ${join(ctx.outputDir, "report.json")}`);
   }
 }
 
@@ -766,7 +776,7 @@ export async function runEngine(
 
     // Generate reports with per-node attribution
     const areaResults = buildAreaResults(ctx);
-    writeReports(config, startTime, outputDir, areaResults, remaining);
+    writeReports(ctx, startTime, areaResults, remaining);
 
     // Summary
     const blindSpots = ctx.globalCoverage.getBlindSpots();
@@ -780,7 +790,7 @@ export async function runEngine(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`\nFatal error: ${message}`);
-    process.exit(1);
+    throw error;
   } finally {
     errorCollector.detach();
     await closeWorkerPool(workerPool);

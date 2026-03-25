@@ -1,4 +1,5 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
+import { randomUUID } from "node:crypto";
 import type {
   RawFinding,
   Evidence,
@@ -129,13 +130,13 @@ export class BrowserErrorCollector {
 
     for (const [msg, errors] of consoleMsgs) {
       const first = errors[0];
-      const evidenceId = `ev-console-${evidence.length}`;
+      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
       evidence.push({
         id: evidenceId,
         type: "console-error",
         summary: `${first.level}: ${msg.slice(0, 120)}`,
         timestamp: first.timestamp,
-        relatedFindingIds: [String(findings.length)],
+        relatedFindingIds: [],
       });
 
       findings.push({
@@ -151,13 +152,13 @@ export class BrowserErrorCollector {
 
     // Page errors (uncaught exceptions)
     for (const err of this.pageErrors) {
-      const evidenceId = `ev-pageerror-${evidence.length}`;
+      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
       evidence.push({
         id: evidenceId,
         type: "console-error",
         summary: `Uncaught: ${err.message.slice(0, 120)}`,
         timestamp: err.timestamp,
-        relatedFindingIds: [String(findings.length)],
+        relatedFindingIds: [],
       });
 
       findings.push({
@@ -182,20 +183,27 @@ export class BrowserErrorCollector {
 
     for (const [, errors] of networkMsgs) {
       const first = errors[0];
-      const evidenceId = `ev-network-${evidence.length}`;
+      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
       const statusLabel = first.status === 0 ? "failed" : `${first.status}`;
       evidence.push({
         id: evidenceId,
         type: "network-error",
         summary: `${first.method} ${first.url} → ${statusLabel}`,
         timestamp: first.timestamp,
-        relatedFindingIds: [String(findings.length)],
+        relatedFindingIds: [],
       });
+
+      let pathname: string;
+      try {
+        pathname = new URL(first.url).pathname;
+      } catch {
+        pathname = first.url;
+      }
 
       findings.push({
         category: "Bug",
         severity: first.status >= 500 ? "Major" : "Minor",
-        title: `Network ${statusLabel}: ${first.method} ${new URL(first.url).pathname}`,
+        title: `Network ${statusLabel}: ${first.method} ${pathname}`,
         stepsToReproduce: [`Request: ${first.method} ${first.url}`],
         expected: "Successful HTTP response (2xx/3xx)",
         actual: `${errors.length} occurrence(s): ${first.status} ${first.statusText}`,

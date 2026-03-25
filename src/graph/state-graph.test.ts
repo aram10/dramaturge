@@ -309,4 +309,53 @@ describe("StateGraph", () => {
       expect(node.controlsExercised).toEqual(["input-name"]);
     });
   });
+
+  describe("toMermaid", () => {
+    it("renders an empty graph", () => {
+      const graph = new StateGraph();
+      expect(graph.toMermaid()).toBe("graph TD");
+    });
+
+    it("renders nodes and edges as a Mermaid flowchart", () => {
+      const graph = new StateGraph();
+      const a = graph.addNode({
+        fingerprint: makeFp("m1"),
+        pageType: "dashboard",
+        title: "Home",
+        depth: 0,
+      });
+      const b = graph.addNode({
+        fingerprint: makeFp("m2"),
+        pageType: "form",
+        title: "Login",
+        depth: 1,
+      });
+      graph.addEdge(a.id, b.id, {
+        actionLabel: "Click login",
+        navigationHint: {},
+        targetFingerprint: makeFp("m2"),
+        targetPageType: "form",
+      });
+
+      const mermaid = graph.toMermaid();
+      expect(mermaid).toContain("graph TD");
+      expect(mermaid).toContain(`${a.id}["dashboard: Home"]`);
+      expect(mermaid).toContain(`${b.id}["form: Login"]`);
+      expect(mermaid).toContain(`${a.id} -->|"Click login"| ${b.id}`);
+    });
+
+    it("escapes double quotes in labels", () => {
+      const graph = new StateGraph();
+      const node = graph.addNode({
+        fingerprint: makeFp("m3"),
+        pageType: "detail",
+        title: 'Item "Special"',
+        depth: 0,
+      });
+
+      const mermaid = graph.toMermaid();
+      expect(mermaid).toContain('#quot;');
+      expect(mermaid).not.toContain('"Special"');
+    });
+  });
 });

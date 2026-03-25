@@ -136,5 +136,47 @@ export function renderMarkdown(result: RunResult): string {
     lines.push("");
   }
 
+  // Blind Spots
+  if (result.blindSpots.length > 0) {
+    lines.push("## Blind Spots");
+    lines.push(
+      "Areas where testing coverage may be incomplete:"
+    );
+    lines.push("");
+    lines.push("| Severity | Reason | Summary |");
+    lines.push("|----------|--------|---------|");
+    for (const spot of result.blindSpots) {
+      lines.push(`| ${spot.severity} | ${spot.reason} | ${spot.summary} |`);
+    }
+    lines.push("");
+  }
+
+  // State Graph
+  if (result.stateGraphMermaid) {
+    lines.push("## State Graph");
+    lines.push("");
+    lines.push("```mermaid");
+    lines.push(result.stateGraphMermaid);
+    lines.push("```");
+    lines.push("");
+  }
+
+  // Run Configuration
+  if (result.runConfig) {
+    const rc = result.runConfig;
+    lines.push("## Run Configuration");
+    lines.push(`- **App:** ${rc.appDescription}`);
+    lines.push(`- **Planner model:** ${rc.models.planner}`);
+    lines.push(`- **Worker model:** ${rc.models.worker}`);
+    lines.push(`- **Concurrency:** ${rc.concurrency} worker(s)`);
+    lines.push(
+      `- **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states`
+    );
+    lines.push(`- **Checkpoint interval:** ${rc.checkpointInterval === 0 ? "disabled" : `every ${rc.checkpointInterval} tasks`}`);
+    lines.push(`- **Auto-capture:** ${rc.autoCaptureEnabled ? "enabled" : "disabled"}`);
+    lines.push(`- **LLM planner:** ${rc.llmPlannerEnabled ? "enabled" : "disabled"}`);
+    lines.push("");
+  }
+
   return lines.join("\n");
 }

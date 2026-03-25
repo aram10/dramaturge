@@ -125,6 +125,22 @@ export interface RunResult {
   areaResults: AreaResult[];
   unexploredAreas: Array<{ name: string; reason: string }>;
   partial: boolean;
+  /** Blind spots from coverage tracker. */
+  blindSpots: BlindSpot[];
+  /** Mermaid graph source for state graph visualization. */
+  stateGraphMermaid?: string;
+  /** Run configuration metadata for report context. */
+  runConfig?: RunConfigMeta;
+}
+
+export interface RunConfigMeta {
+  appDescription: string;
+  models: { planner: string; worker: string };
+  concurrency: number;
+  budget: { timeLimitSeconds: number; maxStepsPerTask: number; maxStateNodes: number };
+  checkpointInterval: number;
+  autoCaptureEnabled: boolean;
+  llmPlannerEnabled: boolean;
 }
 
 // --- State Graph ---
