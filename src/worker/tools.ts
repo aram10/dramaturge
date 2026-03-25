@@ -3,7 +3,7 @@ import { z } from "zod";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { RawFinding, Evidence, CoverageEvent } from "../types.js";
+import type { RawFinding, Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from "../types.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
@@ -66,6 +66,37 @@ const MarkControlExercisedSchema = z.object({
     .describe("What happened when you interacted with the control"),
 });
 
+const RequestFollowupSchema = z.object({
+  type: z.enum(["navigation", "form", "crud"]),
+  reason: z
+    .string()
+    .describe("Why this follow-up is needed"),
+  relatedFindingId: z
+    .string()
+    .optional()
+    .describe("Finding ID this relates to"),
+});
+
+const ReportDiscoveredEdgeSchema = z.object({
+  actionLabel: z
+    .string()
+    .describe(
+      "What action leads to the new state (e.g., 'Click Create User button')"
+    ),
+  url: z
+    .string()
+    .optional()
+    .describe("Direct URL of the discovered page, if known"),
+  selector: z
+    .string()
+    .optional()
+    .describe("CSS selector that was clicked"),
+  actionDescription: z
+    .string()
+    .optional()
+    .describe("Natural language action description"),
+});
+
 export function createWorkerTools(
   findings: RawFinding[],
   screenshots: Map<string, Buffer>,
@@ -73,7 +104,9 @@ export function createWorkerTools(
   coverageTracker: CoverageTracker,
   page: StagehandPage,
   screenshotDir: string,
-  areaName: string
+  areaName: string,
+  followupRequests: FollowupRequest[] = [],
+  discoveredEdges: DiscoveredEdge[] = []
 ) {
   mkdirSync(screenshotDir, { recursive: true });
 
@@ -147,6 +180,54 @@ export function createWorkerTools(
           recorded: true,
           controlId: input.controlId,
           message: `Coverage recorded: ${input.action} on ${input.controlId} → ${input.outcome}`,
+        };
+      },
+    },
+
+    request_followup: {
+      description:
+        "Request the planner to perform additional investigation on the current page or a related area. Use this when you discover something that needs a different kind of testing.",
+      inputSchema: RequestFollowupSchema,
+      execute: async (input: z.infer<typeof RequestFollowupSchema>) => {
+        followupRequests.push({
+          type: input.type,
+          reason: input.reason,
+          relatedFindingId: input.relatedFindingId,
+        });
+        return {
+          requested: true,
+          message: `Follow-up requested: ${input.type} — ${input.reason}`,
+        };
+      },
+    },
+
+    report_discovered_edge: {
+      description:
+        "Report a navigation target you discovered (a link, button, or action that leads to a different page/state). This helps the planner discover new areas to explore.",
+      inputSchema: ReportDiscoveredEdgeSchema,
+      execute: async (
+        input: z.infer<typeof ReportDiscoveredEdgeSchema>
+      ) => {
+        discoveredEdges.push({
+          actionLabel: input.actionLabel,
+          navigationHint: {
+            url: input.url,
+            selector: input.selector,
+            actionDescription: input.actionDescription,
+          },
+          // Placeholder — engine fills these when it actually navigates
+          targetFingerprint: {
+            normalizedPath: "",
+            title: "",
+            heading: "",
+            dialogTitles: [],
+            hash: "",
+          },
+          targetPageType: "unknown",
+        });
+        return {
+          reported: true,
+          message: `Discovered edge: ${input.actionLabel}`,
         };
       },
     },
