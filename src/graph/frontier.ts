@@ -1,34 +1,45 @@
 import type { FrontierItem } from "../types.js";
 
 export class FrontierQueue {
+  /** Sorted descending by priority — highest-priority items first. */
   private items: FrontierItem[] = [];
 
   enqueue(item: FrontierItem): void {
-    this.items.push(item);
+    this.insertSorted(item);
   }
 
   enqueueMany(items: FrontierItem[]): void {
-    this.items.push(...items);
+    for (const item of items) {
+      this.insertSorted(item);
+    }
   }
 
   /**
-   * Remove and return the highest-priority pending item.
+   * Remove and return the highest-priority pending item. O(n) scan from front.
    */
   dequeueHighest(): FrontierItem | undefined {
-    const pending = this.items.filter((i) => i.status === "pending");
-    if (pending.length === 0) return undefined;
-    pending.sort((a, b) => b.priority - a.priority);
-    const chosen = pending[0];
-    chosen.status = "in-progress";
-    return chosen;
+    for (let i = 0; i < this.items.length; i++) {
+      if (this.items[i].status === "pending") {
+        this.items[i].status = "in-progress";
+        return this.items[i];
+      }
+    }
+    return undefined;
   }
 
   /**
    * Re-queue a blocked/failed item with reduced priority.
    */
   requeue(item: FrontierItem): void {
+    // Remove from current position
+    const idx = this.items.indexOf(item);
+    if (idx !== -1) this.items.splice(idx, 1);
+
     item.status = "pending";
     item.priority *= 0.8;
+
+    // Re-insert at correct sorted position
+    this.insertSorted(item);
   }
 
   hasItems(): boolean {
@@ -45,6 +56,7 @@ export class FrontierQueue {
    */
   pruneLowest(fraction: number): FrontierItem[] {
     const pending = this.items.filter((i) => i.status === "pending");
+    // Items are sorted descending, so lowest are at the end of pending
     pending.sort((a, b) => a.priority - b.priority);
     const cutCount = Math.ceil(pending.length * fraction);
     const toPrune = pending.slice(0, cutCount);
@@ -62,5 +74,20 @@ export class FrontierQueue {
       item.status = "completed";
     }
     return remaining;
+  }
+
+  /** Binary search insert to maintain descending sort order by priority. */
+  private insertSorted(item: FrontierItem): void {
+    let lo = 0;
+    let hi = this.items.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (this.items[mid].priority > item.priority) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    this.items.splice(lo, 0, item);
   }
 }
