@@ -2,7 +2,7 @@ import { Stagehand } from "@browserbasehq/stagehand";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { WebProbeConfig } from "./config.js";
-import { resolveWorkerModel } from "./config.js";
+import { resolveWorkerModel, resolveAgentMode } from "./config.js";
 import type {
   AreaResult,
   Evidence,
@@ -146,7 +146,7 @@ async function processTasksSequentially(
       },
       model,
       ctx.screenshotDir,
-      ctx.config.models.agentMode,
+      resolveAgentMode(ctx.config, item.workerType),
       ctx.config.output.screenshots,
       ctx.config.budget.stagnationThreshold ?? 0,
       ctx.config.appContext

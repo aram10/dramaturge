@@ -45,12 +45,21 @@ const WorkerModelsSchema = z
 
 const AgentModeSchema = z.enum(["cua", "dom"]).default("cua");
 
+const AgentModesSchema = z
+  .object({
+    navigation: z.enum(["cua", "dom"]).optional(),
+    form: z.enum(["cua", "dom"]).optional(),
+    crud: z.enum(["cua", "dom"]).optional(),
+  })
+  .optional();
+
 const ModelsSchema = z
   .object({
     planner: z.string().default("anthropic/claude-sonnet-4-6"),
     worker: z.string().default("anthropic/claude-haiku-4-5"),
     workers: WorkerModelsSchema,
     agentMode: AgentModeSchema,
+    agentModes: AgentModesSchema,
   })
   .default({});
 
@@ -206,4 +215,16 @@ export function resolveWorkerModel(
     if (specific) return specific;
   }
   return config.models.worker;
+}
+
+export function resolveAgentMode(
+  config: WebProbeConfig,
+  workerType: string
+): "cua" | "dom" {
+  const perType = config.models.agentModes;
+  if (perType) {
+    const specific = (perType as Record<string, "cua" | "dom" | undefined>)[workerType];
+    if (specific) return specific;
+  }
+  return config.models.agentMode;
 }
