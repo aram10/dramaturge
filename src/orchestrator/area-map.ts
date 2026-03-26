@@ -1,9 +1,6 @@
 import type { Area } from "../types.js";
 
-/**
- * Deduplicate areas by URL (preferred) or name similarity.
- * Keeps the first occurrence when duplicates are found.
- */
+/** Deduplicate by URL path (or name fallback); keeps first occurrence. */
 export function deduplicateAreas(areas: Area[]): Area[] {
   const seen = new Map<string, Area>();
 
@@ -21,10 +18,7 @@ export function deduplicateAreas(areas: Area[]): Area[] {
   return Array.from(seen.values());
 }
 
-/**
- * Convert Stagehand observe() Action results into Area objects.
- * Extracts URLs from href attributes when available.
- */
+/** Filter Stagehand actions to navigation-like items and extract href URLs. */
 export function actionsToAreas(
   actions: Array<{
     selector: string;

@@ -4,11 +4,7 @@ import type { PageFingerprint } from "../types.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
-/**
- * Capture a deterministic fingerprint of the current page state.
- * Uses URL path, title, heading, and visible dialog titles to produce a hash.
- * Two pages with the same path but a different modal should produce different fingerprints.
- */
+/** Hash of URL path + title + heading + visible dialog titles (different modals → different fingerprints). */
 export async function captureFingerprint(
   page: StagehandPage
 ): Promise<PageFingerprint> {
@@ -45,10 +41,6 @@ export async function captureFingerprint(
   return { normalizedPath, title, heading, dialogTitles, hash };
 }
 
-/**
- * Check if a fingerprint has already been seen.
- * Returns true if this is a duplicate (should be skipped).
- */
 export function isDuplicateState(
   fingerprint: PageFingerprint,
   visited: Set<string>
@@ -56,9 +48,6 @@ export function isDuplicateState(
   return visited.has(fingerprint.hash);
 }
 
-/**
- * Mark a fingerprint as visited.
- */
 export function markVisited(
   fingerprint: PageFingerprint,
   visited: Set<string>
