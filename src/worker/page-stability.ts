@@ -1,0 +1,67 @@
+import type { Stagehand } from "@browserbasehq/stagehand";
+
+type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+
+/**
+ * Returns the JS string to evaluate in the browser context.
+ * The script waits until:
+ *  - document.readyState is "complete"
+ *  - No DOM mutations for `quietMs` milliseconds
+ * Resolves after page is stable or after `timeoutMs`.
+ */
+export function buildStabilityChecker(): string {
+  return `
+    () => new Promise((resolve) => {
+      const QUIET_MS = 300;
+      const TIMEOUT_MS = 5000;
+      let timer;
+      let settled = false;
+
+      const done = (reason) => {
+        if (settled) return;
+        settled = true;
+        if (observer) observer.disconnect();
+        resolve(reason);
+      };
+
+      // Timeout fallback
+      setTimeout(() => done("timeout"), TIMEOUT_MS);
+
+      // Watch for DOM quiet
+      const observer = new MutationObserver(() => {
+        clearTimeout(timer);
+        timer = setTimeout(() => done("stable"), QUIET_MS);
+      });
+
+      observer.observe(document.body ?? document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+      });
+
+      // Start the quiet timer immediately (page may already be stable)
+      timer = setTimeout(() => done("stable"), QUIET_MS);
+    })
+  `.trim();
+}
+
+/**
+ * Wait for the page to stabilize (DOM settles + no pending renders).
+ * Returns "stable" or "timeout".
+ */
+export async function waitForPageStable(
+  page: StagehandPage,
+  timeoutMs = 5000,
+): Promise<"stable" | "timeout"> {
+  try {
+    const result = await Promise.race([
+      page.evaluate(buildStabilityChecker()) as Promise<string>,
+      new Promise<string>((resolve) =>
+        setTimeout(() => resolve("timeout"), timeoutMs + 1000),
+      ),
+    ]);
+    return result === "stable" ? "stable" : "timeout";
+  } catch {
+    return "timeout";
+  }
+}
