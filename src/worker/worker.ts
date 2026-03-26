@@ -13,6 +13,7 @@ import type {
   DiscoveredEdge,
 } from "../types.js";
 import { CoverageTracker } from "../coverage/tracker.js";
+import { StagnationTracker } from "./stagnation.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
 
@@ -22,7 +23,10 @@ export async function exploreArea(
   appDescription: string,
   model: string,
   stepsPerArea: number,
-  screenshotDir: string
+  screenshotDir: string,
+  agentMode: "cua" | "dom" = "cua",
+  screenshotsEnabled = true,
+  stagnationThreshold = 0
 ): Promise<AreaResult> {
   const findings: RawFinding[] = [];
   const screenshots = new Map<string, Buffer>();
@@ -43,6 +47,10 @@ export async function exploreArea(
     console.warn(`  Could not classify page for "${area.name}"`);
   }
 
+  const stagnationTracker = stagnationThreshold > 0
+    ? new StagnationTracker(stagnationThreshold)
+    : undefined;
+
   const tools = createWorkerTools(
     findings,
     screenshots,
@@ -50,7 +58,11 @@ export async function exploreArea(
     coverageTracker,
     page,
     screenshotDir,
-    area.name
+    area.name,
+    undefined,
+    undefined,
+    screenshotsEnabled,
+    stagnationTracker
   );
 
   const systemPrompt = buildWorkerSystemPrompt(
@@ -63,7 +75,7 @@ export async function exploreArea(
   // Cast tools to any to work around Zod v3/v4 type mismatch in Stagehand's .d.ts.
   // At runtime the tool objects have the correct shape (description, inputSchema, execute).
   const agent = stagehand.agent({
-    mode: "cua",
+    mode: agentMode,
     model,
     systemPrompt,
     tools: tools as any,
@@ -120,7 +132,10 @@ export async function executeWorkerTask(
   stagehand: Stagehand,
   task: WorkerTask,
   model: string,
-  screenshotDir: string
+  screenshotDir: string,
+  agentMode: "cua" | "dom" = "cua",
+  screenshotsEnabled = true,
+  stagnationThreshold = 0
 ): Promise<WorkerResult> {
   const findings: RawFinding[] = [];
   const screenshots = new Map<string, Buffer>();
@@ -129,6 +144,10 @@ export async function executeWorkerTask(
   const followupRequests: FollowupRequest[] = [];
   const discoveredEdges: DiscoveredEdge[] = [];
   const page = stagehand.context.pages()[0];
+
+  const stagnationTracker = stagnationThreshold > 0
+    ? new StagnationTracker(stagnationThreshold)
+    : undefined;
 
   const tools = createWorkerTools(
     findings,
@@ -139,7 +158,9 @@ export async function executeWorkerTask(
     screenshotDir,
     task.nodeId,
     followupRequests,
-    discoveredEdges
+    discoveredEdges,
+    screenshotsEnabled,
+    stagnationTracker
   );
 
   const systemPrompt = buildWorkerSystemPrompt(
@@ -150,7 +171,7 @@ export async function executeWorkerTask(
   );
 
   const agent = stagehand.agent({
-    mode: "cua",
+    mode: agentMode,
     model,
     systemPrompt,
     tools: tools as any,

@@ -1,16 +1,26 @@
 /**
  * Lightweight LLM call utility for the planner.
- * Uses the Anthropic Messages API via fetch — no extra dependency.
+ * Supports Anthropic, OpenAI, and Google Generative AI via fetch — no extra dependency.
  */
 import type { LLMTaskProposal, WorkerType } from "./types.js";
 
-interface AnthropicMessage {
-  role: "user" | "assistant";
+interface ChatMessage {
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
-interface AnthropicResponse {
-  content: Array<{ type: "text"; text: string }>;
+// ---------------------------------------------------------------------------
+// Provider detection
+// ---------------------------------------------------------------------------
+
+type Provider = "anthropic" | "openai" | "google";
+
+function detectProvider(model: string): Provider {
+  const lower = model.toLowerCase();
+  if (lower.startsWith("openai/")) return "openai";
+  if (lower.startsWith("google/")) return "google";
+  // Default — covers "anthropic/..." and bare model strings
+  return "anthropic";
 }
 
 /**
@@ -23,18 +33,29 @@ function stripProvider(model: string): string {
 }
 
 /**
- * Call the Anthropic Messages API and return the text response.
- * Requires ANTHROPIC_API_KEY in the environment.
+ * Returns true if an API key is configured for any supported provider.
  */
+export function hasLLMApiKey(): boolean {
+  return !!(
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Anthropic
+// ---------------------------------------------------------------------------
+
 async function callAnthropic(
   model: string,
   system: string,
-  messages: AnthropicMessage[],
-  maxTokens = 1024
+  messages: ChatMessage[],
+  maxTokens: number
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY not set — required for LLM planner");
+    throw new Error("ANTHROPIC_API_KEY not set — required for Anthropic models");
   }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -48,7 +69,9 @@ async function callAnthropic(
       model: stripProvider(model),
       max_tokens: maxTokens,
       system,
-      messages,
+      messages: messages
+        .filter((m) => m.role !== "system")
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     }),
   });
 
@@ -59,11 +82,134 @@ async function callAnthropic(
     );
   }
 
-  const data = (await response.json()) as AnthropicResponse;
+  const data = (await response.json()) as {
+    content: Array<{ type: "text"; text: string }>;
+  };
   return data.content
     .filter((c) => c.type === "text")
     .map((c) => c.text)
     .join("");
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI (compatible with Azure OpenAI by overriding OPENAI_BASE_URL)
+// ---------------------------------------------------------------------------
+
+async function callOpenAI(
+  model: string,
+  system: string,
+  messages: ChatMessage[],
+  maxTokens: number
+): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY not set — required for OpenAI models");
+  }
+
+  const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
+  const allMessages: Array<{ role: string; content: string }> = [
+    { role: "system", content: system },
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  ];
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: stripProvider(model),
+      max_tokens: maxTokens,
+      messages: allMessages,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `OpenAI API error ${response.status}: ${body.slice(0, 200)}`
+    );
+  }
+
+  const data = (await response.json()) as {
+    choices: Array<{ message: { content: string } }>;
+  };
+  return data.choices[0]?.message?.content ?? "";
+}
+
+// ---------------------------------------------------------------------------
+// Google Generative AI (Gemini)
+// ---------------------------------------------------------------------------
+
+async function callGoogle(
+  model: string,
+  system: string,
+  messages: ChatMessage[],
+  maxTokens: number
+): Promise<string> {
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GOOGLE_GENERATIVE_AI_API_KEY not set — required for Google models"
+    );
+  }
+
+  const modelId = stripProvider(model);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+  const contents = messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents,
+      generationConfig: { maxOutputTokens: maxTokens },
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Google AI API error ${response.status}: ${body.slice(0, 200)}`
+    );
+  }
+
+  const data = (await response.json()) as {
+    candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
+  };
+  return (
+    data.candidates?.[0]?.content?.parts
+      ?.filter((p) => p.text)
+      .map((p) => p.text)
+      .join("") ?? ""
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dispatcher
+// ---------------------------------------------------------------------------
+
+async function callLLM(
+  model: string,
+  system: string,
+  messages: ChatMessage[],
+  maxTokens = 1024
+): Promise<string> {
+  const provider = detectProvider(model);
+  switch (provider) {
+    case "anthropic":
+      return callAnthropic(model, system, messages, maxTokens);
+    case "openai":
+      return callOpenAI(model, system, messages, maxTokens);
+    case "google":
+      return callGoogle(model, system, messages, maxTokens);
+  }
 }
 
 /**
@@ -99,7 +245,7 @@ ${nodeDescription}
 Propose testing tasks for this page.`;
 
   try {
-    const raw = await callAnthropic(model, system, [
+    const raw = await callLLM(model, system, [
       { role: "user", content: userPrompt },
     ]);
 
