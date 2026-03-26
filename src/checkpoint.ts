@@ -13,9 +13,6 @@ import type { CoverageTracker } from "./coverage/tracker.js";
 
 const CHECKPOINT_FILE = "checkpoint.json";
 
-/**
- * Save a checkpoint of the current engine state to disk.
- */
 export function saveCheckpoint(
   outputDir: string,
   graph: StateGraph,
@@ -45,10 +42,6 @@ export function saveCheckpoint(
   writeFileSync(path, JSON.stringify(checkpoint), "utf-8");
 }
 
-/**
- * Load a checkpoint from a previous run directory.
- * Returns null if not found.
- */
 export function loadCheckpoint(runDir: string): Checkpoint | null {
   const path = join(runDir, CHECKPOINT_FILE);
   if (!existsSync(path)) return null;
@@ -61,10 +54,7 @@ export function loadCheckpoint(runDir: string): Checkpoint | null {
   return data;
 }
 
-/**
- * Restore engine state from a checkpoint. Returns the hydrated data
- * structures that the engine needs to resume.
- */
+/** Hydrate graph, frontier, and coverage from a checkpoint; returns findings/evidence maps. */
 export function hydrateFromCheckpoint(
   checkpoint: Checkpoint,
   graph: StateGraph,

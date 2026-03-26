@@ -43,10 +43,6 @@ function buildMission(config: WebProbeConfig): MissionConfig | undefined {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Task processing (sequential mode — concurrency=1)
-// ---------------------------------------------------------------------------
-
 async function processTasksSequentially(
   ctx: EngineContext,
   items: FrontierItem[],
@@ -118,10 +114,7 @@ async function processTasksSequentially(
   return results;
 }
 
-/**
- * Process a batch of frontier items in parallel using the worker pool.
- * Returns results paired with their frontier items.
- */
+/** Run frontier items in parallel across the worker pool. */
 async function processTaskBatch(
   ctx: EngineContext,
   batchItems: FrontierItem[],

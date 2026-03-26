@@ -2,13 +2,7 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
-/**
- * Returns the JS string to evaluate in the browser context.
- * The script waits until:
- *  - document.readyState is "complete"
- *  - No DOM mutations for `quietMs` milliseconds
- * Resolves after page is stable or after `timeoutMs`.
- */
+/** Builds a browser-eval script that resolves once DOM mutations quiet for 300ms (or 5s timeout). */
 export function buildStabilityChecker(): string {
   return `
     () => new Promise((resolve) => {
@@ -45,10 +39,7 @@ export function buildStabilityChecker(): string {
   `.trim();
 }
 
-/**
- * Wait for the page to stabilize (DOM settles + no pending renders).
- * Returns "stable" or "timeout".
- */
+/** Wait for the page DOM to settle; returns "stable" or "timeout". */
 export async function waitForPageStable(
   page: StagehandPage,
   timeoutMs = 5000,

@@ -16,10 +16,7 @@ export interface BrowserErrorCollectorOptions {
   networkErrorMinStatus: number;
 }
 
-/**
- * Hooks into browser page events to automatically capture console errors,
- * uncaught exceptions, and failed network requests.
- */
+/** Auto-captures console errors, uncaught exceptions, and network failures from browser pages. */
 export class BrowserErrorCollector {
   private consoleErrors: BrowserConsoleError[] = [];
   private networkErrors: BrowserNetworkError[] = [];
@@ -31,16 +28,9 @@ export class BrowserErrorCollector {
     this.options = options;
   }
 
-  /**
-   * Attach event listeners to a page. Safe to call multiple times for
-   * different pages (e.g., parallel workers).
-   * Uses `any` casts for event names because Stagehand's Page type
-   * exposes a subset of Playwright's event surface.
-   */
+  /** Attach event listeners to a page. Safe to call for multiple pages. */
   attach(page: StagehandPage): void {
-    // Cast page to any since Stagehand's type definition only exposes
-    // a subset of Playwright Page events (console), but the underlying
-    // Playwright Page supports pageerror, response, requestfailed.
+    // Stagehand's Page type only exposes a subset of Playwright events,
     const p = page as any;
 
     if (this.options.captureConsole) {
@@ -103,18 +93,12 @@ export class BrowserErrorCollector {
     }
   }
 
-  /**
-   * Remove all event listeners.
-   */
-  detach(): void {
+    detach(): void {
     for (const fn of this.teardownFns) fn();
     this.teardownFns = [];
   }
 
-  /**
-   * Flush captured browser errors since last flush as RawFindings + Evidence.
-   * Returns the findings and evidence to be merged into the run results.
-   */
+    /** Drain captured errors into findings + evidence, clearing internal buffers. */
   flush(): { findings: RawFinding[]; evidence: Evidence[] } {
     const findings: RawFinding[] = [];
     const evidence: Evidence[] = [];
@@ -199,8 +183,7 @@ export class BrowserErrorCollector {
     return { findings, evidence };
   }
 
-  /** Number of captured errors since last flush. */
-  get pendingCount(): number {
+    get pendingCount(): number {
     return (
       this.consoleErrors.length +
       this.networkErrors.length +
