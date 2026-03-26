@@ -115,6 +115,17 @@ const CheckpointSchema = z
   })
   .default({});
 
+const AppContextSchema = z
+  .object({
+    /** Patterns the agent should consider normal (not bugs). */
+    knownPatterns: z.array(z.string()).optional(),
+    /** Specific behaviors to ignore when encountered. */
+    ignoredBehaviors: z.array(z.string()).optional(),
+    /** Explicit NOT-a-bug examples for prompt calibration. */
+    notBugs: z.array(z.string()).optional(),
+  })
+  .optional();
+
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
   appDescription: z.string().min(1),
@@ -127,6 +138,7 @@ export const ConfigSchema = z.object({
   autoCapture: AutoCaptureSchema,
   concurrency: ConcurrencySchema,
   checkpoint: CheckpointSchema,
+  appContext: AppContextSchema,
 });
 
 export type WebProbeConfig = z.infer<typeof ConfigSchema>;
