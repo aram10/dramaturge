@@ -2,6 +2,7 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 import type { StateNode, StateEdge } from "../types.js";
 import type { StateGraph } from "../graph/state-graph.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
+import { waitForPageStable } from "../worker/page-stability.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -23,6 +24,7 @@ export class Navigator {
     // Fast path: direct URL
     if (node.url) {
       await page.goto(node.url);
+      await waitForPageStable(page);
       return this.verifyArrival(node, page);
     }
 
@@ -37,6 +39,7 @@ export class Navigator {
 
     // Start from the root URL
     await page.goto(rootUrl);
+    await waitForPageStable(page);
 
     for (const edge of path) {
       const hint = edge.navigationHint;
@@ -49,8 +52,7 @@ export class Navigator {
         } else if (hint.actionDescription) {
           await stagehand.act(hint.actionDescription);
         }
-        // Brief settle time for SPA transitions
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await waitForPageStable(page);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : String(error);

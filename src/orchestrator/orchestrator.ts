@@ -9,6 +9,7 @@ import {
   isDuplicateState,
   markVisited,
 } from "../graph/fingerprint.js";
+import { waitForPageStable } from "../worker/page-stability.js";
 
 export interface OrchestratorResult {
   areaResults: AreaResult[];
@@ -109,6 +110,9 @@ export async function orchestrate(
       });
       continue;
     }
+
+    // Wait for SPA content to settle before fingerprinting
+    await waitForPageStable(page);
 
     // Fingerprint check: skip if we've already visited this exact state
     try {
