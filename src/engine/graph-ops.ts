@@ -2,15 +2,17 @@ import type { EngineContext } from "./context.js";
 import type { WorkerResult, FrontierItem } from "../types.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
+import { NAV_SETTLE_DELAY_MS } from "../constants.js";
+
+function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): void {
+  const existing = map.get(nodeId) ?? [];
+  existing.push(...items);
+  map.set(nodeId, existing);
+}
 
 export function collectResults(ctx: EngineContext, nodeId: string, result: WorkerResult): void {
-  const nodeFindings = ctx.findingsByNode.get(nodeId) ?? [];
-  nodeFindings.push(...result.findings);
-  ctx.findingsByNode.set(nodeId, nodeFindings);
-
-  const nodeEvidence = ctx.evidenceByNode.get(nodeId) ?? [];
-  nodeEvidence.push(...result.evidence);
-  ctx.evidenceByNode.set(nodeId, nodeEvidence);
+  appendToNodeMap(ctx.findingsByNode, nodeId, result.findings);
+  appendToNodeMap(ctx.evidenceByNode, nodeId, result.evidence);
 
   for (const event of result.coverageSnapshot.events) {
     ctx.globalCoverage.recordEvent(event);
@@ -36,6 +38,8 @@ export async function expandGraph(
     let fingerprint = edge.targetFingerprint;
     let pageType = edge.targetPageType;
 
+    // Workers report discovered edges with an empty fingerprint hash when
+    // they haven't navigated to the target page yet. Resolve by navigating.
     if (fingerprint.hash === "") {
       const resolved = await resolveEdgeFingerprint(ctx, edge.navigationHint);
       if (!resolved) continue;
@@ -72,10 +76,10 @@ async function resolveEdgeFingerprint(
       await ctx.page.goto(hint.url);
     } else if (hint.selector) {
       await ctx.stagehand.act(`Click the element matching "${hint.selector}"`);
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, NAV_SETTLE_DELAY_MS));
     } else if (hint.actionDescription) {
       await ctx.stagehand.act(hint.actionDescription);
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, NAV_SETTLE_DELAY_MS));
     } else {
       return null;
     }
@@ -112,13 +116,8 @@ export function flushBrowserErrors(ctx: EngineContext, nodeId: string): void {
   const { findings, evidence } = ctx.errorCollector.flush();
   if (findings.length === 0) return;
 
-  const nodeFindings = ctx.findingsByNode.get(nodeId) ?? [];
-  nodeFindings.push(...findings);
-  ctx.findingsByNode.set(nodeId, nodeFindings);
-
-  const nodeEvidence = ctx.evidenceByNode.get(nodeId) ?? [];
-  nodeEvidence.push(...evidence);
-  ctx.evidenceByNode.set(nodeId, nodeEvidence);
+  appendToNodeMap(ctx.findingsByNode, nodeId, findings);
+  appendToNodeMap(ctx.evidenceByNode, nodeId, evidence);
 
   console.log(`  Auto-captured ${findings.length} browser error(s)`);
 }

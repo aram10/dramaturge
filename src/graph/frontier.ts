@@ -1,4 +1,5 @@
 import type { FrontierItem } from "../types.js";
+import { REQUEUE_PRIORITY_DECAY } from "../constants.js";
 
 export class FrontierQueue {
   /** Sorted descending by priority — highest-priority items first. */
@@ -36,7 +37,7 @@ export class FrontierQueue {
     if (idx !== -1) this.items.splice(idx, 1);
 
     item.status = "pending";
-    item.priority *= 0.8;
+    item.priority *= REQUEUE_PRIORITY_DECAY;
 
     // Re-insert at correct sorted position
     this.insertSorted(item);
