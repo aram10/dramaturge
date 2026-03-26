@@ -26,6 +26,7 @@ import { renderMarkdown } from "./report/markdown.js";
 import { renderJson } from "./report/json.js";
 import { BrowserErrorCollector } from "./browser-errors.js";
 import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from "./checkpoint.js";
+import { hasLLMApiKey } from "./llm.js";
 
 // ---------------------------------------------------------------------------
 // Types for internal engine state passed between decomposed functions
@@ -144,7 +145,10 @@ async function processTasksSequentially(
         missionContext: ctx.config.appDescription,
       },
       model,
-      ctx.screenshotDir
+      ctx.screenshotDir,
+      ctx.config.models.agentMode,
+      ctx.config.output.screenshots,
+      ctx.config.budget.stagnationThreshold ?? 0
     );
 
     results.push({ item, result });
@@ -550,7 +554,7 @@ export async function runEngine(
   const budget = resolveBudget(config);
   const mission = buildMission(config);
   const concurrency = config.concurrency.workers;
-  const useLLMPlanner = !!process.env.ANTHROPIC_API_KEY;
+  const useLLMPlanner = hasLLMApiKey();
 
   // Browser error auto-capture
   const errorCollector = new BrowserErrorCollector({

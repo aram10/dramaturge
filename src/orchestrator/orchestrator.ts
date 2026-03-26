@@ -136,7 +136,10 @@ export async function orchestrate(
       appDescription,
       models.worker,
       exploration.stepsPerArea,
-      screenshotDir
+      screenshotDir,
+      config.models.agentMode,
+      config.output.screenshots,
+      config.budget.stagnationThreshold ?? 0
     );
     areaResults.push(result);
 

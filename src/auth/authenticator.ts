@@ -4,6 +4,7 @@ import { authenticateNone } from "./none.js";
 import { authenticateStoredState } from "./stored-state.js";
 import { authenticateForm } from "./form.js";
 import { authenticateOAuthRedirect } from "./oauth-redirect.js";
+import { authenticateInteractive } from "./interactive.js";
 
 export async function authenticate(
   stagehand: Stagehand,
@@ -16,7 +17,7 @@ export async function authenticate(
       return authenticateNone(stagehand, targetUrl);
 
     case "stored-state":
-      return authenticateStoredState(stagehand, targetUrl, auth.stateFile);
+      return authenticateStoredState(stagehand, targetUrl, auth.stateFile, auth.successIndicator);
 
     case "form":
       return authenticateForm(
@@ -35,6 +36,16 @@ export async function authenticate(
         auth.credentials,
         auth.successIndicator,
         models.planner
+      );
+
+    case "interactive":
+      return authenticateInteractive(
+        stagehand,
+        targetUrl,
+        auth.loginUrl,
+        auth.successIndicator,
+        auth.stateFile,
+        auth.manualTimeoutSeconds * 1000
       );
   }
 }

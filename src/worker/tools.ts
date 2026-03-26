@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { RawFinding, Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from "../types.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
+import type { StagnationTracker } from "./stagnation.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -106,7 +107,9 @@ export function createWorkerTools(
   screenshotDir: string,
   areaName: string,
   followupRequests: FollowupRequest[] = [],
-  discoveredEdges: DiscoveredEdge[] = []
+  discoveredEdges: DiscoveredEdge[] = [],
+  screenshotsEnabled = true,
+  stagnationTracker?: StagnationTracker
 ) {
   mkdirSync(screenshotDir, { recursive: true });
 
@@ -127,6 +130,7 @@ export function createWorkerTools(
             }
           }
         }
+        stagnationTracker?.recordStep({ findings: 1, newControls: 0, edges: 0 });
         return {
           logged: true,
           findingIndex: findings.length - 1,
@@ -140,6 +144,9 @@ export function createWorkerTools(
         "Capture a screenshot of the current page state. Returns an evidenceId you can pass to log_finding to link them. Use this to document visual issues, unexpected states, or as evidence for a finding.",
       inputSchema: TakeScreenshotSchema,
       execute: async (input: z.infer<typeof TakeScreenshotSchema>) => {
+        if (!screenshotsEnabled) {
+          return { captured: false, ref: input.ref, message: "Screenshots disabled in config" };
+        }
         const buffer = await page.screenshot({
           fullPage: false,
           type: "png",
@@ -176,6 +183,7 @@ export function createWorkerTools(
           timestamp: new Date().toISOString(),
         };
         coverageTracker.recordEvent(event);
+        stagnationTracker?.recordStep({ findings: 0, newControls: 1, edges: 0 });
         return {
           recorded: true,
           controlId: input.controlId,
@@ -225,6 +233,7 @@ export function createWorkerTools(
           },
           targetPageType: "unknown",
         });
+        stagnationTracker?.recordStep({ findings: 0, newControls: 0, edges: 1 });
         return {
           reported: true,
           message: `Discovered edge: ${input.actionLabel}`,

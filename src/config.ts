@@ -10,6 +10,7 @@ const AuthSchema = z
     z.object({
       type: z.literal("stored-state"),
       stateFile: z.string(),
+      successIndicator: z.string().optional(),
     }),
     z.object({
       type: z.literal("form"),
@@ -23,6 +24,14 @@ const AuthSchema = z
       credentials: z.record(z.string()),
       successIndicator: z.string(),
     }),
+    z.object({
+      type: z.literal("interactive"),
+      loginUrl: z.string(),
+      successIndicator: z.string(),
+      stateFile: z.string().default(".webprobe-state.json"),
+      /** Timeout in seconds for the human to complete login (default: 120). */
+      manualTimeoutSeconds: z.number().int().min(30).default(120),
+    }),
   ])
   .default({ type: "none" });
 
@@ -34,11 +43,14 @@ const WorkerModelsSchema = z
   })
   .optional();
 
+const AgentModeSchema = z.enum(["cua", "dom"]).default("cua");
+
 const ModelsSchema = z
   .object({
     planner: z.string().default("anthropic/claude-sonnet-4-6"),
     worker: z.string().default("anthropic/claude-haiku-4-5"),
     workers: WorkerModelsSchema,
+    agentMode: AgentModeSchema,
   })
   .default({});
 
@@ -75,6 +87,8 @@ const BudgetSchema = z
     maxStepsPerTask: z.number().int().min(5).default(40),
     maxFrontierSize: z.number().int().min(10).default(200),
     maxStateNodes: z.number().int().min(5).default(50),
+    /** Abort a worker after this many consecutive steps with no findings, controls, or edges (0 = disabled). */
+    stagnationThreshold: z.number().int().min(0).default(8),
   })
   .default({});
 
