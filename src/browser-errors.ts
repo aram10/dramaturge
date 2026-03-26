@@ -119,6 +119,17 @@ export class BrowserErrorCollector {
     const findings: RawFinding[] = [];
     const evidence: Evidence[] = [];
 
+    const emit = (
+      evidenceType: Evidence["type"],
+      summary: string,
+      timestamp: string,
+      finding: Omit<RawFinding, "evidenceIds">
+    ) => {
+      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
+      evidence.push({ id: evidenceId, type: evidenceType, summary, timestamp, relatedFindingIds: [] });
+      findings.push({ ...finding, evidenceIds: [evidenceId] });
+    };
+
     // Group console errors by message to avoid duplicate findings
     const consoleMsgs = new Map<string, BrowserConsoleError[]>();
     for (const err of this.consoleErrors) {
@@ -130,45 +141,25 @@ export class BrowserErrorCollector {
 
     for (const [msg, errors] of consoleMsgs) {
       const first = errors[0];
-      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
-      evidence.push({
-        id: evidenceId,
-        type: "console-error",
-        summary: `${first.level}: ${msg.slice(0, 120)}`,
-        timestamp: first.timestamp,
-        relatedFindingIds: [],
-      });
-
-      findings.push({
+      emit("console-error", `${first.level}: ${msg.slice(0, 120)}`, first.timestamp, {
         category: "Bug",
         severity: first.level === "error" ? "Major" : "Minor",
         title: `Browser console ${first.level}: ${msg.slice(0, 80)}`,
         stepsToReproduce: [`Navigate to ${first.url}`],
         expected: "No console errors",
         actual: `${errors.length} occurrence(s): ${msg.slice(0, 200)}`,
-        evidenceIds: [evidenceId],
       });
     }
 
     // Page errors (uncaught exceptions)
     for (const err of this.pageErrors) {
-      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
-      evidence.push({
-        id: evidenceId,
-        type: "console-error",
-        summary: `Uncaught: ${err.message.slice(0, 120)}`,
-        timestamp: err.timestamp,
-        relatedFindingIds: [],
-      });
-
-      findings.push({
+      emit("console-error", `Uncaught: ${err.message.slice(0, 120)}`, err.timestamp, {
         category: "Bug",
         severity: "Critical",
         title: `Uncaught exception: ${err.message.slice(0, 80)}`,
         stepsToReproduce: [`Navigate to ${err.url}`],
         expected: "No uncaught exceptions",
         actual: err.message,
-        evidenceIds: [evidenceId],
       });
     }
 
@@ -183,31 +174,20 @@ export class BrowserErrorCollector {
 
     for (const [, errors] of networkMsgs) {
       const first = errors[0];
-      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
       const statusLabel = first.status === 0 ? "failed" : `${first.status}`;
-      evidence.push({
-        id: evidenceId,
-        type: "network-error",
-        summary: `${first.method} ${first.url} → ${statusLabel}`,
-        timestamp: first.timestamp,
-        relatedFindingIds: [],
-      });
-
       let pathname: string;
       try {
         pathname = new URL(first.url).pathname;
       } catch {
         pathname = first.url;
       }
-
-      findings.push({
+      emit("network-error", `${first.method} ${first.url} → ${statusLabel}`, first.timestamp, {
         category: "Bug",
         severity: first.status >= 500 ? "Major" : "Minor",
         title: `Network ${statusLabel}: ${first.method} ${pathname}`,
         stepsToReproduce: [`Request: ${first.method} ${first.url}`],
         expected: "Successful HTTP response (2xx/3xx)",
         actual: `${errors.length} occurrence(s): ${first.status} ${first.statusText}`,
-        evidenceIds: [evidenceId],
       });
     }
 
