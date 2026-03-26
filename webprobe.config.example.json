@@ -12,9 +12,25 @@
     "successIndicator": "url:/"
   },
 
+  // Alternative: interactive auth — human completes login in a visible browser,
+  // state is cached to disk for reuse in future runs.
+  // "auth": {
+  //   "type": "interactive",
+  //   "loginUrl": "/login",
+  //   "successIndicator": "url:/",
+  //   "stateFile": ".webprobe-state.json",
+  //   "manualTimeoutSeconds": 120
+  // },
+
   "models": {
     "planner": "anthropic/claude-sonnet-4-6",
-    "worker": "anthropic/claude-haiku-4-5"
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "cua",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "cua"
+    }
   },
 
   "mission": {
