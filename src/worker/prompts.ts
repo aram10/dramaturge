@@ -1,10 +1,39 @@
 import type { PageType } from "../types.js";
 
+interface AppContext {
+  knownPatterns?: string[];
+  ignoredBehaviors?: string[];
+  notBugs?: string[];
+}
+
+function buildAppContextSection(ctx?: AppContext): string {
+  if (!ctx) return "";
+  const parts: string[] = [];
+
+  if (ctx.knownPatterns?.length) {
+    parts.push("## Known Patterns (Expected Behavior)");
+    for (const p of ctx.knownPatterns) parts.push(`- ${p}`);
+  }
+
+  if (ctx.notBugs?.length) {
+    parts.push("\n## These are NOT bugs \u2014 do not report them:");
+    for (const nb of ctx.notBugs) parts.push(`- ${nb}`);
+  }
+
+  if (ctx.ignoredBehaviors?.length) {
+    parts.push("\n## Behaviors to Ignore:");
+    for (const ib of ctx.ignoredBehaviors) parts.push(`- ${ib}`);
+  }
+
+  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+}
+
 export function buildWorkerSystemPrompt(
   appDescription: string,
   areaName: string,
   areaDescription?: string,
-  pageType?: PageType
+  pageType?: PageType,
+  appContext?: AppContext
 ): string {
   const areaContext = areaDescription
     ? `\n\nAbout this area: ${areaDescription}`
@@ -20,7 +49,7 @@ export function buildWorkerSystemPrompt(
 ${appDescription}
 
 ## Your Assignment
-You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}
+You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}
 
 ## What to Do
 1. Systematically explore all visible UI elements in this area

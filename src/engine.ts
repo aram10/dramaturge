@@ -148,7 +148,8 @@ async function processTasksSequentially(
       ctx.screenshotDir,
       ctx.config.models.agentMode,
       ctx.config.output.screenshots,
-      ctx.config.budget.stagnationThreshold ?? 0
+      ctx.config.budget.stagnationThreshold ?? 0,
+      ctx.config.appContext
     );
 
     results.push({ item, result });
