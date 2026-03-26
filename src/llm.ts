@@ -1,7 +1,3 @@
-/**
- * Lightweight LLM call utility for the planner.
- * Supports Anthropic, OpenAI, and Google Generative AI via fetch — no extra dependency.
- */
 import type { LLMTaskProposal, WorkerType } from "./types.js";
 
 interface ChatMessage {
@@ -9,32 +5,20 @@ interface ChatMessage {
   content: string;
 }
 
-// ---------------------------------------------------------------------------
-// Provider detection
-// ---------------------------------------------------------------------------
-
 type Provider = "anthropic" | "openai" | "google";
 
 function detectProvider(model: string): Provider {
   const lower = model.toLowerCase();
   if (lower.startsWith("openai/")) return "openai";
   if (lower.startsWith("google/")) return "google";
-  // Default — covers "anthropic/..." and bare model strings
   return "anthropic";
 }
 
-/**
- * Extract the model name from a "provider/model" string.
- * e.g. "anthropic/claude-sonnet-4-6" → "claude-sonnet-4-6"
- */
 function stripProvider(model: string): string {
   const slash = model.indexOf("/");
   return slash >= 0 ? model.slice(slash + 1) : model;
 }
 
-/**
- * Returns true if an API key is configured for any supported provider.
- */
 export function hasLLMApiKey(): boolean {
   return !!(
     process.env.ANTHROPIC_API_KEY ||
@@ -43,157 +27,53 @@ export function hasLLMApiKey(): boolean {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Anthropic
-// ---------------------------------------------------------------------------
-
-async function callAnthropic(
-  model: string,
-  system: string,
-  messages: ChatMessage[],
-  maxTokens: number
-): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY not set — required for Anthropic models");
-  }
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: stripProvider(model),
-      max_tokens: maxTokens,
-      system,
-      messages: messages
-        .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Anthropic API error ${response.status}: ${body.slice(0, 200)}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    content: Array<{ type: "text"; text: string }>;
-  };
-  return data.content
-    .filter((c) => c.type === "text")
-    .map((c) => c.text)
-    .join("");
+interface ProviderSpec {
+  envKey: string;
+  envName: string;
+  url: (model: string, apiKey: string) => string;
+  headers: (apiKey: string) => Record<string, string>;
+  body: (model: string, system: string, messages: ChatMessage[], maxTokens: number) => unknown;
+  extract: (data: unknown) => string;
 }
 
-// ---------------------------------------------------------------------------
-// OpenAI (compatible with Azure OpenAI by overriding OPENAI_BASE_URL)
-// ---------------------------------------------------------------------------
-
-async function callOpenAI(
-  model: string,
-  system: string,
-  messages: ChatMessage[],
-  maxTokens: number
-): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY not set — required for OpenAI models");
-  }
-
-  const baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
-  const allMessages: Array<{ role: string; content: string }> = [
-    { role: "system", content: system },
-    ...messages.map((m) => ({ role: m.role, content: m.content })),
-  ];
-
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: stripProvider(model),
-      max_tokens: maxTokens,
-      messages: allMessages,
+const PROVIDERS: Record<Provider, ProviderSpec> = {
+  anthropic: {
+    envKey: "ANTHROPIC_API_KEY",
+    envName: "Anthropic",
+    url: () => "https://api.anthropic.com/v1/messages",
+    headers: (key) => ({ "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" }),
+    body: (model, system, messages, maxTokens) => ({
+      model, max_tokens: maxTokens, system,
+      messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
     }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `OpenAI API error ${response.status}: ${body.slice(0, 200)}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    choices: Array<{ message: { content: string } }>;
-  };
-  return data.choices[0]?.message?.content ?? "";
-}
-
-// ---------------------------------------------------------------------------
-// Google Generative AI (Gemini)
-// ---------------------------------------------------------------------------
-
-async function callGoogle(
-  model: string,
-  system: string,
-  messages: ChatMessage[],
-  maxTokens: number
-): Promise<string> {
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "GOOGLE_GENERATIVE_AI_API_KEY not set — required for Google models"
-    );
-  }
-
-  const modelId = stripProvider(model);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-  const contents = messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
+    extract: (data) => (data as { content: Array<{ type: string; text: string }> }).content
+      .filter((c) => c.type === "text").map((c) => c.text).join(""),
+  },
+  openai: {
+    envKey: "OPENAI_API_KEY",
+    envName: "OpenAI",
+    url: () => `${process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1"}/chat/completions`,
+    headers: (key) => ({ "content-type": "application/json", authorization: `Bearer ${key}` }),
+    body: (model, system, messages, maxTokens) => ({
+      model, max_tokens: maxTokens,
+      messages: [{ role: "system", content: system }, ...messages.map((m) => ({ role: m.role, content: m.content }))],
+    }),
+    extract: (data) => (data as { choices: Array<{ message: { content: string } }> }).choices[0]?.message?.content ?? "",
+  },
+  google: {
+    envKey: "GOOGLE_GENERATIVE_AI_API_KEY",
+    envName: "Google",
+    url: (model, key) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+    headers: () => ({ "content-type": "application/json" }),
+    body: (_, system, messages, maxTokens) => ({
       systemInstruction: { parts: [{ text: system }] },
-      contents,
+      contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
       generationConfig: { maxOutputTokens: maxTokens },
     }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Google AI API error ${response.status}: ${body.slice(0, 200)}`
-    );
-  }
-
-  const data = (await response.json()) as {
-    candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
-  };
-  return (
-    data.candidates?.[0]?.content?.parts
-      ?.filter((p) => p.text)
-      .map((p) => p.text)
-      .join("") ?? ""
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Dispatcher
-// ---------------------------------------------------------------------------
+    extract: (data) => (data as { candidates: Array<{ content: { parts: Array<{ text: string }> } }> })
+      .candidates?.[0]?.content?.parts?.filter((p) => p.text).map((p) => p.text).join("") ?? "",
+  },
+};
 
 async function callLLM(
   model: string,
@@ -202,22 +82,25 @@ async function callLLM(
   maxTokens = 1024
 ): Promise<string> {
   const provider = detectProvider(model);
-  switch (provider) {
-    case "anthropic":
-      return callAnthropic(model, system, messages, maxTokens);
-    case "openai":
-      return callOpenAI(model, system, messages, maxTokens);
-    case "google":
-      return callGoogle(model, system, messages, maxTokens);
+  const spec = PROVIDERS[provider];
+  const apiKey = process.env[spec.envKey];
+  if (!apiKey) throw new Error(`${spec.envKey} not set — required for ${spec.envName} models`);
+
+  const modelId = stripProvider(model);
+  const response = await fetch(spec.url(modelId, apiKey), {
+    method: "POST",
+    headers: spec.headers(apiKey),
+    body: JSON.stringify(spec.body(modelId, system, messages, maxTokens)),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`${spec.envName} API error ${response.status}: ${body.slice(0, 200)}`);
   }
+
+  return spec.extract(await response.json());
 }
 
-/**
- * Ask the planner LLM to propose tasks for a state node based on its context.
- *
- * The LLM returns a JSON array of proposals. If parsing fails or the LLM is
- * unavailable, returns null so the caller can fall back to deterministic logic.
- */
 export async function proposeLLMTasks(
   model: string,
   graphSummary: string,
