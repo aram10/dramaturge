@@ -67,19 +67,15 @@ export function renderMarkdown(result: RunResult): string {
     lines.push("## Findings");
     lines.push("");
     for (const f of findings) {
-      lines.push(`### [${f.id}] ${f.severity}: ${f.title}`);
-      lines.push(`- **Area:** ${f.area}`);
-      lines.push(`- **Category:** ${f.category}`);
-      lines.push(`- **Severity:** ${f.severity}`);
-      lines.push("- **Steps to reproduce:**");
-      f.stepsToReproduce.forEach((step, i) => {
-        lines.push(`  ${i + 1}. ${step}`);
-      });
-      lines.push(`- **Expected:** ${f.expected}`);
-      lines.push(`- **Actual:** ${f.actual}`);
-      if (f.screenshot) {
-        lines.push(`- **Screenshot:** ${f.screenshot}`);
-      }
+      const steps = f.stepsToReproduce.map((s, i) => `  ${i + 1}. ${s}`).join("\n");
+      lines.push(`### [${f.id}] ${f.severity}: ${f.title}
+- **Area:** ${f.area}
+- **Category:** ${f.category}
+- **Severity:** ${f.severity}
+- **Steps to reproduce:**
+${steps}
+- **Expected:** ${f.expected}
+- **Actual:** ${f.actual}${f.screenshot ? `\n- **Screenshot:** ${f.screenshot}` : ""}`);
       lines.push("");
     }
   }
@@ -164,17 +160,16 @@ export function renderMarkdown(result: RunResult): string {
   // Run Configuration
   if (result.runConfig) {
     const rc = result.runConfig;
-    lines.push("## Run Configuration");
-    lines.push(`- **App:** ${rc.appDescription}`);
-    lines.push(`- **Planner model:** ${rc.models.planner}`);
-    lines.push(`- **Worker model:** ${rc.models.worker}`);
-    lines.push(`- **Concurrency:** ${rc.concurrency} worker(s)`);
-    lines.push(
-      `- **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states`
-    );
-    lines.push(`- **Checkpoint interval:** ${rc.checkpointInterval === 0 ? "disabled" : `every ${rc.checkpointInterval} tasks`}`);
-    lines.push(`- **Auto-capture:** ${rc.autoCaptureEnabled ? "enabled" : "disabled"}`);
-    lines.push(`- **LLM planner:** ${rc.llmPlannerEnabled ? "enabled" : "disabled"}`);
+    const ckpt = rc.checkpointInterval === 0 ? "disabled" : `every ${rc.checkpointInterval} tasks`;
+    lines.push(`## Run Configuration
+- **App:** ${rc.appDescription}
+- **Planner model:** ${rc.models.planner}
+- **Worker model:** ${rc.models.worker}
+- **Concurrency:** ${rc.concurrency} worker(s)
+- **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states
+- **Checkpoint interval:** ${ckpt}
+- **Auto-capture:** ${rc.autoCaptureEnabled ? "enabled" : "disabled"}
+- **LLM planner:** ${rc.llmPlannerEnabled ? "enabled" : "disabled"}`);
     lines.push("");
   }
 
