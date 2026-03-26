@@ -2,6 +2,7 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 import type { WebProbeConfig } from "../config.js";
 import type { Area, AreaResult } from "../types.js";
 import { actionsToAreas, deduplicateAreas } from "./area-map.js";
+import { extractPageLinks } from "./link-extractor.js";
 import { exploreArea } from "../worker/worker.js";
 import { join } from "node:path";
 import {
@@ -27,25 +28,49 @@ export async function orchestrate(
 
   console.log("Discovering navigation structure...");
 
-  // Step 1: Observe navigation elements
-  let areas: Area[];
+  // Pass 1: Stagehand semantic observe (existing)
+  let observedAreas: Area[] = [];
   try {
     const actions = await stagehand.observe(
       "What navigation elements are on this page? List all links, menu items, sidebar entries, tabs, and buttons that navigate to different sections or pages of the application."
     );
-
-    areas = deduplicateAreas(actionsToAreas(actions, targetUrl));
+    observedAreas = actionsToAreas(actions, targetUrl);
     console.log(
-      `Discovered ${areas.length} areas: ${areas.map((a) => a.name).join(", ")}`
+      `Pass 1 (observe): ${observedAreas.length} areas`
     );
-  } catch (error) {
-    console.warn(
-      "Navigation discovery failed, exploring current page as single area."
+  } catch {
+    console.warn("Pass 1 (observe) failed.");
+  }
+
+  // Pass 2: Direct <a href> extraction
+  let linkAreas: Area[] = [];
+  try {
+    const links = await extractPageLinks(page, targetUrl);
+    linkAreas = links.map((l) => ({
+      name: l.text,
+      url: l.url,
+      description: `Link: ${l.text}`,
+    }));
+    console.log(
+      `Pass 2 (links): ${linkAreas.length} links`
     );
+  } catch {
+    console.warn("Pass 2 (link extraction) failed.");
+  }
+
+  // Union + deduplicate
+  let areas = deduplicateAreas([...observedAreas, ...linkAreas]);
+
+  if (areas.length === 0) {
+    console.warn("No areas discovered, exploring current page as single area.");
     areas = [
       { name: "Main Page", url: targetUrl, description: "The main/home page" },
     ];
   }
+
+  console.log(
+    `Discovered ${areas.length} areas total: ${areas.map((a) => a.name).join(", ")}`
+  );
 
   // Step 2: Limit to maxAreasToExplore
   const maxAreas = exploration.maxAreasToExplore || areas.length;
