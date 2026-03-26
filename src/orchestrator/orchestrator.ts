@@ -139,7 +139,8 @@ export async function orchestrate(
       screenshotDir,
       config.models.agentMode,
       config.output.screenshots,
-      config.budget.stagnationThreshold ?? 0
+      config.budget.stagnationThreshold ?? 0,
+      config.appContext
     );
     areaResults.push(result);
 

@@ -26,7 +26,8 @@ export async function exploreArea(
   screenshotDir: string,
   agentMode: "cua" | "dom" = "cua",
   screenshotsEnabled = true,
-  stagnationThreshold = 0
+  stagnationThreshold = 0,
+  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] }
 ): Promise<AreaResult> {
   const findings: RawFinding[] = [];
   const screenshots = new Map<string, Buffer>();
@@ -69,7 +70,8 @@ export async function exploreArea(
     appDescription,
     area.name,
     area.description,
-    pageType
+    pageType,
+    appContext
   );
 
   // Cast tools to any to work around Zod v3/v4 type mismatch in Stagehand's .d.ts.
@@ -135,7 +137,8 @@ export async function executeWorkerTask(
   screenshotDir: string,
   agentMode: "cua" | "dom" = "cua",
   screenshotsEnabled = true,
-  stagnationThreshold = 0
+  stagnationThreshold = 0,
+  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] }
 ): Promise<WorkerResult> {
   const findings: RawFinding[] = [];
   const screenshots = new Map<string, Buffer>();
@@ -167,7 +170,8 @@ export async function executeWorkerTask(
     task.missionContext ?? "",
     task.objective,
     undefined,
-    task.pageType
+    task.pageType,
+    appContext
   );
 
   const agent = stagehand.agent({
