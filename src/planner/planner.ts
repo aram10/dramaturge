@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type {
   StateNode,
   FrontierItem,
@@ -10,6 +9,7 @@ import type {
 import type { StateGraph } from "../graph/state-graph.js";
 import { computePriority, type PriorityContext } from "./priority.js";
 import { proposeLLMTasks } from "../llm.js";
+import { shortId } from "../constants.js";
 
 /** Default page-type → worker-type mapping. */
 const PAGE_TYPE_WORKER_MAP: Record<PageType, WorkerType> = {
@@ -24,6 +24,8 @@ const PAGE_TYPE_WORKER_MAP: Record<PageType, WorkerType> = {
   landing: "navigation",
   unknown: "navigation",
 };
+
+const DEFAULT_FOCUS_MODES: WorkerType[] = ["navigation", "form", "crud"];
 
 interface PlannerProposal {
   workerType: WorkerType;
@@ -51,11 +53,7 @@ export class Planner {
     const defaultWorker = PAGE_TYPE_WORKER_MAP[node.pageType];
 
     // Filter by focus modes if configured
-    const allowedTypes: WorkerType[] = mission?.focusModes ?? [
-      "navigation",
-      "form",
-      "crud",
-    ];
+    const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
 
     if (allowedTypes.includes(defaultWorker)) {
       proposals.push({
@@ -92,11 +90,7 @@ export class Planner {
     plannerModel: string,
     mission?: MissionConfig
   ): Promise<FrontierItem[]> {
-    const allowedTypes: WorkerType[] = mission?.focusModes ?? [
-      "navigation",
-      "form",
-      "crud",
-    ];
+    const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
 
     const nodeDesc = [
       `Page type: ${node.pageType}`,
@@ -141,7 +135,7 @@ export class Planner {
     return proposals.map((p) => {
       const computed = computePriority(node, p.workerType, priorityCtx);
       return {
-        id: `task-${randomUUID().slice(0, 8)}`,
+        id: `task-${shortId()}`,
         nodeId: node.id,
         workerType: p.workerType,
         objective: p.objective,
@@ -171,7 +165,7 @@ export class Planner {
     sourceNodeId: string
   ): FrontierItem {
     return {
-      id: `task-${randomUUID().slice(0, 8)}`,
+      id: `task-${shortId()}`,
       nodeId: request.targetNodeId ?? sourceNodeId,
       workerType: request.type,
       objective: request.reason,

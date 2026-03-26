@@ -1,5 +1,4 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
-import { randomUUID } from "node:crypto";
 import type {
   RawFinding,
   Evidence,
@@ -7,6 +6,7 @@ import type {
   BrowserNetworkError,
   BrowserPageError,
 } from "./types.js";
+import { shortId, TRUNCATE_GROUP_KEY, TRUNCATE_SUMMARY, TRUNCATE_TITLE } from "./constants.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -109,7 +109,7 @@ export class BrowserErrorCollector {
       timestamp: string,
       finding: Omit<RawFinding, "evidenceIds">
     ) => {
-      const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
+      const evidenceId = `ev-${shortId()}`;
       evidence.push({ id: evidenceId, type: evidenceType, summary, timestamp, relatedFindingIds: [] });
       findings.push({ ...finding, evidenceIds: [evidenceId] });
     };
@@ -117,7 +117,7 @@ export class BrowserErrorCollector {
     // Group console errors by message to avoid duplicate findings
     const consoleMsgs = new Map<string, BrowserConsoleError[]>();
     for (const err of this.consoleErrors) {
-      const key = err.text.slice(0, 200);
+      const key = err.text.slice(0, TRUNCATE_GROUP_KEY);
       const group = consoleMsgs.get(key) ?? [];
       group.push(err);
       consoleMsgs.set(key, group);
@@ -125,22 +125,22 @@ export class BrowserErrorCollector {
 
     for (const [msg, errors] of consoleMsgs) {
       const first = errors[0];
-      emit("console-error", `${first.level}: ${msg.slice(0, 120)}`, first.timestamp, {
+      emit("console-error", `${first.level}: ${msg.slice(0, TRUNCATE_SUMMARY)}`, first.timestamp, {
         category: "Bug",
         severity: first.level === "error" ? "Major" : "Minor",
-        title: `Browser console ${first.level}: ${msg.slice(0, 80)}`,
+        title: `Browser console ${first.level}: ${msg.slice(0, TRUNCATE_TITLE)}`,
         stepsToReproduce: [`Navigate to ${first.url}`],
         expected: "No console errors",
-        actual: `${errors.length} occurrence(s): ${msg.slice(0, 200)}`,
+        actual: `${errors.length} occurrence(s): ${msg.slice(0, TRUNCATE_GROUP_KEY)}`,
       });
     }
 
     // Page errors (uncaught exceptions)
     for (const err of this.pageErrors) {
-      emit("console-error", `Uncaught: ${err.message.slice(0, 120)}`, err.timestamp, {
+      emit("console-error", `Uncaught: ${err.message.slice(0, TRUNCATE_SUMMARY)}`, err.timestamp, {
         category: "Bug",
         severity: "Critical",
-        title: `Uncaught exception: ${err.message.slice(0, 80)}`,
+        title: `Uncaught exception: ${err.message.slice(0, TRUNCATE_TITLE)}`,
         stepsToReproduce: [`Navigate to ${err.url}`],
         expected: "No uncaught exceptions",
         actual: err.message,
