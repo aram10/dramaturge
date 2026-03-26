@@ -1,4 +1,3 @@
-import { Stagehand } from "@browserbasehq/stagehand";
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { WebProbeConfig } from "./config.js";
@@ -16,8 +15,9 @@ import { executeWorkerTask } from "./worker/worker.js";
 import { BrowserErrorCollector } from "./browser-errors.js";
 import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from "./checkpoint.js";
 import { hasLLMApiKey } from "./llm.js";
+import { MAX_NAV_RETRIES } from "./constants.js";
 import type { EngineContext } from "./engine/context.js";
-import { initWorkerPool, closeWorkerPool } from "./engine/worker-pool.js";
+import { initWorkerPool, closeWorkerPool, createStagehand } from "./engine/worker-pool.js";
 import { collectResults, expandGraph, routeFollowups, maintainFrontier, flushBrowserErrors } from "./engine/graph-ops.js";
 import { buildAreaResults, writeReports } from "./engine/reports.js";
 
@@ -41,6 +41,25 @@ function buildMission(config: WebProbeConfig): MissionConfig | undefined {
     destructiveActionsAllowed:
       config.mission.destructiveActionsAllowed ?? false,
   };
+}
+
+function handleNavFailure(
+  ctx: EngineContext,
+  item: FrontierItem,
+  logPrefix = ""
+): void {
+  console.log(`${logPrefix}  Navigation failed`);
+  item.retryCount++;
+  if (item.retryCount >= MAX_NAV_RETRIES) {
+    ctx.globalCoverage.addBlindSpot({
+      nodeId: item.nodeId,
+      summary: `Unreachable: ${item.objective}`,
+      reason: "state-unreachable",
+      severity: "medium",
+    });
+  } else {
+    ctx.frontier.requeue(item);
+  }
 }
 
 async function processTasksSequentially(
@@ -69,18 +88,7 @@ async function processTasksSequentially(
     );
 
     if (!navResult.success) {
-      console.log(`  Navigation failed: ${navResult.reason}`);
-      item.retryCount++;
-      if (item.retryCount >= 2) {
-        ctx.globalCoverage.addBlindSpot({
-          nodeId: item.nodeId,
-          summary: `Unreachable: ${item.objective}`,
-          reason: "state-unreachable",
-          severity: "medium",
-        });
-      } else {
-        ctx.frontier.requeue(item);
-      }
+      handleNavFailure(ctx, item);
       results.push({ item, result: null });
       continue;
     }
@@ -143,18 +151,7 @@ async function processTaskBatch(
     );
 
     if (!navResult.success) {
-      console.log(`  [${taskNum}] Navigation failed: ${navResult.reason}`);
-      item.retryCount++;
-      if (item.retryCount >= 2) {
-        ctx.globalCoverage.addBlindSpot({
-          nodeId: item.nodeId,
-          summary: `Unreachable: ${item.objective}`,
-          reason: "state-unreachable",
-          severity: "medium",
-        });
-      } else {
-        ctx.frontier.requeue(item);
-      }
+      handleNavFailure(ctx, item, `  [${taskNum}]`);
       return { item, result: null };
     }
 
@@ -216,12 +213,7 @@ export async function runEngine(
   });
 
   // Initialize primary Stagehand
-  const stagehand = new Stagehand({
-    env: "LOCAL",
-    model: config.models.planner,
-    localBrowserLaunchOptions: { headless: false },
-    verbose: 0,
-  });
+  const stagehand = createStagehand(config);
   await stagehand.init();
   errorCollector.attach(stagehand.context.pages()[0]);
 

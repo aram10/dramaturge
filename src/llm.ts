@@ -1,4 +1,5 @@
 import type { LLMTaskProposal, WorkerType } from "./types.js";
+import { TRUNCATE_GROUP_KEY } from "./constants.js";
 
 interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -95,7 +96,7 @@ async function callLLM(
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`${spec.envName} API error ${response.status}: ${body.slice(0, 200)}`);
+    throw new Error(`${spec.envName} API error ${response.status}: ${body.slice(0, TRUNCATE_GROUP_KEY)}`);
   }
 
   return spec.extract(await response.json());
@@ -167,8 +168,9 @@ Propose testing tasks for this page.`;
 
     return proposals.length > 0 ? proposals : null;
   } catch (error) {
+    const label = error instanceof SyntaxError ? "parse" : "API";
     const msg = error instanceof Error ? error.message : String(error);
-    console.warn(`LLM planner call failed (falling back to deterministic): ${msg}`);
+    console.warn(`LLM planner ${label} error (falling back to deterministic): ${msg}`);
     return null;
   }
 }

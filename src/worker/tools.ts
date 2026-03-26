@@ -2,8 +2,8 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 import { z } from "zod";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
 import type { RawFinding, Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from "../types.js";
+import { shortId } from "../constants.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
 import type { StagnationTracker } from "./stagnation.js";
 
@@ -117,7 +117,7 @@ export function createWorkerTools(
         const filename = `${input.ref}.png`;
         writeFileSync(join(screenshotDir, filename), buffer);
 
-        const evidenceId = `ev-${randomUUID().slice(0, 8)}`;
+        const evidenceId = `ev-${shortId()}`;
         const ev: Evidence = {
           id: evidenceId,
           type: "screenshot",

@@ -17,6 +17,69 @@ import { StagnationTracker } from "./stagnation.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
 
+interface WorkerSetup {
+  findings: RawFinding[];
+  screenshots: Map<string, Buffer>;
+  evidence: Evidence[];
+  coverageTracker: CoverageTracker;
+  followupRequests: FollowupRequest[];
+  discoveredEdges: DiscoveredEdge[];
+  agent: ReturnType<Stagehand["agent"]>;
+}
+
+function initWorker(
+  stagehand: Stagehand,
+  opts: {
+    screenshotDir: string;
+    areaName: string;
+    appDescription: string;
+    objectiveLabel: string;
+    objectiveDescription?: string;
+    pageType: PageType;
+    agentMode: "cua" | "dom";
+    model: string;
+    screenshotsEnabled: boolean;
+    stagnationThreshold: number;
+    appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
+  }
+): WorkerSetup {
+  const findings: RawFinding[] = [];
+  const screenshots = new Map<string, Buffer>();
+  const evidence: Evidence[] = [];
+  const coverageTracker = new CoverageTracker();
+  const followupRequests: FollowupRequest[] = [];
+  const discoveredEdges: DiscoveredEdge[] = [];
+  const page = stagehand.context.pages()[0];
+
+  const stagnationTracker = opts.stagnationThreshold > 0
+    ? new StagnationTracker(opts.stagnationThreshold)
+    : undefined;
+
+  const tools = createWorkerTools(
+    findings, screenshots, evidence, coverageTracker, page,
+    opts.screenshotDir, opts.areaName,
+    followupRequests, discoveredEdges,
+    opts.screenshotsEnabled, stagnationTracker
+  );
+
+  const systemPrompt = buildWorkerSystemPrompt(
+    opts.appDescription,
+    opts.objectiveLabel,
+    opts.objectiveDescription,
+    opts.pageType,
+    opts.appContext
+  );
+
+  const agent = stagehand.agent({
+    mode: opts.agentMode,
+    model: opts.model,
+    systemPrompt,
+    tools: tools as any,
+  });
+
+  return { findings, screenshots, evidence, coverageTracker, followupRequests, discoveredEdges, agent };
+}
+
 export async function exploreArea(
   stagehand: Stagehand,
   area: Area,
@@ -29,13 +92,8 @@ export async function exploreArea(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] }
 ): Promise<AreaResult> {
-  const findings: RawFinding[] = [];
-  const screenshots = new Map<string, Buffer>();
-  const evidence: Evidence[] = [];
-  const coverageTracker = new CoverageTracker();
-  const page = stagehand.context.pages()[0];
-
   // Classify the page and capture fingerprint before starting the worker
+  const page = stagehand.context.pages()[0];
   let pageType: PageType = "unknown";
   let fingerprint;
   try {
@@ -48,39 +106,18 @@ export async function exploreArea(
     console.warn(`  Could not classify page for "${area.name}"`);
   }
 
-  const stagnationTracker = stagnationThreshold > 0
-    ? new StagnationTracker(stagnationThreshold)
-    : undefined;
-
-  const tools = createWorkerTools(
-    findings,
-    screenshots,
-    evidence,
-    coverageTracker,
-    page,
+  const { findings, screenshots, evidence, coverageTracker, agent } = initWorker(stagehand, {
     screenshotDir,
-    area.name,
-    undefined,
-    undefined,
-    screenshotsEnabled,
-    stagnationTracker
-  );
-
-  const systemPrompt = buildWorkerSystemPrompt(
+    areaName: area.name,
     appDescription,
-    area.name,
-    area.description,
+    objectiveLabel: area.name,
+    objectiveDescription: area.description,
     pageType,
-    appContext
-  );
-
-  // Cast tools to any to work around Zod v3/v4 type mismatch in Stagehand's .d.ts.
-  // At runtime the tool objects have the correct shape (description, inputSchema, execute).
-  const agent = stagehand.agent({
-    mode: agentMode,
+    agentMode,
     model,
-    systemPrompt,
-    tools: tools as any,
+    screenshotsEnabled,
+    stagnationThreshold,
+    appContext,
   });
 
   try {
@@ -89,7 +126,6 @@ export async function exploreArea(
       maxSteps: stepsPerArea,
     });
 
-    // AgentResult.actions may not exist on all return types; access safely
     const stepCount =
       "actions" in result && Array.isArray(result.actions)
         ? result.actions.length
@@ -127,9 +163,6 @@ export async function exploreArea(
   }
 }
 
-/**
- * V2 engine-compatible entry point: accepts a WorkerTask, returns a WorkerResult.
- */
 export async function executeWorkerTask(
   stagehand: Stagehand,
   task: WorkerTask,
@@ -140,45 +173,17 @@ export async function executeWorkerTask(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] }
 ): Promise<WorkerResult> {
-  const findings: RawFinding[] = [];
-  const screenshots = new Map<string, Buffer>();
-  const evidence: Evidence[] = [];
-  const coverageTracker = new CoverageTracker();
-  const followupRequests: FollowupRequest[] = [];
-  const discoveredEdges: DiscoveredEdge[] = [];
-  const page = stagehand.context.pages()[0];
-
-  const stagnationTracker = stagnationThreshold > 0
-    ? new StagnationTracker(stagnationThreshold)
-    : undefined;
-
-  const tools = createWorkerTools(
-    findings,
-    screenshots,
-    evidence,
-    coverageTracker,
-    page,
+  const { findings, evidence, coverageTracker, followupRequests, discoveredEdges, agent } = initWorker(stagehand, {
     screenshotDir,
-    task.nodeId,
-    followupRequests,
-    discoveredEdges,
-    screenshotsEnabled,
-    stagnationTracker
-  );
-
-  const systemPrompt = buildWorkerSystemPrompt(
-    task.missionContext ?? "",
-    task.objective,
-    undefined,
-    task.pageType,
-    appContext
-  );
-
-  const agent = stagehand.agent({
-    mode: agentMode,
+    areaName: task.nodeId,
+    appDescription: task.missionContext ?? "",
+    objectiveLabel: task.objective,
+    pageType: task.pageType,
+    agentMode,
     model,
-    systemPrompt,
-    tools: tools as any,
+    screenshotsEnabled,
+    stagnationThreshold,
+    appContext,
   });
 
   try {

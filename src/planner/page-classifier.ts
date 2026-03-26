@@ -3,6 +3,17 @@ import type { PageType } from "../types.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
+// Keyword lists for deterministic page classification
+const AUTH_PATH_KEYWORDS = ["login", "signin", "auth"];
+const AUTH_TITLE_KEYWORDS = ["sign in", "log in"];
+const WIZARD_BUTTON_LABELS = ["next", "previous", "back", "step"];
+const WIZARD_PATH_KEYWORDS = ["wizard", "step"];
+const SETTINGS_PATH_KEYWORDS = ["settings", "preferences", "config"];
+const SETTINGS_HEADING_KEYWORDS = ["settings", "preferences"];
+const LIST_BUTTON_LABELS = ["filter", "search", "sort", "delete", "edit", "create", "add", "new"];
+const DASHBOARD_PATH_KEYWORDS = ["dashboard", "home"];
+const DASHBOARD_HEADING_KEYWORDS = ["dashboard", "overview"];
+
 interface ClassificationSignals {
   pathname: string;
   title: string;
@@ -66,11 +77,8 @@ export async function classifyPage(
 function classifyFromSignals(s: ClassificationSignals): PageType {
   // Auth pages
   if (
-    s.pathname.includes("login") ||
-    s.pathname.includes("signin") ||
-    s.pathname.includes("auth") ||
-    s.title.includes("sign in") ||
-    s.title.includes("log in")
+    AUTH_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
+    AUTH_TITLE_KEYWORDS.some((k) => s.title.includes(k))
   ) {
     return "auth";
   }
@@ -81,13 +89,10 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
   }
 
   // Wizard / multi-step
-  const wizardLabels = ["next", "previous", "back", "step"];
   if (
-    s.pathname.includes("wizard") ||
-    s.pathname.includes("step") ||
-    wizardLabels.some((w) => s.buttonLabels.some((b) => b.includes(w)))
+    WIZARD_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
+    WIZARD_BUTTON_LABELS.some((w) => s.buttonLabels.some((b) => b.includes(w)))
   ) {
-    // Only classify as wizard if there are also form inputs
     if (s.inputCount > 0) {
       return "wizard";
     }
@@ -95,11 +100,8 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
 
   // Settings pages
   if (
-    s.pathname.includes("settings") ||
-    s.pathname.includes("preferences") ||
-    s.pathname.includes("config") ||
-    s.headingText.includes("settings") ||
-    s.headingText.includes("preferences")
+    SETTINGS_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
+    SETTINGS_HEADING_KEYWORDS.some((k) => s.headingText.includes(k))
   ) {
     return "settings";
   }
@@ -110,10 +112,9 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
   }
 
   // List pages (tables or grids with action buttons)
-  const listLabels = ["filter", "search", "sort", "delete", "edit", "create", "add", "new"];
   if (
     s.tableCount > 0 ||
-    (s.pathname.includes("list") && listLabels.some((l) => s.buttonLabels.some((b) => b.includes(l))))
+    (s.pathname.includes("list") && LIST_BUTTON_LABELS.some((l) => s.buttonLabels.some((b) => b.includes(l))))
   ) {
     return "list";
   }
@@ -126,10 +127,8 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
   // Dashboard pages
   if (
     s.pathname === "/" ||
-    s.pathname.includes("dashboard") ||
-    s.pathname.includes("home") ||
-    s.headingText.includes("dashboard") ||
-    s.headingText.includes("overview")
+    DASHBOARD_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
+    DASHBOARD_HEADING_KEYWORDS.some((k) => s.headingText.includes(k))
   ) {
     return "dashboard";
   }

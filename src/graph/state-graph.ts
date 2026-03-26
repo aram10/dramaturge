@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type {
   StateNode,
   StateEdge,
@@ -7,6 +6,7 @@ import type {
   NavigationHint,
   DiscoveredEdge,
 } from "../types.js";
+import { shortId, TRUNCATE_MERMAID_LABEL } from "../constants.js";
 
 export interface AddNodeInit {
   url?: string;
@@ -25,7 +25,7 @@ export class StateGraph {
   private fingerprintIndex = new Map<string, string>();
 
   addNode(init: AddNodeInit): StateNode {
-    const id = `node-${randomUUID().slice(0, 8)}`;
+    const id = `node-${shortId()}`;
     const node: StateNode = {
       id,
       url: init.url,
@@ -59,7 +59,7 @@ export class StateGraph {
   }
 
   addEdge(fromId: string, toId: string, edge: DiscoveredEdge): StateEdge {
-    const id = `edge-${randomUUID().slice(0, 8)}`;
+    const id = `edge-${shortId()}`;
     const stateEdge: StateEdge = {
       id,
       fromNodeId: fromId,
@@ -198,7 +198,7 @@ export class StateGraph {
   }
 
   private mermaidEscape(text: string): string {
-    return text.slice(0, 60).replace(/"/g, "#quot;").replace(/\n/g, " ");
+    return text.slice(0, TRUNCATE_MERMAID_LABEL).replace(/"/g, "#quot;").replace(/\n/g, " ");
   }
 
   private findRoot(): StateNode | undefined {

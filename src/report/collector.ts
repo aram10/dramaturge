@@ -1,5 +1,6 @@
 import type { AreaResult, BlindSpot, Finding, FindingSeverity, RunResult, RunConfigMeta } from "../types.js";
 import { CATEGORY_PREFIX } from "../types.js";
+import { FINDING_ID_PAD } from "../constants.js";
 
 const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   Critical: 0,
@@ -21,7 +22,7 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
       seen.add(dedupeKey);
 
       const prefix = CATEGORY_PREFIX[raw.category];
-      const id = `${prefix}-${String(counter).padStart(3, "0")}`;
+      const id = `${prefix}-${String(counter).padStart(FINDING_ID_PAD, "0")}`;
       counter++;
 
       const finding: Finding = {
@@ -46,7 +47,7 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
   // Re-number IDs after sorting
   for (let i = 0; i < findings.length; i++) {
     const prefix = CATEGORY_PREFIX[findings[i].category];
-    findings[i].id = `${prefix}-${String(i + 1).padStart(3, "0")}`;
+    findings[i].id = `${prefix}-${String(i + 1).padStart(FINDING_ID_PAD, "0")}`;
   }
 
   return findings;
