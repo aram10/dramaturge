@@ -1,6 +1,6 @@
 node_modules/
 dist/
-webprobe-reports/
-webprobe.config.json
-.webprobe-state/
+dramaturge-reports/
+dramaturge.config.json
+.dramaturge-state/
 *.tgz

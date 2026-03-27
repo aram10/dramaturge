@@ -1,13 +1,15 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
-import type { ExpectedHttpNoise, RepoHints } from "./types.js";
+import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from "./types.js";
 
 const PAGE_FILE_RE = /(?:^|\/)app(?:\/.*)?\/page\.(?:ts|tsx|js|jsx|mdx)$/;
 const ROUTE_FILE_RE = /(?:^|\/)app(?:\/.*)?\/route\.(?:ts|tsx|js|jsx)$/;
 const SELECTOR_SOURCE_RE = /^(app|components|tests)\//;
 const QUERY_ROUTE_RE = /["'`](\/[^"'`\n]*\?[^"'`\n]+)["'`]/g;
 const SELECTOR_RE = /\b(id|data-testid)\s*=\s*["'`]([^"'`]+)["'`]/g;
-const STATUS_RE = /status\s*:\s*(401|403)\b/g;
+const STATUS_RE = /status\s*:\s*(\d{3})\b/g;
+const EXPORTED_METHOD_RE =
+  /\bexport\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b|\bexport\s+const\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b/g;
 
 function toPosix(value: string): string {
   return value.split(sep).join("/");
@@ -39,6 +41,16 @@ function uniqueSorted(values: string[]): string[] {
 function normalizeRoutePath(routePath: string): string {
   const normalized = routePath.replace(/\/+$/g, "");
   return normalized || "/";
+}
+
+function routeFamilyFromRoute(routePath: string): string {
+  const [pathname] = routePath.split("?");
+  if (!pathname || pathname === "/") {
+    return "/";
+  }
+
+  const segments = pathname.split("/").filter(Boolean);
+  return segments.length > 0 ? `/${segments[0]}` : "/";
 }
 
 function stripNextRouteGroups(segments: string[]): string[] {
@@ -118,6 +130,35 @@ function extractExpectedHttpNoise(
   return noise.sort((left, right) => left.pathPrefix.localeCompare(right.pathPrefix));
 }
 
+function extractStatusCodes(content: string): number[] {
+  return uniqueSorted([...content.matchAll(STATUS_RE)].map((match) => match[1])).map((status) =>
+    Number.parseInt(status, 10)
+  );
+}
+
+function extractRouteMethods(content: string): string[] {
+  const methods: string[] = [];
+
+  for (const match of content.matchAll(EXPORTED_METHOD_RE)) {
+    methods.push(match[1] ?? match[2]);
+  }
+
+  return uniqueSorted(methods);
+}
+
+function extractApiEndpoints(root: string, routeFiles: string[]): ApiEndpointHint[] {
+  return routeFiles
+    .map((filePath) => {
+      const content = readFileSync(filePath, "utf-8");
+      return {
+        route: routeFromRouteFile(root, filePath),
+        methods: extractRouteMethods(content),
+        statuses: extractStatusCodes(content),
+      };
+    })
+    .sort((left, right) => left.route.localeCompare(right.route));
+}
+
 export function scanNextJsRepo(root: string): RepoHints {
   const resolvedRoot = resolve(root);
   const allFiles = walkFiles(resolvedRoot);
@@ -151,10 +192,14 @@ export function scanNextJsRepo(root: string): RepoHints {
       extractStableSelectors(readFileSync(filePath, "utf-8"))
     )
   );
+  const routeFamilies = uniqueSorted(routes.map(routeFamilyFromRoute));
+  const apiEndpoints = extractApiEndpoints(resolvedRoot, routeFiles);
 
   return {
     routes,
+    routeFamilies,
     stableSelectors,
+    apiEndpoints,
     authHints: {
       loginRoutes: routes.filter((route) =>
         /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)

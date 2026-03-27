@@ -47,7 +47,15 @@ describe("buildWorkerSystemPrompt", () => {
       undefined,
       {
         routes: ["/login", "/manage/knowledge-bases", "/?kb=starter"],
+        routeFamilies: ["/", "/login", "/manage"],
         stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
+        apiEndpoints: [
+          {
+            route: "/api/manage/knowledge-bases",
+            methods: ["GET"],
+            statuses: [401, 403],
+          },
+        ],
         authHints: {
           loginRoutes: ["/login"],
           callbackRoutes: ["/auth/callback"],
@@ -60,6 +68,10 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("/manage/knowledge-bases");
     expect(prompt).toContain("#manage-kb-new-btn");
     expect(prompt).toContain("/login");
+    expect(prompt).toContain("Route families");
+    expect(prompt).toContain("/manage");
+    expect(prompt).toContain("API endpoints");
+    expect(prompt).toContain("GET /api/manage/knowledge-bases");
   });
 
   it("adds stronger safety guidance when destructive actions are disabled", () => {

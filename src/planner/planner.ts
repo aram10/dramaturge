@@ -60,9 +60,20 @@ function summarizeRepoHints(repoHints?: RepoHints): string | undefined {
   if (repoHints.routes.length > 0) {
     parts.push(`routes: ${repoHints.routes.slice(0, 3).join(", ")}`);
   }
+  if ((repoHints.routeFamilies?.length ?? 0) > 0) {
+    parts.push(`route families: ${repoHints.routeFamilies.slice(0, 3).join(", ")}`);
+  }
   if (repoHints.stableSelectors.length > 0) {
     parts.push(
       `stable selectors: ${repoHints.stableSelectors.slice(0, 3).join(", ")}`
+    );
+  }
+  if ((repoHints.apiEndpoints?.length ?? 0) > 0) {
+    parts.push(
+      `api endpoints: ${repoHints.apiEndpoints
+        .slice(0, 2)
+        .map((endpoint) => `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}`)
+        .join(", ")}`
     );
   }
   if (repoHints.authHints.loginRoutes.length > 0) {

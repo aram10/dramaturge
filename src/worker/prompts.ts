@@ -42,9 +42,24 @@ function buildRepoHintsSection(repoHints?: RepoHints): string {
     );
   }
 
+  if ((repoHints.routeFamilies?.length ?? 0) > 0) {
+    if (parts.length === 0) parts.push("## Repo Hints");
+    parts.push(`Route families: ${repoHints.routeFamilies.slice(0, 6).join(", ")}`);
+  }
+
   if (repoHints.stableSelectors.length > 0) {
     parts.push(
       `Stable selectors: ${repoHints.stableSelectors.slice(0, 6).join(", ")}`
+    );
+  }
+
+  if ((repoHints.apiEndpoints?.length ?? 0) > 0) {
+    if (parts.length === 0) parts.push("## Repo Hints");
+    parts.push(
+      `API endpoints: ${repoHints.apiEndpoints
+        .slice(0, 4)
+        .map((endpoint) => `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}`)
+        .join(", ")}`
     );
   }
 

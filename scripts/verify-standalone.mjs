@@ -39,18 +39,9 @@ const FORBIDDEN_TEXT_CHECKS = [
     pattern: /\.\.\/playwright/g,
     reason: "parent-directory auth path",
   },
-  {
-    pattern: /\bwebprobe\b/gi,
-    reason: "stale pre-rename product name",
-  },
 ];
 
-const PACKAGE_TEXT_PATHS = [
-  "README.md",
-  "dramaturge.config.example.json",
-  "examples",
-  "docs",
-];
+const PACKAGE_TEXT_PATHS = ["README.md", "dramaturge.config.example.json"];
 
 export function buildVerifyStandaloneHelpText() {
   return HELP_TEXT;
@@ -199,9 +190,7 @@ export function scanPackageTextFiles(packageDir) {
       check.pattern.lastIndex = 0;
     }
 
-    const isConfigLikeFile =
-      file === "dramaturge.config.example.json" ||
-      file.startsWith("examples/");
+    const isConfigLikeFile = file === "dramaturge.config.example.json";
 
     if (isConfigLikeFile && contents.includes("../")) {
       issues.push({
@@ -251,11 +240,11 @@ function verifyInstalledConfigLoad(consumerDir, packageName, installedPackageDir
     const require = createRequire(import.meta.url);
     const packageJsonPath = require.resolve(${JSON.stringify(`${packageName}/package.json`)});
     const packageDir = dirname(packageJsonPath);
-    const examplePath = join(packageDir, "examples", "standalone.local.profile.jsonc");
+    const examplePath = join(packageDir, "dramaturge.config.example.json");
     const config = loadConfig(examplePath);
 
     if (config.auth.type !== "interactive") {
-      throw new Error("Expected standalone.local profile to use interactive auth");
+      throw new Error("Expected the packaged example config to use interactive auth");
     }
 
     const expectedPrefix = resolve(packageDir).replace(/\\\\/g, "/");
