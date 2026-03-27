@@ -111,6 +111,35 @@ describe("Planner", () => {
         expect(task.priority).toBeGreaterThan(0);
       }
     });
+
+    it("adds a repo-aware navigation seed when routes and selectors are known", () => {
+      const planner = new Planner();
+      const graph = makeGraph();
+      const node = graph.addNode({
+        fingerprint: makeFp("root"),
+        pageType: "dashboard",
+        depth: 0,
+      });
+
+      const tasks = planner.proposeTasks(node, graph, undefined, {
+        routes: ["/login", "/manage/knowledge-bases"],
+        stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
+        authHints: {
+          loginRoutes: ["/login"],
+          callbackRoutes: ["/auth/callback"],
+        },
+        expectedHttpNoise: [],
+      });
+
+      expect(
+        tasks.some(
+          (task) =>
+            task.workerType === "navigation" &&
+            task.objective.includes("/manage/knowledge-bases") &&
+            task.objective.includes("#manage-kb-new-btn")
+        )
+      ).toBe(true);
+    });
   });
 
   describe("recordDispatch", () => {

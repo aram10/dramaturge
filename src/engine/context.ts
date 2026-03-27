@@ -8,6 +8,7 @@ import type { Navigator } from "../planner/navigator.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
 import type { BrowserErrorCollector } from "../browser-errors.js";
 import type { WorkerSession } from "./worker-pool.js";
+import type { RepoHints } from "../adaptation/types.js";
 
 export interface EngineContext {
   config: WebProbeConfig;
@@ -27,4 +28,5 @@ export interface EngineContext {
   errorCollector: BrowserErrorCollector;
   completedTaskIds: Set<string>;
   workerPool: WorkerSession[];
+  repoHints?: RepoHints;
 }

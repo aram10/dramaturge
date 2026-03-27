@@ -1,4 +1,5 @@
 import type { PageType } from "../types.js";
+import type { RepoHints } from "../adaptation/types.js";
 
 interface AppContext {
   knownPatterns?: string[];
@@ -28,12 +29,46 @@ function buildAppContextSection(ctx?: AppContext): string {
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
 }
 
+function buildRepoHintsSection(repoHints?: RepoHints): string {
+  if (!repoHints) return "";
+
+  const parts: string[] = [];
+
+  if (repoHints.routes.length > 0) {
+    parts.push("## Repo Hints");
+    parts.push(
+      `Known route families: ${repoHints.routes.slice(0, 6).join(", ")}`
+    );
+  }
+
+  if (repoHints.stableSelectors.length > 0) {
+    parts.push(
+      `Stable selectors: ${repoHints.stableSelectors.slice(0, 6).join(", ")}`
+    );
+  }
+
+  if (repoHints.authHints.loginRoutes.length > 0) {
+    parts.push(
+      `Login routes: ${repoHints.authHints.loginRoutes.slice(0, 3).join(", ")}`
+    );
+  }
+
+  if (repoHints.authHints.callbackRoutes.length > 0) {
+    parts.push(
+      `Callback routes: ${repoHints.authHints.callbackRoutes.slice(0, 3).join(", ")}`
+    );
+  }
+
+  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+}
+
 export function buildWorkerSystemPrompt(
   appDescription: string,
   areaName: string,
   areaDescription?: string,
   pageType?: PageType,
-  appContext?: AppContext
+  appContext?: AppContext,
+  repoHints?: RepoHints
 ): string {
   const areaContext = areaDescription
     ? `\n\nAbout this area: ${areaDescription}`
@@ -46,7 +81,7 @@ export function buildWorkerSystemPrompt(
   return `You are an autonomous QA tester exploring a web application. Your job is to find bugs, UX issues, accessibility problems, and visual glitches through hands-on exploration.
 
 ## The Application
-${appDescription}
+${appDescription}${buildRepoHintsSection(repoHints)}
 
 ## Your Assignment
 You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}

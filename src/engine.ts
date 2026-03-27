@@ -1,5 +1,8 @@
 import { mkdirSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import type { Stagehand } from "@browserbasehq/stagehand";
 import type { WebProbeConfig } from "./config.js";
 import type { FrontierItem, WorkerResult, BudgetConfig, MissionConfig } from "./types.js";
 import { authenticate } from "./auth/authenticator.js";
@@ -20,6 +23,8 @@ import { collectResults, expandGraph, routeFollowups, maintainFrontier, flushBro
 import { buildAreaResults, writeReports } from "./engine/reports.js";
 import { executeFrontierItem } from "./engine/execute-frontier-item.js";
 import type { WorkerSession } from "./engine/worker-pool.js";
+import { scanRepository } from "./adaptation/repo-scan.js";
+import type { RepoHints } from "./adaptation/types.js";
 
 function resolveBudget(config: WebProbeConfig): BudgetConfig {
   return {
@@ -66,6 +71,111 @@ interface BatchTaskResult {
   item: FrontierItem;
   result: WorkerResult | null;
   pageKey: string;
+}
+
+type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+
+function loadRepoHints(config: WebProbeConfig): RepoHints | undefined {
+  if (!config.repoContext) return undefined;
+
+  const repoHints = scanRepository({
+    root: config.repoContext.root ?? process.cwd(),
+    framework: config.repoContext.framework,
+    hintsFile: config.repoContext.hintsFile,
+  });
+
+  const hasHints =
+    repoHints.routes.length > 0 ||
+    repoHints.stableSelectors.length > 0 ||
+    repoHints.authHints.loginRoutes.length > 0 ||
+    repoHints.authHints.callbackRoutes.length > 0 ||
+    repoHints.expectedHttpNoise.length > 0;
+
+  return hasHints ? repoHints : undefined;
+}
+
+function startBootstrapProcess(config: WebProbeConfig): ChildProcess | undefined {
+  const command = config.bootstrap?.command;
+  if (!command) return undefined;
+
+  console.log(`Starting bootstrap command: ${command}`);
+  return spawn(command, {
+    cwd: config.bootstrap?.cwd,
+    shell: true,
+    stdio: "ignore",
+  });
+}
+
+async function isReadyUrlReachable(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { redirect: "manual" });
+    return response.ok || (response.status >= 300 && response.status < 400);
+  } catch {
+    return false;
+  }
+}
+
+async function hasReadyIndicator(
+  page: StagehandPage,
+  url: string,
+  selector: string
+): Promise<boolean> {
+  try {
+    await page.goto(url);
+    const found = await page.evaluate(
+      `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
+    );
+    return found === true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForBootstrapReady(
+  config: WebProbeConfig,
+  page: StagehandPage
+): Promise<void> {
+  if (!config.bootstrap) return;
+
+  const readyUrl = config.bootstrap.readyUrl
+    ? new URL(config.bootstrap.readyUrl, config.targetUrl).href
+    : config.targetUrl;
+  const readyIndicator = config.bootstrap.readyIndicator;
+
+  if (!config.bootstrap.readyUrl && !readyIndicator) {
+    return;
+  }
+
+  const deadline = Date.now() + config.bootstrap.timeoutSeconds * 1000;
+  while (Date.now() < deadline) {
+    const urlReady = !config.bootstrap.readyUrl || await isReadyUrlReachable(readyUrl);
+    const indicatorReady =
+      !readyIndicator || (await hasReadyIndicator(page, readyUrl, readyIndicator));
+
+    if (urlReady && indicatorReady) {
+      console.log("Bootstrap target is ready.");
+      return;
+    }
+
+    await delay(1000);
+  }
+
+  throw new Error(
+    `Bootstrap did not become ready within ${config.bootstrap.timeoutSeconds}s`
+  );
+}
+
+function stopBootstrapProcess(processRef?: ChildProcess): void {
+  if (!processRef?.pid) return;
+
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/pid", String(processRef.pid), "/t", "/f"], {
+      stdio: "ignore",
+    });
+    return;
+  }
+
+  processRef.kill("SIGTERM");
 }
 
 /** Run frontier items in parallel across the worker pool. */
@@ -134,6 +244,14 @@ export async function runEngine(
   const mission = buildMission(config);
   const concurrency = config.concurrency.workers;
   const useLLMPlanner = hasLLMApiKey();
+  const repoHints = loadRepoHints(config);
+  let bootstrapProcess: ChildProcess | undefined;
+
+  if (repoHints) {
+    console.log(
+      `Repo-aware mode: ${repoHints.routes.length} routes, ${repoHints.stableSelectors.length} selectors, ${repoHints.expectedHttpNoise.length} expected-noise rule(s)`
+    );
+  }
 
   // Browser error auto-capture
   const errorCollector = new BrowserErrorCollector({
@@ -146,6 +264,9 @@ export async function runEngine(
   const stagehand = createStagehand(config);
   await stagehand.init();
   errorCollector.attach(stagehand.context.pages()[0], "primary");
+
+  bootstrapProcess = startBootstrapProcess(config);
+  await waitForBootstrapReady(config, stagehand.context.pages()[0]);
 
   // Initialize worker pool for parallel execution
   const workerPool = concurrency > 1
@@ -174,6 +295,7 @@ export async function runEngine(
     errorCollector,
     completedTaskIds: new Set(),
     workerPool,
+    repoHints,
   };
 
   try {
@@ -226,10 +348,16 @@ export async function runEngine(
           rootNode,
           ctx.graph,
           config.models.planner,
-          mission
+          mission,
+          ctx.repoHints
         );
       } else {
-        seedTasks = ctx.planner.proposeTasks(rootNode, ctx.graph, mission);
+        seedTasks = ctx.planner.proposeTasks(
+          rootNode,
+          ctx.graph,
+          mission,
+          ctx.repoHints
+        );
       }
       ctx.frontier.enqueueMany(seedTasks);
       console.log(`Seeded frontier with ${seedTasks.length} tasks\n`);
@@ -379,5 +507,6 @@ export async function runEngine(
     errorCollector.detach();
     await closeWorkerPool(workerPool);
     await stagehand.context.close();
+    stopBootstrapProcess(bootstrapProcess);
   }
 }
