@@ -9,6 +9,19 @@ interface AppContext {
   notBugs?: string[];
 }
 
+function formatObservedApiEndpoint(endpoint: ObservedApiEndpoint): string {
+  const statuses =
+    endpoint.statuses.length > 0 ? `statuses=${endpoint.statuses.join(", ")}` : undefined;
+  const failures =
+    endpoint.failures.length > 0 ? `failures=${endpoint.failures.join(" | ")}` : undefined;
+
+  return `- ${endpoint.methods.join("/") || "ANY"} ${endpoint.route}${
+    [statuses, failures].filter(Boolean).length > 0
+      ? ` (${[statuses, failures].filter(Boolean).join("; ")})`
+      : ""
+  }`;
+}
+
 function buildAppContextSection(ctx?: AppContext): string {
   if (!ctx) return "";
   const parts: string[] = [];
@@ -106,17 +119,7 @@ function buildObservedApiSection(observedApiEndpoints?: ObservedApiEndpoint[]): 
 
   return `\n\n## Observed API Traffic\n${observedApiEndpoints
     .slice(0, 6)
-    .map((endpoint) => {
-      const statuses =
-        endpoint.statuses.length > 0 ? `statuses=${endpoint.statuses.join(", ")}` : undefined;
-      const failures =
-        endpoint.failures.length > 0 ? `failures=${endpoint.failures.join(" | ")}` : undefined;
-      return `- ${endpoint.methods.join("/") || "ANY"} ${endpoint.route}${
-        [statuses, failures].filter(Boolean).length > 0
-          ? ` (${[statuses, failures].filter(Boolean).join("; ")})`
-          : ""
-      }`;
-    })
+    .map((endpoint) => formatObservedApiEndpoint(endpoint))
     .join("\n")}`;
 }
 
@@ -147,6 +150,12 @@ function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
   if (history.authHints.length > 0) {
     if (parts.length === 0) parts.push("## Historical Notes");
     parts.push(`Authentication hints from prior runs: ${history.authHints.join(" | ")}`);
+  }
+
+  if (history.apiHints.length > 0) {
+    if (parts.length === 0) parts.push("## Historical Notes");
+    parts.push("Historical API hints:");
+    parts.push(...history.apiHints.slice(0, 4).map((endpoint) => formatObservedApiEndpoint(endpoint)));
   }
 
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";

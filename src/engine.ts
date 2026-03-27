@@ -570,6 +570,10 @@ export async function runEngine(
     const areaResults = buildAreaResults(ctx);
     if (memoryStore) {
       memoryStore.recordRunFindings(startTime.toISOString(), areaResults);
+      memoryStore.recordObservedApiTraffic(
+        startTime.toISOString(),
+        trafficObserver.snapshot()
+      );
       memoryStore.recordNavigationSnapshot(config.targetUrl, ctx.graph);
       ctx.runMemory = memoryStore.getSummary(
         warmStartApplied,
