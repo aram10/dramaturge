@@ -36,6 +36,22 @@ interface PlannerProposal {
   priority?: number;
 }
 
+function matchesMissionPattern(
+  patterns: string[] | undefined,
+  ...candidates: Array<string | undefined>
+): boolean {
+  if (!patterns?.length) return false;
+
+  const haystacks = candidates
+    .filter((candidate): candidate is string => Boolean(candidate))
+    .map((candidate) => candidate.toLowerCase());
+
+  return patterns.some((pattern) => {
+    const needle = pattern.toLowerCase();
+    return haystacks.some((candidate) => candidate.includes(needle));
+  });
+}
+
 function summarizeRepoHints(repoHints?: RepoHints): string | undefined {
   if (!repoHints) return undefined;
 
@@ -114,7 +130,7 @@ export class Planner {
       });
     }
 
-    return this.toFrontierItems(node, proposals);
+    return this.toFrontierItems(node, proposals, mission);
   }
 
   /**
@@ -158,7 +174,7 @@ export class Planner {
       return this.proposeTasks(node, graph, mission, repoHints);
     }
 
-    return this.toFrontierItems(node, llmProposals);
+    return this.toFrontierItems(node, llmProposals, mission);
   }
 
   /**
@@ -166,27 +182,54 @@ export class Planner {
    */
   private toFrontierItems(
     node: StateNode,
-    proposals: PlannerProposal[]
+    proposals: PlannerProposal[],
+    mission?: MissionConfig
   ): FrontierItem[] {
     const priorityCtx: PriorityContext = {
       visitedWorkerTypes:
         this.workerTypesPerNode.get(node.id) ?? new Set(),
     };
 
-    return proposals.map((p) => {
-      const computed = computePriority(node, p.workerType, priorityCtx);
-      return {
+    return proposals
+      .map((p) => {
+        const computed = computePriority(node, p.workerType, priorityCtx);
+        const criticalFlowBoost = matchesMissionPattern(
+          mission?.criticalFlows,
+          p.objective,
+          p.reason,
+          node.url,
+          node.title,
+          node.pageType
+        )
+          ? 0.2
+          : 0;
+
+        return {
         id: `task-${shortId()}`,
         nodeId: node.id,
         workerType: p.workerType,
         objective: p.objective,
-        priority: p.priority != null ? Math.max(p.priority, computed) : computed,
+        priority: Math.min(
+          1,
+          (p.priority != null ? Math.max(p.priority, computed) : computed) +
+            criticalFlowBoost
+        ),
         reason: p.reason,
         retryCount: 0,
         createdAt: new Date().toISOString(),
         status: "pending" as const,
-      };
-    });
+        };
+      })
+      .filter((item) =>
+        !matchesMissionPattern(
+          mission?.excludedAreas,
+          item.objective,
+          item.reason,
+          node.url,
+          node.title,
+          node.pageType
+        )
+      );
   }
 
   /**

@@ -140,6 +140,50 @@ describe("Planner", () => {
         )
       ).toBe(true);
     });
+
+    it("suppresses tasks for excluded areas", () => {
+      const planner = new Planner();
+      const graph = makeGraph();
+      const node = graph.addNode({
+        url: "https://example.com/manage/billing",
+        title: "Billing settings",
+        fingerprint: makeFp("billing"),
+        pageType: "settings",
+        depth: 1,
+      });
+
+      const mission: MissionConfig = {
+        appDescription: "Test app",
+        destructiveActionsAllowed: false,
+        excludedAreas: ["billing"],
+      };
+
+      expect(planner.proposeTasks(node, graph, mission)).toEqual([]);
+    });
+
+    it("boosts matching critical flows", () => {
+      const planner = new Planner();
+      const graph = makeGraph();
+      const node = graph.addNode({
+        url: "https://example.com/manage/knowledge-bases",
+        title: "Knowledge bases",
+        fingerprint: makeFp("knowledge-bases"),
+        pageType: "list",
+        depth: 1,
+      });
+
+      const baselineTasks = planner.proposeTasks(node, graph);
+      const boostedTasks = planner.proposeTasks(node, graph, {
+        appDescription: "Test app",
+        destructiveActionsAllowed: false,
+        criticalFlows: ["knowledge-bases"],
+      });
+
+      const baselineCrud = baselineTasks.find((task) => task.workerType === "crud");
+      const boostedCrud = boostedTasks.find((task) => task.workerType === "crud");
+
+      expect(boostedCrud?.priority).toBeGreaterThan(baselineCrud?.priority ?? 0);
+    });
   });
 
   describe("recordDispatch", () => {

@@ -225,4 +225,40 @@ describe("BrowserErrorCollector", () => {
     expect(findings).toHaveLength(1); // only the 503
     expect(findings[0].title).toContain("503");
   });
+
+  it("suppresses expected auth noise while preserving unexpected failures", () => {
+    const collector = new BrowserErrorCollector({
+      captureConsole: false,
+      captureNetwork: true,
+      networkErrorMinStatus: 400,
+      policy: {
+        expectedResponses: [
+          {
+            pathPrefix: "/api/manage/knowledge-bases",
+            statuses: [401, 403],
+          },
+        ],
+        ignoredConsolePatterns: [],
+      },
+    });
+    const page = createMockPage();
+    collector.attach(page as any);
+
+    page.emit("response", {
+      status: () => 401,
+      url: () => "https://example.com/api/manage/knowledge-bases",
+      statusText: () => "Unauthorized",
+      request: () => ({ method: () => "GET" }),
+    });
+    page.emit("response", {
+      status: () => 500,
+      url: () => "https://example.com/api/manage/knowledge-bases",
+      statusText: () => "Internal Server Error",
+      request: () => ({ method: () => "GET" }),
+    });
+
+    const { findings } = collector.flush();
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toContain("500");
+  });
 });
