@@ -30,6 +30,7 @@ import type { RepoHints } from "./adaptation/types.js";
 import { resolvePolicy } from "./policy/policy.js";
 import { MemoryStore } from "./memory/store.js";
 import { seedGraphFromNavigationMemory } from "./memory/navigation-cache.js";
+import { NetworkTrafficObserver } from "./network/traffic-observer.js";
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -275,11 +276,13 @@ export async function runEngine(
     networkErrorMinStatus: config.autoCapture.networkErrorMinStatus,
     policy,
   });
+  const trafficObserver = new NetworkTrafficObserver();
 
   // Initialize primary Stagehand
   const stagehand = createStagehand(config);
   await stagehand.init();
   errorCollector.attach(stagehand.context.pages()[0], "primary");
+  trafficObserver.attach(stagehand.context.pages()[0], "primary");
 
   bootstrapProcess = startBootstrapProcess(config);
   await waitForBootstrapReady(config, stagehand.context.pages()[0]);
@@ -306,6 +309,7 @@ export async function runEngine(
     completedTaskIds: new Set(),
     workerPool,
     repoHints,
+    trafficObserver,
     memoryStore,
   };
 
@@ -322,6 +326,7 @@ export async function runEngine(
         config,
         concurrency - 1,
         errorCollector,
+        trafficObserver,
         sharedWorkerState
       );
       ctx.workerPool = workerPool;
@@ -588,6 +593,7 @@ export async function runEngine(
     throw error;
   } finally {
     errorCollector.detach();
+    trafficObserver.detach();
     await closeWorkerPool(workerPool);
     await stagehand.context.close();
     stopBootstrapProcess(bootstrapProcess);

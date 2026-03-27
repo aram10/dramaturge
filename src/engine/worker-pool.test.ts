@@ -57,6 +57,7 @@ describe("worker-pool", () => {
 
   it("reuses shared storage state for worker browsers instead of reauthenticating", async () => {
     const errorCollector = { attach: vi.fn() };
+    const trafficObserver = { attach: vi.fn() };
 
     const pool = await initWorkerPool(
       {
@@ -66,6 +67,7 @@ describe("worker-pool", () => {
       } as any,
       2,
       errorCollector as any,
+      trafficObserver as any,
       { cookies: [], origins: [] } as any
     );
 
@@ -73,6 +75,7 @@ describe("worker-pool", () => {
     expect(authenticateMock).not.toHaveBeenCalled();
     expect(applyStorageStateMock).toHaveBeenCalledTimes(2);
     expect(errorCollector.attach).toHaveBeenCalledTimes(2);
+    expect(trafficObserver.attach).toHaveBeenCalledTimes(2);
   });
 
   it("falls back to full authenticate when no shared state is supplied", async () => {

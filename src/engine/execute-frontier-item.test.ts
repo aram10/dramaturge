@@ -72,12 +72,30 @@ describe("executeFrontierItem", () => {
       screenshotDir: "C:/tmp/screenshots",
       repoHints: {
         routes: ["/login", "/manage/knowledge-bases"],
+        routeFamilies: ["/", "/login", "/manage"],
         stableSelectors: ["#manage-kb-new-btn"],
+        apiEndpoints: [
+          {
+            route: "/api/manage/knowledge-bases",
+            methods: ["GET"],
+            statuses: [401, 403],
+          },
+        ],
         authHints: {
           loginRoutes: ["/login"],
           callbackRoutes: ["/auth/callback"],
         },
         expectedHttpNoise: [],
+      },
+      trafficObserver: {
+        snapshot: vi.fn().mockReturnValue([
+          {
+            route: "/api/widgets",
+            methods: ["GET"],
+            statuses: [200],
+            failures: [],
+          },
+        ]),
       },
       mission: {
         appDescription: "Example app",
@@ -138,13 +156,29 @@ describe("executeFrontierItem", () => {
       },
       {
         routes: ["/login", "/manage/knowledge-bases"],
+        routeFamilies: ["/", "/login", "/manage"],
         stableSelectors: ["#manage-kb-new-btn"],
+        apiEndpoints: [
+          {
+            route: "/api/manage/knowledge-bases",
+            methods: ["GET"],
+            statuses: [401, 403],
+          },
+        ],
         authHints: {
           loginRoutes: ["/login"],
           callbackRoutes: ["/auth/callback"],
         },
         expectedHttpNoise: [],
       },
+      [
+        {
+          route: "/api/widgets",
+          methods: ["GET"],
+          statuses: [200],
+          failures: [],
+        },
+      ],
       {
         appDescription: "Example app",
         destructiveActionsAllowed: false,

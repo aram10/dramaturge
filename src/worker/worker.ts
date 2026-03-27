@@ -20,6 +20,7 @@ import { classifyPage } from "../planner/page-classifier.js";
 import type { RepoHints } from "../adaptation/types.js";
 import { ActionRecorder } from "./action-recorder.js";
 import type { WorkerHistoryContext } from "../memory/types.js";
+import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
 
 interface WorkerSetup {
   findings: RawFinding[];
@@ -47,6 +48,7 @@ function initWorker(
     stagnationThreshold: number;
     appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
     repoHints?: RepoHints;
+    observedApiEndpoints?: ObservedApiEndpoint[];
     mission?: MissionConfig;
     history?: WorkerHistoryContext;
     stateId?: string;
@@ -88,6 +90,7 @@ function initWorker(
     opts.pageType,
     opts.appContext,
     opts.repoHints,
+    opts.observedApiEndpoints,
     opts.mission,
     opts.history
   );
@@ -123,6 +126,7 @@ export async function exploreArea(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
   repoHints?: RepoHints,
+  observedApiEndpoints?: ObservedApiEndpoint[],
   mission?: MissionConfig,
   history?: WorkerHistoryContext
 ): Promise<AreaResult> {
@@ -160,6 +164,7 @@ export async function exploreArea(
     stagnationThreshold,
     appContext,
     repoHints,
+    observedApiEndpoints,
     mission,
     history,
   });
@@ -219,6 +224,7 @@ export async function executeWorkerTask(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
   repoHints?: RepoHints,
+  observedApiEndpoints?: ObservedApiEndpoint[],
   mission?: MissionConfig,
   history?: WorkerHistoryContext
 ): Promise<WorkerResult> {
@@ -242,6 +248,7 @@ export async function executeWorkerTask(
     stagnationThreshold,
     appContext,
     repoHints,
+    observedApiEndpoints,
     mission,
     history,
     stateId: task.nodeId,

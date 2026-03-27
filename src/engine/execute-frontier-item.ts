@@ -63,6 +63,7 @@ export async function executeFrontierItem(
     ctx.config.budget.stagnationThreshold ?? 0,
     ctx.config.appContext,
     ctx.repoHints,
+    ctx.trafficObserver?.snapshot(),
     ctx.mission,
     history
   );

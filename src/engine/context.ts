@@ -17,6 +17,7 @@ import type { WorkerSession } from "./worker-pool.js";
 import type { RepoHints } from "../adaptation/types.js";
 import type { MemoryStore } from "../memory/store.js";
 import type { RunMemoryMeta } from "../types.js";
+import type { NetworkTrafficObserver } from "../network/traffic-observer.js";
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -38,6 +39,7 @@ export interface EngineContext {
   completedTaskIds: Set<string>;
   workerPool: WorkerSession[];
   repoHints?: RepoHints;
+  trafficObserver?: NetworkTrafficObserver;
   memoryStore?: MemoryStore;
   runMemory?: RunMemoryMeta;
 }
