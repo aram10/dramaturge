@@ -3,31 +3,61 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
 export type IndicatorType = "url" | "selector" | "text";
+export type UrlMatchMode = "exact" | "prefix";
 
 export interface ParsedIndicator {
   type: IndicatorType;
   value: string;
+  match?: UrlMatchMode;
 }
 
 export function parseIndicator(raw: string): ParsedIndicator {
   const colonIndex = raw.indexOf(":");
   if (colonIndex === -1) {
     throw new Error(
-      `Invalid successIndicator format: "${raw}". Expected "url:<path>", "selector:<css>", or "text:<string>".`
+      `Invalid successIndicator format: "${raw}". Expected "url:<path>", "url-prefix:<path>", "selector:<css>", or "text:<string>".`
     );
   }
-  const type = raw.slice(0, colonIndex) as IndicatorType;
+  const rawType = raw.slice(0, colonIndex);
   const value = raw.slice(colonIndex + 1);
 
-  if (!["url", "selector", "text"].includes(type)) {
+  if (!["url", "url-prefix", "selector", "text"].includes(rawType)) {
     throw new Error(
-      `Unknown successIndicator type: "${type}". Expected "url", "selector", or "text".`
+      `Unknown successIndicator type: "${rawType}". Expected "url", "url-prefix", "selector", or "text".`
     );
   }
   if (!value) {
     throw new Error(`Empty value in successIndicator: "${raw}".`);
   }
-  return { type, value };
+  if (rawType === "url-prefix") {
+    return { type: "url", value, match: "prefix" };
+  }
+  if (rawType === "url") {
+    return { type: "url", value, match: "exact" };
+  }
+  return { type: rawType as IndicatorType, value };
+}
+
+export function matchesUrlIndicator(
+  currentUrl: string,
+  indicator: ParsedIndicator
+): boolean {
+  if (indicator.type !== "url") {
+    return false;
+  }
+
+  try {
+    const url = new URL(currentUrl);
+    if (indicator.match === "prefix") {
+      return url.pathname.startsWith(indicator.value);
+    }
+    return url.pathname === indicator.value;
+  } catch {
+    if (indicator.match === "prefix") {
+      return currentUrl.includes(indicator.value);
+    }
+    return currentUrl === indicator.value;
+  }
 }
 
 export async function waitForSuccess(
@@ -40,16 +70,7 @@ export async function waitForSuccess(
   const poll = async (): Promise<boolean> => {
     switch (indicator.type) {
       case "url": {
-        const currentUrl = page.url();
-        try {
-          const url = new URL(currentUrl);
-          return (
-            url.pathname === indicator.value ||
-            url.pathname.startsWith(indicator.value)
-          );
-        } catch {
-          return currentUrl.includes(indicator.value);
-        }
+        return matchesUrlIndicator(page.url(), indicator);
       }
       case "selector": {
         try {
