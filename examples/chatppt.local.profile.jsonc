@@ -1,0 +1,95 @@
+{
+  "targetUrl": "http://localhost:3000",
+  "appDescription": "ChatPPT is a Next.js chat assistant with Better Auth, Microsoft sign-in, a chat workspace, knowledge base selection, and a /manage admin surface for knowledge bases, groups, jobs, health, and feedback.",
+
+  // Interactive auth is the safest default for local ChatPPT runs.
+  // WebProbe will reuse the cached state when available and otherwise wait
+  // for a human to finish Microsoft sign-in in the visible browser window.
+  "auth": {
+    "type": "interactive",
+    "loginUrl": "/login",
+    "successIndicator": "selector:[data-testid='user-nav-button']",
+    "stateFile": "../playwright/.auth/user.json",
+    "manualTimeoutSeconds": 180
+  },
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "cua",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "cua"
+    }
+  },
+
+  "repoContext": {
+    "root": "..",
+    "framework": "nextjs"
+  },
+
+  "appContext": {
+    "knownPatterns": [
+      "The first authenticated visit may show an onboarding tour. Skipping or dismissing it is expected.",
+      "Admin-only areas may redirect or return 403 responses when the signed-in account lacks admin access."
+    ],
+    "notBugs": [
+      "The login page showing only a Microsoft sign-in button before authentication is expected."
+    ]
+  },
+
+  "mission": {
+    "criticalFlows": [
+      "Reach the authenticated chat shell and verify the sidebar user menu loads",
+      "Navigate from chat to knowledge bases and inspect filtering or selection behavior",
+      "Open the /manage surface and inspect the knowledge base management flow",
+      "Open the New KB dialog and validate required-field behavior without intentionally saving destructive changes"
+    ],
+    "excludedAreas": [
+      "/manage/groups",
+      "/manage/feedback",
+      "Danger Zone"
+    ],
+    "destructiveActionsAllowed": false,
+    "focusModes": ["navigation", "form", "crud"]
+  },
+
+  "budget": {
+    "globalTimeLimitSeconds": 900,
+    "maxStepsPerTask": 35,
+    "maxFrontierSize": 200,
+    "maxStateNodes": 50,
+    "stagnationThreshold": 10
+  },
+
+  "autoCapture": {
+    "consoleErrors": true,
+    "networkErrors": true,
+    "networkErrorMinStatus": 400
+  },
+
+  "policy": {
+    "expectedResponses": [
+      { "pathPrefix": "/api/manage/", "statuses": [401, 403] },
+      { "pathPrefix": "/api/chat", "statuses": [401, 403] },
+      { "pathPrefix": "/api/history", "statuses": [401] },
+      { "pathPrefix": "/api/pinned-knowledge-bases", "statuses": [401] }
+    ],
+    "ignoredConsolePatterns": []
+  },
+
+  "concurrency": {
+    "workers": 1
+  },
+
+  "checkpoint": {
+    "intervalTasks": 5
+  },
+
+  "output": {
+    "dir": "./webprobe-reports/chatppt-local",
+    "format": "both",
+    "screenshots": true
+  }
+}
