@@ -73,4 +73,47 @@ describe("loadConfig", () => {
     expect(config.appDescription).toBe("Test app");
     expect(config.auth).toMatchObject({ type: "none" });
   });
+
+  it("accepts repo-aware mode and bootstrap settings", () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "webprobe.config.json");
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": {
+          "type": "none"
+        },
+        "repoContext": {
+          "root": "../..",
+          "framework": "nextjs",
+          "hintsFile": "./webprobe.hints.jsonc"
+        },
+        "bootstrap": {
+          "command": "pnpm dev",
+          "cwd": "..",
+          "readyUrl": "https://example.com/health",
+          "readyIndicator": "[data-testid='app-shell']",
+          "timeoutSeconds": 90
+        }
+      }`,
+      "utf-8"
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.repoContext).toMatchObject({
+      root: "../..",
+      framework: "nextjs",
+      hintsFile: "./webprobe.hints.jsonc",
+    });
+    expect(config.bootstrap).toMatchObject({
+      command: "pnpm dev",
+      cwd: "..",
+      readyUrl: "https://example.com/health",
+      readyIndicator: "[data-testid='app-shell']",
+      timeoutSeconds: 90,
+    });
+  });
 });

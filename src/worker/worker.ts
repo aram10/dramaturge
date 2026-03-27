@@ -16,6 +16,7 @@ import { CoverageTracker } from "../coverage/tracker.js";
 import { StagnationTracker } from "./stagnation.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
+import type { RepoHints } from "../adaptation/types.js";
 
 interface WorkerSetup {
   findings: RawFinding[];
@@ -41,6 +42,7 @@ function initWorker(
     screenshotsEnabled: boolean;
     stagnationThreshold: number;
     appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
+    repoHints?: RepoHints;
   }
 ): WorkerSetup {
   const findings: RawFinding[] = [];
@@ -67,7 +69,8 @@ function initWorker(
     opts.objectiveLabel,
     opts.objectiveDescription,
     opts.pageType,
-    opts.appContext
+    opts.appContext,
+    opts.repoHints
   );
 
   const agent = stagehand.agent({
@@ -90,7 +93,8 @@ export async function exploreArea(
   agentMode: "cua" | "dom" = "cua",
   screenshotsEnabled = true,
   stagnationThreshold = 0,
-  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] }
+  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
+  repoHints?: RepoHints
 ): Promise<AreaResult> {
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
@@ -118,6 +122,7 @@ export async function exploreArea(
     screenshotsEnabled,
     stagnationThreshold,
     appContext,
+    repoHints,
   });
 
   try {
@@ -171,7 +176,8 @@ export async function executeWorkerTask(
   agentMode: "cua" | "dom" = "cua",
   screenshotsEnabled = true,
   stagnationThreshold = 0,
-  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] }
+  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
+  repoHints?: RepoHints
 ): Promise<WorkerResult> {
   const { findings, evidence, coverageTracker, followupRequests, discoveredEdges, agent } = initWorker(stagehand, {
     screenshotDir,
@@ -184,6 +190,7 @@ export async function executeWorkerTask(
     screenshotsEnabled,
     stagnationThreshold,
     appContext,
+    repoHints,
   });
 
   try {

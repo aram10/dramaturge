@@ -24,6 +24,10 @@ Options:
   --resume <run-dir>   Resume a previous run from its output directory
   --help, -h           Show this help message
 
+Repo-aware config:
+  repoContext.root     Optional repo root for source-aware route/selector hints
+  bootstrap.command    Optional command to start a local app before probing
+
 Environment variables:
   ANTHROPIC_API_KEY              API key for Anthropic models (enables LLM planner)
   OPENAI_API_KEY                 API key for OpenAI models

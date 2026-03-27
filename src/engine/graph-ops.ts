@@ -62,8 +62,8 @@ export async function expandGraph(
       ctx.graph.addEdge(sourceNodeId, newNode.id, edge);
 
       const newTasks = useLLMPlanner
-        ? await ctx.planner.proposeTasksWithLLM(newNode, ctx.graph, ctx.config.models.planner, ctx.mission)
-        : ctx.planner.proposeTasks(newNode, ctx.graph, ctx.mission);
+        ? await ctx.planner.proposeTasksWithLLM(newNode, ctx.graph, ctx.config.models.planner, ctx.mission, ctx.repoHints)
+        : ctx.planner.proposeTasks(newNode, ctx.graph, ctx.mission, ctx.repoHints);
       ctx.frontier.enqueueMany(newTasks);
       console.log(`  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`);
     }
