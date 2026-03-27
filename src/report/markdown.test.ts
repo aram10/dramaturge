@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderMarkdown } from "./markdown.js";
-import type { RunResult } from "../types.js";
+import type { AreaResult, RunResult } from "../types.js";
 
 function makeResult(overrides: Partial<RunResult> = {}): RunResult {
   return {
@@ -82,5 +82,54 @@ describe("renderMarkdown", () => {
   it("omits run configuration section when not provided", () => {
     const md = renderMarkdown(makeResult());
     expect(md).not.toContain("## Run Configuration");
+  });
+
+  it("renders confidence and repro details for findings", () => {
+    const areaResult: AreaResult = {
+      name: "Knowledge bases",
+      url: "https://example.com/manage/knowledge-bases",
+      steps: 2,
+      findings: [
+        {
+          category: "Bug",
+          severity: "Major",
+          title: "Create button stops responding",
+          stepsToReproduce: ["Open the page", "Click Create"],
+          expected: "A dialog opens",
+          actual: "Nothing happens",
+          evidenceIds: ["ev-1"],
+          meta: {
+            source: "agent",
+            confidence: "medium",
+            repro: {
+              stateId: "node-1",
+              route: "https://example.com/manage/knowledge-bases",
+              objective: "Validate knowledge base creation",
+              breadcrumbs: [
+                "click create button -> worked",
+                "submit knowledge base form -> blocked",
+              ],
+              evidenceIds: ["ev-1"],
+            },
+          },
+        },
+      ],
+      screenshots: new Map(),
+      evidence: [],
+      coverage: { controlsDiscovered: 1, controlsExercised: 1, events: [] },
+      pageType: "list",
+      status: "explored",
+    };
+
+    const md = renderMarkdown(
+      makeResult({
+        areaResults: [areaResult],
+      })
+    );
+
+    expect(md).toContain("**Confidence:** medium");
+    expect(md).toContain("**Source:** agent");
+    expect(md).toContain("**Repro route:** https://example.com/manage/knowledge-bases");
+    expect(md).toContain("click create button -> worked");
   });
 });

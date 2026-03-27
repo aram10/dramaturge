@@ -6,6 +6,7 @@ import type { RawFinding, Evidence, CoverageEvent, FollowupRequest, DiscoveredEd
 import { shortId } from "../constants.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
 import type { StagnationTracker } from "./stagnation.js";
+import { buildAgentFindingMeta } from "../repro/repro.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -71,9 +72,21 @@ export function createWorkerTools(
   followupRequests: FollowupRequest[] = [],
   discoveredEdges: DiscoveredEdge[] = [],
   screenshotsEnabled = true,
-  stagnationTracker?: StagnationTracker
+  stagnationTracker?: StagnationTracker,
+  findingContext?: {
+    stateId?: string;
+    objective?: string;
+  }
 ) {
   mkdirSync(screenshotDir, { recursive: true });
+  const breadcrumbs: string[] = [];
+
+  const rememberBreadcrumb = (value: string) => {
+    breadcrumbs.push(value);
+    if (breadcrumbs.length > 8) {
+      breadcrumbs.shift();
+    }
+  };
 
   return {
     log_finding: {
@@ -81,11 +94,22 @@ export function createWorkerTools(
         "Report a bug, UX concern, accessibility, performance, or visual issue. Attach evidence IDs from take_screenshot calls.",
       inputSchema: LogFindingSchema,
       execute: async (input: z.infer<typeof LogFindingSchema>) => {
-        findings.push(input);
+        const evidenceIds = input.evidenceIds ?? [];
+        findings.push({
+          ...input,
+          evidenceIds,
+          meta: buildAgentFindingMeta({
+            stateId: findingContext?.stateId,
+            route: page.url(),
+            objective: findingContext?.objective ?? "Investigate the current page",
+            breadcrumbs: [...breadcrumbs],
+            evidenceIds,
+          }),
+        });
         // Cross-link evidence to this finding
-        if (input.evidenceIds) {
+        if (evidenceIds.length > 0) {
           const findingIndex = findings.length - 1;
-          for (const eid of input.evidenceIds) {
+          for (const eid of evidenceIds) {
             const ev = evidence.find((e) => e.id === eid);
             if (ev) {
               ev.relatedFindingIds.push(String(findingIndex));
@@ -128,6 +152,7 @@ export function createWorkerTools(
           relatedFindingIds: [],
         };
         evidence.push(ev);
+        rememberBreadcrumb(`capture screenshot ${input.ref}`);
 
         return { captured: true, ref: input.ref, filename, evidenceId };
       },
@@ -145,6 +170,7 @@ export function createWorkerTools(
           timestamp: new Date().toISOString(),
         };
         coverageTracker.recordEvent(event);
+        rememberBreadcrumb(`${input.action} ${input.controlId} -> ${input.outcome}`);
         stagnationTracker?.recordStep({ findings: 0, newControls: 1, edges: 0 });
         return {
           recorded: true,
@@ -200,6 +226,7 @@ export function createWorkerTools(
           },
           targetPageType: "unknown",
         });
+        rememberBreadcrumb(`discover edge ${input.actionLabel}`);
         stagnationTracker?.recordStep({ findings: 0, newControls: 0, edges: 1 });
         return {
           reported: true,

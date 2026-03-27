@@ -83,6 +83,35 @@ describe("collectFindings", () => {
   it("returns empty array for no findings", () => {
     expect(collectFindings([])).toEqual([]);
   });
+
+  it("preserves finding metadata and repro artifacts", () => {
+    const area = makeAreaResult("test", [
+      {
+        ...makeFinding("Major", "Bug", "Metadata is preserved"),
+        meta: {
+          source: "agent",
+          confidence: "medium",
+          repro: {
+            stateId: "node-1",
+            route: "https://example.com/manage/knowledge-bases",
+            objective: "Validate knowledge base creation",
+            breadcrumbs: ["click create button -> worked"],
+            evidenceIds: ["ev-1"],
+          },
+        },
+      },
+    ]);
+
+    const result = collectFindings([area]);
+    expect(result[0].meta).toMatchObject({
+      source: "agent",
+      confidence: "medium",
+      repro: {
+        objective: "Validate knowledge base creation",
+        evidenceIds: ["ev-1"],
+      },
+    });
+  });
 });
 
 describe("buildRunResult", () => {

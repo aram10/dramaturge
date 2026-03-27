@@ -68,6 +68,24 @@ export interface CoverageSnapshot {
 
 // --- Findings ---
 
+export type FindingSource = "agent" | "auto-capture" | "confirmed";
+
+export type FindingConfidence = "low" | "medium" | "high";
+
+export interface ReproArtifact {
+  stateId?: string;
+  route?: string;
+  objective: string;
+  breadcrumbs: string[];
+  evidenceIds: string[];
+}
+
+export interface FindingMeta {
+  source: FindingSource;
+  confidence: FindingConfidence;
+  repro?: ReproArtifact;
+}
+
 export interface RawFinding {
   category: FindingCategory;
   severity: FindingSeverity;
@@ -77,6 +95,7 @@ export interface RawFinding {
   actual: string;
   screenshotRef?: string;
   evidenceIds?: string[];
+  meta?: FindingMeta;
 }
 
 export interface Finding extends RawFinding {

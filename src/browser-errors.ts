@@ -9,6 +9,7 @@ import type {
 import { shortId, TRUNCATE_GROUP_KEY, TRUNCATE_SUMMARY, TRUNCATE_TITLE } from "./constants.js";
 import type { PolicyConfig } from "./policy/types.js";
 import { shouldSuppressFinding } from "./policy/policy.js";
+import { buildAutoCaptureFindingMeta } from "./repro/repro.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -128,11 +129,16 @@ export class BrowserErrorCollector {
       evidenceType: Evidence["type"],
       summary: string,
       timestamp: string,
-      finding: Omit<RawFinding, "evidenceIds">
+      finding: Omit<RawFinding, "evidenceIds" | "meta">,
+      metaFactory?: (evidenceIds: string[]) => RawFinding["meta"]
     ) => {
       const evidenceId = `ev-${shortId()}`;
       evidence.push({ id: evidenceId, type: evidenceType, summary, timestamp, relatedFindingIds: [] });
-      findings.push({ ...finding, evidenceIds: [evidenceId] });
+      findings.push({
+        ...finding,
+        evidenceIds: [evidenceId],
+        meta: metaFactory?.([evidenceId]),
+      });
     };
 
     // Group console errors by message to avoid duplicate findings
@@ -159,7 +165,15 @@ export class BrowserErrorCollector {
         stepsToReproduce: [`Navigate to ${first.url}`],
         expected: "No console errors",
         actual: `${errors.length} occurrence(s): ${msg.slice(0, TRUNCATE_GROUP_KEY)}`,
-      });
+      }, (evidenceIds) =>
+        buildAutoCaptureFindingMeta({
+          route: first.url,
+          objective: "Observe auto-captured browser failure",
+          confidence: first.level === "error" ? "high" : "medium",
+          breadcrumbs: [`auto-captured console ${first.level}`],
+          evidenceIds,
+        })
+      );
     }
 
     // Page errors (uncaught exceptions)
@@ -177,7 +191,15 @@ export class BrowserErrorCollector {
         stepsToReproduce: [`Navigate to ${err.url}`],
         expected: "No uncaught exceptions",
         actual: err.message,
-      });
+      }, (evidenceIds) =>
+        buildAutoCaptureFindingMeta({
+          route: err.url,
+          objective: "Observe auto-captured browser failure",
+          confidence: "high",
+          breadcrumbs: ["auto-captured uncaught exception"],
+          evidenceIds,
+        })
+      );
     }
 
     // Group network errors by URL+status
@@ -211,7 +233,15 @@ export class BrowserErrorCollector {
         stepsToReproduce: [`Request: ${first.method} ${first.url}`],
         expected: "Successful HTTP response (2xx/3xx)",
         actual: `${errors.length} occurrence(s): ${first.status} ${first.statusText}`,
-      });
+      }, (evidenceIds) =>
+        buildAutoCaptureFindingMeta({
+          route: first.url,
+          objective: "Observe auto-captured browser failure",
+          confidence: first.status === 0 || first.status >= 500 ? "high" : "medium",
+          breadcrumbs: [`auto-captured ${first.method} ${pathname} -> ${statusLabel}`],
+          evidenceIds,
+        })
+      );
     }
 
     // Clear captured data
