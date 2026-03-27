@@ -7,6 +7,7 @@ export interface ObservedApiEndpoint {
 
 export class NetworkTrafficObserver {
   private endpoints = new Map<string, ObservedApiEndpoint>();
+  private pageEndpoints = new Map<string, Map<string, ObservedApiEndpoint>>();
   private teardownFns = new Map<string, Array<() => void>>();
 
   attach(page: any, pageKey = "default"): void {
@@ -26,6 +27,7 @@ export class NetworkTrafficObserver {
       if (!shouldRecordRoute(route, request.resourceType?.())) return;
 
       this.record({
+        pageKey,
         route,
         method: request.method(),
         status: response.status(),
@@ -44,6 +46,7 @@ export class NetworkTrafficObserver {
       if (!shouldRecordRoute(route, request.resourceType?.())) return;
 
       this.record({
+        pageKey,
         route,
         method: request.method(),
         status: 0,
@@ -70,8 +73,16 @@ export class NetworkTrafficObserver {
     this.teardownFns.clear();
   }
 
-  snapshot(): ObservedApiEndpoint[] {
-    return [...this.endpoints.values()].map((endpoint) => ({
+  resetPage(pageKey: string): void {
+    this.pageEndpoints.set(pageKey, new Map());
+  }
+
+  snapshot(pageKey?: string): ObservedApiEndpoint[] {
+    const source = pageKey
+      ? this.pageEndpoints.get(pageKey) ?? new Map<string, ObservedApiEndpoint>()
+      : this.endpoints;
+
+    return [...source.values()].map((endpoint) => ({
       route: endpoint.route,
       methods: [...endpoint.methods],
       statuses: [...endpoint.statuses],
@@ -80,12 +91,29 @@ export class NetworkTrafficObserver {
   }
 
   private record(input: {
+    pageKey: string;
     route: string;
     method: string;
     status: number;
     failure?: string;
   }): void {
-    const current = this.endpoints.get(input.route) ?? {
+    this.recordInto(this.endpoints, input);
+    const pageMap =
+      this.pageEndpoints.get(input.pageKey) ?? new Map<string, ObservedApiEndpoint>();
+    this.recordInto(pageMap, input);
+    this.pageEndpoints.set(input.pageKey, pageMap);
+  }
+
+  private recordInto(
+    map: Map<string, ObservedApiEndpoint>,
+    input: {
+      route: string;
+      method: string;
+      status: number;
+      failure?: string;
+    }
+  ): void {
+    const current = map.get(input.route) ?? {
       route: input.route,
       methods: [],
       statuses: [],
@@ -98,7 +126,7 @@ export class NetworkTrafficObserver {
       current.failures = uniqueSorted([...current.failures, input.failure]);
     }
 
-    this.endpoints.set(input.route, current);
+    map.set(input.route, current);
   }
 }
 

@@ -24,7 +24,8 @@ export interface Evidence {
     | "console-error"
     | "network-error"
     | "accessibility-scan"
-    | "visual-diff";
+    | "visual-diff"
+    | "api-contract";
   summary: string;
   path?: string;
   timestamp: string;
@@ -401,6 +402,7 @@ export interface Checkpoint {
   actionsByNode?: Record<string, ReplayableAction[]>;
   blindSpots: BlindSpot[];
   completedTaskIds: string[];
+  plannerState?: Record<string, WorkerType[]>;
 }
 
 // --- LLM Planner Task Proposal ---

@@ -124,18 +124,22 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
     return "detail";
   }
 
+  // Landing page (root with minimal interactive elements)
+  if (
+    s.pathname === "/" &&
+    s.formCount === 0 &&
+    s.tableCount === 0 &&
+    !DASHBOARD_HEADING_KEYWORDS.some((k) => s.headingText.includes(k))
+  ) {
+    return "landing";
+  }
+
   // Dashboard pages
   if (
-    s.pathname === "/" ||
     DASHBOARD_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
     DASHBOARD_HEADING_KEYWORDS.some((k) => s.headingText.includes(k))
   ) {
     return "dashboard";
-  }
-
-  // Landing page (root with minimal interactive elements)
-  if (s.pathname === "/" && s.formCount === 0 && s.tableCount === 0) {
-    return "landing";
   }
 
   return "unknown";

@@ -49,6 +49,7 @@ export async function expandGraph(
       if (!resolved) continue;
       fingerprint = resolved.fingerprint;
       pageType = resolved.pageType;
+      edge.navigationHint.url = edge.navigationHint.url ?? resolved.url;
       try { await ctx.page.goto(ctx.config.targetUrl); } catch { /* best-effort */ }
     }
 
@@ -89,7 +90,11 @@ async function resolveEdgeFingerprint(
   ctx: EngineContext,
   sourceNodeId: string,
   hint: { url?: string; selector?: string; actionDescription?: string }
-): Promise<{ fingerprint: Awaited<ReturnType<typeof captureFingerprint>>; pageType: Awaited<ReturnType<typeof classifyPage>> } | null> {
+): Promise<{
+  fingerprint: Awaited<ReturnType<typeof captureFingerprint>>;
+  pageType: Awaited<ReturnType<typeof classifyPage>>;
+  url?: string;
+} | null> {
   try {
     const navigation = await ctx.navigator.navigateFromNode(
       sourceNodeId,
@@ -109,6 +114,7 @@ async function resolveEdgeFingerprint(
     return {
       fingerprint: await captureFingerprint(ctx.page),
       pageType: await classifyPage(ctx.page),
+      url: typeof ctx.page.url === "function" ? ctx.page.url() : undefined,
     };
   } catch (error) {
     console.log(`  Could not resolve discovered edge: ${error instanceof Error ? error.message : String(error)}`);

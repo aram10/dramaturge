@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { proposeLLMTasks } from "./llm.js";
+import { hasLLMApiKey, proposeLLMTasks } from "./llm.js";
 
 describe("proposeLLMTasks", () => {
   const originalFetch = globalThis.fetch;
   const originalEnv = process.env.ANTHROPIC_API_KEY;
+  const originalOpenAiEnv = process.env.OPENAI_API_KEY;
+  const originalGoogleEnv = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = "test-key-123";
@@ -16,6 +18,29 @@ describe("proposeLLMTasks", () => {
     } else {
       delete process.env.ANTHROPIC_API_KEY;
     }
+    if (originalOpenAiEnv !== undefined) {
+      process.env.OPENAI_API_KEY = originalOpenAiEnv;
+    } else {
+      delete process.env.OPENAI_API_KEY;
+    }
+    if (originalGoogleEnv !== undefined) {
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = originalGoogleEnv;
+    } else {
+      delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    }
+  });
+
+  it("checks planner readiness against the model's provider", () => {
+    process.env.ANTHROPIC_API_KEY = "anthropic-key";
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+
+    expect(hasLLMApiKey("anthropic/claude-sonnet-4-6")).toBe(true);
+    expect(hasLLMApiKey("openai/gpt-4.1")).toBe(false);
+
+    process.env.OPENAI_API_KEY = "openai-key";
+    expect(hasLLMApiKey("openai/gpt-4.1")).toBe(true);
+    expect(hasLLMApiKey("google/gemini-2.5-flash")).toBe(false);
   });
 
   it("returns null when ANTHROPIC_API_KEY is not set", async () => {

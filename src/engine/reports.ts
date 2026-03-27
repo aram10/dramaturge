@@ -5,6 +5,7 @@ import type { AreaResult, FrontierItem } from "../types.js";
 import { buildRunResult } from "../report/collector.js";
 import { renderMarkdown } from "../report/markdown.js";
 import { renderJson } from "../report/json.js";
+import { writeGeneratedPlaywrightTests } from "../report/test-gen.js";
 import { hasLLMApiKey } from "../llm.js";
 
 export function buildAreaResults(ctx: EngineContext): AreaResult[] {
@@ -72,13 +73,14 @@ export function writeReports(
       },
       checkpointInterval: config.checkpoint.intervalTasks,
       autoCaptureEnabled: config.autoCapture.consoleErrors || config.autoCapture.networkErrors,
-      llmPlannerEnabled: hasLLMApiKey(),
+      llmPlannerEnabled: hasLLMApiKey(config.models.planner),
       memoryEnabled: config.memory.enabled,
       visualRegressionEnabled: config.visualRegression.enabled,
       warmStartEnabled: config.memory.enabled && config.memory.warmStart,
     },
     ctx.runMemory
   );
+  const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);
 
   const format = config.output.format;
   if (format === "markdown" || format === "both") {
@@ -90,5 +92,10 @@ export function writeReports(
     const json = renderJson(runResult);
     writeFileSync(join(ctx.outputDir, "report.json"), json, "utf-8");
     console.log(`JSON report: ${join(ctx.outputDir, "report.json")}`);
+  }
+  if (generatedTests.length > 0) {
+    console.log(
+      `Generated ${generatedTests.length} Playwright test file(s): ${join(ctx.outputDir, "generated-tests")}`
+    );
   }
 }

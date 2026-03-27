@@ -16,6 +16,10 @@ export type { RunEngineOptions } from "./engine.js";
 export { CATEGORY_PREFIX } from "./types.js";
 export { MemoryStore, buildFindingSignature } from "./memory/store.js";
 export { comparePngBuffers, runVisualRegressionScan } from "./coverage/visual-regression.js";
+export {
+  generatePlaywrightTests,
+  writeGeneratedPlaywrightTests,
+} from "./report/test-gen.js";
 export type {
   Area,
   AreaResult,

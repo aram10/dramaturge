@@ -24,6 +24,8 @@ const RepoHintsOverrideSchema = z.object({
       route: z.string(),
       methods: z.array(z.string()),
       statuses: z.array(z.number().int()),
+      authRequired: z.boolean().optional(),
+      validationSchemas: z.array(z.string()).optional(),
     })
   ).optional(),
   authHints: z
@@ -77,6 +79,8 @@ function mergeRepoHints(base: RepoHints, override?: RepoHintsOverride): RepoHint
             route: endpoint.route,
             methods: uniqueSorted(endpoint.methods),
             statuses: [...new Set(endpoint.statuses)].sort((left, right) => left - right),
+            authRequired: endpoint.authRequired,
+            validationSchemas: uniqueSorted(endpoint.validationSchemas ?? []),
           });
           return acc;
         }
@@ -85,6 +89,11 @@ function mergeRepoHints(base: RepoHints, override?: RepoHintsOverride): RepoHint
         existing.statuses = [...new Set([...existing.statuses, ...endpoint.statuses])].sort(
           (left, right) => left - right
         );
+        existing.authRequired = existing.authRequired || endpoint.authRequired;
+        existing.validationSchemas = uniqueSorted([
+          ...(existing.validationSchemas ?? []),
+          ...(endpoint.validationSchemas ?? []),
+        ]);
         return acc;
       }, [])
       .sort((left, right) => left.route.localeCompare(right.route)),

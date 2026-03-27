@@ -259,6 +259,24 @@ export class Planner {
     this.workerTypesPerNode.set(nodeId, set);
   }
 
+  snapshotDispatchState(): Record<string, WorkerType[]> {
+    return Object.fromEntries(
+      [...this.workerTypesPerNode.entries()].map(([nodeId, workerTypes]) => [
+        nodeId,
+        [...workerTypes].sort(),
+      ])
+    );
+  }
+
+  restoreDispatchState(snapshot: Record<string, WorkerType[]>): void {
+    this.workerTypesPerNode = new Map(
+      Object.entries(snapshot).map(([nodeId, workerTypes]) => [
+        nodeId,
+        new Set(workerTypes),
+      ])
+    );
+  }
+
   /**
    * Convert a follow-up request from a worker into a frontier item.
    */
