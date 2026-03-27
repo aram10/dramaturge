@@ -37,7 +37,7 @@ describe("BrowserErrorCollector", () => {
     page.emit("console", { type: () => "log", text: () => "normal log" }); // should be ignored
     page.emit("console", { type: () => "warning", text: () => "deprecation warning" });
 
-    expect(collector.pendingCount).toBe(2);
+    expect(collector.pendingCount()).toBe(2);
 
     const { findings, evidence } = collector.flush();
     expect(findings).toHaveLength(2);
@@ -46,7 +46,7 @@ describe("BrowserErrorCollector", () => {
     expect(findings[1].title).toContain("console warning");
     expect(findings[1].severity).toBe("Minor");
     expect(evidence).toHaveLength(2);
-    expect(collector.pendingCount).toBe(0);
+    expect(collector.pendingCount()).toBe(0);
   });
 
   it("captures page errors (uncaught exceptions)", () => {

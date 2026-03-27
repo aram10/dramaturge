@@ -7,6 +7,7 @@ import type { Planner } from "../planner/planner.js";
 import type { Navigator } from "../planner/navigator.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
 import type { BrowserErrorCollector } from "../browser-errors.js";
+import type { WorkerSession } from "./worker-pool.js";
 
 export interface EngineContext {
   config: WebProbeConfig;
@@ -25,5 +26,5 @@ export interface EngineContext {
   evidenceByNode: Map<string, Evidence[]>;
   errorCollector: BrowserErrorCollector;
   completedTaskIds: Set<string>;
-  workerPool: Stagehand[];
+  workerPool: WorkerSession[];
 }

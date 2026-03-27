@@ -111,9 +111,13 @@ export function maintainFrontier(ctx: EngineContext): void {
   }
 }
 
-export function flushBrowserErrors(ctx: EngineContext, nodeId: string): void {
-  if (ctx.errorCollector.pendingCount === 0) return;
-  const { findings, evidence } = ctx.errorCollector.flush();
+export function flushBrowserErrors(
+  ctx: EngineContext,
+  nodeId: string,
+  pageKey: string
+): void {
+  if (ctx.errorCollector.pendingCount(pageKey) === 0) return;
+  const { findings, evidence } = ctx.errorCollector.flush(pageKey);
   if (findings.length === 0) return;
 
   appendToNodeMap(ctx.findingsByNode, nodeId, findings);

@@ -16,28 +16,34 @@ export interface BrowserErrorCollectorOptions {
   networkErrorMinStatus: number;
 }
 
+interface ErrorBucket {
+  consoleErrors: BrowserConsoleError[];
+  networkErrors: BrowserNetworkError[];
+  pageErrors: BrowserPageError[];
+}
+
 /** Auto-captures console errors, uncaught exceptions, and network failures from browser pages. */
 export class BrowserErrorCollector {
-  private consoleErrors: BrowserConsoleError[] = [];
-  private networkErrors: BrowserNetworkError[] = [];
-  private pageErrors: BrowserPageError[] = [];
+  private buckets = new Map<string, ErrorBucket>();
   private options: BrowserErrorCollectorOptions;
-  private teardownFns: Array<() => void> = [];
+  private teardownFns = new Map<string, Array<() => void>>();
 
   constructor(options: BrowserErrorCollectorOptions) {
     this.options = options;
   }
 
   /** Attach event listeners to a page. Safe to call for multiple pages. */
-  attach(page: StagehandPage): void {
+  attach(page: StagehandPage, pageKey = "default"): void {
     // Stagehand's Page type only exposes a subset of Playwright events,
     const p = page as any;
+    const bucket = this.getBucket(pageKey);
+    const teardowns = this.teardownFns.get(pageKey) ?? [];
 
     if (this.options.captureConsole) {
       const onConsole = (msg: { type: () => string; text: () => string }) => {
         const type = msg.type();
         if (type === "error" || type === "warning") {
-          this.consoleErrors.push({
+          bucket.consoleErrors.push({
             level: type as "error" | "warning",
             text: msg.text(),
             url: page.url(),
@@ -46,17 +52,17 @@ export class BrowserErrorCollector {
         }
       };
       p.on("console", onConsole);
-      this.teardownFns.push(() => p.off("console", onConsole));
+      teardowns.push(() => p.off("console", onConsole));
 
       const onPageError = (error: Error) => {
-        this.pageErrors.push({
+        bucket.pageErrors.push({
           message: error.message,
           url: page.url(),
           timestamp: new Date().toISOString(),
         });
       };
       p.on("pageerror", onPageError);
-      this.teardownFns.push(() => p.off("pageerror", onPageError));
+      teardowns.push(() => p.off("pageerror", onPageError));
     }
 
     if (this.options.captureNetwork) {
@@ -64,7 +70,7 @@ export class BrowserErrorCollector {
       const onResponse = (response: { status: () => number; url: () => string; statusText: () => string; request: () => { method: () => string } }) => {
         const status = response.status();
         if (status >= minStatus) {
-          this.networkErrors.push({
+          bucket.networkErrors.push({
             method: response.request().method(),
             url: response.url(),
             status,
@@ -74,12 +80,12 @@ export class BrowserErrorCollector {
         }
       };
       p.on("response", onResponse);
-      this.teardownFns.push(() => p.off("response", onResponse));
+      teardowns.push(() => p.off("response", onResponse));
 
       const onRequestFailed = (request: { url: () => string; method: () => string; failure: () => { errorText: string } | null }) => {
         const failure = request.failure();
         if (failure) {
-          this.networkErrors.push({
+          bucket.networkErrors.push({
             method: request.method(),
             url: request.url(),
             status: 0,
@@ -89,19 +95,31 @@ export class BrowserErrorCollector {
         }
       };
       p.on("requestfailed", onRequestFailed);
-      this.teardownFns.push(() => p.off("requestfailed", onRequestFailed));
+      teardowns.push(() => p.off("requestfailed", onRequestFailed));
     }
+
+    this.teardownFns.set(pageKey, teardowns);
   }
 
-    detach(): void {
-    for (const fn of this.teardownFns) fn();
-    this.teardownFns = [];
+  detach(pageKey?: string): void {
+    if (pageKey) {
+      const teardowns = this.teardownFns.get(pageKey) ?? [];
+      for (const fn of teardowns) fn();
+      this.teardownFns.delete(pageKey);
+      return;
+    }
+
+    for (const teardowns of this.teardownFns.values()) {
+      for (const fn of teardowns) fn();
+    }
+    this.teardownFns.clear();
   }
 
-    /** Drain captured errors into findings + evidence, clearing internal buffers. */
-  flush(): { findings: RawFinding[]; evidence: Evidence[] } {
+  /** Drain captured errors into findings + evidence, clearing internal buffers. */
+  flush(pageKey = "default"): { findings: RawFinding[]; evidence: Evidence[] } {
     const findings: RawFinding[] = [];
     const evidence: Evidence[] = [];
+    const bucket = this.getBucket(pageKey);
 
     const emit = (
       evidenceType: Evidence["type"],
@@ -116,7 +134,7 @@ export class BrowserErrorCollector {
 
     // Group console errors by message to avoid duplicate findings
     const consoleMsgs = new Map<string, BrowserConsoleError[]>();
-    for (const err of this.consoleErrors) {
+    for (const err of bucket.consoleErrors) {
       const key = err.text.slice(0, TRUNCATE_GROUP_KEY);
       const group = consoleMsgs.get(key) ?? [];
       group.push(err);
@@ -136,7 +154,7 @@ export class BrowserErrorCollector {
     }
 
     // Page errors (uncaught exceptions)
-    for (const err of this.pageErrors) {
+    for (const err of bucket.pageErrors) {
       emit("console-error", `Uncaught: ${err.message.slice(0, TRUNCATE_SUMMARY)}`, err.timestamp, {
         category: "Bug",
         severity: "Critical",
@@ -149,7 +167,7 @@ export class BrowserErrorCollector {
 
     // Group network errors by URL+status
     const networkMsgs = new Map<string, BrowserNetworkError[]>();
-    for (const err of this.networkErrors) {
+    for (const err of bucket.networkErrors) {
       const key = `${err.method} ${err.url} ${err.status}`;
       const group = networkMsgs.get(key) ?? [];
       group.push(err);
@@ -176,18 +194,32 @@ export class BrowserErrorCollector {
     }
 
     // Clear captured data
-    this.consoleErrors = [];
-    this.networkErrors = [];
-    this.pageErrors = [];
+    bucket.consoleErrors = [];
+    bucket.networkErrors = [];
+    bucket.pageErrors = [];
 
     return { findings, evidence };
   }
 
-    get pendingCount(): number {
+  pendingCount(pageKey = "default"): number {
+    const bucket = this.getBucket(pageKey);
     return (
-      this.consoleErrors.length +
-      this.networkErrors.length +
-      this.pageErrors.length
+      bucket.consoleErrors.length +
+      bucket.networkErrors.length +
+      bucket.pageErrors.length
     );
+  }
+
+  private getBucket(pageKey: string): ErrorBucket {
+    let bucket = this.buckets.get(pageKey);
+    if (!bucket) {
+      bucket = {
+        consoleErrors: [],
+        networkErrors: [],
+        pageErrors: [],
+      };
+      this.buckets.set(pageKey, bucket);
+    }
+    return bucket;
   }
 }
