@@ -5,6 +5,11 @@ import type { PageFingerprint, DiscoveredEdge } from "../types.js";
 function makeFp(hash: string): PageFingerprint {
   return {
     normalizedPath: `/${hash}`,
+    signature: {
+      pathname: `/${hash}`,
+      query: [],
+      uiMarkers: [],
+    },
     title: `Page ${hash}`,
     heading: `Heading ${hash}`,
     dialogTitles: [],

@@ -2,7 +2,6 @@ import type { EngineContext } from "./context.js";
 import type { WorkerResult, FrontierItem } from "../types.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
-import { NAV_SETTLE_DELAY_MS } from "../constants.js";
 
 function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): void {
   const existing = map.get(nodeId) ?? [];
@@ -41,7 +40,11 @@ export async function expandGraph(
     // Workers report discovered edges with an empty fingerprint hash when
     // they haven't navigated to the target page yet. Resolve by navigating.
     if (fingerprint.hash === "") {
-      const resolved = await resolveEdgeFingerprint(ctx, edge.navigationHint);
+      const resolved = await resolveEdgeFingerprint(
+        ctx,
+        sourceNodeId,
+        edge.navigationHint
+      );
       if (!resolved) continue;
       fingerprint = resolved.fingerprint;
       pageType = resolved.pageType;
@@ -69,21 +72,29 @@ export async function expandGraph(
 
 async function resolveEdgeFingerprint(
   ctx: EngineContext,
+  sourceNodeId: string,
   hint: { url?: string; selector?: string; actionDescription?: string }
 ): Promise<{ fingerprint: Awaited<ReturnType<typeof captureFingerprint>>; pageType: Awaited<ReturnType<typeof classifyPage>> } | null> {
   try {
-    if (hint.url) {
-      await ctx.page.goto(hint.url);
-    } else if (hint.selector) {
-      await ctx.stagehand.act(`Click the element matching "${hint.selector}"`);
-      await new Promise((r) => setTimeout(r, NAV_SETTLE_DELAY_MS));
-    } else if (hint.actionDescription) {
-      await ctx.stagehand.act(hint.actionDescription);
-      await new Promise((r) => setTimeout(r, NAV_SETTLE_DELAY_MS));
-    } else {
+    const navigation = await ctx.navigator.navigateFromNode(
+      sourceNodeId,
+      hint,
+      ctx.graph,
+      ctx.page,
+      ctx.stagehand,
+      ctx.config.targetUrl
+    );
+    if (!navigation.success) {
+      console.log(
+        `  Could not resolve discovered edge: ${navigation.reason ?? "navigation failed"}`
+      );
       return null;
     }
-    return { fingerprint: await captureFingerprint(ctx.page), pageType: await classifyPage(ctx.page) };
+
+    return {
+      fingerprint: await captureFingerprint(ctx.page),
+      pageType: await classifyPage(ctx.page),
+    };
   } catch (error) {
     console.log(`  Could not resolve discovered edge: ${error instanceof Error ? error.message : String(error)}`);
     return null;

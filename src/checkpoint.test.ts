@@ -9,7 +9,18 @@ import { CoverageTracker } from "./coverage/tracker.js";
 import type { RawFinding, Evidence, PageFingerprint } from "./types.js";
 
 function makeFP(hash: string): PageFingerprint {
-  return { normalizedPath: "/", title: "T", heading: "H", dialogTitles: [], hash };
+  return {
+    normalizedPath: "/",
+    signature: {
+      pathname: "/",
+      query: [],
+      uiMarkers: [],
+    },
+    title: "T",
+    heading: "H",
+    dialogTitles: [],
+    hash,
+  };
 }
 
 describe("Checkpoint", () => {

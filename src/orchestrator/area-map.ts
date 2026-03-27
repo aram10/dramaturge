@@ -1,4 +1,8 @@
 import type { Area } from "../types.js";
+import {
+  buildStateSignatureFromUrl,
+  buildStateSignatureKey,
+} from "../graph/state-signature.js";
 
 /** Deduplicate by URL path (or name fallback); keeps first occurrence. */
 export function deduplicateAreas(areas: Area[]): Area[] {
@@ -7,7 +11,9 @@ export function deduplicateAreas(areas: Area[]): Area[] {
   for (const area of areas) {
     // Normalize key: prefer URL path, fall back to lowercase name
     const key = area.url
-      ? new URL(area.url, "http://placeholder").pathname
+      ? buildStateSignatureKey(
+          buildStateSignatureFromUrl(area.url, "http://placeholder")
+        )
       : area.name.toLowerCase().trim();
 
     if (!seen.has(key)) {
