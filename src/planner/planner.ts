@@ -11,6 +11,7 @@ import type { StateGraph } from "../graph/state-graph.js";
 import { computePriority, type PriorityContext } from "./priority.js";
 import { proposeLLMTasks } from "../llm.js";
 import { shortId } from "../constants.js";
+import type { PlannerMemorySignals } from "../memory/types.js";
 
 /** Default page-type → worker-type mapping. */
 const PAGE_TYPE_WORKER_MAP: Record<PageType, WorkerType> = {
@@ -84,7 +85,8 @@ export class Planner {
     node: StateNode,
     _graph: StateGraph,
     mission?: MissionConfig,
-    repoHints?: RepoHints
+    repoHints?: RepoHints,
+    memorySignals?: PlannerMemorySignals
   ): FrontierItem[] {
     const proposals: PlannerProposal[] = [];
 
@@ -130,7 +132,7 @@ export class Planner {
       });
     }
 
-    return this.toFrontierItems(node, proposals, mission);
+    return this.toFrontierItems(node, proposals, mission, memorySignals);
   }
 
   /**
@@ -143,7 +145,9 @@ export class Planner {
     graph: StateGraph,
     plannerModel: string,
     mission?: MissionConfig,
-    repoHints?: RepoHints
+    repoHints?: RepoHints,
+    llmRequestTimeoutMs?: number,
+    memorySignals?: PlannerMemorySignals
   ): Promise<FrontierItem[]> {
     const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
     const repoHintSummary = summarizeRepoHints(repoHints);
@@ -166,15 +170,16 @@ export class Planner {
       plannerModel,
       graph.summary(),
       nodeDesc,
-      allowedTypes
+      allowedTypes,
+      llmRequestTimeoutMs
     );
 
     if (!llmProposals) {
       // LLM failed — fall back to deterministic
-      return this.proposeTasks(node, graph, mission, repoHints);
+      return this.proposeTasks(node, graph, mission, repoHints, memorySignals);
     }
 
-    return this.toFrontierItems(node, llmProposals, mission);
+    return this.toFrontierItems(node, llmProposals, mission, memorySignals);
   }
 
   /**
@@ -183,11 +188,13 @@ export class Planner {
   private toFrontierItems(
     node: StateNode,
     proposals: PlannerProposal[],
-    mission?: MissionConfig
+    mission?: MissionConfig,
+    memorySignals?: PlannerMemorySignals
   ): FrontierItem[] {
     const priorityCtx: PriorityContext = {
       visitedWorkerTypes:
         this.workerTypesPerNode.get(node.id) ?? new Set(),
+      memory: memorySignals,
     };
 
     return proposals

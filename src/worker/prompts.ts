@@ -1,5 +1,6 @@
 import type { MissionConfig, PageType } from "../types.js";
 import type { RepoHints } from "../adaptation/types.js";
+import type { WorkerHistoryContext } from "../memory/types.js";
 
 interface AppContext {
   knownPatterns?: string[];
@@ -84,6 +85,38 @@ function buildMissionSection(mission?: MissionConfig): string {
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
 }
 
+function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
+  if (!history) return "";
+
+  const parts: string[] = [];
+
+  if (history.suppressedFindings.length > 0) {
+    parts.push("## Historical Notes");
+    parts.push(
+      `Previously suppressed findings to avoid re-reporting unless the behavior materially changed: ${history.suppressedFindings.join(
+        " | "
+      )}`
+    );
+  }
+
+  if (history.flakyPageNotes.length > 0) {
+    if (parts.length === 0) parts.push("## Historical Notes");
+    parts.push(`Historically dynamic page notes: ${history.flakyPageNotes.join(" | ")}`);
+  }
+
+  if (history.navigationHints.length > 0) {
+    if (parts.length === 0) parts.push("## Historical Notes");
+    parts.push(`Navigation hints from prior runs: ${history.navigationHints.join(" | ")}`);
+  }
+
+  if (history.authHints.length > 0) {
+    if (parts.length === 0) parts.push("## Historical Notes");
+    parts.push(`Authentication hints from prior runs: ${history.authHints.join(" | ")}`);
+  }
+
+  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+}
+
 export function buildWorkerSystemPrompt(
   appDescription: string,
   areaName: string,
@@ -91,7 +124,8 @@ export function buildWorkerSystemPrompt(
   pageType?: PageType,
   appContext?: AppContext,
   repoHints?: RepoHints,
-  mission?: MissionConfig
+  mission?: MissionConfig,
+  history?: WorkerHistoryContext
 ): string {
   const areaContext = areaDescription
     ? `\n\nAbout this area: ${areaDescription}`
@@ -107,7 +141,7 @@ export function buildWorkerSystemPrompt(
 ${appDescription}${buildRepoHintsSection(repoHints)}
 
 ## Your Assignment
-You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}${buildMissionSection(mission)}
+You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}${buildMissionSection(mission)}${buildHistoricalContextSection(history)}
 
 ## What to Do
 1. Systematically explore all visible UI elements in this area

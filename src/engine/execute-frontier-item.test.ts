@@ -149,7 +149,8 @@ describe("executeFrontierItem", () => {
         appDescription: "Example app",
         destructiveActionsAllowed: false,
         criticalFlows: ["knowledge-bases"],
-      }
+      },
+      undefined
     );
   });
 });

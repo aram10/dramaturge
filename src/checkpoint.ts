@@ -4,6 +4,7 @@ import type {
   Checkpoint,
   RawFinding,
   Evidence,
+  ReplayableAction,
   BlindSpot,
   FrontierItem,
 } from "./types.js";
@@ -19,6 +20,7 @@ export function saveCheckpoint(
   frontier: FrontierQueue,
   findingsByNode: Map<string, RawFinding[]>,
   evidenceByNode: Map<string, Evidence[]>,
+  actionsByNode: Map<string, ReplayableAction[]>,
   coverage: CoverageTracker,
   completedTaskIds: string[],
   tasksExecuted: number
@@ -34,6 +36,7 @@ export function saveCheckpoint(
     frontierSnapshot: frontier.snapshot(),
     findingsByNode: Object.fromEntries(findingsByNode.entries()),
     evidenceByNode: Object.fromEntries(evidenceByNode.entries()),
+    actionsByNode: Object.fromEntries(actionsByNode.entries()),
     blindSpots: coverage.getBlindSpots(),
     completedTaskIds,
   };
@@ -63,6 +66,7 @@ export function hydrateFromCheckpoint(
 ): {
   findingsByNode: Map<string, RawFinding[]>;
   evidenceByNode: Map<string, Evidence[]>;
+  actionsByNode: Map<string, ReplayableAction[]>;
   completedTaskIds: Set<string>;
   tasksExecuted: number;
 } {
@@ -97,9 +101,15 @@ export function hydrateFromCheckpoint(
     evidenceByNode.set(nodeId, evidence);
   }
 
+  const actionsByNode = new Map<string, ReplayableAction[]>();
+  for (const [nodeId, actions] of Object.entries(checkpoint.actionsByNode ?? {})) {
+    actionsByNode.set(nodeId, actions);
+  }
+
   return {
     findingsByNode,
     evidenceByNode,
+    actionsByNode,
     completedTaskIds: new Set(checkpoint.completedTaskIds),
     tasksExecuted: checkpoint.tasksExecuted,
   };

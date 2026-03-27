@@ -1,6 +1,12 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
-import type { WebProbeConfig } from "../config.js";
-import type { BudgetConfig, MissionConfig, RawFinding, Evidence } from "../types.js";
+import type { DramaturgeConfig } from "../config.js";
+import type {
+  BudgetConfig,
+  MissionConfig,
+  RawFinding,
+  Evidence,
+  ReplayableAction,
+} from "../types.js";
 import type { StateGraph } from "../graph/state-graph.js";
 import type { FrontierQueue } from "../graph/frontier.js";
 import type { Planner } from "../planner/planner.js";
@@ -9,9 +15,11 @@ import type { CoverageTracker } from "../coverage/tracker.js";
 import type { BrowserErrorCollector } from "../browser-errors.js";
 import type { WorkerSession } from "./worker-pool.js";
 import type { RepoHints } from "../adaptation/types.js";
+import type { MemoryStore } from "../memory/store.js";
+import type { RunMemoryMeta } from "../types.js";
 
 export interface EngineContext {
-  config: WebProbeConfig;
+  config: DramaturgeConfig;
   budget: BudgetConfig;
   mission: MissionConfig | undefined;
   stagehand: Stagehand;
@@ -25,8 +33,11 @@ export interface EngineContext {
   outputDir: string;
   findingsByNode: Map<string, RawFinding[]>;
   evidenceByNode: Map<string, Evidence[]>;
+  actionsByNode: Map<string, ReplayableAction[]>;
   errorCollector: BrowserErrorCollector;
   completedTaskIds: Set<string>;
   workerPool: WorkerSession[];
   repoHints?: RepoHints;
+  memoryStore?: MemoryStore;
+  runMemory?: RunMemoryMeta;
 }

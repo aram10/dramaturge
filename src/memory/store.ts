@@ -1,0 +1,317 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { DramaturgeConfig } from "../config.js";
+import type { AreaResult, RawFinding, RunMemoryMeta } from "../types.js";
+import type { StateGraph } from "../graph/state-graph.js";
+import { collectFindings, buildFindingGroupKey } from "../report/collector.js";
+import type {
+  FlakyPageInput,
+  HistoricalFlakyPageRecord,
+  MemoryRouteMatchInput,
+  MemorySnapshot,
+  NavigationMemorySnapshot,
+  PlannerMemorySignals,
+  WorkerHistoryContext,
+} from "./types.js";
+
+const STORE_FILE = "memory.json";
+const CURRENT_MEMORY_VERSION = 1 as const;
+
+function createEmptySnapshot(): MemorySnapshot {
+  return {
+    version: CURRENT_MEMORY_VERSION,
+    updatedAt: new Date(0).toISOString(),
+    findingHistory: {},
+    flakyPages: [],
+    authHints: {
+      successfulLoginRoutes: [],
+    },
+  };
+}
+
+function normalizeRoute(urlOrPath?: string): string | undefined {
+  if (!urlOrPath) {
+    return undefined;
+  }
+  try {
+    return new URL(urlOrPath).pathname;
+  } catch {
+    return urlOrPath.startsWith("/") ? urlOrPath : `/${urlOrPath}`;
+  }
+}
+
+function normalizeOrigin(urlOrPath?: string): string | undefined {
+  if (!urlOrPath) {
+    return undefined;
+  }
+  try {
+    return new URL(urlOrPath).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function uniqueStrings(values: Array<string | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+function matchesRoute(
+  input: MemoryRouteMatchInput,
+  candidateRoute?: string,
+  candidateFingerprintHash?: string
+): boolean {
+  const route = normalizeRoute(input.url) ?? input.fingerprint?.normalizedPath;
+  if (candidateFingerprintHash && input.fingerprint?.hash === candidateFingerprintHash) {
+    return true;
+  }
+  if (!candidateRoute) {
+    return false;
+  }
+  const normalizedCandidate = normalizeRoute(candidateRoute);
+  if (!normalizedCandidate || !route) {
+    return false;
+  }
+  return route === normalizedCandidate;
+}
+
+export function buildFindingSignature(finding: Pick<RawFinding, "category" | "severity" | "title" | "expected" | "actual">): string {
+  return buildFindingGroupKey(finding);
+}
+
+export class MemoryStore {
+  private snapshot?: MemorySnapshot;
+
+  constructor(private dir: string) {}
+
+  getSnapshot(): MemorySnapshot {
+    if (!this.snapshot) {
+      const path = this.storePath();
+      if (!existsSync(path)) {
+        this.snapshot = createEmptySnapshot();
+      } else {
+        const raw = JSON.parse(readFileSync(path, "utf-8")) as MemorySnapshot;
+        if (raw.version !== CURRENT_MEMORY_VERSION) {
+          throw new Error(`Unsupported memory snapshot version: ${raw.version}`);
+        }
+        this.snapshot = {
+          ...createEmptySnapshot(),
+          ...raw,
+          authHints: {
+            successfulLoginRoutes: raw.authHints?.successfulLoginRoutes ?? [],
+          },
+          findingHistory: raw.findingHistory ?? {},
+          flakyPages: raw.flakyPages ?? [],
+        };
+      }
+    }
+    return this.snapshot;
+  }
+
+  recordRunFindings(runAt: string, areaResults: AreaResult[]): void {
+    const snapshot = this.getSnapshot();
+    const findings = collectFindings(areaResults);
+
+    for (const finding of findings) {
+      const signature = buildFindingSignature(finding);
+      const existing = snapshot.findingHistory[signature];
+      const recentRoutes = uniqueStrings([
+        ...(existing?.recentRoutes ?? []),
+        ...finding.occurrences.map((occurrence) => occurrence.route),
+        finding.meta?.repro?.route,
+      ]).slice(-8);
+
+      snapshot.findingHistory[signature] = {
+        signature,
+        title: finding.title,
+        category: finding.category,
+        severity: finding.severity,
+        confidence: finding.meta?.confidence ?? existing?.confidence,
+        firstSeenAt: existing?.firstSeenAt ?? runAt,
+        lastSeenAt: runAt,
+        runCount: (existing?.runCount ?? 0) + 1,
+        occurrenceCount: (existing?.occurrenceCount ?? 0) + finding.occurrenceCount,
+        recentRoutes,
+        dismissedAt: existing?.dismissedAt,
+        dismissalReason: existing?.dismissalReason,
+        suppressed: existing?.suppressed ?? false,
+      };
+    }
+
+    this.persist(snapshot);
+  }
+
+  markFindingSuppressed(signature: string, reason: string, dismissedAt = new Date().toISOString()): void {
+    const snapshot = this.getSnapshot();
+    const existing = snapshot.findingHistory[signature];
+    if (!existing) {
+      throw new Error(`Cannot suppress unknown finding signature: ${signature}`);
+    }
+
+    snapshot.findingHistory[signature] = {
+      ...existing,
+      suppressed: true,
+      dismissedAt,
+      dismissalReason: reason,
+    };
+    this.persist(snapshot);
+  }
+
+  recordFlakyPage(input: FlakyPageInput): void {
+    const snapshot = this.getSnapshot();
+    const route = normalizeRoute(input.route);
+    const key = `${input.fingerprintHash ?? "no-fingerprint"}::${route ?? "no-route"}::${input.note}`;
+    const existing = snapshot.flakyPages.find((record) => record.key === key);
+    const now = new Date().toISOString();
+
+    if (existing) {
+      existing.lastSeenAt = now;
+      existing.count += 1;
+      this.persist(snapshot);
+      return;
+    }
+
+    snapshot.flakyPages.push({
+      key,
+      route,
+      fingerprintHash: input.fingerprintHash,
+      note: input.note,
+      source: input.source ?? "manual",
+      firstSeenAt: now,
+      lastSeenAt: now,
+      count: 1,
+    });
+    this.persist(snapshot);
+  }
+
+  recordNavigationSnapshot(targetUrl: string, graph: StateGraph): void {
+    const snapshot = this.getSnapshot();
+    snapshot.navigation = {
+      targetOrigin: normalizeOrigin(targetUrl) ?? targetUrl,
+      savedAt: new Date().toISOString(),
+      nodes: graph.getAllNodes(),
+      edges: graph.getAllEdges(),
+    };
+    this.persist(snapshot);
+  }
+
+  rememberAuthHint(loginUrl: string): void {
+    const snapshot = this.getSnapshot();
+    const loginRoute = normalizeRoute(loginUrl);
+    snapshot.authHints.successfulLoginRoutes = uniqueStrings([
+      ...snapshot.authHints.successfulLoginRoutes,
+      loginRoute,
+    ]);
+    this.persist(snapshot);
+  }
+
+  rememberAuthFromConfig(config: DramaturgeConfig): void {
+    switch (config.auth.type) {
+      case "form":
+      case "oauth-redirect":
+      case "interactive":
+        this.rememberAuthHint(config.auth.loginUrl);
+        break;
+      default:
+        break;
+    }
+  }
+
+  getNavigationSnapshot(targetUrl: string): NavigationMemorySnapshot | undefined {
+    const snapshot = this.getSnapshot();
+    if (!snapshot.navigation) {
+      return undefined;
+    }
+    const expectedOrigin = normalizeOrigin(targetUrl) ?? targetUrl;
+    return snapshot.navigation.targetOrigin === expectedOrigin
+      ? snapshot.navigation
+      : undefined;
+  }
+
+  getWorkerContext(input: MemoryRouteMatchInput): WorkerHistoryContext {
+    const snapshot = this.getSnapshot();
+    const matchingFindings = Object.values(snapshot.findingHistory).filter(
+      (record) =>
+        (record.suppressed || record.dismissedAt) &&
+        (record.recentRoutes.length === 0 ||
+          record.recentRoutes.some((route) => matchesRoute(input, route)))
+    );
+    const matchingFlakyPages = snapshot.flakyPages.filter((record) =>
+      matchesRoute(input, record.route, record.fingerprintHash)
+    );
+    const navigationHints = this.describeNavigationHints(input, snapshot.navigation);
+
+    return {
+      suppressedFindings: matchingFindings.map((record) => record.title),
+      flakyPageNotes: matchingFlakyPages.map((record) => record.note),
+      navigationHints,
+      authHints: [...snapshot.authHints.successfulLoginRoutes],
+    };
+  }
+
+  getPlannerSignals(input: MemoryRouteMatchInput): PlannerMemorySignals {
+    const workerContext = this.getWorkerContext(input);
+    return {
+      hasSuppressedFindings: workerContext.suppressedFindings.length > 0,
+      hasFlakyPageNotes: workerContext.flakyPageNotes.length > 0,
+      hasNavigationHints:
+        workerContext.navigationHints.length > 0 || workerContext.authHints.length > 0,
+    };
+  }
+
+  getSummary(warmStartApplied: boolean, restoredStateCount = 0): RunMemoryMeta {
+    const snapshot = this.getSnapshot();
+    const navigation = snapshot.navigation;
+
+    return {
+      enabled: true,
+      warmStartApplied,
+      restoredStateCount,
+      knownFindingCount: Object.keys(snapshot.findingHistory).length,
+      suppressedFindingCount: Object.values(snapshot.findingHistory).filter(
+        (record) => record.suppressed || record.dismissedAt
+      ).length,
+      flakyPageCount: snapshot.flakyPages.length,
+      visualBaselineCount: navigation?.nodes.length ?? 0,
+    };
+  }
+
+  private describeNavigationHints(
+    input: MemoryRouteMatchInput,
+    navigation?: NavigationMemorySnapshot
+  ): string[] {
+    if (!navigation) {
+      return [];
+    }
+
+    const matchedNode = navigation.nodes.find((node) => matchesRoute(input, node.url, node.fingerprint.hash));
+    if (!matchedNode) {
+      return [];
+    }
+
+    const hints: string[] = [];
+    if (matchedNode.navigationHint?.actionDescription) {
+      hints.push(`Previously reached via: ${matchedNode.navigationHint.actionDescription}`);
+    } else if (matchedNode.navigationHint?.selector) {
+      hints.push(`Previously reached via selector: ${matchedNode.navigationHint.selector}`);
+    }
+
+    for (const edge of navigation.edges.filter((item) => item.fromNodeId === matchedNode.id)) {
+      const targetNode = navigation.nodes.find((node) => node.id === edge.toNodeId);
+      const destination = normalizeRoute(targetNode?.url) ?? targetNode?.fingerprint.normalizedPath ?? edge.toNodeId;
+      hints.push(`Known transition: ${edge.actionLabel} -> ${destination}`);
+    }
+
+    return uniqueStrings(hints);
+  }
+
+  private persist(snapshot: MemorySnapshot): void {
+    snapshot.updatedAt = new Date().toISOString();
+    mkdirSync(this.dir, { recursive: true });
+    writeFileSync(this.storePath(), JSON.stringify(snapshot, null, 2), "utf-8");
+    this.snapshot = snapshot;
+  }
+
+  private storePath(): string {
+    return join(this.dir, STORE_FILE);
+  }
+}

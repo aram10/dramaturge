@@ -82,7 +82,7 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
 }
 
 export function scanRepository(options: RepoScanOptions): RepoHints {
-  const root = resolve(options.root);
+  const root = options.root;
   const framework =
     options.framework === "auto"
       ? canScanNextJsRepo(root)

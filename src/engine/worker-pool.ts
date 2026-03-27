@@ -1,7 +1,8 @@
 import { Stagehand } from "@browserbasehq/stagehand";
-import type { WebProbeConfig } from "../config.js";
+import type { DramaturgeConfig } from "../config.js";
 import { authenticate } from "../auth/authenticator.js";
 import type { BrowserErrorCollector } from "../browser-errors.js";
+import { applyStorageState, type BrowserStorageState } from "../auth/storage-state.js";
 
 export interface WorkerSession {
   key: string;
@@ -9,26 +10,31 @@ export interface WorkerSession {
   page: ReturnType<Stagehand["context"]["pages"]>[number];
 }
 
-export function createStagehand(config: WebProbeConfig): Stagehand {
+export function createStagehand(config: DramaturgeConfig): Stagehand {
   return new Stagehand({
     env: "LOCAL",
     model: config.models.planner,
-    localBrowserLaunchOptions: { headless: false },
+    localBrowserLaunchOptions: { headless: config.browser?.headless ?? false },
     verbose: 0,
   });
 }
 
 export async function initWorkerPool(
-  config: WebProbeConfig,
+  config: DramaturgeConfig,
   count: number,
-  errorCollector: BrowserErrorCollector
+  errorCollector: BrowserErrorCollector,
+  sharedState?: BrowserStorageState
 ): Promise<WorkerSession[]> {
   if (count <= 0) return [];
   const pool: WorkerSession[] = [];
   for (let i = 0; i < count; i++) {
     const sh = createStagehand(config);
     await sh.init();
-    await authenticate(sh, config);
+    if (sharedState) {
+      await applyStorageState(sh, config.targetUrl, sharedState);
+    } else {
+      await authenticate(sh, config);
+    }
     const key = `worker-${i + 1}`;
     const page = sh.context.pages()[0];
     errorCollector.attach(page, key);
