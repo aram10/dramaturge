@@ -38,6 +38,9 @@ export class BrowserErrorCollector {
 
   /** Attach event listeners to a page. Safe to call for multiple pages. */
   attach(page: StagehandPage, pageKey = "default"): void {
+    if (this.teardownFns.has(pageKey)) {
+      this.detach(pageKey);
+    }
     // Stagehand's Page type only exposes a subset of Playwright events,
     const p = page as any;
     const bucket = this.getBucket(pageKey);
@@ -133,8 +136,16 @@ export class BrowserErrorCollector {
       metaFactory?: (evidenceIds: string[]) => RawFinding["meta"]
     ) => {
       const evidenceId = `ev-${shortId()}`;
-      evidence.push({ id: evidenceId, type: evidenceType, summary, timestamp, relatedFindingIds: [] });
+      const findingRef = `fid-${shortId()}`;
+      evidence.push({
+        id: evidenceId,
+        type: evidenceType,
+        summary,
+        timestamp,
+        relatedFindingIds: [findingRef],
+      });
       findings.push({
+        ref: findingRef,
         ...finding,
         evidenceIds: [evidenceId],
         meta: metaFactory?.([evidenceId]),

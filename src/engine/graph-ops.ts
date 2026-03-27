@@ -12,6 +12,7 @@ function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): 
 export function collectResults(ctx: EngineContext, nodeId: string, result: WorkerResult): void {
   appendToNodeMap(ctx.findingsByNode, nodeId, result.findings);
   appendToNodeMap(ctx.evidenceByNode, nodeId, result.evidence);
+  appendToNodeMap(ctx.actionsByNode, nodeId, result.replayableActions ?? []);
 
   for (const event of result.coverageSnapshot.events) {
     ctx.globalCoverage.recordEvent(event);
@@ -62,8 +63,22 @@ export async function expandGraph(
       ctx.graph.addEdge(sourceNodeId, newNode.id, edge);
 
       const newTasks = useLLMPlanner
-        ? await ctx.planner.proposeTasksWithLLM(newNode, ctx.graph, ctx.config.models.planner, ctx.mission, ctx.repoHints)
-        : ctx.planner.proposeTasks(newNode, ctx.graph, ctx.mission, ctx.repoHints);
+        ? await ctx.planner.proposeTasksWithLLM(
+            newNode,
+            ctx.graph,
+            ctx.config.models.planner,
+            ctx.mission,
+            ctx.repoHints,
+            ctx.config.llm.requestTimeoutMs,
+            ctx.memoryStore?.getPlannerSignals(newNode)
+          )
+        : ctx.planner.proposeTasks(
+            newNode,
+            ctx.graph,
+            ctx.mission,
+            ctx.repoHints,
+            ctx.memoryStore?.getPlannerSignals(newNode)
+          );
       ctx.frontier.enqueueMany(newTasks);
       console.log(`  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`);
     }

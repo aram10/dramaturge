@@ -1,5 +1,5 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
-import type { WebProbeConfig } from "../config.js";
+import type { DramaturgeConfig } from "../config.js";
 import { authenticateNone } from "./none.js";
 import { authenticateStoredState } from "./stored-state.js";
 import { authenticateForm } from "./form.js";
@@ -8,7 +8,7 @@ import { authenticateInteractive } from "./interactive.js";
 
 export async function authenticate(
   stagehand: Stagehand,
-  config: WebProbeConfig
+  config: DramaturgeConfig
 ): Promise<void> {
   const { auth, targetUrl, models } = config;
 
@@ -24,7 +24,8 @@ export async function authenticate(
         stagehand,
         targetUrl,
         auth.loginUrl,
-        auth.credentials,
+        auth.fields,
+        auth.submit,
         auth.successIndicator
       );
 
@@ -33,9 +34,8 @@ export async function authenticate(
         stagehand,
         targetUrl,
         auth.loginUrl,
-        auth.credentials,
-        auth.successIndicator,
-        models.planner
+        auth.steps,
+        auth.successIndicator
       );
 
     case "interactive":

@@ -4,6 +4,13 @@ import { collectFindings } from "./collector.js";
 export function renderJson(result: RunResult): string {
   const findings = collectFindings(result.areaResults);
   const duration = result.endTime.getTime() - result.startTime.getTime();
+  const findingIdByRef = new Map<string, string>();
+
+  for (const finding of findings) {
+    for (const occurrence of finding.occurrences) {
+      findingIdByRef.set(occurrence.ref, finding.id);
+    }
+  }
 
   const report = {
     meta: {
@@ -47,6 +54,10 @@ export function renderJson(result: RunResult): string {
       actual: f.actual,
       screenshot: f.screenshot ?? null,
       evidenceIds: f.evidenceIds ?? [],
+      verdict: f.verdict ?? null,
+      occurrenceCount: f.occurrenceCount,
+      impactedAreas: f.impactedAreas,
+      occurrences: f.occurrences,
       meta: f.meta ?? null,
     })),
     coverage: result.areaResults.map((a) => ({
@@ -63,6 +74,13 @@ export function renderJson(result: RunResult): string {
       failureReason: a.failureReason ?? null,
       fingerprint: a.fingerprint?.hash ?? null,
     })),
+    actions: result.areaResults.flatMap((a) =>
+      (a.replayableActions ?? []).map((action) => ({
+        ...action,
+        areaName: a.name,
+        route: a.url ?? null,
+      }))
+    ),
     evidence: result.areaResults.flatMap((a) =>
       a.evidence.map((ev) => ({
         id: ev.id,
@@ -70,7 +88,9 @@ export function renderJson(result: RunResult): string {
         summary: ev.summary,
         path: ev.path ?? null,
         areaName: ev.areaName ?? null,
-        relatedFindingIds: ev.relatedFindingIds,
+        relatedFindingIds: Array.from(
+          new Set(ev.relatedFindingIds.map((ref) => findingIdByRef.get(ref) ?? ref))
+        ),
         timestamp: ev.timestamp,
       }))
     ),
@@ -83,6 +103,7 @@ export function renderJson(result: RunResult): string {
     })),
     stateGraph: result.stateGraphMermaid ?? null,
     runConfig: result.runConfig ?? null,
+    runMemory: result.runMemory ?? null,
   };
 
   return JSON.stringify(report, null, 2);

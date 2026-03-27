@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 import type { Stagehand } from "@browserbasehq/stagehand";
 import { parseIndicator, waitForSuccess } from "./success-indicator.js";
+import { applyStorageState, captureStorageState, type BrowserStorageState } from "./storage-state.js";
 
 /**
  * Interactive auth strategy: tries cached browser state first, falling back to
@@ -24,22 +25,16 @@ export async function authenticateInteractive(
   manualTimeoutMs: number = 120_000
 ): Promise<void> {
   const indicator = parseIndicator(successIndicator);
-  const resolvedStateFile = resolve(stateFile);
 
   // 1. Try cached state if it exists
-  if (existsSync(resolvedStateFile)) {
+  if (existsSync(stateFile)) {
     console.log("  Trying cached browser state…");
     try {
-      const state = JSON.parse(readFileSync(resolvedStateFile, "utf-8"));
-
-      if (state.cookies?.length) {
-        await stagehand.context.addCookies(state.cookies);
-      }
-
-      const page = stagehand.context.pages()[0];
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+      const state = JSON.parse(readFileSync(stateFile, "utf-8")) as BrowserStorageState;
+      await applyStorageState(stagehand, targetUrl, state);
 
       // Quick check — 10 s timeout
+      const page = stagehand.context.pages()[0];
       await waitForSuccess(page, indicator, 10_000);
       console.log("  Cached state is still valid.");
       return;
@@ -62,20 +57,7 @@ export async function authenticateInteractive(
   console.log("  Manual login detected — saving state for reuse.");
 
   // 3. Persist storage state
-  const cookies = await stagehand.context.cookies();
-  const localStorage = await page.evaluate(() => {
-    const items: Array<{ name: string; value: string }> = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (key) items.push({ name: key, value: window.localStorage.getItem(key) ?? "" });
-    }
-    return items;
-  });
-
-  const storageState = {
-    cookies,
-    origins: [{ origin: new URL(targetUrl).origin, localStorage }],
-  };
-  mkdirSync(dirname(resolvedStateFile), { recursive: true });
-  writeFileSync(resolvedStateFile, JSON.stringify(storageState, null, 2));
+  const storageState = await captureStorageState(stagehand, targetUrl);
+  mkdirSync(dirname(stateFile), { recursive: true });
+  writeFileSync(stateFile, JSON.stringify(storageState, null, 2));
 }

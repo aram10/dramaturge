@@ -7,6 +7,7 @@ import { shortId } from "../constants.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
 import type { StagnationTracker } from "./stagnation.js";
 import { buildAgentFindingMeta } from "../repro/repro.js";
+import type { ActionRecorder } from "./action-recorder.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -35,6 +36,15 @@ const LogFindingSchema = z.object({
   expected: z.string(),
   actual: z.string(),
   evidenceIds: z.array(z.string()).optional().describe("Evidence IDs from take_screenshot"),
+  verdict: z
+    .object({
+      hypothesis: z.string(),
+      observation: z.string(),
+      evidenceChain: z.array(z.string()).default([]),
+      alternativesConsidered: z.array(z.string()).default([]),
+      suggestedVerification: z.array(z.string()).default([]),
+    })
+    .optional(),
 });
 
 const TakeScreenshotSchema = z.object({
@@ -76,7 +86,8 @@ export function createWorkerTools(
   findingContext?: {
     stateId?: string;
     objective?: string;
-  }
+  },
+  actionRecorder?: ActionRecorder
 ) {
   mkdirSync(screenshotDir, { recursive: true });
   const breadcrumbs: string[] = [];
@@ -95,30 +106,42 @@ export function createWorkerTools(
       inputSchema: LogFindingSchema,
       execute: async (input: z.infer<typeof LogFindingSchema>) => {
         const evidenceIds = input.evidenceIds ?? [];
+        const findingRef = `fid-${shortId()}`;
         findings.push({
+          ref: findingRef,
           ...input,
           evidenceIds,
+          verdict: {
+            hypothesis: input.verdict?.hypothesis ?? input.expected,
+            observation: input.verdict?.observation ?? input.actual,
+            evidenceChain: input.verdict?.evidenceChain ?? evidenceIds,
+            alternativesConsidered:
+              input.verdict?.alternativesConsidered ?? [],
+            suggestedVerification:
+              input.verdict?.suggestedVerification ?? [],
+          },
           meta: buildAgentFindingMeta({
             stateId: findingContext?.stateId,
             route: page.url(),
             objective: findingContext?.objective ?? "Investigate the current page",
-            breadcrumbs: [...breadcrumbs],
+            breadcrumbs: actionRecorder?.getRecentSummaries() ?? [...breadcrumbs],
+            actionIds: actionRecorder?.getRecentActionIds(),
             evidenceIds,
           }),
         });
         // Cross-link evidence to this finding
         if (evidenceIds.length > 0) {
-          const findingIndex = findings.length - 1;
           for (const eid of evidenceIds) {
             const ev = evidence.find((e) => e.id === eid);
             if (ev) {
-              ev.relatedFindingIds.push(String(findingIndex));
+              ev.relatedFindingIds.push(findingRef);
             }
           }
         }
         stagnationTracker?.recordStep({ findings: 1, newControls: 0, edges: 0 });
         return {
           logged: true,
+          findingRef,
           findingIndex: findings.length - 1,
           message: `Finding logged: ${input.title}`,
         };
@@ -137,8 +160,9 @@ export function createWorkerTools(
           fullPage: false,
           type: "png",
         });
-        screenshots.set(input.ref, buffer);
-        const filename = `${input.ref}.png`;
+        const screenshotId = `ss-${shortId()}`;
+        screenshots.set(screenshotId, buffer);
+        const filename = `${screenshotId}.png`;
         writeFileSync(join(screenshotDir, filename), buffer);
 
         const evidenceId = `ev-${shortId()}`;
@@ -153,6 +177,12 @@ export function createWorkerTools(
         };
         evidence.push(ev);
         rememberBreadcrumb(`capture screenshot ${input.ref}`);
+        actionRecorder?.recordToolAction({
+          kind: "screenshot",
+          summary: `capture screenshot ${input.ref}`,
+          source: "worker-tool",
+          status: "recorded",
+        });
 
         return { captured: true, ref: input.ref, filename, evidenceId };
       },
@@ -171,6 +201,11 @@ export function createWorkerTools(
         };
         coverageTracker.recordEvent(event);
         rememberBreadcrumb(`${input.action} ${input.controlId} -> ${input.outcome}`);
+        actionRecorder?.recordControlAction(
+          input.controlId,
+          input.action,
+          input.outcome
+        );
         stagnationTracker?.recordStep({ findings: 0, newControls: 1, edges: 0 });
         return {
           recorded: true,
@@ -227,6 +262,14 @@ export function createWorkerTools(
           targetPageType: "unknown",
         });
         rememberBreadcrumb(`discover edge ${input.actionLabel}`);
+        actionRecorder?.recordToolAction({
+          kind: "discover-edge",
+          selector: input.selector,
+          url: input.url,
+          summary: `discover edge ${input.actionLabel}`,
+          source: "worker-tool",
+          status: "recorded",
+        });
         stagnationTracker?.recordStep({ findings: 0, newControls: 0, edges: 1 });
         return {
           reported: true,

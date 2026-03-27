@@ -6,7 +6,7 @@ import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from "./checkpo
 import { StateGraph } from "./graph/state-graph.js";
 import { FrontierQueue } from "./graph/frontier.js";
 import { CoverageTracker } from "./coverage/tracker.js";
-import type { RawFinding, Evidence, PageFingerprint } from "./types.js";
+import type { RawFinding, Evidence, PageFingerprint, ReplayableAction } from "./types.js";
 
 function makeFP(hash: string): PageFingerprint {
   return {
@@ -27,7 +27,7 @@ describe("Checkpoint", () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `webprobe-test-${Date.now()}`);
+    tmpDir = join(tmpdir(), `dramaturge-test-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
   });
 
@@ -68,10 +68,11 @@ describe("Checkpoint", () => {
     }]);
 
     const evidence = new Map<string, Evidence[]>();
+    const actions = new Map<string, ReplayableAction[]>();
     const coverage = new CoverageTracker();
 
     saveCheckpoint(
-      tmpDir, graph, frontier, findings, evidence,
+      tmpDir, graph, frontier, findings, evidence, actions,
       coverage, ["task-0"], 5
     );
 
@@ -83,6 +84,7 @@ describe("Checkpoint", () => {
     expect(raw.tasksExecuted).toBe(5);
     expect(raw.graphSnapshot.nodes).toHaveLength(1);
     expect(raw.completedTaskIds).toEqual(["task-0"]);
+    expect(raw.actionsByNode).toEqual({});
   });
 
   it("loadCheckpoint returns null for missing file", () => {
@@ -101,8 +103,9 @@ describe("Checkpoint", () => {
     const coverage = new CoverageTracker();
     const findings = new Map<string, RawFinding[]>();
     const evidence = new Map<string, Evidence[]>();
+    const actions = new Map<string, ReplayableAction[]>();
 
-    saveCheckpoint(tmpDir, graph, frontier, findings, evidence, coverage, [], 0);
+    saveCheckpoint(tmpDir, graph, frontier, findings, evidence, actions, coverage, [], 0);
 
     const loaded = loadCheckpoint(tmpDir);
     expect(loaded).not.toBeNull();
@@ -144,6 +147,18 @@ describe("Checkpoint", () => {
     }]);
 
     const evidence = new Map<string, Evidence[]>();
+    const actions = new Map<string, ReplayableAction[]>();
+    actions.set(node.id, [
+      {
+        id: "act-1",
+        kind: "click",
+        selector: "button[data-testid='create']",
+        summary: "click create button -> worked",
+        source: "worker-tool",
+        status: "worked",
+        timestamp: new Date().toISOString(),
+      },
+    ]);
     const coverage = new CoverageTracker();
     coverage.addBlindSpot({
       nodeId: node.id,
@@ -153,7 +168,7 @@ describe("Checkpoint", () => {
     });
 
     saveCheckpoint(
-      tmpDir, origGraph, origFrontier, findings, evidence,
+      tmpDir, origGraph, origFrontier, findings, evidence, actions,
       coverage, ["task-1", "task-2"], 10
     );
 
@@ -171,6 +186,7 @@ describe("Checkpoint", () => {
     expect(newGraph.getNode(node.id).url).toBe("https://example.com/page");
     expect(newFrontier.size()).toBe(1);
     expect(result.findingsByNode.get(node.id)).toHaveLength(1);
+    expect(result.actionsByNode.get(node.id)).toHaveLength(1);
     expect(result.completedTaskIds.size).toBe(2);
     expect(result.tasksExecuted).toBe(10);
     expect(newCoverage.getBlindSpots()).toHaveLength(1);

@@ -24,6 +24,7 @@ function makeFinding(
   title: string
 ): RawFinding {
   return {
+    ref: `fid-${title.toLowerCase().replace(/\s+/g, "-")}-${severity.toLowerCase()}`,
     severity,
     category,
     title,
@@ -51,7 +52,7 @@ describe("collectFindings", () => {
     ]);
   });
 
-  it("deduplicates findings with same title and severity across areas", () => {
+  it("groups findings with same title and severity across areas", () => {
     const area1 = makeAreaResult("page A", [
       makeFinding("Major", "Bug", "Shared error message"),
     ]);
@@ -66,6 +67,12 @@ describe("collectFindings", () => {
     expect(result).toHaveLength(2);
     expect(result[0].severity).toBe("Major");
     expect(result[1].severity).toBe("Minor");
+    expect(result[0].occurrenceCount).toBe(2);
+    expect(result[0].impactedAreas).toEqual(["page A", "page B"]);
+    expect(result[0].occurrences.map((occurrence) => occurrence.area)).toEqual([
+      "page A",
+      "page B",
+    ]);
   });
 
   it("re-numbers IDs after sorting", () => {
@@ -111,6 +118,28 @@ describe("collectFindings", () => {
         evidenceIds: ["ev-1"],
       },
     });
+  });
+
+  it("uses a richer grouping key than severity and title alone", () => {
+    const area1 = makeAreaResult("page A", [
+      {
+        ...makeFinding("Major", "Bug", "Shared error message"),
+        expected: "Dialog opens",
+        actual: "Nothing happens",
+      },
+    ]);
+    const area2 = makeAreaResult("page B", [
+      {
+        ...makeFinding("Major", "Bug", "Shared error message"),
+        expected: "Toast appears",
+        actual: "Spinner never finishes",
+      },
+    ]);
+
+    const result = collectFindings([area1, area2]);
+
+    expect(result).toHaveLength(2);
+    expect(result.every((finding) => finding.occurrenceCount === 1)).toBe(true);
   });
 });
 
@@ -161,6 +190,9 @@ describe("buildRunResult", () => {
         checkpointInterval: 5,
         autoCaptureEnabled: true,
         llmPlannerEnabled: false,
+        memoryEnabled: true,
+        visualRegressionEnabled: true,
+        warmStartEnabled: true,
       }
     );
     expect(result.runConfig?.concurrency).toBe(2);

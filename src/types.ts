@@ -19,11 +19,17 @@ export const CATEGORY_PREFIX: Record<FindingCategory, string> = {
 
 export interface Evidence {
   id: string;
-  type: "screenshot" | "console-error" | "network-error";
+  type:
+    | "screenshot"
+    | "console-error"
+    | "network-error"
+    | "accessibility-scan"
+    | "visual-diff";
   summary: string;
   path?: string;
   timestamp: string;
   areaName?: string;
+  /** Stable raw finding refs collected during runtime; renderers map these to display IDs. */
   relatedFindingIds: string[];
 }
 
@@ -77,6 +83,7 @@ export interface ReproArtifact {
   route?: string;
   objective: string;
   breadcrumbs: string[];
+  actionIds?: string[];
   evidenceIds: string[];
 }
 
@@ -86,7 +93,16 @@ export interface FindingMeta {
   repro?: ReproArtifact;
 }
 
+export interface FindingVerdict {
+  hypothesis: string;
+  observation: string;
+  evidenceChain: string[];
+  alternativesConsidered: string[];
+  suggestedVerification: string[];
+}
+
 export interface RawFinding {
+  ref?: string;
   category: FindingCategory;
   severity: FindingSeverity;
   title: string;
@@ -95,13 +111,24 @@ export interface RawFinding {
   actual: string;
   screenshotRef?: string;
   evidenceIds?: string[];
+  verdict?: FindingVerdict;
   meta?: FindingMeta;
+}
+
+export interface FindingOccurrence {
+  area: string;
+  route?: string;
+  evidenceIds: string[];
+  ref: string;
 }
 
 export interface Finding extends RawFinding {
   id: string;
   area: string;
   screenshot?: string;
+  occurrenceCount: number;
+  impactedAreas: string[];
+  occurrences: FindingOccurrence[];
 }
 
 // --- Page fingerprint ---
@@ -128,6 +155,7 @@ export interface AreaResult {
   url?: string;
   steps: number;
   findings: RawFinding[];
+  replayableActions?: ReplayableAction[];
   screenshots: Map<string, Buffer>;
   evidence: Evidence[];
   coverage: CoverageSnapshot;
@@ -157,6 +185,8 @@ export interface RunResult {
   stateGraphMermaid?: string;
   /** Run configuration metadata for report context. */
   runConfig?: RunConfigMeta;
+  /** Historical-memory summary when run memory is enabled. */
+  runMemory?: RunMemoryMeta;
 }
 
 export interface RunConfigMeta {
@@ -167,6 +197,19 @@ export interface RunConfigMeta {
   checkpointInterval: number;
   autoCaptureEnabled: boolean;
   llmPlannerEnabled: boolean;
+  memoryEnabled: boolean;
+  visualRegressionEnabled: boolean;
+  warmStartEnabled: boolean;
+}
+
+export interface RunMemoryMeta {
+  enabled: boolean;
+  warmStartApplied: boolean;
+  restoredStateCount: number;
+  knownFindingCount: number;
+  suppressedFindingCount: number;
+  flakyPageCount: number;
+  visualBaselineCount: number;
 }
 
 // --- State Graph ---
@@ -256,11 +299,34 @@ export interface WorkerResult {
   taskId: string;
   findings: RawFinding[];
   evidence: Evidence[];
+  replayableActions?: ReplayableAction[];
   coverageSnapshot: CoverageSnapshot;
   followupRequests: FollowupRequest[];
   discoveredEdges: DiscoveredEdge[];
   outcome: "completed" | "blocked" | "timed-out" | "failed";
   summary: string;
+}
+
+export type ReplayableActionKind =
+  | "navigate"
+  | ControlAction
+  | "keydown"
+  | "screenshot"
+  | "discover-edge";
+
+export type ReplayableActionStatus = ControlOutcome | "recorded";
+
+export interface ReplayableAction {
+  id: string;
+  kind: ReplayableActionKind;
+  summary: string;
+  source: "page" | "worker-tool";
+  status: ReplayableActionStatus;
+  timestamp: string;
+  selector?: string;
+  url?: string;
+  value?: string;
+  key?: string;
 }
 
 // --- Coverage extension ---
@@ -332,6 +398,7 @@ export interface Checkpoint {
   frontierSnapshot: FrontierItem[];
   findingsByNode: Record<string, RawFinding[]>;
   evidenceByNode: Record<string, Evidence[]>;
+  actionsByNode?: Record<string, ReplayableAction[]>;
   blindSpots: BlindSpot[];
   completedTaskIds: string[];
 }

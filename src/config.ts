@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { parseJsoncObject } from "./utils/jsonc.js";
+import {
+  getConfigFileContext,
+  normalizeConfigPaths,
+  type ConfigWithMeta,
+  type LoadedConfigMeta,
+} from "./config-paths.js";
 
 const AuthSchema = z
   .discriminatedUnion("type", [
@@ -16,20 +21,48 @@ const AuthSchema = z
     z.object({
       type: z.literal("form"),
       loginUrl: z.string(),
-      credentials: z.record(z.string()),
+      fields: z.array(z.object({
+        selector: z.string().min(1),
+        value: z.string(),
+        label: z.string().optional(),
+        secret: z.boolean().default(false),
+      })).min(1),
+      submit: z.object({
+        selector: z.string().min(1),
+        label: z.string().optional(),
+      }),
       successIndicator: z.string(),
     }),
     z.object({
       type: z.literal("oauth-redirect"),
       loginUrl: z.string(),
-      credentials: z.record(z.string()),
+      steps: z.array(
+        z.discriminatedUnion("type", [
+          z.object({
+            type: z.literal("click"),
+            selector: z.string().min(1),
+            label: z.string().optional(),
+          }),
+          z.object({
+            type: z.literal("fill"),
+            selector: z.string().min(1),
+            value: z.string(),
+            label: z.string().optional(),
+            secret: z.boolean().default(false),
+          }),
+          z.object({
+            type: z.literal("wait-for-selector"),
+            selector: z.string().min(1),
+          }),
+        ])
+      ).min(1),
       successIndicator: z.string(),
     }),
     z.object({
       type: z.literal("interactive"),
       loginUrl: z.string(),
       successIndicator: z.string(),
-      stateFile: z.string().default(".webprobe-state.json"),
+      stateFile: z.string().default("./.dramaturge-state/user.json"),
       /** Timeout in seconds for the human to complete login (default: 120). */
       manualTimeoutSeconds: z.number().int().min(30).default(120),
     }),
@@ -62,7 +95,11 @@ const ModelsSchema = z
     agentMode: AgentModeSchema,
     agentModes: AgentModesSchema,
   })
-  .default({});
+  .default({
+    planner: "anthropic/claude-sonnet-4-6",
+    worker: "anthropic/claude-haiku-4-5",
+    agentMode: "cua",
+  });
 
 const ExplorationSchema = z
   .object({
@@ -70,15 +107,53 @@ const ExplorationSchema = z
     stepsPerArea: z.number().int().min(1).default(40),
     totalTimeout: z.number().int().min(1).default(900),
   })
-  .default({});
+  .default({
+    maxAreasToExplore: 10,
+    stepsPerArea: 40,
+    totalTimeout: 900,
+  });
 
 const OutputSchema = z
   .object({
-    dir: z.string().default("./webprobe-reports"),
+    dir: z.string().default("./dramaturge-reports"),
     format: z.enum(["markdown", "json", "both"]).default("markdown"),
     screenshots: z.boolean().default(true),
   })
-  .default({});
+  .default({
+    dir: "./dramaturge-reports",
+    format: "markdown",
+    screenshots: true,
+  });
+
+const MemorySchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    dir: z.string().default("./.dramaturge"),
+    warmStart: z.boolean().default(true),
+  })
+  .default({
+    enabled: false,
+    dir: "./.dramaturge",
+    warmStart: true,
+  });
+
+const VisualRegressionSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    baselineDir: z.string().default("./.dramaturge/visual-baselines"),
+    diffPixelRatioThreshold: z.number().min(0).max(1).default(0.01),
+    includeAA: z.boolean().default(false),
+    fullPage: z.boolean().default(true),
+    maskSelectors: z.array(z.string()).default([]),
+  })
+  .default({
+    enabled: false,
+    baselineDir: "./.dramaturge/visual-baselines",
+    diffPixelRatioThreshold: 0.01,
+    includeAA: false,
+    fullPage: true,
+    maskSelectors: [],
+  });
 
 const MissionSchema = z
   .object({
@@ -100,7 +175,13 @@ const BudgetSchema = z
     /** Abort a worker after this many consecutive steps with no findings, controls, or edges (0 = disabled). */
     stagnationThreshold: z.number().int().min(0).default(8),
   })
-  .default({});
+  .default({
+    globalTimeLimitSeconds: 900,
+    maxStepsPerTask: 40,
+    maxFrontierSize: 200,
+    maxStateNodes: 50,
+    stagnationThreshold: 8,
+  });
 
 const AutoCaptureSchema = z
   .object({
@@ -109,21 +190,45 @@ const AutoCaptureSchema = z
     /** Minimum HTTP status code to capture as network error (default: 400). */
     networkErrorMinStatus: z.number().int().min(400).max(599).default(400),
   })
-  .default({});
+  .default({
+    consoleErrors: true,
+    networkErrors: true,
+    networkErrorMinStatus: 400,
+  });
+
+const BrowserSchema = z
+  .object({
+    headless: z.boolean().default(false),
+  })
+  .default({
+    headless: false,
+  });
+
+const LlmSchema = z
+  .object({
+    requestTimeoutMs: z.number().int().min(100).default(30_000),
+  })
+  .default({
+    requestTimeoutMs: 30_000,
+  });
 
 const ConcurrencySchema = z
   .object({
     /** Number of parallel browser workers (default: 1 = sequential). */
     workers: z.number().int().min(1).max(8).default(1),
   })
-  .default({});
+  .default({
+    workers: 1,
+  });
 
 const CheckpointSchema = z
   .object({
     /** Save checkpoint every N completed tasks (0 = disabled). */
     intervalTasks: z.number().int().min(0).default(5),
   })
-  .default({});
+  .default({
+    intervalTasks: 5,
+  });
 
 const AppContextSchema = z
   .object({
@@ -167,7 +272,10 @@ const PolicySchema = z
       .default([]),
     ignoredConsolePatterns: z.array(z.string()).default([]),
   })
-  .default({});
+  .default({
+    expectedResponses: [],
+    ignoredConsolePatterns: [],
+  });
 
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
@@ -178,7 +286,11 @@ export const ConfigSchema = z.object({
   budget: BudgetSchema,
   exploration: ExplorationSchema,
   output: OutputSchema,
+  memory: MemorySchema,
+  visualRegression: VisualRegressionSchema,
   autoCapture: AutoCaptureSchema,
+  browser: BrowserSchema,
+  llm: LlmSchema,
   concurrency: ConcurrencySchema,
   checkpoint: CheckpointSchema,
   appContext: AppContextSchema,
@@ -187,7 +299,12 @@ export const ConfigSchema = z.object({
   policy: PolicySchema,
 });
 
-export type WebProbeConfig = z.infer<typeof ConfigSchema>;
+export type DramaturgeConfig = z.infer<typeof ConfigSchema>;
+export type LoadedDramaturgeConfig = ConfigWithMeta<DramaturgeConfig>;
+export type { ConfigFileContext, LoadedConfigMeta } from "./config-paths.js";
+export type FormAuthField = Extract<DramaturgeConfig["auth"], { type: "form" }>["fields"][number];
+export type FormAuthSubmit = Extract<DramaturgeConfig["auth"], { type: "form" }>["submit"];
+export type OAuthRedirectStep = Extract<DramaturgeConfig["auth"], { type: "oauth-redirect" }>["steps"][number];
 
 function interpolateEnvVars(value: unknown): unknown {
   if (typeof value === "string") {
@@ -215,28 +332,28 @@ function interpolateEnvVars(value: unknown): unknown {
   return value;
 }
 
-export function loadConfig(configPath?: string): WebProbeConfig {
-  const resolvedPath = resolve(configPath ?? "webprobe.config.json");
+export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
+  const context = getConfigFileContext(configPath);
   let raw: string;
   try {
-    raw = readFileSync(resolvedPath, "utf-8");
+    raw = readFileSync(context.configPath, "utf-8");
   } catch {
-    throw new Error(`Config file not found: ${resolvedPath}`);
+    throw new Error(`Config file not found: ${context.configPath}`);
   }
 
   let parsed: unknown;
   try {
     parsed = parseJsoncObject(raw);
   } catch {
-    throw new Error(`Invalid JSON in config file: ${resolvedPath}`);
+    throw new Error(`Invalid JSON in config file: ${context.configPath}`);
   }
 
   const interpolated = interpolateEnvVars(parsed);
-  return ConfigSchema.parse(interpolated);
+  return normalizeConfigPaths(ConfigSchema.parse(interpolated), context);
 }
 
 export function resolveWorkerModel(
-  config: WebProbeConfig,
+  config: DramaturgeConfig,
   workerType: string
 ): string {
   const perType = config.models.workers;
@@ -250,7 +367,7 @@ export function resolveWorkerModel(
 }
 
 export function resolveAgentMode(
-  config: WebProbeConfig,
+  config: DramaturgeConfig,
   workerType: string
 ): "cua" | "dom" {
   const perType = config.models.agentModes;

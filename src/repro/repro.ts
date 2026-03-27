@@ -10,6 +10,7 @@ interface ReproInput {
   route?: string;
   objective: string;
   breadcrumbs?: string[];
+  actionIds?: string[];
   evidenceIds?: string[];
 }
 
@@ -24,6 +25,7 @@ export function buildReproArtifact(input: ReproInput): ReproArtifact {
     route: input.route,
     objective: input.objective,
     breadcrumbs: input.breadcrumbs ?? [],
+    actionIds: input.actionIds ?? [],
     evidenceIds: input.evidenceIds ?? [],
   };
 }
