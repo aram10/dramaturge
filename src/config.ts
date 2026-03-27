@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseJsoncObject } from "./utils/jsonc.js";
 
 const AuthSchema = z
   .discriminatedUnion("type", [
@@ -187,14 +188,9 @@ export function loadConfig(configPath?: string): WebProbeConfig {
     throw new Error(`Config file not found: ${resolvedPath}`);
   }
 
-  // Strip JSON comments (// and /* */)
-  const stripped = raw
-    .replace(/\/\/.*$/gm, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "");
-
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripped);
+    parsed = parseJsoncObject(raw);
   } catch {
     throw new Error(`Invalid JSON in config file: ${resolvedPath}`);
   }
