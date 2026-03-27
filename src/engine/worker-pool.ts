@@ -3,6 +3,7 @@ import type { DramaturgeConfig } from "../config.js";
 import { authenticate } from "../auth/authenticator.js";
 import type { BrowserErrorCollector } from "../browser-errors.js";
 import { applyStorageState, type BrowserStorageState } from "../auth/storage-state.js";
+import type { NetworkTrafficObserver } from "../network/traffic-observer.js";
 
 export interface WorkerSession {
   key: string;
@@ -23,6 +24,7 @@ export async function initWorkerPool(
   config: DramaturgeConfig,
   count: number,
   errorCollector: BrowserErrorCollector,
+  trafficObserver?: NetworkTrafficObserver,
   sharedState?: BrowserStorageState
 ): Promise<WorkerSession[]> {
   if (count <= 0) return [];
@@ -38,6 +40,7 @@ export async function initWorkerPool(
     const key = `worker-${i + 1}`;
     const page = sh.context.pages()[0];
     errorCollector.attach(page, key);
+    trafficObserver?.attach(page, key);
     pool.push({ key, stagehand: sh, page });
   }
   return pool;

@@ -74,12 +74,37 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("GET /api/manage/knowledge-bases");
   });
 
+  it("includes observed API traffic when provided", () => {
+    const prompt = buildWorkerSystemPrompt(
+      "A todo app",
+      "Main",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      [
+        {
+          route: "/api/widgets",
+          methods: ["GET", "POST"],
+          statuses: [0, 200, 201],
+          failures: ["net::ERR_CONNECTION_RESET"],
+        },
+      ]
+    );
+
+    expect(prompt).toContain("Observed API Traffic");
+    expect(prompt).toContain("GET/POST /api/widgets");
+    expect(prompt).toContain("0, 200, 201");
+    expect(prompt).toContain("net::ERR_CONNECTION_RESET");
+  });
+
   it("adds stronger safety guidance when destructive actions are disabled", () => {
     const prompt = buildWorkerSystemPrompt(
       "A todo app",
       "Main",
       undefined,
       "list",
+      undefined,
       undefined,
       undefined,
       {
@@ -100,6 +125,7 @@ describe("buildWorkerSystemPrompt", () => {
       "Settings",
       undefined,
       "settings",
+      undefined,
       undefined,
       undefined,
       undefined,

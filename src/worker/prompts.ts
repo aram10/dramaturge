@@ -1,6 +1,7 @@
 import type { MissionConfig, PageType } from "../types.js";
 import type { RepoHints } from "../adaptation/types.js";
 import type { WorkerHistoryContext } from "../memory/types.js";
+import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
 
 interface AppContext {
   knownPatterns?: string[];
@@ -100,6 +101,25 @@ function buildMissionSection(mission?: MissionConfig): string {
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
 }
 
+function buildObservedApiSection(observedApiEndpoints?: ObservedApiEndpoint[]): string {
+  if (!observedApiEndpoints?.length) return "";
+
+  return `\n\n## Observed API Traffic\n${observedApiEndpoints
+    .slice(0, 6)
+    .map((endpoint) => {
+      const statuses =
+        endpoint.statuses.length > 0 ? `statuses=${endpoint.statuses.join(", ")}` : undefined;
+      const failures =
+        endpoint.failures.length > 0 ? `failures=${endpoint.failures.join(" | ")}` : undefined;
+      return `- ${endpoint.methods.join("/") || "ANY"} ${endpoint.route}${
+        [statuses, failures].filter(Boolean).length > 0
+          ? ` (${[statuses, failures].filter(Boolean).join("; ")})`
+          : ""
+      }`;
+    })
+    .join("\n")}`;
+}
+
 function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
   if (!history) return "";
 
@@ -139,6 +159,7 @@ export function buildWorkerSystemPrompt(
   pageType?: PageType,
   appContext?: AppContext,
   repoHints?: RepoHints,
+  observedApiEndpoints?: ObservedApiEndpoint[],
   mission?: MissionConfig,
   history?: WorkerHistoryContext
 ): string {
@@ -153,7 +174,7 @@ export function buildWorkerSystemPrompt(
   return `You are an autonomous QA tester exploring a web application. Your job is to find bugs, UX issues, accessibility problems, and visual glitches through hands-on exploration.
 
 ## The Application
-${appDescription}${buildRepoHintsSection(repoHints)}
+${appDescription}${buildRepoHintsSection(repoHints)}${buildObservedApiSection(observedApiEndpoints)}
 
 ## Your Assignment
 You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}${buildMissionSection(mission)}${buildHistoricalContextSection(history)}
