@@ -9,7 +9,7 @@
       "email": "${TEST_USER_EMAIL}",
       "password": "${TEST_USER_PASSWORD}"
     },
-    "successIndicator": "url:/"
+    "successIndicator": "selector:[data-testid='user-menu']"
   },
 
   // Alternative: interactive auth — human completes login in a visible browser,
@@ -17,7 +17,7 @@
   // "auth": {
   //   "type": "interactive",
   //   "loginUrl": "/login",
-  //   "successIndicator": "url:/",
+  //   "successIndicator": "selector:[data-testid='user-menu']",
   //   "stateFile": ".webprobe-state.json",
   //   "manualTimeoutSeconds": 120
   // },
