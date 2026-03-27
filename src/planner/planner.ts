@@ -6,6 +6,7 @@ import type {
   MissionConfig,
   PageType,
 } from "../types.js";
+import type { RepoHints } from "../adaptation/types.js";
 import type { StateGraph } from "../graph/state-graph.js";
 import { computePriority, type PriorityContext } from "./priority.js";
 import { proposeLLMTasks } from "../llm.js";
@@ -35,6 +36,27 @@ interface PlannerProposal {
   priority?: number;
 }
 
+function summarizeRepoHints(repoHints?: RepoHints): string | undefined {
+  if (!repoHints) return undefined;
+
+  const parts: string[] = [];
+  if (repoHints.routes.length > 0) {
+    parts.push(`routes: ${repoHints.routes.slice(0, 3).join(", ")}`);
+  }
+  if (repoHints.stableSelectors.length > 0) {
+    parts.push(
+      `stable selectors: ${repoHints.stableSelectors.slice(0, 3).join(", ")}`
+    );
+  }
+  if (repoHints.authHints.loginRoutes.length > 0) {
+    parts.push(
+      `login routes: ${repoHints.authHints.loginRoutes.slice(0, 2).join(", ")}`
+    );
+  }
+
+  return parts.length > 0 ? parts.join("; ") : undefined;
+}
+
 export class Planner {
   private workerTypesPerNode = new Map<string, Set<WorkerType>>();
 
@@ -45,7 +67,8 @@ export class Planner {
   proposeTasks(
     node: StateNode,
     _graph: StateGraph,
-    mission?: MissionConfig
+    mission?: MissionConfig,
+    repoHints?: RepoHints
   ): FrontierItem[] {
     const proposals: PlannerProposal[] = [];
 
@@ -76,6 +99,21 @@ export class Planner {
       });
     }
 
+    const repoHintSummary = summarizeRepoHints(repoHints);
+    if (
+      repoHintSummary &&
+      allowedTypes.includes("navigation") &&
+      node.depth === 0 &&
+      node.timesVisited === 0
+    ) {
+      proposals.push({
+        workerType: "navigation",
+        objective: `Use repo-aware hints to probe likely routes and controls from this page: ${repoHintSummary}`,
+        reason: "Repo-aware navigation seed",
+        priority: 0.85,
+      });
+    }
+
     return this.toFrontierItems(node, proposals);
   }
 
@@ -88,9 +126,11 @@ export class Planner {
     node: StateNode,
     graph: StateGraph,
     plannerModel: string,
-    mission?: MissionConfig
+    mission?: MissionConfig,
+    repoHints?: RepoHints
   ): Promise<FrontierItem[]> {
     const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
+    const repoHintSummary = summarizeRepoHints(repoHints);
 
     const nodeDesc = [
       `Page type: ${node.pageType}`,
@@ -101,6 +141,7 @@ export class Planner {
       `Controls exercised: ${node.controlsExercised.length}`,
       `Times visited: ${node.timesVisited}`,
       `Risk score: ${node.riskScore}`,
+      repoHintSummary ? `Repo hints: ${repoHintSummary}` : null,
     ]
       .filter(Boolean)
       .join("\n");
@@ -114,7 +155,7 @@ export class Planner {
 
     if (!llmProposals) {
       // LLM failed — fall back to deterministic
-      return this.proposeTasks(node, graph, mission);
+      return this.proposeTasks(node, graph, mission, repoHints);
     }
 
     return this.toFrontierItems(node, llmProposals);

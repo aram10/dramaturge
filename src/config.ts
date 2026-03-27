@@ -136,6 +136,24 @@ const AppContextSchema = z
   })
   .optional();
 
+const RepoContextSchema = z
+  .object({
+    root: z.string().optional(),
+    framework: z.enum(["auto", "nextjs", "generic"]).default("auto"),
+    hintsFile: z.string().optional(),
+  })
+  .optional();
+
+const BootstrapSchema = z
+  .object({
+    command: z.string().optional(),
+    cwd: z.string().optional(),
+    readyUrl: z.string().optional(),
+    readyIndicator: z.string().optional(),
+    timeoutSeconds: z.number().int().min(5).default(120),
+  })
+  .optional();
+
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
   appDescription: z.string().min(1),
@@ -149,6 +167,8 @@ export const ConfigSchema = z.object({
   concurrency: ConcurrencySchema,
   checkpoint: CheckpointSchema,
   appContext: AppContextSchema,
+  repoContext: RepoContextSchema,
+  bootstrap: BootstrapSchema,
 });
 
 export type WebProbeConfig = z.infer<typeof ConfigSchema>;

@@ -58,7 +58,8 @@ export async function executeFrontierItem(
     resolveAgentMode(ctx.config, item.workerType),
     ctx.config.output.screenshots,
     ctx.config.budget.stagnationThreshold ?? 0,
-    ctx.config.appContext
+    ctx.config.appContext,
+    ctx.repoHints
   );
 
   return { item, result };

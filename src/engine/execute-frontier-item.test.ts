@@ -70,6 +70,15 @@ describe("executeFrontierItem", () => {
         maxStepsPerTask: 12,
       },
       screenshotDir: "C:/tmp/screenshots",
+      repoHints: {
+        routes: ["/login", "/manage/knowledge-bases"],
+        stableSelectors: ["#manage-kb-new-btn"],
+        authHints: {
+          loginRoutes: ["/login"],
+          callbackRoutes: ["/auth/callback"],
+        },
+        expectedHttpNoise: [],
+      },
       navigator: {
         navigateTo: vi.fn().mockResolvedValue({ success: true }),
       },
@@ -121,6 +130,15 @@ describe("executeFrontierItem", () => {
       7,
       {
         knownPatterns: ["401s are expected before login"],
+      },
+      {
+        routes: ["/login", "/manage/knowledge-bases"],
+        stableSelectors: ["#manage-kb-new-btn"],
+        authHints: {
+          loginRoutes: ["/login"],
+          callbackRoutes: ["/auth/callback"],
+        },
+        expectedHttpNoise: [],
       }
     );
   });
