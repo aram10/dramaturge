@@ -1,7 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { WebProbeConfig } from "./config.js";
-import { resolveWorkerModel, resolveAgentMode } from "./config.js";
 import type { FrontierItem, WorkerResult, BudgetConfig, MissionConfig } from "./types.js";
 import { authenticate } from "./auth/authenticator.js";
 import { captureFingerprint } from "./graph/fingerprint.js";
@@ -11,7 +10,6 @@ import { FrontierQueue } from "./graph/frontier.js";
 import { Planner } from "./planner/planner.js";
 import { Navigator } from "./planner/navigator.js";
 import { CoverageTracker } from "./coverage/tracker.js";
-import { executeWorkerTask } from "./worker/worker.js";
 import { BrowserErrorCollector } from "./browser-errors.js";
 import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from "./checkpoint.js";
 import { hasLLMApiKey } from "./llm.js";
@@ -20,6 +18,8 @@ import type { EngineContext } from "./engine/context.js";
 import { initWorkerPool, closeWorkerPool, createStagehand } from "./engine/worker-pool.js";
 import { collectResults, expandGraph, routeFollowups, maintainFrontier, flushBrowserErrors } from "./engine/graph-ops.js";
 import { buildAreaResults, writeReports } from "./engine/reports.js";
+import { executeFrontierItem } from "./engine/execute-frontier-item.js";
+import type { WorkerSession } from "./engine/worker-pool.js";
 
 function resolveBudget(config: WebProbeConfig): BudgetConfig {
   return {
@@ -62,64 +62,10 @@ function handleNavFailure(
   }
 }
 
-async function processTasksSequentially(
-  ctx: EngineContext,
-  items: FrontierItem[],
-  taskNumberStart: number
-): Promise<Array<{ item: FrontierItem; result: WorkerResult | null }>> {
-  const results: Array<{ item: FrontierItem; result: WorkerResult | null }> = [];
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const taskNumber = taskNumberStart + i;
-    const node = ctx.graph.getNode(item.nodeId);
-
-    console.log(
-      `[${taskNumber}] ${item.workerType} task on ${node.pageType} (${node.url ?? node.id}): ${item.objective}`
-    );
-
-    // Navigate to target state
-    const navResult = await ctx.navigator.navigateTo(
-      item.nodeId,
-      ctx.graph,
-      ctx.page,
-      ctx.stagehand,
-      ctx.config.targetUrl
-    );
-
-    if (!navResult.success) {
-      handleNavFailure(ctx, item);
-      results.push({ item, result: null });
-      continue;
-    }
-
-    ctx.planner.recordDispatch(item.nodeId, item.workerType);
-    ctx.graph.recordVisit(item.nodeId);
-
-    const model = resolveWorkerModel(ctx.config, item.workerType);
-    const result = await executeWorkerTask(
-      ctx.stagehand,
-      {
-        id: item.id,
-        workerType: item.workerType,
-        nodeId: item.nodeId,
-        objective: item.objective,
-        maxSteps: ctx.budget.maxStepsPerTask,
-        pageType: node.pageType,
-        missionContext: ctx.config.appDescription,
-      },
-      model,
-      ctx.screenshotDir,
-      resolveAgentMode(ctx.config, item.workerType),
-      ctx.config.output.screenshots,
-      ctx.config.budget.stagnationThreshold ?? 0,
-      ctx.config.appContext
-    );
-
-    results.push({ item, result });
-  }
-
-  return results;
+interface BatchTaskResult {
+  item: FrontierItem;
+  result: WorkerResult | null;
+  pageKey: string;
 }
 
 /** Run frontier items in parallel across the worker pool. */
@@ -127,54 +73,38 @@ async function processTaskBatch(
   ctx: EngineContext,
   batchItems: FrontierItem[],
   taskNumberStart: number
-): Promise<Array<{ item: FrontierItem; result: WorkerResult | null }>> {
-  // Primary stagehand handles the first item, pool handles the rest
-  const allWorkers = [ctx.stagehand, ...ctx.workerPool];
+): Promise<BatchTaskResult[]> {
+  const primaryWorker: WorkerSession = {
+    key: "primary",
+    stagehand: ctx.stagehand,
+    page: ctx.page,
+  };
+  const workers = [primaryWorker, ...ctx.workerPool];
 
-  const promises = batchItems.map(async (item, i) => {
-    const worker = allWorkers[i % allWorkers.length];
-    const page = worker.context.pages()[0];
-    const node = ctx.graph.getNode(item.nodeId);
-    const taskNum = taskNumberStart + i;
+  const promises = batchItems.map(async (item, i): Promise<BatchTaskResult> => {
+    const worker = workers[i % workers.length];
+    const taskNumber = taskNumberStart + i;
+    const result = await executeFrontierItem({
+      ctx,
+      stagehand: worker.stagehand,
+      page: worker.page,
+      item,
+      taskNumber,
+      pageKey: worker.key,
+    });
 
-    console.log(
-      `[${taskNum}] ${item.workerType} task on ${node.pageType} (${node.url ?? node.id}): ${item.objective}`
-    );
-
-    // Navigate to target state
-    const navResult = await ctx.navigator.navigateTo(
-      item.nodeId,
-      ctx.graph,
-      page,
-      worker,
-      ctx.config.targetUrl
-    );
-
-    if (!navResult.success) {
-      handleNavFailure(ctx, item, `  [${taskNum}]`);
-      return { item, result: null };
+    if (!result.result) {
+      handleNavFailure(
+        ctx,
+        item,
+        workers.length > 1 ? `  [${taskNumber}]` : ""
+      );
     }
 
-    ctx.planner.recordDispatch(item.nodeId, item.workerType);
-    ctx.graph.recordVisit(item.nodeId);
-
-    const model = resolveWorkerModel(ctx.config, item.workerType);
-    const result = await executeWorkerTask(
-      worker,
-      {
-        id: item.id,
-        workerType: item.workerType,
-        nodeId: item.nodeId,
-        objective: item.objective,
-        maxSteps: ctx.budget.maxStepsPerTask,
-        pageType: node.pageType,
-        missionContext: ctx.config.appDescription,
-      },
-      model,
-      ctx.screenshotDir
-    );
-
-    return { item, result };
+    return {
+      ...result,
+      pageKey: worker.key,
+    };
   });
 
   return Promise.all(promises);
@@ -215,7 +145,7 @@ export async function runEngine(
   // Initialize primary Stagehand
   const stagehand = createStagehand(config);
   await stagehand.init();
-  errorCollector.attach(stagehand.context.pages()[0]);
+  errorCollector.attach(stagehand.context.pages()[0], "primary");
 
   // Initialize worker pool for parallel execution
   const workerPool = concurrency > 1
@@ -333,17 +263,18 @@ export async function runEngine(
 
       if (batchItems.length === 0) break;
 
-      // Process batch (parallel if concurrency > 1, sequential if 1)
-      const batchResults = concurrency > 1
-        ? await processTaskBatch(ctx, batchItems, tasksExecuted + 1)
-        : await processTasksSequentially(ctx, batchItems, tasksExecuted + 1);
+      const batchResults = await processTaskBatch(
+        ctx,
+        batchItems,
+        tasksExecuted + 1
+      );
 
       // Collect results and expand graph
-      for (const { item, result } of batchResults) {
+      for (const { item, result, pageKey } of batchResults) {
+        flushBrowserErrors(ctx, item.nodeId, pageKey);
         if (!result) continue;
 
         collectResults(ctx, item.nodeId, result);
-        flushBrowserErrors(ctx, item.nodeId);
 
         const coverageInfo =
           result.coverageSnapshot.controlsExercised > 0
@@ -394,7 +325,12 @@ export async function runEngine(
     // Flush any remaining browser errors
     if (ctx.graph.nodeCount() > 0) {
       const rootNode = ctx.graph.getAllNodes().find((n) => n.depth === 0);
-      if (rootNode) flushBrowserErrors(ctx, rootNode.id);
+      if (rootNode) {
+        flushBrowserErrors(ctx, rootNode.id, "primary");
+        for (const worker of ctx.workerPool) {
+          flushBrowserErrors(ctx, rootNode.id, worker.key);
+        }
+      }
     }
 
     // Record remaining frontier as blind spots
