@@ -7,6 +7,8 @@ import type {
   BrowserPageError,
 } from "./types.js";
 import { shortId, TRUNCATE_GROUP_KEY, TRUNCATE_SUMMARY, TRUNCATE_TITLE } from "./constants.js";
+import type { PolicyConfig } from "./policy/types.js";
+import { shouldSuppressFinding } from "./policy/policy.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -14,6 +16,7 @@ export interface BrowserErrorCollectorOptions {
   captureConsole: boolean;
   captureNetwork: boolean;
   networkErrorMinStatus: number;
+  policy?: PolicyConfig;
 }
 
 interface ErrorBucket {
@@ -143,6 +146,12 @@ export class BrowserErrorCollector {
 
     for (const [msg, errors] of consoleMsgs) {
       const first = errors[0];
+      if (
+        this.options.policy &&
+        shouldSuppressFinding({ type: "console", error: first }, this.options.policy)
+      ) {
+        continue;
+      }
       emit("console-error", `${first.level}: ${msg.slice(0, TRUNCATE_SUMMARY)}`, first.timestamp, {
         category: "Bug",
         severity: first.level === "error" ? "Major" : "Minor",
@@ -155,6 +164,12 @@ export class BrowserErrorCollector {
 
     // Page errors (uncaught exceptions)
     for (const err of bucket.pageErrors) {
+      if (
+        this.options.policy &&
+        shouldSuppressFinding({ type: "console", error: err }, this.options.policy)
+      ) {
+        continue;
+      }
       emit("console-error", `Uncaught: ${err.message.slice(0, TRUNCATE_SUMMARY)}`, err.timestamp, {
         category: "Bug",
         severity: "Critical",
@@ -176,6 +191,12 @@ export class BrowserErrorCollector {
 
     for (const [, errors] of networkMsgs) {
       const first = errors[0];
+      if (
+        this.options.policy &&
+        shouldSuppressFinding({ type: "network", error: first }, this.options.policy)
+      ) {
+        continue;
+      }
       const statusLabel = first.status === 0 ? "failed" : `${first.status}`;
       let pathname: string;
       try {

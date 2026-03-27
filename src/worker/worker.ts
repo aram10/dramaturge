@@ -11,6 +11,7 @@ import type {
   WorkerResult,
   FollowupRequest,
   DiscoveredEdge,
+  MissionConfig,
 } from "../types.js";
 import { CoverageTracker } from "../coverage/tracker.js";
 import { StagnationTracker } from "./stagnation.js";
@@ -43,6 +44,7 @@ function initWorker(
     stagnationThreshold: number;
     appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
     repoHints?: RepoHints;
+    mission?: MissionConfig;
   }
 ): WorkerSetup {
   const findings: RawFinding[] = [];
@@ -70,7 +72,8 @@ function initWorker(
     opts.objectiveDescription,
     opts.pageType,
     opts.appContext,
-    opts.repoHints
+    opts.repoHints,
+    opts.mission
   );
 
   const agent = stagehand.agent({
@@ -94,7 +97,8 @@ export async function exploreArea(
   screenshotsEnabled = true,
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
-  repoHints?: RepoHints
+  repoHints?: RepoHints,
+  mission?: MissionConfig
 ): Promise<AreaResult> {
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
@@ -123,6 +127,7 @@ export async function exploreArea(
     stagnationThreshold,
     appContext,
     repoHints,
+    mission,
   });
 
   try {
@@ -177,7 +182,8 @@ export async function executeWorkerTask(
   screenshotsEnabled = true,
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
-  repoHints?: RepoHints
+  repoHints?: RepoHints,
+  mission?: MissionConfig
 ): Promise<WorkerResult> {
   const { findings, evidence, coverageTracker, followupRequests, discoveredEdges, agent } = initWorker(stagehand, {
     screenshotDir,
@@ -191,6 +197,7 @@ export async function executeWorkerTask(
     stagnationThreshold,
     appContext,
     repoHints,
+    mission,
   });
 
   try {

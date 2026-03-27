@@ -61,4 +61,24 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("#manage-kb-new-btn");
     expect(prompt).toContain("/login");
   });
+
+  it("adds stronger safety guidance when destructive actions are disabled", () => {
+    const prompt = buildWorkerSystemPrompt(
+      "A todo app",
+      "Main",
+      undefined,
+      "list",
+      undefined,
+      undefined,
+      {
+        appDescription: "A todo app",
+        destructiveActionsAllowed: false,
+        criticalFlows: ["knowledge-bases", "search"],
+      }
+    );
+
+    expect(prompt).toContain("Destructive actions are disabled");
+    expect(prompt).toContain("knowledge-bases");
+    expect(prompt).toContain("search");
+  });
 });

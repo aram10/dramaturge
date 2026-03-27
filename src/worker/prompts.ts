@@ -1,4 +1,4 @@
-import type { PageType } from "../types.js";
+import type { MissionConfig, PageType } from "../types.js";
 import type { RepoHints } from "../adaptation/types.js";
 
 interface AppContext {
@@ -62,13 +62,36 @@ function buildRepoHintsSection(repoHints?: RepoHints): string {
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
 }
 
+function buildMissionSection(mission?: MissionConfig): string {
+  if (!mission) return "";
+
+  const parts: string[] = [];
+
+  if (mission.criticalFlows?.length) {
+    parts.push("## Critical Flows");
+    for (const flow of mission.criticalFlows) {
+      parts.push(`- Prioritize: ${flow}`);
+    }
+  }
+
+  if (!mission.destructiveActionsAllowed) {
+    parts.push("## Safety Guardrail");
+    parts.push(
+      "Destructive actions are disabled for this run. Do not delete records, clear lists, or trigger irreversible changes."
+    );
+  }
+
+  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+}
+
 export function buildWorkerSystemPrompt(
   appDescription: string,
   areaName: string,
   areaDescription?: string,
   pageType?: PageType,
   appContext?: AppContext,
-  repoHints?: RepoHints
+  repoHints?: RepoHints,
+  mission?: MissionConfig
 ): string {
   const areaContext = areaDescription
     ? `\n\nAbout this area: ${areaDescription}`
@@ -84,7 +107,7 @@ export function buildWorkerSystemPrompt(
 ${appDescription}${buildRepoHintsSection(repoHints)}
 
 ## Your Assignment
-You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}
+You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}${buildMissionSection(mission)}
 
 ## What to Do
 1. Systematically explore all visible UI elements in this area

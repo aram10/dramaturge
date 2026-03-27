@@ -79,6 +79,11 @@ describe("executeFrontierItem", () => {
         },
         expectedHttpNoise: [],
       },
+      mission: {
+        appDescription: "Example app",
+        destructiveActionsAllowed: false,
+        criticalFlows: ["knowledge-bases"],
+      },
       navigator: {
         navigateTo: vi.fn().mockResolvedValue({ success: true }),
       },
@@ -139,6 +144,11 @@ describe("executeFrontierItem", () => {
           callbackRoutes: ["/auth/callback"],
         },
         expectedHttpNoise: [],
+      },
+      {
+        appDescription: "Example app",
+        destructiveActionsAllowed: false,
+        criticalFlows: ["knowledge-bases"],
       }
     );
   });
