@@ -45,6 +45,7 @@ function initWorker(
     appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
     repoHints?: RepoHints;
     mission?: MissionConfig;
+    stateId?: string;
   }
 ): WorkerSetup {
   const findings: RawFinding[] = [];
@@ -63,7 +64,14 @@ function initWorker(
     findings, screenshots, evidence, coverageTracker, page,
     opts.screenshotDir, opts.areaName,
     followupRequests, discoveredEdges,
-    opts.screenshotsEnabled, stagnationTracker
+    opts.screenshotsEnabled,
+    stagnationTracker,
+    {
+      stateId: opts.stateId,
+      objective: opts.objectiveDescription
+        ? `${opts.objectiveLabel}: ${opts.objectiveDescription}`
+        : opts.objectiveLabel,
+    }
   );
 
   const systemPrompt = buildWorkerSystemPrompt(
@@ -198,6 +206,7 @@ export async function executeWorkerTask(
     appContext,
     repoHints,
     mission,
+    stateId: task.nodeId,
   });
 
   try {
