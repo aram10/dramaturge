@@ -154,6 +154,21 @@ const BootstrapSchema = z
   })
   .optional();
 
+const PolicySchema = z
+  .object({
+    expectedResponses: z
+      .array(
+        z.object({
+          method: z.string().optional(),
+          pathPrefix: z.string(),
+          statuses: z.array(z.number().int()),
+        })
+      )
+      .default([]),
+    ignoredConsolePatterns: z.array(z.string()).default([]),
+  })
+  .default({});
+
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
   appDescription: z.string().min(1),
@@ -169,6 +184,7 @@ export const ConfigSchema = z.object({
   appContext: AppContextSchema,
   repoContext: RepoContextSchema,
   bootstrap: BootstrapSchema,
+  policy: PolicySchema,
 });
 
 export type WebProbeConfig = z.infer<typeof ConfigSchema>;

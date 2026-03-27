@@ -59,7 +59,8 @@ export async function executeFrontierItem(
     ctx.config.output.screenshots,
     ctx.config.budget.stagnationThreshold ?? 0,
     ctx.config.appContext,
-    ctx.repoHints
+    ctx.repoHints,
+    ctx.mission
   );
 
   return { item, result };

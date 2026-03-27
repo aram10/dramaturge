@@ -116,4 +116,41 @@ describe("loadConfig", () => {
       timeoutSeconds: 90,
     });
   });
+
+  it("accepts explicit policy controls", () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "webprobe.config.json");
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "policy": {
+          "expectedResponses": [
+            {
+              "method": "GET",
+              "pathPrefix": "/api/manage/knowledge-bases",
+              "statuses": [401, 403]
+            }
+          ],
+          "ignoredConsolePatterns": ["ResizeObserver loop"]
+        }
+      }`,
+      "utf-8"
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.policy).toMatchObject({
+      expectedResponses: [
+        {
+          method: "GET",
+          pathPrefix: "/api/manage/knowledge-bases",
+          statuses: [401, 403],
+        },
+      ],
+      ignoredConsolePatterns: ["ResizeObserver loop"],
+    });
+  });
 });

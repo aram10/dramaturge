@@ -25,6 +25,7 @@ import { executeFrontierItem } from "./engine/execute-frontier-item.js";
 import type { WorkerSession } from "./engine/worker-pool.js";
 import { scanRepository } from "./adaptation/repo-scan.js";
 import type { RepoHints } from "./adaptation/types.js";
+import { resolvePolicy } from "./policy/policy.js";
 
 function resolveBudget(config: WebProbeConfig): BudgetConfig {
   return {
@@ -245,6 +246,7 @@ export async function runEngine(
   const concurrency = config.concurrency.workers;
   const useLLMPlanner = hasLLMApiKey();
   const repoHints = loadRepoHints(config);
+  const policy = resolvePolicy(config.policy, repoHints);
   let bootstrapProcess: ChildProcess | undefined;
 
   if (repoHints) {
@@ -258,6 +260,7 @@ export async function runEngine(
     captureConsole: config.autoCapture.consoleErrors,
     captureNetwork: config.autoCapture.networkErrors,
     networkErrorMinStatus: config.autoCapture.networkErrorMinStatus,
+    policy,
   });
 
   // Initialize primary Stagehand
