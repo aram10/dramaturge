@@ -76,4 +76,34 @@ describe("deduplicateLinks", () => {
     const result = deduplicateLinks(links);
     expect(result.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("keeps meaningful query-driven routes distinct", () => {
+    const links = [
+      {
+        url: "https://app.example.com/manage/knowledge-bases?status=all",
+        text: "All knowledge bases",
+      },
+      {
+        url: "https://app.example.com/manage/knowledge-bases?status=pending",
+        text: "Pending knowledge bases",
+      },
+    ];
+
+    expect(deduplicateLinks(links)).toHaveLength(2);
+  });
+
+  it("collapses links that differ only by tracking params", () => {
+    const links = [
+      {
+        url: "https://app.example.com/manage/knowledge-bases",
+        text: "Knowledge bases",
+      },
+      {
+        url: "https://app.example.com/manage/knowledge-bases?utm_source=email",
+        text: "Knowledge bases email",
+      },
+    ];
+
+    expect(deduplicateLinks(links)).toHaveLength(1);
+  });
 });

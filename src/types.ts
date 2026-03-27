@@ -87,8 +87,15 @@ export interface Finding extends RawFinding {
 
 // --- Page fingerprint ---
 
+export interface StateSignature {
+  pathname: string;
+  query: Array<[string, string]>;
+  uiMarkers: string[];
+}
+
 export interface PageFingerprint {
   normalizedPath: string;
+  signature: StateSignature;
   title: string;
   heading: string;
   dialogTitles: string[];

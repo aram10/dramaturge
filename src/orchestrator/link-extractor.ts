@@ -1,4 +1,8 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
+import {
+  buildStateSignatureFromUrl,
+  buildStateSignatureKey,
+} from "../graph/state-signature.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -31,8 +35,9 @@ export function deduplicateLinks(links: ExtractedLink[]): ExtractedLink[] {
 
   for (const link of links) {
     try {
-      const url = new URL(link.url);
-      const key = url.pathname.replace(/\/+$/, "") || "/";
+      const key = buildStateSignatureKey(
+        buildStateSignatureFromUrl(link.url)
+      );
       if (!seen.has(key)) {
         seen.add(key);
         result.push(link);
@@ -51,7 +56,7 @@ export function deduplicateLinks(links: ExtractedLink[]): ExtractedLink[] {
  */
 export async function extractPageLinks(
   page: StagehandPage,
-  baseUrl: string,
+  baseUrl: string
 ): Promise<ExtractedLink[]> {
   const raw: Array<{ href: string; text: string }> = await page.evaluate(() =>
     Array.from(document.querySelectorAll("a[href]")).map((a) => ({

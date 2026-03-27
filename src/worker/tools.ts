@@ -188,6 +188,11 @@ export function createWorkerTools(
           // Placeholder — engine fills these when it actually navigates
           targetFingerprint: {
             normalizedPath: "",
+            signature: {
+              pathname: "",
+              query: [],
+              uiMarkers: [],
+            },
             title: "",
             heading: "",
             dialogTitles: [],

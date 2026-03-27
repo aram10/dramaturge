@@ -7,6 +7,11 @@ function makeNode(overrides: Partial<StateNode> = {}): StateNode {
     id: "node-test",
     fingerprint: {
       normalizedPath: "/test",
+      signature: {
+        pathname: "/test",
+        query: [],
+        uiMarkers: [],
+      },
       title: "Test",
       heading: "Test",
       dialogTitles: [],

@@ -1,7 +1,11 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
-import type { StateNode, StateEdge } from "../types.js";
+import type { NavigationHint, StateNode } from "../types.js";
 import type { StateGraph } from "../graph/state-graph.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
+import {
+  hasPathOnlyStateSignature,
+  signaturesEqual,
+} from "../graph/state-signature.js";
 import { waitForPageStable } from "../worker/page-stability.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
@@ -23,7 +27,7 @@ export class Navigator {
 
     // Fast path: direct URL
     if (node.url) {
-      await page.goto(node.url);
+      await page.goto(this.resolveUrl(node.url, rootUrl));
       await waitForPageStable(page);
       return this.verifyArrival(node, page);
     }
@@ -42,17 +46,8 @@ export class Navigator {
     await waitForPageStable(page);
 
     for (const edge of path) {
-      const hint = edge.navigationHint;
       try {
-        if (hint.url) {
-          await page.goto(hint.url);
-        } else if (hint.selector) {
-          // Stagehand page.click takes (x,y), so use act() for selector-based nav
-          await stagehand.act(`Click the element matching "${hint.selector}"`);
-        } else if (hint.actionDescription) {
-          await stagehand.act(hint.actionDescription);
-        }
-        await waitForPageStable(page);
+        await this.followHint(edge.navigationHint, page, stagehand, rootUrl);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : String(error);
@@ -66,6 +61,37 @@ export class Navigator {
     return this.verifyArrival(node, page);
   }
 
+  async navigateFromNode(
+    fromNodeId: string,
+    hint: NavigationHint,
+    graph: StateGraph,
+    page: StagehandPage,
+    stagehand: Stagehand,
+    rootUrl: string
+  ): Promise<NavigationResult> {
+    const restored = await this.navigateTo(
+      fromNodeId,
+      graph,
+      page,
+      stagehand,
+      rootUrl
+    );
+    if (!restored.success) {
+      return restored;
+    }
+
+    try {
+      await this.followHint(hint, page, stagehand, rootUrl);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        reason: `Navigation step failed: ${message}`,
+      };
+    }
+  }
+
   private async verifyArrival(
     node: StateNode,
     page: StagehandPage
@@ -75,9 +101,16 @@ export class Navigator {
       if (currentFp.hash === node.fingerprint.hash) {
         return { success: true };
       }
-      // Soft match: same normalized path is "close enough" for dynamic pages
-      // where content changes between visits (timestamps, notifications, etc.)
-      if (currentFp.normalizedPath === node.fingerprint.normalizedPath) {
+      if (signaturesEqual(currentFp.signature, node.fingerprint.signature)) {
+        return { success: true };
+      }
+      // Soft match only when both pages are path-only states. This keeps
+      // dynamic pages tolerant without collapsing meaningful query/UI states.
+      if (
+        currentFp.normalizedPath === node.fingerprint.normalizedPath &&
+        hasPathOnlyStateSignature(currentFp.signature) &&
+        hasPathOnlyStateSignature(node.fingerprint.signature)
+      ) {
         return { success: true };
       }
       return {
@@ -88,5 +121,27 @@ export class Navigator {
       // If fingerprinting fails, assume arrival is OK (best-effort)
       return { success: true };
     }
+  }
+
+  private async followHint(
+    hint: NavigationHint,
+    page: StagehandPage,
+    stagehand: Stagehand,
+    rootUrl: string
+  ): Promise<void> {
+    if (hint.url) {
+      await page.goto(this.resolveUrl(hint.url, rootUrl));
+    } else if (hint.selector) {
+      await stagehand.act(`Click the element matching "${hint.selector}"`);
+    } else if (hint.actionDescription) {
+      await stagehand.act(hint.actionDescription);
+    } else {
+      throw new Error("No navigation hint available");
+    }
+    await waitForPageStable(page);
+  }
+
+  private resolveUrl(url: string, rootUrl: string): string {
+    return new URL(url, rootUrl).href;
   }
 }
