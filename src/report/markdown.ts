@@ -68,14 +68,36 @@ export function renderMarkdown(result: RunResult): string {
     lines.push("");
     for (const f of findings) {
       const steps = f.stepsToReproduce.map((s, i) => `  ${i + 1}. ${s}`).join("\n");
-      lines.push(`### [${f.id}] ${f.severity}: ${f.title}
-- **Area:** ${f.area}
-- **Category:** ${f.category}
-- **Severity:** ${f.severity}
-- **Steps to reproduce:**
-${steps}
-- **Expected:** ${f.expected}
-- **Actual:** ${f.actual}${f.screenshot ? `\n- **Screenshot:** ${f.screenshot}` : ""}`);
+      lines.push(`### [${f.id}] ${f.severity}: ${f.title}`);
+      lines.push(`- **Area:** ${f.area}`);
+      lines.push(`- **Category:** ${f.category}`);
+      lines.push(`- **Severity:** ${f.severity}`);
+      lines.push(`- **Steps to reproduce:**`);
+      lines.push(steps);
+      lines.push(`- **Expected:** ${f.expected}`);
+      lines.push(`- **Actual:** ${f.actual}`);
+      if (f.screenshot) {
+        lines.push(`- **Screenshot:** ${f.screenshot}`);
+      }
+      if (f.meta) {
+        lines.push(`- **Source:** ${f.meta.source}`);
+        lines.push(`- **Confidence:** ${f.meta.confidence}`);
+        if (f.meta.repro?.stateId) {
+          lines.push(`- **Repro state:** ${f.meta.repro.stateId}`);
+        }
+        if (f.meta.repro?.route) {
+          lines.push(`- **Repro route:** ${f.meta.repro.route}`);
+        }
+        if (f.meta.repro?.objective) {
+          lines.push(`- **Repro objective:** ${f.meta.repro.objective}`);
+        }
+        if ((f.meta.repro?.breadcrumbs?.length ?? 0) > 0) {
+          lines.push(`- **Repro breadcrumbs:** ${f.meta.repro?.breadcrumbs.join(" | ")}`);
+        }
+        if ((f.meta.repro?.evidenceIds?.length ?? 0) > 0) {
+          lines.push(`- **Repro evidence:** ${f.meta.repro?.evidenceIds.join(", ")}`);
+        }
+      }
       lines.push("");
     }
   }

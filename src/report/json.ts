@@ -47,6 +47,7 @@ export function renderJson(result: RunResult): string {
       actual: f.actual,
       screenshot: f.screenshot ?? null,
       evidenceIds: f.evidenceIds ?? [],
+      meta: f.meta ?? null,
     })),
     coverage: result.areaResults.map((a) => ({
       name: a.name,
