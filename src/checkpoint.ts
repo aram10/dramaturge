@@ -23,7 +23,8 @@ export function saveCheckpoint(
   actionsByNode: Map<string, ReplayableAction[]>,
   coverage: CoverageTracker,
   completedTaskIds: string[],
-  tasksExecuted: number
+  tasksExecuted: number,
+  plannerState: Record<string, FrontierItem["workerType"][]>
 ): void {
   const checkpoint: Checkpoint = {
     version: 1,
@@ -39,6 +40,7 @@ export function saveCheckpoint(
     actionsByNode: Object.fromEntries(actionsByNode.entries()),
     blindSpots: coverage.getBlindSpots(),
     completedTaskIds,
+    plannerState,
   };
 
   const path = join(outputDir, CHECKPOINT_FILE);
@@ -69,6 +71,7 @@ export function hydrateFromCheckpoint(
   actionsByNode: Map<string, ReplayableAction[]>;
   completedTaskIds: Set<string>;
   tasksExecuted: number;
+  plannerState: Record<string, FrontierItem["workerType"][]>;
 } {
   // Restore graph nodes
   for (const node of checkpoint.graphSnapshot.nodes) {
@@ -112,5 +115,6 @@ export function hydrateFromCheckpoint(
     actionsByNode,
     completedTaskIds: new Set(checkpoint.completedTaskIds),
     tasksExecuted: checkpoint.tasksExecuted,
+    plannerState: checkpoint.plannerState ?? {},
   };
 }

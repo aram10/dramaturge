@@ -20,12 +20,17 @@ function stripProvider(model: string): string {
   return slash >= 0 ? model.slice(slash + 1) : model;
 }
 
-export function hasLLMApiKey(): boolean {
-  return !!(
-    process.env.ANTHROPIC_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY
-  );
+export function hasLLMApiKey(model?: string): boolean {
+  if (!model) {
+    return !!(
+      process.env.ANTHROPIC_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    );
+  }
+
+  const provider = detectProvider(model);
+  return Boolean(process.env[PROVIDERS[provider].envKey]);
 }
 
 interface ProviderSpec {

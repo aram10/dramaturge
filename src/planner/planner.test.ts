@@ -220,6 +220,19 @@ describe("Planner", () => {
       // Second proposal should have lower priority (coverage gap goes to 0)
       expect(secondFormPriority).toBeLessThan(firstFormPriority!);
     });
+
+    it("can snapshot and restore dispatched worker types", () => {
+      const planner = new Planner();
+      planner.recordDispatch("node-1", "form");
+      planner.recordDispatch("node-1", "navigation");
+
+      const snapshot = planner.snapshotDispatchState();
+
+      const restored = new Planner();
+      restored.restoreDispatchState(snapshot);
+
+      expect(restored.snapshotDispatchState()).toEqual(snapshot);
+    });
   });
 
   describe("routeFollowup", () => {

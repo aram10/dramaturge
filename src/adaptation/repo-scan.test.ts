@@ -29,8 +29,10 @@ describe("scanRepository", () => {
 
     expect(hints.apiEndpoints).toContainEqual({
       route: "/api/manage/knowledge-bases",
-      methods: ["GET"],
-      statuses: [401, 403],
+      methods: ["GET", "POST"],
+      statuses: [201, 400, 401, 403],
+      authRequired: true,
+      validationSchemas: ["CreateKnowledgeBaseSchema"],
     });
 
     expect(hints.authHints.loginRoutes).toContain("/login");

@@ -255,7 +255,7 @@ export async function runEngine(
   const budget = resolveBudget(config);
   const mission = buildMission(config);
   const concurrency = config.concurrency.workers;
-  const useLLMPlanner = hasLLMApiKey();
+  const useLLMPlanner = hasLLMApiKey(config.models.planner);
   const repoHints = loadRepoHints(config);
   const policy = resolvePolicy(config.policy, repoHints);
   const memoryStore = config.memory.enabled ? new MemoryStore(config.memory.dir) : undefined;
@@ -348,6 +348,7 @@ export async function runEngine(
         ctx.evidenceByNode = hydrated.evidenceByNode;
         ctx.actionsByNode = hydrated.actionsByNode;
         ctx.completedTaskIds = hydrated.completedTaskIds;
+        ctx.planner.restoreDispatchState(hydrated.plannerState);
         tasksExecuted = hydrated.tasksExecuted;
         console.log(
           `Resumed from checkpoint: ${tasksExecuted} tasks, ${ctx.graph.nodeCount()} states, ${ctx.frontier.size()} pending`
@@ -515,7 +516,8 @@ export async function runEngine(
           ctx.actionsByNode,
           ctx.globalCoverage,
           [...ctx.completedTaskIds],
-          tasksExecuted
+          tasksExecuted,
+          ctx.planner.snapshotDispatchState()
         );
         tasksSinceCheckpoint = 0;
         console.log(`  Checkpoint saved (${tasksExecuted} tasks completed)`);
@@ -562,7 +564,8 @@ export async function runEngine(
         ctx.actionsByNode,
         ctx.globalCoverage,
         [...ctx.completedTaskIds],
-        tasksExecuted
+        tasksExecuted,
+        ctx.planner.snapshotDispatchState()
       );
     }
 

@@ -10,6 +10,8 @@ export interface ApiEndpointHint {
   route: string;
   methods: string[];
   statuses: number[];
+  authRequired?: boolean;
+  validationSchemas?: string[];
 }
 
 export interface RepoHints {

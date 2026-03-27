@@ -10,6 +10,9 @@ const SELECTOR_RE = /\b(id|data-testid)\s*=\s*["'`]([^"'`]+)["'`]/g;
 const STATUS_RE = /status\s*:\s*(\d{3})\b/g;
 const EXPORTED_METHOD_RE =
   /\bexport\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b|\bexport\s+const\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b/g;
+const AUTH_RE =
+  /\b(getServerSession|requireAuth|requireUser|assertRole|unauthorized|forbidden|auth)\b/;
+const VALIDATION_SCHEMA_RE = /\b([A-Z][A-Za-z0-9]+Schema)\b/g;
 
 function toPosix(value: string): string {
   return value.split(sep).join("/");
@@ -117,7 +120,9 @@ function extractExpectedHttpNoise(
     const content = readFileSync(filePath, "utf-8");
     const statuses = uniqueSorted(
       [...content.matchAll(STATUS_RE)].map((match) => match[1])
-    ).map((status) => Number.parseInt(status, 10));
+    )
+      .map((status) => Number.parseInt(status, 10))
+      .filter((status) => status === 401 || status === 403);
 
     if (statuses.length === 0) continue;
 
@@ -154,6 +159,10 @@ function extractApiEndpoints(root: string, routeFiles: string[]): ApiEndpointHin
         route: routeFromRouteFile(root, filePath),
         methods: extractRouteMethods(content),
         statuses: extractStatusCodes(content),
+        authRequired: AUTH_RE.test(content) || /(401|403)\b/.test(content),
+        validationSchemas: uniqueSorted(
+          [...content.matchAll(VALIDATION_SCHEMA_RE)].map((match) => match[1])
+        ),
       };
     })
     .sort((left, right) => left.route.localeCompare(right.route));

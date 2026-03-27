@@ -72,7 +72,20 @@ function buildRepoHintsSection(repoHints?: RepoHints): string {
     parts.push(
       `API endpoints: ${repoHints.apiEndpoints
         .slice(0, 4)
-        .map((endpoint) => `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}`)
+        .map((endpoint) => {
+          const details = [
+            endpoint.statuses.length > 0
+              ? `expected statuses ${endpoint.statuses.join(", ")}`
+              : undefined,
+            endpoint.authRequired ? "requires auth" : undefined,
+            (endpoint.validationSchemas?.length ?? 0) > 0
+              ? `validation schemas ${endpoint.validationSchemas?.join(", ")}`
+              : undefined,
+          ].filter(Boolean);
+          return `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}${
+            details.length > 0 ? ` (${details.join("; ")})` : ""
+          }`;
+        })
         .join(", ")}`
     );
   }

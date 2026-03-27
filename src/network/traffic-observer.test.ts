@@ -100,4 +100,41 @@ describe("NetworkTrafficObserver", () => {
     expect(page._handlers.get("response")).toHaveLength(initialResponseListeners);
     expect(page._handlers.get("requestfailed")).toHaveLength(initialFailedListeners);
   });
+
+  it("resets page-scoped traffic without losing the global catalog", () => {
+    const observer = new NetworkTrafficObserver();
+    const page = createMockPage();
+
+    observer.attach(page as any, "primary");
+
+    page.emit("response", {
+      status: () => 200,
+      url: () => "https://example.com/api/widgets",
+      request: () => ({
+        method: () => "GET",
+        resourceType: () => "fetch",
+      }),
+    });
+
+    expect(observer.snapshot("primary")).toEqual([
+      {
+        route: "/api/widgets",
+        methods: ["GET"],
+        statuses: [200],
+        failures: [],
+      },
+    ]);
+
+    observer.resetPage("primary");
+
+    expect(observer.snapshot("primary")).toEqual([]);
+    expect(observer.snapshot()).toEqual([
+      {
+        route: "/api/widgets",
+        methods: ["GET"],
+        statuses: [200],
+        failures: [],
+      },
+    ]);
+  });
 });

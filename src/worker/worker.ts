@@ -211,6 +211,8 @@ export async function exploreArea(
       status: "failed",
       failureReason: message,
     };
+  } finally {
+    actionRecorder.stop();
   }
 }
 
@@ -283,5 +285,7 @@ export async function executeWorkerTask(
       outcome: "failed",
       summary: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    actionRecorder.stop();
   }
 }

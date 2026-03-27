@@ -73,7 +73,9 @@ describe("Checkpoint", () => {
 
     saveCheckpoint(
       tmpDir, graph, frontier, findings, evidence, actions,
-      coverage, ["task-0"], 5
+      coverage, ["task-0"], 5, {
+        [node.id]: ["navigation"],
+      }
     );
 
     const cpPath = join(tmpDir, "checkpoint.json");
@@ -85,6 +87,9 @@ describe("Checkpoint", () => {
     expect(raw.graphSnapshot.nodes).toHaveLength(1);
     expect(raw.completedTaskIds).toEqual(["task-0"]);
     expect(raw.actionsByNode).toEqual({});
+    expect(raw.plannerState).toEqual({
+      [node.id]: ["navigation"],
+    });
   });
 
   it("loadCheckpoint returns null for missing file", () => {
@@ -105,7 +110,7 @@ describe("Checkpoint", () => {
     const evidence = new Map<string, Evidence[]>();
     const actions = new Map<string, ReplayableAction[]>();
 
-    saveCheckpoint(tmpDir, graph, frontier, findings, evidence, actions, coverage, [], 0);
+    saveCheckpoint(tmpDir, graph, frontier, findings, evidence, actions, coverage, [], 0, {});
 
     const loaded = loadCheckpoint(tmpDir);
     expect(loaded).not.toBeNull();
@@ -169,7 +174,9 @@ describe("Checkpoint", () => {
 
     saveCheckpoint(
       tmpDir, origGraph, origFrontier, findings, evidence, actions,
-      coverage, ["task-1", "task-2"], 10
+      coverage, ["task-1", "task-2"], 10, {
+        [node.id]: ["crud", "navigation"],
+      }
     );
 
     // Load and hydrate into fresh structures
@@ -189,6 +196,9 @@ describe("Checkpoint", () => {
     expect(result.actionsByNode.get(node.id)).toHaveLength(1);
     expect(result.completedTaskIds.size).toBe(2);
     expect(result.tasksExecuted).toBe(10);
+    expect(result.plannerState).toEqual({
+      [node.id]: ["crud", "navigation"],
+    });
     expect(newCoverage.getBlindSpots()).toHaveLength(1);
   });
 });

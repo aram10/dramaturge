@@ -54,6 +54,8 @@ describe("buildWorkerSystemPrompt", () => {
             route: "/api/manage/knowledge-bases",
             methods: ["GET"],
             statuses: [401, 403],
+            authRequired: true,
+            validationSchemas: ["CreateKnowledgeBaseSchema"],
           },
         ],
         authHints: {
@@ -72,6 +74,9 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("/manage");
     expect(prompt).toContain("API endpoints");
     expect(prompt).toContain("GET /api/manage/knowledge-bases");
+    expect(prompt).toContain("expected statuses 401, 403");
+    expect(prompt).toContain("requires auth");
+    expect(prompt).toContain("CreateKnowledgeBaseSchema");
   });
 
   it("includes observed API traffic when provided", () => {
