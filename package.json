@@ -26,10 +26,8 @@
   },
   "files": [
     "dist",
-    "examples",
     "README.md",
-    "dramaturge.config.example.json",
-    "docs/*.md"
+    "dramaturge.config.example.json"
   ],
   "engines": {
     "node": ">=20"

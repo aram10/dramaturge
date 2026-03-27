@@ -6,9 +6,17 @@ export interface ExpectedHttpNoise {
   statuses: number[];
 }
 
+export interface ApiEndpointHint {
+  route: string;
+  methods: string[];
+  statuses: number[];
+}
+
 export interface RepoHints {
   routes: string[];
+  routeFamilies: string[];
   stableSelectors: string[];
+  apiEndpoints: ApiEndpointHint[];
   authHints: {
     loginRoutes: string[];
     callbackRoutes: string[];
@@ -24,7 +32,9 @@ export interface RepoScanOptions {
 
 export interface RepoHintsOverride {
   routes?: string[];
+  routeFamilies?: string[];
   stableSelectors?: string[];
+  apiEndpoints?: ApiEndpointHint[];
   authHints?: Partial<RepoHints["authHints"]>;
   expectedHttpNoise?: ExpectedHttpNoise[];
 }

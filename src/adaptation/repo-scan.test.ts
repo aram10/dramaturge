@@ -5,7 +5,7 @@ import { scanRepository } from "./repo-scan.js";
 const fixtureRoot = fileURLToPath(new URL("./fixtures/next-app", import.meta.url));
 
 describe("scanRepository", () => {
-  it("extracts routes, selectors, auth hints, query routes, and expected auth noise from a Next.js repo", () => {
+  it("extracts routes, route families, selectors, API endpoints, auth hints, query routes, and expected auth noise from a Next.js repo", () => {
     const hints = scanRepository({
       root: fixtureRoot,
       framework: "nextjs",
@@ -21,6 +21,17 @@ describe("scanRepository", () => {
     expect(hints.stableSelectors).toContain("#manage-kb-new-btn");
     expect(hints.stableSelectors).toContain('[data-testid="kb-filter-pending"]');
     expect(hints.stableSelectors).toContain('[data-testid="app-nav"]');
+
+    expect(hints.routeFamilies).toContain("/");
+    expect(hints.routeFamilies).toContain("/auth");
+    expect(hints.routeFamilies).toContain("/login");
+    expect(hints.routeFamilies).toContain("/manage");
+
+    expect(hints.apiEndpoints).toContainEqual({
+      route: "/api/manage/knowledge-bases",
+      methods: ["GET"],
+      statuses: [401, 403],
+    });
 
     expect(hints.authHints.loginRoutes).toContain("/login");
     expect(hints.authHints.callbackRoutes).toContain("/auth/callback");

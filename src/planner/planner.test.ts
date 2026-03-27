@@ -123,7 +123,15 @@ describe("Planner", () => {
 
       const tasks = planner.proposeTasks(node, graph, undefined, {
         routes: ["/login", "/manage/knowledge-bases"],
+        routeFamilies: ["/", "/login", "/manage"],
         stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
+        apiEndpoints: [
+          {
+            route: "/api/manage/knowledge-bases",
+            methods: ["GET"],
+            statuses: [401, 403],
+          },
+        ],
         authHints: {
           loginRoutes: ["/login"],
           callbackRoutes: ["/auth/callback"],

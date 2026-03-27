@@ -93,7 +93,9 @@ function loadRepoHints(config: DramaturgeConfig): RepoHints | undefined {
 
   const hasHints =
     repoHints.routes.length > 0 ||
+    repoHints.routeFamilies.length > 0 ||
     repoHints.stableSelectors.length > 0 ||
+    repoHints.apiEndpoints.length > 0 ||
     repoHints.authHints.loginRoutes.length > 0 ||
     repoHints.authHints.callbackRoutes.length > 0 ||
     repoHints.expectedHttpNoise.length > 0;

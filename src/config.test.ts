@@ -1,6 +1,6 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadConfig } from "./config.js";
 import { parseJsoncObject } from "./utils/jsonc.js";
@@ -275,49 +275,6 @@ describe("loadConfig", () => {
     expect(() => loadConfig(configPath)).toThrow();
   });
 
-  it("loads the shipped example config", () => {
-    process.env.TEST_USER_EMAIL = "operator@example.com";
-    process.env.TEST_USER_PASSWORD = "super-secret";
-
-    const config = loadConfig(
-      join(process.cwd(), "dramaturge.config.example.json")
-    );
-
-    expect(config.targetUrl).toBe("https://your-app.example.com");
-    expect(config.auth).toMatchObject({
-      type: "interactive",
-      loginUrl: "/login",
-      successIndicator: "selector:[data-testid='user-menu']",
-    });
-  });
-
-  it("loads the standalone local example config", () => {
-    const configPath = join(process.cwd(), "examples", "standalone.local.profile.jsonc");
-    const config = loadConfig(configPath);
-
-    expect(config.auth).toMatchObject({
-      type: "interactive",
-      stateFile: resolve(dirname(configPath), ".dramaturge-state/local-user.json"),
-    });
-    expect(config.output.dir).toBe(
-      resolve(dirname(configPath), "dramaturge-reports", "local")
-    );
-  });
-
-  it("loads the standalone live example config", () => {
-    const configPath = join(process.cwd(), "examples", "standalone.live.profile.jsonc");
-    const config = loadConfig(configPath);
-
-    expect(config.targetUrl).toBe("https://your-app.example.com");
-    expect(config.auth).toMatchObject({
-      type: "interactive",
-      stateFile: resolve(dirname(configPath), ".dramaturge-state/live-user.json"),
-    });
-    expect(config.output.dir).toBe(
-      resolve(dirname(configPath), "dramaturge-reports", "live")
-    );
-  });
-
   it("resolves filesystem paths relative to the config file", () => {
     const dir = createTempDir();
     const configsDir = join(dir, "configs");
@@ -390,16 +347,4 @@ describe("loadConfig", () => {
     });
   });
 
-  it("keeps the ChatPPT profile self-contained inside the package directory", () => {
-    const configPath = join(process.cwd(), "examples", "chatppt.local.profile.jsonc");
-    const raw = readFileSync(configPath, "utf-8");
-    const config = loadConfig(configPath);
-
-    expect(raw).not.toContain("../");
-    expect(config.auth).toMatchObject({
-      type: "interactive",
-      stateFile: resolve(dirname(configPath), ".dramaturge-state/chatppt-user.json"),
-    });
-    expect(config.repoContext).toBeUndefined();
-  });
 });

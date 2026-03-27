@@ -17,7 +17,15 @@ const ExpectedHttpNoiseSchema = z.object({
 
 const RepoHintsOverrideSchema = z.object({
   routes: z.array(z.string()).optional(),
+  routeFamilies: z.array(z.string()).optional(),
   stableSelectors: z.array(z.string()).optional(),
+  apiEndpoints: z.array(
+    z.object({
+      route: z.string(),
+      methods: z.array(z.string()),
+      statuses: z.array(z.number().int()),
+    })
+  ).optional(),
   authHints: z
     .object({
       loginRoutes: z.array(z.string()).optional(),
@@ -34,7 +42,9 @@ function uniqueSorted(values: string[]): string[] {
 export function emptyRepoHints(): RepoHints {
   return {
     routes: [],
+    routeFamilies: [],
     stableSelectors: [],
+    apiEndpoints: [],
     authHints: {
       loginRoutes: [],
       callbackRoutes: [],
@@ -48,10 +58,36 @@ function mergeRepoHints(base: RepoHints, override?: RepoHintsOverride): RepoHint
 
   return {
     routes: uniqueSorted([...base.routes, ...(override.routes ?? [])]),
+    routeFamilies: uniqueSorted([
+      ...base.routeFamilies,
+      ...(override.routeFamilies ?? []),
+    ]),
     stableSelectors: uniqueSorted([
       ...base.stableSelectors,
       ...(override.stableSelectors ?? []),
     ]),
+    apiEndpoints: [
+      ...base.apiEndpoints,
+      ...(override.apiEndpoints ?? []),
+    ]
+      .reduce<RepoHints["apiEndpoints"]>((acc, endpoint) => {
+        const existing = acc.find((candidate) => candidate.route === endpoint.route);
+        if (!existing) {
+          acc.push({
+            route: endpoint.route,
+            methods: uniqueSorted(endpoint.methods),
+            statuses: [...new Set(endpoint.statuses)].sort((left, right) => left - right),
+          });
+          return acc;
+        }
+
+        existing.methods = uniqueSorted([...existing.methods, ...endpoint.methods]);
+        existing.statuses = [...new Set([...existing.statuses, ...endpoint.statuses])].sort(
+          (left, right) => left - right
+        );
+        return acc;
+      }, [])
+      .sort((left, right) => left.route.localeCompare(right.route)),
     authHints: {
       loginRoutes: uniqueSorted([
         ...base.authHints.loginRoutes,
