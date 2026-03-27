@@ -7,6 +7,7 @@ import type {
   StateEdge,
   StateNode,
 } from "../types.js";
+import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
 
 export interface HistoricalFindingRecord {
   signature: string;
@@ -39,6 +40,12 @@ export interface HistoricalAuthHints {
   successfulLoginRoutes: string[];
 }
 
+export interface HistoricalApiEndpointRecord extends ObservedApiEndpoint {
+  firstSeenAt: string;
+  lastSeenAt: string;
+  runCount: number;
+}
+
 export interface NavigationMemorySnapshot {
   targetOrigin: string;
   savedAt: string;
@@ -52,6 +59,7 @@ export interface MemorySnapshot {
   findingHistory: Record<string, HistoricalFindingRecord>;
   flakyPages: HistoricalFlakyPageRecord[];
   authHints: HistoricalAuthHints;
+  observedApiCatalog: HistoricalApiEndpointRecord[];
   navigation?: NavigationMemorySnapshot;
 }
 
@@ -60,6 +68,7 @@ export interface WorkerHistoryContext {
   flakyPageNotes: string[];
   navigationHints: string[];
   authHints: string[];
+  apiHints: ObservedApiEndpoint[];
 }
 
 export interface PlannerMemorySignals {

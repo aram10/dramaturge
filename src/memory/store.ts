@@ -4,9 +4,11 @@ import type { DramaturgeConfig } from "../config.js";
 import type { AreaResult, RawFinding, RunMemoryMeta } from "../types.js";
 import type { StateGraph } from "../graph/state-graph.js";
 import { collectFindings, buildFindingGroupKey } from "../report/collector.js";
+import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
 import type {
   FlakyPageInput,
   HistoricalFlakyPageRecord,
+  HistoricalApiEndpointRecord,
   MemoryRouteMatchInput,
   MemorySnapshot,
   NavigationMemorySnapshot,
@@ -26,6 +28,7 @@ function createEmptySnapshot(): MemorySnapshot {
     authHints: {
       successfulLoginRoutes: [],
     },
+    observedApiCatalog: [],
   };
 }
 
@@ -53,6 +56,27 @@ function normalizeOrigin(urlOrPath?: string): string | undefined {
 
 function uniqueStrings(values: Array<string | undefined>): string[] {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+function uniqueSortedStrings(values: Array<string | undefined>): string[] {
+  return uniqueStrings(values).sort();
+}
+
+function uniqueNumbers(values: number[]): number[] {
+  return Array.from(new Set(values)).sort((left, right) => left - right);
+}
+
+function routeTokens(urlOrPath?: string): string[] {
+  const route = normalizeRoute(urlOrPath);
+  if (!route) {
+    return [];
+  }
+
+  return route
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => segment.toLowerCase())
+    .filter((segment) => !segment.startsWith(":") && !/^\d+$/.test(segment));
 }
 
 function matchesRoute(
@@ -101,6 +125,7 @@ export class MemoryStore {
           },
           findingHistory: raw.findingHistory ?? {},
           flakyPages: raw.flakyPages ?? [],
+          observedApiCatalog: raw.observedApiCatalog ?? [],
         };
       }
     }
@@ -194,6 +219,44 @@ export class MemoryStore {
     this.persist(snapshot);
   }
 
+  recordObservedApiTraffic(runAt: string, endpoints: ObservedApiEndpoint[]): void {
+    if (endpoints.length === 0) {
+      return;
+    }
+
+    const snapshot = this.getSnapshot();
+
+    for (const endpoint of endpoints) {
+      const existing = snapshot.observedApiCatalog.find(
+        (record) => record.route === endpoint.route
+      );
+
+      if (existing) {
+        existing.methods = uniqueSortedStrings([...existing.methods, ...endpoint.methods]);
+        existing.statuses = uniqueNumbers([...existing.statuses, ...endpoint.statuses]);
+        existing.failures = uniqueSortedStrings([
+          ...existing.failures,
+          ...endpoint.failures,
+        ]);
+        existing.lastSeenAt = runAt;
+        existing.runCount += 1;
+        continue;
+      }
+
+      snapshot.observedApiCatalog.push({
+        route: endpoint.route,
+        methods: uniqueSortedStrings(endpoint.methods),
+        statuses: uniqueNumbers(endpoint.statuses),
+        failures: uniqueSortedStrings(endpoint.failures),
+        firstSeenAt: runAt,
+        lastSeenAt: runAt,
+        runCount: 1,
+      });
+    }
+
+    this.persist(snapshot);
+  }
+
   rememberAuthHint(loginUrl: string): void {
     const snapshot = this.getSnapshot();
     const loginRoute = normalizeRoute(loginUrl);
@@ -239,12 +302,14 @@ export class MemoryStore {
       matchesRoute(input, record.route, record.fingerprintHash)
     );
     const navigationHints = this.describeNavigationHints(input, snapshot.navigation);
+    const apiHints = this.describeApiHints(input, snapshot.observedApiCatalog);
 
     return {
       suppressedFindings: matchingFindings.map((record) => record.title),
       flakyPageNotes: matchingFlakyPages.map((record) => record.note),
       navigationHints,
       authHints: [...snapshot.authHints.successfulLoginRoutes],
+      apiHints,
     };
   }
 
@@ -302,6 +367,36 @@ export class MemoryStore {
     }
 
     return uniqueStrings(hints);
+  }
+
+  private describeApiHints(
+    input: MemoryRouteMatchInput,
+    catalog: HistoricalApiEndpointRecord[]
+  ): ObservedApiEndpoint[] {
+    if (catalog.length === 0) {
+      return [];
+    }
+
+    const inputTokens = new Set(routeTokens(input.url ?? input.fingerprint?.normalizedPath));
+    const ranked = catalog
+      .map((record) => ({
+        record,
+        score: routeTokens(record.route).filter((token) => inputTokens.has(token)).length,
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((left, right) => {
+        if (right.score !== left.score) {
+          return right.score - left.score;
+        }
+        return right.record.lastSeenAt.localeCompare(left.record.lastSeenAt);
+      });
+
+    return ranked.slice(0, 4).map(({ record }) => ({
+      route: record.route,
+      methods: [...record.methods],
+      statuses: [...record.statuses],
+      failures: [...record.failures],
+    }));
   }
 
   private persist(snapshot: MemorySnapshot): void {

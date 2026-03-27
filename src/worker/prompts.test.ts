@@ -134,6 +134,14 @@ describe("buildWorkerSystemPrompt", () => {
         flakyPageNotes: ["Relative timestamps refresh every second near the header"],
         navigationHints: ["Known transition: Settings -> Members via role=button[name=Members]"],
         authHints: ["Successful login has historically started at /login"],
+        apiHints: [
+          {
+            route: "/api/settings/members",
+            methods: ["GET", "POST"],
+            statuses: [200, 400],
+            failures: ["validation failed"],
+          },
+        ],
       }
     );
 
@@ -142,5 +150,7 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("Relative timestamps refresh every second");
     expect(prompt).toContain("Settings -> Members");
     expect(prompt).toContain("historically started at /login");
+    expect(prompt).toContain("Historical API hints");
+    expect(prompt).toContain("GET/POST /api/settings/members");
   });
 });

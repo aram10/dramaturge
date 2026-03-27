@@ -133,6 +133,20 @@ describe("MemoryStore", () => {
     store.recordRunFindings("2026-03-27T12:00:00.000Z", [
       makeAreaResult("Settings", "https://example.com/settings", finding),
     ]);
+    store.recordObservedApiTraffic("2026-03-27T12:00:00.000Z", [
+      {
+        route: "/api/settings/members",
+        methods: ["GET"],
+        statuses: [200],
+        failures: [],
+      },
+      {
+        route: "/api/settings/members",
+        methods: ["POST"],
+        statuses: [400],
+        failures: ["validation failed"],
+      },
+    ]);
     store.markFindingSuppressed(buildFindingSignature(finding), "Known transient render");
     store.recordFlakyPage({
       route: "https://example.com/settings",
@@ -165,6 +179,14 @@ describe("MemoryStore", () => {
       true
     );
     expect(workerContext.authHints).toContain("/login");
+    expect(workerContext.apiHints).toEqual([
+      {
+        route: "/api/settings/members",
+        methods: ["GET", "POST"],
+        statuses: [200, 400],
+        failures: ["validation failed"],
+      },
+    ]);
     expect(plannerSignals).toEqual({
       hasSuppressedFindings: true,
       hasFlakyPageNotes: true,
