@@ -1,0 +1,105 @@
+{
+  "targetUrl": "https://your-app.example.com",
+  "appDescription": "Describe your app: what it does, its main features, and user roles.",
+
+  "auth": {
+    "type": "interactive",
+    "loginUrl": "/login",
+    "successIndicator": "selector:[data-testid='user-menu']",
+    "stateFile": "./.dramaturge-state/user.json",
+    "manualTimeoutSeconds": 120
+  },
+
+  // Alternative: deterministic form auth with explicit selectors.
+  // Environment variables can be interpolated with ${NAME}.
+  // "auth": {
+  //   "type": "form",
+  //   "loginUrl": "/login",
+  //   "fields": [
+  //     { "selector": "input[name='email']", "value": "${TEST_USER_EMAIL}" },
+  //     { "selector": "input[name='password']", "value": "${TEST_USER_PASSWORD}", "secret": true }
+  //   ],
+  //   "submit": { "selector": "button[type='submit']" },
+  //   "successIndicator": "selector:[data-testid='user-menu']"
+  // },
+
+  // Alternative: scripted redirect auth for IdP flows that still need
+  // deterministic selectors rather than model-mediated credential entry.
+  // "auth": {
+  //   "type": "oauth-redirect",
+  //   "loginUrl": "/login",
+  //   "steps": [
+  //     { "type": "click", "selector": "button[data-provider='microsoft']" },
+  //     { "type": "fill", "selector": "input[type='email']", "value": "${TEST_USER_EMAIL}" },
+  //     { "type": "click", "selector": "input[type='submit']" },
+  //     { "type": "wait-for-selector", "selector": "input[type='password']" },
+  //     { "type": "fill", "selector": "input[type='password']", "value": "${TEST_USER_PASSWORD}", "secret": true },
+  //     { "type": "click", "selector": "input[type='submit']" }
+  //   ],
+  //   "successIndicator": "selector:[data-testid='user-menu']"
+  // },
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "cua",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "cua"
+    }
+  },
+
+  "mission": {
+    "criticalFlows": [
+      "Create a new record",
+      "Edit an existing record",
+      "Search and filter the list"
+    ],
+    "destructiveActionsAllowed": false,
+    "focusModes": ["navigation", "form", "crud"]
+  },
+
+  "budget": {
+    "globalTimeLimitSeconds": 900,
+    "maxStepsPerTask": 40,
+    "maxFrontierSize": 200,
+    "maxStateNodes": 50
+  },
+
+  "exploration": {
+    "maxAreasToExplore": 10,
+    "stepsPerArea": 40,
+    "totalTimeout": 900
+  },
+
+  "output": {
+    "dir": "./dramaturge-reports/default",
+    "format": "markdown",
+    "screenshots": true
+  },
+
+  "memory": {
+    "enabled": true,
+    "dir": "./.dramaturge",
+    "warmStart": true
+  },
+
+  // Optional deterministic visual diffs. First run captures baselines,
+  // later runs compare against them and emit visual findings when the
+  // configured diff threshold is exceeded.
+  "visualRegression": {
+    "enabled": false,
+    "baselineDir": "./.dramaturge/visual-baselines",
+    "diffPixelRatioThreshold": 0.01,
+    "maskSelectors": []
+  },
+
+  "browser": {
+    "headless": false
+  },
+
+  "llm": {
+    "requestTimeoutMs": 30000
+  }
+}

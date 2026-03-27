@@ -2,54 +2,57 @@
 
 ## Purpose
 
-This runbook validates that WebProbe can orient itself in the local ChatPPT environment, authenticate, discover the main route families, and produce useful findings without getting derailed by expected auth noise.
+This runbook validates that Dramaturge can orient itself in a local ChatPPT environment, authenticate, discover the main route families, and produce useful findings without getting derailed by expected auth noise.
 
 ## Prerequisites
 
-- `.env.local` is populated for the main repo
-- Docker Desktop is running
-- An LLM provider key is exported, for example `ANTHROPIC_API_KEY`
-- You are working from the repo root that contains both `webprobe/` and the main ChatPPT app
+- the ChatPPT frontend is already reachable at `http://localhost:3000`
+- the backend APIs the app depends on are already running
+- an LLM provider key is exported, for example `ANTHROPIC_API_KEY`
+- you can complete a normal ChatPPT sign-in flow in a visible browser
 
-## 1. Start the local stack
+Starting the host application stack is intentionally outside the scope of this package. Dramaturge assumes the target environment is already up.
 
-From the repo root:
+## 1. Optional: pre-seed browser auth state
+
+If you want to avoid an interactive login during the Dramaturge run, seed a package-local storage-state file first:
 
 ```powershell
-pnpm local:up -- --backend-ref main
+pnpm exec dramaturge-auth-state `
+  --url http://localhost:3000/login `
+  --output ./.dramaturge-state/chatppt-user.json `
+  --success-url http://localhost:3000/
 ```
 
-Wait for the app and backend to come up. The important local endpoints are:
+You can skip this step. The ChatPPT profile uses `interactive` auth and will fall back to manual sign-in automatically.
 
-- `http://localhost:3000` for the web app
-- `http://localhost:7071/api` for the backend
+## 2. Run Dramaturge with the ChatPPT profile
 
-## 2. Optional: pre-seed browser auth state
-
-If you want to avoid an interactive login during the WebProbe run, seed the shared Playwright auth file first:
+From this package directory:
 
 ```powershell
-npx tsx tests/interactive-login.ts
-```
-
-This writes `playwright/.auth/user.json`, which the ChatPPT WebProbe profile reuses.
-
-You can skip this step. The profile uses `interactive` auth and will fall back to manual sign-in automatically.
-
-## 3. Run WebProbe with the ChatPPT profile
-
-From `webprobe/`:
-
-```powershell
-npx tsx src/index.ts --config examples/chatppt.local.profile.jsonc
+pnpm exec dramaturge --config examples/chatppt.local.profile.jsonc
 ```
 
 What to expect:
 
-- If `../playwright/.auth/user.json` is valid, WebProbe reuses it.
-- Otherwise WebProbe opens a visible browser window at `/login`.
-- Complete Microsoft sign-in manually if prompted.
-- WebProbe waits until `selector:[data-testid='user-nav-button']` appears, then caches the refreshed state and continues.
+- if `./.dramaturge-state/chatppt-user.json` is valid, Dramaturge reuses it
+- otherwise Dramaturge opens a visible browser window at `/login`
+- complete Microsoft sign-in manually if prompted
+- Dramaturge waits until `selector:[data-testid='user-nav-button']` appears, then caches the refreshed state and continues
+
+## 3. Optional: add source-aware ChatPPT hints
+
+The shipped ChatPPT example is self-contained and does not require source access. If you also have a ChatPPT checkout and want route and selector hints from source, add `repoContext` to a copied config:
+
+```jsonc
+"repoContext": {
+  "root": "C:/src/chatppt",
+  "framework": "nextjs"
+}
+```
+
+That keeps repo scanning opt-in instead of assuming the app repo lives next to the package.
 
 ## 4. First flows to watch
 
@@ -84,11 +87,11 @@ Pay attention to three report concepts:
 
 ## 6. What counts as a good smoke run
 
-A healthy first run should show that WebProbe:
+A healthy first run should show that Dramaturge:
 
 - authenticates successfully
 - recognizes the chat and manage route families
-- suppresses expected 401 or 403 protected-route noise
+- suppresses expected `401` or `403` protected-route noise
 - returns findings with evidence and repro metadata
 - leaves behind understandable blind spots instead of silently skipping work
 

@@ -1,8 +1,10 @@
 import type { StateNode, WorkerType } from "../types.js";
+import type { PlannerMemorySignals } from "../memory/types.js";
 
 export interface PriorityContext {
   /** Set of worker types already dispatched for this node. */
   visitedWorkerTypes: Set<WorkerType>;
+  memory?: PlannerMemorySignals;
 }
 
 export function computePriority(
@@ -32,11 +34,18 @@ export function computePriority(
 
   // Revisit penalty: diminishing returns from re-visiting
   const revisitPenalty = Math.min(node.timesVisited / 3, 1);
+  const historicalBoost = ctx.memory?.hasNavigationHints ? 0.05 : 0;
+  const flakyBoost = ctx.memory?.hasFlakyPageNotes ? 0.05 : 0;
+  const suppressionPenalty = ctx.memory?.hasSuppressedFindings ? 0.05 : 0;
 
-  return (
+  return Math.max(
+    0,
     weights.novelty * unseenRatio +
-    weights.risk * risk +
-    weights.coverageGap * coverageGap -
-    weights.revisitPenalty * revisitPenalty
+      weights.risk * risk +
+      weights.coverageGap * coverageGap -
+      weights.revisitPenalty * revisitPenalty +
+      historicalBoost +
+      flakyBoost -
+      suppressionPenalty
   );
 }

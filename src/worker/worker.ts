@@ -18,6 +18,8 @@ import { StagnationTracker } from "./stagnation.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
 import type { RepoHints } from "../adaptation/types.js";
+import { ActionRecorder } from "./action-recorder.js";
+import type { WorkerHistoryContext } from "../memory/types.js";
 
 interface WorkerSetup {
   findings: RawFinding[];
@@ -26,6 +28,7 @@ interface WorkerSetup {
   coverageTracker: CoverageTracker;
   followupRequests: FollowupRequest[];
   discoveredEdges: DiscoveredEdge[];
+  actionRecorder: ActionRecorder;
   agent: ReturnType<Stagehand["agent"]>;
 }
 
@@ -45,6 +48,7 @@ function initWorker(
     appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
     repoHints?: RepoHints;
     mission?: MissionConfig;
+    history?: WorkerHistoryContext;
     stateId?: string;
   }
 ): WorkerSetup {
@@ -55,6 +59,8 @@ function initWorker(
   const followupRequests: FollowupRequest[] = [];
   const discoveredEdges: DiscoveredEdge[] = [];
   const page = stagehand.context.pages()[0];
+  const actionRecorder = new ActionRecorder(page as any);
+  actionRecorder.start();
 
   const stagnationTracker = opts.stagnationThreshold > 0
     ? new StagnationTracker(opts.stagnationThreshold)
@@ -71,7 +77,8 @@ function initWorker(
       objective: opts.objectiveDescription
         ? `${opts.objectiveLabel}: ${opts.objectiveDescription}`
         : opts.objectiveLabel,
-    }
+    },
+    actionRecorder
   );
 
   const systemPrompt = buildWorkerSystemPrompt(
@@ -81,7 +88,8 @@ function initWorker(
     opts.pageType,
     opts.appContext,
     opts.repoHints,
-    opts.mission
+    opts.mission,
+    opts.history
   );
 
   const agent = stagehand.agent({
@@ -91,7 +99,16 @@ function initWorker(
     tools: tools as any,
   });
 
-  return { findings, screenshots, evidence, coverageTracker, followupRequests, discoveredEdges, agent };
+  return {
+    findings,
+    screenshots,
+    evidence,
+    coverageTracker,
+    followupRequests,
+    discoveredEdges,
+    actionRecorder,
+    agent,
+  };
 }
 
 export async function exploreArea(
@@ -106,7 +123,8 @@ export async function exploreArea(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
   repoHints?: RepoHints,
-  mission?: MissionConfig
+  mission?: MissionConfig,
+  history?: WorkerHistoryContext
 ): Promise<AreaResult> {
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
@@ -122,7 +140,14 @@ export async function exploreArea(
     console.warn(`  Could not classify page for "${area.name}"`);
   }
 
-  const { findings, screenshots, evidence, coverageTracker, agent } = initWorker(stagehand, {
+  const {
+    findings,
+    screenshots,
+    evidence,
+    coverageTracker,
+    actionRecorder,
+    agent,
+  } = initWorker(stagehand, {
     screenshotDir,
     areaName: area.name,
     appDescription,
@@ -136,6 +161,7 @@ export async function exploreArea(
     appContext,
     repoHints,
     mission,
+    history,
   });
 
   try {
@@ -154,6 +180,7 @@ export async function exploreArea(
       url: area.url,
       steps: stepCount,
       findings,
+      replayableActions: actionRecorder.getActions(),
       screenshots,
       evidence,
       coverage: coverageTracker.snapshot(),
@@ -170,6 +197,7 @@ export async function exploreArea(
       url: area.url,
       steps: 0,
       findings,
+      replayableActions: actionRecorder.getActions(),
       screenshots,
       evidence,
       coverage: coverageTracker.snapshot(),
@@ -191,9 +219,18 @@ export async function executeWorkerTask(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
   repoHints?: RepoHints,
-  mission?: MissionConfig
+  mission?: MissionConfig,
+  history?: WorkerHistoryContext
 ): Promise<WorkerResult> {
-  const { findings, evidence, coverageTracker, followupRequests, discoveredEdges, agent } = initWorker(stagehand, {
+  const {
+    findings,
+    evidence,
+    coverageTracker,
+    followupRequests,
+    discoveredEdges,
+    actionRecorder,
+    agent,
+  } = initWorker(stagehand, {
     screenshotDir,
     areaName: task.nodeId,
     appDescription: task.missionContext ?? "",
@@ -206,6 +243,7 @@ export async function executeWorkerTask(
     appContext,
     repoHints,
     mission,
+    history,
     stateId: task.nodeId,
   });
 
@@ -219,6 +257,7 @@ export async function executeWorkerTask(
       taskId: task.id,
       findings,
       evidence,
+      replayableActions: actionRecorder.getActions(),
       coverageSnapshot: coverageTracker.snapshot(),
       followupRequests,
       discoveredEdges,
@@ -230,6 +269,7 @@ export async function executeWorkerTask(
       taskId: task.id,
       findings,
       evidence,
+      replayableActions: actionRecorder.getActions(),
       coverageSnapshot: coverageTracker.snapshot(),
       followupRequests,
       discoveredEdges,

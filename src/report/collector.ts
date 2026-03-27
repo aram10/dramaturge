@@ -1,4 +1,12 @@
-import type { AreaResult, BlindSpot, Finding, FindingSeverity, RunResult, RunConfigMeta } from "../types.js";
+import type {
+  AreaResult,
+  BlindSpot,
+  Finding,
+  FindingSeverity,
+  RunConfigMeta,
+  RunMemoryMeta,
+  RunResult,
+} from "../types.js";
 import { CATEGORY_PREFIX } from "../types.js";
 import { FINDING_ID_PAD } from "../constants.js";
 
@@ -9,39 +17,76 @@ const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   Trivial: 3,
 };
 
+export function buildFindingGroupKey(input: {
+  category: string;
+  severity: string;
+  title: string;
+  expected: string;
+  actual: string;
+}): string {
+  return JSON.stringify([
+    input.category,
+    input.severity,
+    input.title,
+    input.expected,
+    input.actual,
+  ]);
+}
+
 export function collectFindings(areaResults: AreaResult[]): Finding[] {
-  const findings: Finding[] = [];
-  const seen = new Set<string>();
-  let counter = 1;
+  const grouped = new Map<string, Finding>();
+  let missingRefCounter = 1;
 
   for (const area of areaResults) {
     for (const raw of area.findings) {
-      // Deduplicate by title+severity (same issue found on different nodes)
-      const dedupeKey = `${raw.severity}:${raw.title}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
+      const findingRef = raw.ref ?? `fid-legacy-${missingRefCounter++}`;
+      const groupKey = buildFindingGroupKey(raw);
+      const occurrence = {
+        area: area.name,
+        route: raw.meta?.repro?.route,
+        evidenceIds: raw.evidenceIds ?? [],
+        ref: findingRef,
+      };
 
-      const prefix = CATEGORY_PREFIX[raw.category];
-      const id = `${prefix}-${String(counter).padStart(FINDING_ID_PAD, "0")}`;
-      counter++;
+      const existing = grouped.get(groupKey);
+      if (existing) {
+        existing.occurrences.push(occurrence);
+        existing.impactedAreas = Array.from(new Set([...existing.impactedAreas, area.name]));
+        existing.occurrenceCount = existing.occurrences.length;
+        existing.evidenceIds = Array.from(
+          new Set([
+            ...(existing.evidenceIds ?? []),
+            ...(raw.evidenceIds ?? []),
+          ])
+        );
+        continue;
+      }
 
-      const finding: Finding = {
+      grouped.set(groupKey, {
         ...raw,
-        id,
+        ref: findingRef,
+        id: "",
         area: area.name,
         screenshot: raw.screenshotRef
           ? `screenshots/${raw.screenshotRef}.png`
           : undefined,
-      };
-      findings.push(finding);
+        occurrenceCount: 1,
+        impactedAreas: [area.name],
+        occurrences: [occurrence],
+        evidenceIds: raw.evidenceIds ?? [],
+      });
     }
   }
+
+  const findings = [...grouped.values()];
 
   // Sort by severity (Critical first), then by category
   findings.sort((a, b) => {
     const sevDiff = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
     if (sevDiff !== 0) return sevDiff;
-    return a.category.localeCompare(b.category);
+    const catDiff = a.category.localeCompare(b.category);
+    if (catDiff !== 0) return catDiff;
+    return a.title.localeCompare(b.title);
   });
 
   // Re-number IDs after sorting
@@ -61,7 +106,8 @@ export function buildRunResult(
   partial: boolean,
   blindSpots: BlindSpot[] = [],
   stateGraphMermaid?: string,
-  runConfig?: RunConfigMeta
+  runConfig?: RunConfigMeta,
+  runMemory?: RunMemoryMeta
 ): RunResult {
   return {
     targetUrl,
@@ -73,5 +119,6 @@ export function buildRunResult(
     blindSpots,
     stateGraphMermaid,
     runConfig,
+    runMemory,
   };
 }

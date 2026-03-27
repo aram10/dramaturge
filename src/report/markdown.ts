@@ -12,10 +12,17 @@ function formatDuration(ms: number): string {
 export function renderMarkdown(result: RunResult): string {
   const findings = collectFindings(result.areaResults);
   const duration = result.endTime.getTime() - result.startTime.getTime();
+  const findingIdByRef = new Map<string, string>();
   const exploredAreas = result.areaResults.filter(
     (a) => a.status === "explored"
   );
   const totalSteps = result.areaResults.reduce((sum, a) => sum + a.steps, 0);
+
+  for (const finding of findings) {
+    for (const occurrence of finding.occurrences) {
+      findingIdByRef.set(occurrence.ref, finding.id);
+    }
+  }
 
   const bugs = findings.filter((f) => f.category === "Bug");
   const ux = findings.filter((f) => f.category === "UX Concern");
@@ -30,7 +37,7 @@ export function renderMarkdown(result: RunResult): string {
     .toISOString()
     .replace(/[:.]/g, "-")
     .slice(0, 19);
-  lines.push(`# WebProbe Report — ${timestamp}`);
+  lines.push(`# Dramaturge Report — ${timestamp}`);
   if (result.partial) {
     lines.push(
       "> **Warning:** This run was incomplete. Some areas may not have been explored."
@@ -76,6 +83,31 @@ export function renderMarkdown(result: RunResult): string {
       lines.push(steps);
       lines.push(`- **Expected:** ${f.expected}`);
       lines.push(`- **Actual:** ${f.actual}`);
+      if (f.verdict) {
+        lines.push(`- **Hypothesis:** ${f.verdict.hypothesis}`);
+        lines.push(`- **Observation:** ${f.verdict.observation}`);
+        if (f.verdict.evidenceChain.length > 0) {
+          lines.push(`- **Evidence chain:** ${f.verdict.evidenceChain.join(" | ")}`);
+        }
+        if (f.verdict.alternativesConsidered.length > 0) {
+          lines.push(
+            `- **Alternative explanations:** ${f.verdict.alternativesConsidered.join(
+              " | "
+            )}`
+          );
+        }
+        if (f.verdict.suggestedVerification.length > 0) {
+          lines.push(
+            `- **Suggested verification:** ${f.verdict.suggestedVerification.join(
+              " | "
+            )}`
+          );
+        }
+      }
+      if (f.occurrenceCount > 1) {
+        lines.push(`- **Occurrences:** ${f.occurrenceCount}`);
+        lines.push(`- **Impacted areas:** ${f.impactedAreas.join(", ")}`);
+      }
       if (f.screenshot) {
         lines.push(`- **Screenshot:** ${f.screenshot}`);
       }
@@ -93,6 +125,9 @@ export function renderMarkdown(result: RunResult): string {
         }
         if ((f.meta.repro?.breadcrumbs?.length ?? 0) > 0) {
           lines.push(`- **Repro breadcrumbs:** ${f.meta.repro?.breadcrumbs.join(" | ")}`);
+        }
+        if ((f.meta.repro?.actionIds?.length ?? 0) > 0) {
+          lines.push(`- **Repro action ids:** ${f.meta.repro?.actionIds?.join(", ")}`);
         }
         if ((f.meta.repro?.evidenceIds?.length ?? 0) > 0) {
           lines.push(`- **Repro evidence:** ${f.meta.repro?.evidenceIds.join(", ")}`);
@@ -135,11 +170,32 @@ export function renderMarkdown(result: RunResult): string {
   const allEvidence = result.areaResults.flatMap((a) => a.evidence);
   if (allEvidence.length > 0) {
     lines.push("## Evidence Index");
-    lines.push("| ID | Type | Area | Summary | Path |");
-    lines.push("|----|------|------|---------|------|");
+    lines.push("| ID | Type | Area | Summary | Path | Related findings |");
+    lines.push("|----|------|------|---------|------|------------------|");
     for (const ev of allEvidence) {
+      const relatedFindings = Array.from(
+        new Set(ev.relatedFindingIds.map((ref) => findingIdByRef.get(ref) ?? ref))
+      );
       lines.push(
-        `| ${ev.id} | ${ev.type} | ${ev.areaName ?? "—"} | ${ev.summary} | ${ev.path ?? "—"} |`
+        `| ${ev.id} | ${ev.type} | ${ev.areaName ?? "—"} | ${ev.summary} | ${ev.path ?? "—"} | ${relatedFindings.join(", ") || "—"} |`
+      );
+    }
+    lines.push("");
+  }
+
+  const allActions = result.areaResults.flatMap((area) =>
+    (area.replayableActions ?? []).map((action) => ({
+      areaName: area.name,
+      ...action,
+    }))
+  );
+  if (allActions.length > 0) {
+    lines.push("## Action Trace");
+    lines.push("| ID | Area | Kind | Source | Summary | Status |");
+    lines.push("|----|------|------|--------|---------|--------|");
+    for (const action of allActions) {
+      lines.push(
+        `| ${action.id} | ${action.areaName} | ${action.kind} | ${action.source} | ${action.summary} | ${action.status} |`
       );
     }
     lines.push("");
@@ -180,6 +236,19 @@ export function renderMarkdown(result: RunResult): string {
   }
 
   // Run Configuration
+  if (result.runMemory) {
+    const rm = result.runMemory;
+    lines.push(`## Run Memory
+- **Enabled:** ${rm.enabled ? "yes" : "no"}
+- **Warm start applied:** ${rm.warmStartApplied ? "yes" : "no"}
+- **Restored states:** ${rm.restoredStateCount}
+- **Known findings tracked:** ${rm.knownFindingCount}
+- **Suppressed findings:** ${rm.suppressedFindingCount}
+- **Flaky pages noted:** ${rm.flakyPageCount}
+- **Visual baselines tracked:** ${rm.visualBaselineCount}`);
+    lines.push("");
+  }
+
   if (result.runConfig) {
     const rc = result.runConfig;
     const ckpt = rc.checkpointInterval === 0 ? "disabled" : `every ${rc.checkpointInterval} tasks`;
@@ -191,7 +260,10 @@ export function renderMarkdown(result: RunResult): string {
 - **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states
 - **Checkpoint interval:** ${ckpt}
 - **Auto-capture:** ${rc.autoCaptureEnabled ? "enabled" : "disabled"}
-- **LLM planner:** ${rc.llmPlannerEnabled ? "enabled" : "disabled"}`);
+- **LLM planner:** ${rc.llmPlannerEnabled ? "enabled" : "disabled"}
+- **Memory:** ${rc.memoryEnabled ? "enabled" : "disabled"}
+- **Warm start:** ${rc.warmStartEnabled ? "enabled" : "disabled"}
+- **Visual regression:** ${rc.visualRegressionEnabled ? "enabled" : "disabled"}`);
     lines.push("");
   }
 

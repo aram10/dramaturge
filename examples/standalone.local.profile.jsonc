@@ -1,0 +1,59 @@
+{
+  "targetUrl": "http://localhost:3000",
+  "appDescription": "Local web application under active development.",
+
+  "auth": {
+    "type": "interactive",
+    "loginUrl": "/login",
+    "successIndicator": "selector:[data-testid='user-menu']",
+    "stateFile": "./.dramaturge-state/local-user.json",
+    "manualTimeoutSeconds": 180
+  },
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "cua",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "cua"
+    }
+  },
+
+  "mission": {
+    "criticalFlows": [
+      "Reach the authenticated application shell",
+      "Navigate to a primary list or dashboard view",
+      "Open a create or edit flow without saving destructive changes"
+    ],
+    "destructiveActionsAllowed": false,
+    "focusModes": ["navigation", "form", "crud"]
+  },
+
+  "budget": {
+    "globalTimeLimitSeconds": 900,
+    "maxStepsPerTask": 35,
+    "maxFrontierSize": 200,
+    "maxStateNodes": 50
+  },
+
+  "output": {
+    "dir": "./dramaturge-reports/local",
+    "format": "both",
+    "screenshots": true
+  },
+
+  "memory": {
+    "enabled": true,
+    "dir": "./.dramaturge",
+    "warmStart": true
+  },
+
+  "visualRegression": {
+    "enabled": true,
+    "baselineDir": "./.dramaturge/visual-baselines",
+    "diffPixelRatioThreshold": 0.01,
+    "maskSelectors": []
+  }
+}

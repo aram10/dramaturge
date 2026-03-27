@@ -3,13 +3,13 @@
   "appDescription": "ChatPPT is a Next.js chat assistant with Better Auth, Microsoft sign-in, a chat workspace, knowledge base selection, and a /manage admin surface for knowledge bases, groups, jobs, health, and feedback.",
 
   // Interactive auth is the safest default for local ChatPPT runs.
-  // WebProbe will reuse the cached state when available and otherwise wait
+  // Dramaturge will reuse the cached state when available and otherwise wait
   // for a human to finish Microsoft sign-in in the visible browser window.
   "auth": {
     "type": "interactive",
     "loginUrl": "/login",
     "successIndicator": "selector:[data-testid='user-nav-button']",
-    "stateFile": "../playwright/.auth/user.json",
+    "stateFile": "./.dramaturge-state/chatppt-user.json",
     "manualTimeoutSeconds": 180
   },
 
@@ -22,11 +22,6 @@
       "form": "dom",
       "crud": "cua"
     }
-  },
-
-  "repoContext": {
-    "root": "..",
-    "framework": "nextjs"
   },
 
   "appContext": {
@@ -88,7 +83,7 @@
   },
 
   "output": {
-    "dir": "./webprobe-reports/chatppt-local",
+    "dir": "./dramaturge-reports/chatppt-local",
     "format": "both",
     "screenshots": true
   }

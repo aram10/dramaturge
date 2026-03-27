@@ -12,13 +12,22 @@ export function buildAreaResults(ctx: EngineContext): AreaResult[] {
   for (const node of ctx.graph.getAllNodes()) {
     const findings = ctx.findingsByNode.get(node.id) ?? [];
     const evidence = ctx.evidenceByNode.get(node.id) ?? [];
-    if (findings.length === 0 && evidence.length === 0 && node.timesVisited === 0) continue;
+    const replayableActions = ctx.actionsByNode.get(node.id) ?? [];
+    if (
+      findings.length === 0 &&
+      evidence.length === 0 &&
+      replayableActions.length === 0 &&
+      node.timesVisited === 0
+    ) {
+      continue;
+    }
 
     results.push({
       name: node.title ?? `${node.pageType} (${node.id})`,
       url: node.url,
       steps: node.timesVisited,
       findings,
+      replayableActions,
       screenshots: new Map<string, Buffer>(),
       evidence,
       coverage: {
@@ -64,7 +73,11 @@ export function writeReports(
       checkpointInterval: config.checkpoint.intervalTasks,
       autoCaptureEnabled: config.autoCapture.consoleErrors || config.autoCapture.networkErrors,
       llmPlannerEnabled: hasLLMApiKey(),
-    }
+      memoryEnabled: config.memory.enabled,
+      visualRegressionEnabled: config.visualRegression.enabled,
+      warmStartEnabled: config.memory.enabled && config.memory.warmStart,
+    },
+    ctx.runMemory
   );
 
   const format = config.output.format;

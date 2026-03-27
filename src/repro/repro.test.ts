@@ -16,6 +16,7 @@ describe("repro helpers", () => {
         "click create button -> worked",
         "submit knowledge base form -> worked",
       ],
+      actionIds: ["act-1", "act-2"],
       evidenceIds: ["ev-1"],
     });
 
@@ -30,6 +31,7 @@ describe("repro helpers", () => {
           "click create button -> worked",
           "submit knowledge base form -> worked",
         ],
+        actionIds: ["act-1", "act-2"],
         evidenceIds: ["ev-1"],
       },
     });
@@ -74,6 +76,7 @@ describe("renderJson repro metadata", () => {
             route: "https://example.com/manage/knowledge-bases",
             objective: "Validate knowledge base creation",
             breadcrumbs: ["click create button -> worked"],
+            actionIds: ["act-1"],
             evidenceIds: ["ev-1"],
           }),
         },
@@ -105,6 +108,7 @@ describe("renderJson repro metadata", () => {
         route: "https://example.com/manage/knowledge-bases",
         objective: "Validate knowledge base creation",
         breadcrumbs: ["click create button -> worked"],
+        actionIds: ["act-1"],
         evidenceIds: ["ev-1"],
       },
     });

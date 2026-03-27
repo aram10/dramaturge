@@ -80,7 +80,8 @@ async function callLLM(
   model: string,
   system: string,
   messages: ChatMessage[],
-  maxTokens = 1024
+  maxTokens = 1024,
+  requestTimeoutMs = 30_000
 ): Promise<string> {
   const provider = detectProvider(model);
   const spec = PROVIDERS[provider];
@@ -88,11 +89,20 @@ async function callLLM(
   if (!apiKey) throw new Error(`${spec.envKey} not set — required for ${spec.envName} models`);
 
   const modelId = stripProvider(model);
-  const response = await fetch(spec.url(modelId, apiKey), {
-    method: "POST",
-    headers: spec.headers(apiKey),
-    body: JSON.stringify(spec.body(modelId, system, messages, maxTokens)),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+  let response: Response;
+
+  try {
+    response = await fetch(spec.url(modelId, apiKey), {
+      method: "POST",
+      headers: spec.headers(apiKey),
+      body: JSON.stringify(spec.body(modelId, system, messages, maxTokens)),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
@@ -106,7 +116,8 @@ export async function proposeLLMTasks(
   model: string,
   graphSummary: string,
   nodeDescription: string,
-  allowedWorkerTypes: WorkerType[]
+  allowedWorkerTypes: WorkerType[],
+  requestTimeoutMs = 30_000
 ): Promise<LLMTaskProposal[] | null> {
   const system = `You are a QA test planner analyzing a web application's state graph.
 Your job is to propose focused testing tasks for a specific page.
@@ -131,7 +142,7 @@ Propose testing tasks for this page.`;
   try {
     const raw = await callLLM(model, system, [
       { role: "user", content: userPrompt },
-    ]);
+    ], 1024, requestTimeoutMs);
 
     // Extract JSON from response (handle possible markdown code fences)
     const jsonStr = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();

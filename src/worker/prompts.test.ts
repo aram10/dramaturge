@@ -81,4 +81,28 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("knowledge-bases");
     expect(prompt).toContain("search");
   });
+
+  it("includes historical suppressions, flaky-page notes, and prior navigation hints when provided", () => {
+    const prompt = buildWorkerSystemPrompt(
+      "A todo app",
+      "Settings",
+      undefined,
+      "settings",
+      undefined,
+      undefined,
+      undefined,
+      {
+        suppressedFindings: ["Known spinner jitter on autosave toast"],
+        flakyPageNotes: ["Relative timestamps refresh every second near the header"],
+        navigationHints: ["Known transition: Settings -> Members via role=button[name=Members]"],
+        authHints: ["Successful login has historically started at /login"],
+      }
+    );
+
+    expect(prompt).toContain("Historical Notes");
+    expect(prompt).toContain("spinner jitter");
+    expect(prompt).toContain("Relative timestamps refresh every second");
+    expect(prompt).toContain("Settings -> Members");
+    expect(prompt).toContain("historically started at /login");
+  });
 });

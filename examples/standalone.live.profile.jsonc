@@ -1,0 +1,57 @@
+{
+  "targetUrl": "https://your-app.example.com",
+  "appDescription": "Deployed web application under investigation.",
+
+  "auth": {
+    "type": "interactive",
+    "loginUrl": "/login",
+    "successIndicator": "selector:[data-testid='user-menu']",
+    "stateFile": "./.dramaturge-state/live-user.json",
+    "manualTimeoutSeconds": 180
+  },
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "cua",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "cua"
+    }
+  },
+
+  "mission": {
+    "criticalFlows": [
+      "Reach the authenticated application shell",
+      "Navigate to the highest-value workflow",
+      "Inspect a create or edit path without confirming destructive writes"
+    ],
+    "destructiveActionsAllowed": false,
+    "focusModes": ["navigation", "form", "crud"]
+  },
+
+  "policy": {
+    "expectedResponses": [],
+    "ignoredConsolePatterns": []
+  },
+
+  "output": {
+    "dir": "./dramaturge-reports/live",
+    "format": "both",
+    "screenshots": true
+  },
+
+  "memory": {
+    "enabled": true,
+    "dir": "./.dramaturge",
+    "warmStart": true
+  },
+
+  "visualRegression": {
+    "enabled": false,
+    "baselineDir": "./.dramaturge/visual-baselines",
+    "diffPixelRatioThreshold": 0.01,
+    "maskSelectors": []
+  }
+}

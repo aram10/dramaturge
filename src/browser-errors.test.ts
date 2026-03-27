@@ -187,6 +187,24 @@ describe("BrowserErrorCollector", () => {
     }
   });
 
+  it("does not stack duplicate listeners when attaching the same page key twice", () => {
+    const collector = new BrowserErrorCollector({
+      captureConsole: true,
+      captureNetwork: true,
+      networkErrorMinStatus: 400,
+    });
+    const page = createMockPage();
+
+    collector.attach(page as any, "shared");
+    const initialConsoleListeners = page._handlers.get("console")?.length ?? 0;
+    const initialResponseListeners = page._handlers.get("response")?.length ?? 0;
+
+    collector.attach(page as any, "shared");
+
+    expect(page._handlers.get("console")).toHaveLength(initialConsoleListeners);
+    expect(page._handlers.get("response")).toHaveLength(initialResponseListeners);
+  });
+
   it("returns empty when nothing captured", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,

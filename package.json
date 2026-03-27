@@ -1,24 +1,65 @@
 {
-  "name": "webprobe",
+  "name": "@aram10/dramaturge",
   "version": "0.1.0",
-  "description": "Autonomous web application QA explorer",
+  "description": "Environment-aware exploratory QA harness for web applications",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aram10/dramaturge.git"
+  },
+  "homepage": "https://github.com/aram10/dramaturge#readme",
+  "bugs": {
+    "url": "https://github.com/aram10/dramaturge/issues"
+  },
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
-    "webprobe": "./dist/index.js"
+    "dramaturge": "./dist/cli.js",
+    "dramaturge-auth-state": "./dist/bin/export-auth-state.js"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "dramaturge.config.example.json",
+    "docs/*.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.12.3",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm run clean && tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts",
+    "pack:check": "npm pack --dry-run",
+    "prepack": "pnpm run build && pnpm run test",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:standalone": "node scripts/verify-standalone.mjs"
   },
   "dependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@browserbasehq/stagehand": "^3.2.0",
-    "zod": "^3.25.0"
+    "pixelmatch": "^7.1.0",
+    "playwright": "^1.58.2",
+    "pngjs": "^7.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pngjs": "^6.0.5",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "vitest": "^4.1.1"

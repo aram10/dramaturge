@@ -86,4 +86,34 @@ describe("computePriority", () => {
     // novelty=0*0.3=0, risk=0, coverageGap=0.3, revisit=0
     expect(p).toBeCloseTo(0.3);
   });
+
+  it("boosts historically flaky or navigation-rich nodes", () => {
+    const node = makeNode();
+    const baseline = computePriority(node, "navigation", emptyCtx);
+    const boosted = computePriority(node, "navigation", {
+      visitedWorkerTypes: new Set(),
+      memory: {
+        hasFlakyPageNotes: true,
+        hasNavigationHints: true,
+        hasSuppressedFindings: false,
+      },
+    });
+
+    expect(boosted).toBeGreaterThan(baseline);
+  });
+
+  it("slightly penalizes nodes whose prior findings were suppressed", () => {
+    const node = makeNode();
+    const baseline = computePriority(node, "form", emptyCtx);
+    const suppressed = computePriority(node, "form", {
+      visitedWorkerTypes: new Set(),
+      memory: {
+        hasFlakyPageNotes: false,
+        hasNavigationHints: false,
+        hasSuppressedFindings: true,
+      },
+    });
+
+    expect(suppressed).toBeLessThan(baseline);
+  });
 });

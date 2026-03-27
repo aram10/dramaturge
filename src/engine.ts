@@ -1,11 +1,13 @@
 import { mkdirSync } from "node:fs";
 import { spawn, type ChildProcess } from "node:child_process";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Stagehand } from "@browserbasehq/stagehand";
-import type { WebProbeConfig } from "./config.js";
+import type { LoadedDramaturgeConfig, DramaturgeConfig } from "./config.js";
+import { resolveResumeDir } from "./config-paths.js";
 import type { FrontierItem, WorkerResult, BudgetConfig, MissionConfig } from "./types.js";
 import { authenticate } from "./auth/authenticator.js";
+import { captureStorageState } from "./auth/storage-state.js";
 import { captureFingerprint } from "./graph/fingerprint.js";
 import { classifyPage } from "./planner/page-classifier.js";
 import { StateGraph } from "./graph/state-graph.js";
@@ -26,8 +28,10 @@ import type { WorkerSession } from "./engine/worker-pool.js";
 import { scanRepository } from "./adaptation/repo-scan.js";
 import type { RepoHints } from "./adaptation/types.js";
 import { resolvePolicy } from "./policy/policy.js";
+import { MemoryStore } from "./memory/store.js";
+import { seedGraphFromNavigationMemory } from "./memory/navigation-cache.js";
 
-function resolveBudget(config: WebProbeConfig): BudgetConfig {
+function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
     globalTimeLimitSeconds:
       config.budget.globalTimeLimitSeconds ??
@@ -39,7 +43,7 @@ function resolveBudget(config: WebProbeConfig): BudgetConfig {
   };
 }
 
-function buildMission(config: WebProbeConfig): MissionConfig | undefined {
+function buildMission(config: DramaturgeConfig): MissionConfig | undefined {
   if (!config.mission) return undefined;
   return {
     ...config.mission,
@@ -76,11 +80,13 @@ interface BatchTaskResult {
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
-function loadRepoHints(config: WebProbeConfig): RepoHints | undefined {
+function loadRepoHints(config: DramaturgeConfig): RepoHints | undefined {
   if (!config.repoContext) return undefined;
+  const configBaseDir =
+    (config as Partial<LoadedDramaturgeConfig>)._meta?.configDir ?? process.cwd();
 
   const repoHints = scanRepository({
-    root: config.repoContext.root ?? process.cwd(),
+    root: config.repoContext.root ?? configBaseDir,
     framework: config.repoContext.framework,
     hintsFile: config.repoContext.hintsFile,
   });
@@ -95,7 +101,7 @@ function loadRepoHints(config: WebProbeConfig): RepoHints | undefined {
   return hasHints ? repoHints : undefined;
 }
 
-function startBootstrapProcess(config: WebProbeConfig): ChildProcess | undefined {
+function startBootstrapProcess(config: DramaturgeConfig): ChildProcess | undefined {
   const command = config.bootstrap?.command;
   if (!command) return undefined;
 
@@ -133,7 +139,7 @@ async function hasReadyIndicator(
 }
 
 async function waitForBootstrapReady(
-  config: WebProbeConfig,
+  config: DramaturgeConfig,
   page: StagehandPage
 ): Promise<void> {
   if (!config.bootstrap) return;
@@ -226,7 +232,7 @@ export interface RunEngineOptions {
 }
 
 export async function runEngine(
-  config: WebProbeConfig,
+  config: DramaturgeConfig,
   options: RunEngineOptions = {}
 ): Promise<void> {
   const startTime = new Date();
@@ -234,11 +240,13 @@ export async function runEngine(
     .toISOString()
     .replace(/[:.]/g, "-")
     .slice(0, 19);
-  const outputDir = options.resumeDir ?? resolve(join(config.output.dir, timestamp));
+  const outputDir =
+    resolveResumeDir(options.resumeDir, config as Partial<LoadedDramaturgeConfig>) ??
+    join(config.output.dir, timestamp);
   const screenshotDir = join(outputDir, "screenshots");
   mkdirSync(screenshotDir, { recursive: true });
 
-  console.log(`WebProbe v2 starting — target: ${config.targetUrl}`);
+  console.log(`Dramaturge v2 starting — target: ${config.targetUrl}`);
   console.log(`Output: ${outputDir}`);
 
   const budget = resolveBudget(config);
@@ -247,6 +255,9 @@ export async function runEngine(
   const useLLMPlanner = hasLLMApiKey();
   const repoHints = loadRepoHints(config);
   const policy = resolvePolicy(config.policy, repoHints);
+  const memoryStore = config.memory.enabled ? new MemoryStore(config.memory.dir) : undefined;
+  let warmStartApplied = false;
+  let warmStartRestoredStateCount = 0;
   let bootstrapProcess: ChildProcess | undefined;
 
   if (repoHints) {
@@ -271,14 +282,7 @@ export async function runEngine(
   bootstrapProcess = startBootstrapProcess(config);
   await waitForBootstrapReady(config, stagehand.context.pages()[0]);
 
-  // Initialize worker pool for parallel execution
-  const workerPool = concurrency > 1
-    ? await initWorkerPool(config, concurrency - 1, errorCollector)
-    : [];
-
-  if (concurrency > 1) {
-    console.log(`Worker pool: ${concurrency} parallel browsers`);
-  }
+  let workerPool: WorkerSession[] = [];
 
   const ctx: EngineContext = {
     config,
@@ -295,10 +299,12 @@ export async function runEngine(
     outputDir,
     findingsByNode: new Map(),
     evidenceByNode: new Map(),
+    actionsByNode: new Map(),
     errorCollector,
     completedTaskIds: new Set(),
     workerPool,
     repoHints,
+    memoryStore,
   };
 
   try {
@@ -306,6 +312,19 @@ export async function runEngine(
     console.log(`\nAuthenticating (strategy: ${config.auth.type})...`);
     await authenticate(stagehand, config);
     console.log("Authentication successful.");
+    memoryStore?.rememberAuthFromConfig(config);
+
+    if (concurrency > 1) {
+      const sharedWorkerState = await captureStorageState(stagehand, config.targetUrl);
+      workerPool = await initWorkerPool(
+        config,
+        concurrency - 1,
+        errorCollector,
+        sharedWorkerState
+      );
+      ctx.workerPool = workerPool;
+      console.log(`Worker pool: ${concurrency} parallel browsers`);
+    }
 
     // Check for resume
     let tasksExecuted = 0;
@@ -320,10 +339,31 @@ export async function runEngine(
         );
         ctx.findingsByNode = hydrated.findingsByNode;
         ctx.evidenceByNode = hydrated.evidenceByNode;
+        ctx.actionsByNode = hydrated.actionsByNode;
         ctx.completedTaskIds = hydrated.completedTaskIds;
         tasksExecuted = hydrated.tasksExecuted;
         console.log(
           `Resumed from checkpoint: ${tasksExecuted} tasks, ${ctx.graph.nodeCount()} states, ${ctx.frontier.size()} pending`
+        );
+      }
+    }
+
+    if (!options.resumeDir && ctx.graph.nodeCount() === 0 && memoryStore && config.memory.warmStart) {
+      const navigationSnapshot = memoryStore.getNavigationSnapshot(config.targetUrl);
+      if (navigationSnapshot) {
+        const warmStart = seedGraphFromNavigationMemory({
+          graph: ctx.graph,
+          frontier: ctx.frontier,
+          planner: ctx.planner,
+          snapshot: navigationSnapshot,
+          mission: ctx.mission,
+          repoHints: ctx.repoHints,
+          memoryStore,
+        });
+        warmStartApplied = warmStart.restoredNodeCount > 0;
+        warmStartRestoredStateCount = warmStart.restoredNodeCount;
+        console.log(
+          `Warm start restored ${warmStart.restoredNodeCount} state(s), ${warmStart.restoredEdgeCount} transition(s), and seeded ${warmStart.seededTaskCount} task(s)`
         );
       }
     }
@@ -352,18 +392,46 @@ export async function runEngine(
           ctx.graph,
           config.models.planner,
           mission,
-          ctx.repoHints
+          ctx.repoHints,
+          config.llm.requestTimeoutMs,
+          ctx.memoryStore?.getPlannerSignals(rootNode)
         );
       } else {
         seedTasks = ctx.planner.proposeTasks(
           rootNode,
           ctx.graph,
           mission,
-          ctx.repoHints
+          ctx.repoHints,
+          ctx.memoryStore?.getPlannerSignals(rootNode)
         );
       }
       ctx.frontier.enqueueMany(seedTasks);
       console.log(`Seeded frontier with ${seedTasks.length} tasks\n`);
+    } else if (ctx.frontier.size() === 0) {
+      const rootNode =
+        ctx.graph.getAllNodes().find((node) => node.depth === 0) ??
+        ctx.graph.getAllNodes()[0];
+      if (rootNode) {
+        const seedTasks = useLLMPlanner
+          ? await ctx.planner.proposeTasksWithLLM(
+              rootNode,
+              ctx.graph,
+              config.models.planner,
+              mission,
+              ctx.repoHints,
+              config.llm.requestTimeoutMs,
+              ctx.memoryStore?.getPlannerSignals(rootNode)
+            )
+          : ctx.planner.proposeTasks(
+              rootNode,
+              ctx.graph,
+              mission,
+              ctx.repoHints,
+              ctx.memoryStore?.getPlannerSignals(rootNode)
+            );
+        ctx.frontier.enqueueMany(seedTasks);
+        console.log(`Seeded frontier with ${seedTasks.length} warm-start task(s)\n`);
+      }
     }
 
     // === Main planner loop ===
@@ -437,6 +505,7 @@ export async function runEngine(
           ctx.frontier,
           ctx.findingsByNode,
           ctx.evidenceByNode,
+          ctx.actionsByNode,
           ctx.globalCoverage,
           [...ctx.completedTaskIds],
           tasksExecuted
@@ -483,6 +552,7 @@ export async function runEngine(
         ctx.frontier,
         ctx.findingsByNode,
         ctx.evidenceByNode,
+        ctx.actionsByNode,
         ctx.globalCoverage,
         [...ctx.completedTaskIds],
         tasksExecuted
@@ -491,6 +561,14 @@ export async function runEngine(
 
     // Generate reports with per-node attribution
     const areaResults = buildAreaResults(ctx);
+    if (memoryStore) {
+      memoryStore.recordRunFindings(startTime.toISOString(), areaResults);
+      memoryStore.recordNavigationSnapshot(config.targetUrl, ctx.graph);
+      ctx.runMemory = memoryStore.getSummary(
+        warmStartApplied,
+        warmStartRestoredStateCount
+      );
+    }
     writeReports(ctx, startTime, areaResults, remaining);
 
     // Summary

@@ -212,4 +212,29 @@ describe("proposeLLMTasks", () => {
     const body = JSON.parse(fetchCall[1].body);
     expect(body.model).toBe("claude-sonnet-4-6");
   });
+
+  it("returns null when the LLM request times out", async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn().mockImplementation((_url, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new Error("Request aborted"));
+        });
+      })
+    ) as any;
+
+    const resultPromise = proposeLLMTasks(
+      "anthropic/claude-sonnet-4-6",
+      "graph",
+      "desc",
+      ["navigation"],
+      25
+    );
+
+    await vi.advanceTimersByTimeAsync(30);
+    const result = await resultPromise;
+
+    expect(result).toBeNull();
+    vi.useRealTimers();
+  });
 });

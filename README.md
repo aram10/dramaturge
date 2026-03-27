@@ -1,74 +1,73 @@
-# WebProbe
+# Dramaturge
 
-WebProbe is an environment-aware exploratory QA harness for web applications.
+Dramaturge is an environment-aware exploratory QA harness for web applications.
 
-It combines agentic browser exploration with deterministic scaffolding for auth, repo-aware hints, mission controls, policy suppression, evidence capture, and reproducible reporting. The point is not to replace a polished regression suite. The point is to help an operator drop into an unfamiliar environment, get oriented quickly, and come back with actionable findings instead of vague browser-agent output.
+It combines agentic browser exploration with deterministic scaffolding for auth, mission controls, policy suppression, evidence capture, and reproducible reporting. The goal is to help an operator drop into an unfamiliar environment, get oriented quickly, and come back with actionable findings instead of vague browser-agent output.
 
-## Why WebProbe Exists
-
-Traditional Playwright or Cypress suites are strongest when the team already knows the product, the happy paths are well defined, and the assertions are intentional.
-
-WebProbe is for the earlier and messier part of the lifecycle:
-
-- a new environment needs a quick read
-- the app has weak or incomplete automated coverage
-- the agent needs help understanding routes, auth, and what "normal" looks like
-- humans need findings they can replay, not just a transcript of clicks
-
-## What WebProbe Does Today
+## What Dramaturge Does
 
 - explores web apps with specialized `navigation`, `form`, and `crud` workers
 - supports `none`, `form`, `oauth-redirect`, `stored-state`, and `interactive` auth
-- accepts repo-aware hints so it can seed likely routes, stable selectors, and expected auth noise from source
+- accepts optional repo-aware hints so it can seed likely routes, selectors, and expected auth noise when source is available
 - applies mission controls such as `criticalFlows`, `excludedAreas`, and destructive-action guardrails
 - auto-captures console and network failures with policy-based suppression for expected environment noise
-- emits Markdown and JSON reports with evidence, confidence, and a compact repro artifact per finding
-
-## How WebProbe Stays Grounded
-
-WebProbe is intentionally not "just an AI that clicks around."
-
-The surrounding harness keeps the run legible:
-
-- deterministic navigation and state restoration around agent work
-- query-aware state identity so meaningful route variants do not collapse together
-- per-page browser error attribution instead of one shared noise bucket
-- repo-aware route, selector, and auth hints when source is available
-- policy suppression for expected 401 or 403 noise and known console chatter
-- mission steering so critical flows are boosted and excluded areas are skipped
-- finding metadata with source, confidence, route, breadcrumbs, and evidence ids
+- runs deterministic accessibility scans alongside browser exploration
+- optionally persists cross-run memory under `.dramaturge/` so later runs can reuse prior routes, suppressions, and auth hints
+- can capture and compare visual baselines with deterministic `pixelmatch` diffs
+- emits Markdown and JSON reports with evidence, confidence, and compact repro metadata
 
 ## Operating Modes
 
 ### Black-box mode
 
-Point WebProbe at a URL, configure auth, describe the app, and let it explore. This is the right mode when you do not have source access or want to treat the app as an external system.
+Point Dramaturge at a URL, configure auth, describe the app, and let it explore. This is the right mode when you do not have source access or want to treat the app as an external system.
 
 ### Repo-aware mode
 
-Add `repoContext.root` and WebProbe can mine source for route families, auth hints, stable selectors, and expected protected-route noise. The agent still explores autonomously, but it starts with better orientation and fewer false positives.
+Add `repoContext.root` and Dramaturge can mine source for route families, auth hints, stable selectors, and expected protected-route noise. Source-aware scanning is optional; the package does not require a sibling repo to run.
 
 ## Quick Start
 
-WebProbe currently runs from this repo rather than as a published package.
+### Run from this folder
 
-1. Install dependencies.
-2. Copy and adapt [`webprobe.config.example.json`](./webprobe.config.example.json) or start from [`examples/chatppt.local.profile.jsonc`](./examples/chatppt.local.profile.jsonc).
-3. Export an LLM provider key such as `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`.
-4. Run WebProbe from the `webprobe/` directory.
+Dramaturge is structured as a standalone package root. You can run it directly from this directory, copy it somewhere else, or extract it into its own repository.
 
 ```bash
 pnpm install
-cd webprobe
-npx tsx src/index.ts --config webprobe.config.example.json
+pnpm build
+pnpm exec dramaturge --config ./dramaturge.config.example.json
 ```
 
-If you prefer a compiled run:
+For a source run without compiling first:
 
 ```bash
-pnpm build
-node dist/index.js --config webprobe.config.example.json
+pnpm install
+pnpm exec tsx src/cli.ts --config ./dramaturge.config.example.json
 ```
+
+### Pre-seed auth state with the bundled helper
+
+If you want to reuse a logged-in browser session, create a storage-state file with the package-local helper:
+
+```bash
+pnpm exec dramaturge-auth-state \
+  --url http://localhost:3000/login \
+  --output ./.dramaturge-state/user.json \
+  --success-url http://localhost:3000/
+```
+
+That command opens a visible Chromium browser, waits for you to finish sign-in, and writes the resulting state file inside the package directory you choose.
+
+### Example profiles
+
+- [`dramaturge.config.example.json`](./dramaturge.config.example.json)
+  Generic starter config for a live or local app.
+- [`examples/standalone.local.profile.jsonc`](./examples/standalone.local.profile.jsonc)
+  Generic local profile with package-local state and reports.
+- [`examples/standalone.live.profile.jsonc`](./examples/standalone.live.profile.jsonc)
+  Generic live profile for deployed environments.
+- [`examples/chatppt.local.profile.jsonc`](./examples/chatppt.local.profile.jsonc)
+  ChatPPT-flavored profile that is still package-local by default. Additional host-repo integration is optional.
 
 ## Minimal Config
 
@@ -79,8 +78,8 @@ node dist/index.js --config webprobe.config.example.json
   "auth": {
     "type": "interactive",
     "loginUrl": "/login",
-    "successIndicator": "selector:[data-testid='user-nav-button']",
-    "stateFile": ".webprobe-state.json"
+    "successIndicator": "selector:[data-testid='user-menu']",
+    "stateFile": "./.dramaturge-state/user.json"
   },
   "models": {
     "planner": "anthropic/claude-sonnet-4-6",
@@ -88,19 +87,74 @@ node dist/index.js --config webprobe.config.example.json
     "agentMode": "cua"
   },
   "output": {
-    "dir": "./webprobe-reports",
+    "dir": "./dramaturge-reports/default",
     "format": "both",
     "screenshots": true
   }
 }
 ```
 
-For a source-aware run, add:
+For a source-aware run, point `repoContext.root` at the app repo you want scanned:
 
 ```jsonc
 "repoContext": {
-  "root": "..",
+  "root": "/absolute/path/to/your-app",
   "framework": "nextjs"
+}
+```
+
+For cross-run memory and optional visual baselines:
+
+```jsonc
+"memory": {
+  "enabled": true,
+  "dir": "./.dramaturge",
+  "warmStart": true
+},
+"visualRegression": {
+  "enabled": true,
+  "baselineDir": "./.dramaturge/visual-baselines",
+  "diffPixelRatioThreshold": 0.01,
+  "maskSelectors": []
+}
+```
+
+`memory.enabled` keeps a package-local JSON store with prior finding signatures, suppressions, auth hints, and a navigation snapshot that can warm-start the next run. `visualRegression.enabled` captures a baseline on the first run and turns later diffs into normal findings with diff evidence.
+
+## Deterministic Auth Patterns
+
+`interactive` remains the safest default for local OAuth flows because it keeps the human in charge of the sensitive steps. When you do need automated auth, Dramaturge expects explicit selectors and values instead of model-mediated credential entry.
+
+Form auth:
+
+```jsonc
+"auth": {
+  "type": "form",
+  "loginUrl": "/login",
+  "fields": [
+    { "selector": "input[name='email']", "value": "${TEST_USER_EMAIL}" },
+    { "selector": "input[name='password']", "value": "${TEST_USER_PASSWORD}", "secret": true }
+  ],
+  "submit": { "selector": "button[type='submit']" },
+  "successIndicator": "selector:[data-testid='user-menu']"
+}
+```
+
+Redirect auth:
+
+```jsonc
+"auth": {
+  "type": "oauth-redirect",
+  "loginUrl": "/login",
+  "steps": [
+    { "type": "click", "selector": "button[data-provider='microsoft']" },
+    { "type": "fill", "selector": "input[type='email']", "value": "${TEST_USER_EMAIL}" },
+    { "type": "click", "selector": "input[type='submit']" },
+    { "type": "wait-for-selector", "selector": "input[type='password']" },
+    { "type": "fill", "selector": "input[type='password']", "value": "${TEST_USER_PASSWORD}", "secret": true },
+    { "type": "click", "selector": "input[type='submit']" }
+  ],
+  "successIndicator": "selector:[data-testid='user-menu']"
 }
 ```
 
@@ -110,13 +164,11 @@ For a source-aware run, add:
 
 | Auth type | Best for | Operator guidance |
 |---|---|---|
-| `interactive` | local OAuth or flaky sign-in flows | Best default for local protected apps. Reuses cached state when possible and falls back to manual login. |
+| `interactive` | local OAuth or flaky sign-in flows | Best default for protected apps. Reuses cached state when possible and falls back to manual login. |
 | `stored-state` | stable reused sessions | Best when you already have a good storage-state file and want the most repeatable auth path. |
-| `form` | simple single-page logins | Use only when the app really has a straightforward username/password form. |
-| `oauth-redirect` | multi-step IdP flows | Useful, but inherently best-effort. Prefer `interactive` or `stored-state` when the IdP is sensitive to automation. |
+| `form` | simple single-page logins | Use only when the app really has a straightforward username/password form and you can provide stable selectors for every field plus the submit action. |
+| `oauth-redirect` | multi-step IdP flows | Useful when you can script each redirect step with explicit selectors. Prefer `interactive` or `stored-state` when the IdP is sensitive to automation. |
 | `none` | public apps | No authentication. |
-
-For OAuth-heavy local environments, `interactive` is usually the right answer.
 
 ### 2. Give the agent a mission, not just a URL
 
@@ -135,9 +187,7 @@ The most useful knobs are:
 
 If the app intentionally returns protected-route `401` or `403` responses before login, add them to `policy.expectedResponses`. If the environment emits known harmless console chatter, add patterns to `policy.ignoredConsolePatterns`.
 
-This is one of the biggest levers for keeping WebProbe from struggling in a new codebase.
-
-### 4. Run WebProbe and watch the first mile
+### 4. Run Dramaturge and watch the first mile
 
 The first things to confirm are:
 
@@ -148,7 +198,7 @@ The first things to confirm are:
 
 ## Authentication Indicators
 
-WebProbe supports four success-indicator formats:
+Dramaturge supports four success-indicator formats:
 
 - `url:/dashboard`
   Exact path match. This is the safest URL-based option.
@@ -163,7 +213,7 @@ Avoid `url:/` as a generic auth check. It is usually too broad for modern apps b
 
 ## Reports
 
-Each finding can now carry:
+Each finding can carry:
 
 - `source`
   `agent`, `auto-capture`, or `confirmed`
@@ -175,7 +225,7 @@ Each finding can now carry:
 A typical run directory looks like this:
 
 ```text
-webprobe-reports/
+dramaturge-reports/
   2026-03-27T10-40-19/
     report.md
     report.json
@@ -190,40 +240,36 @@ The most important report concepts for operators are:
   The route, objective, breadcrumbs, and evidence ids needed to replay it.
 - `Blind Spots`
   Areas the run could not cover because of time, policy, or state reachability limits. Blind spots are not bugs, but they do tell you where confidence is lower.
+- `Run Memory`
+  A summary of how much history the run reused, how many findings are being tracked across runs, and whether warm start was applied.
 
-## ChatPPT Local Recipe
+## Standalone Verification
 
-WebProbe ships with a concrete ChatPPT profile at [`examples/chatppt.local.profile.jsonc`](./examples/chatppt.local.profile.jsonc).
+From inside this folder, you can prove that the packed artifact installs and runs outside the host repo:
 
-From the repo root:
-
-```powershell
-pnpm local:up -- --backend-ref main
+```bash
+pnpm build
+pnpm test
+pnpm run verify:standalone
 ```
 
-Optional: pre-seed auth state so WebProbe can reuse it immediately:
+That smoke test packs the package, installs it into a temp directory outside this repo, runs `dramaturge --help`, loads the packaged standalone example, and scans the installed docs/examples for forbidden host-repo references.
 
-```powershell
-npx tsx tests/interactive-login.ts
-```
+## ChatPPT Notes
 
-Then run WebProbe from `webprobe/`:
+The ChatPPT-specific runbook lives in [`docs/chatppt-smoke.md`](./docs/chatppt-smoke.md). The packaged ChatPPT profile stays self-contained by default, and source-aware scanning only happens if you point `repoContext.root` at a ChatPPT checkout on purpose.
 
-```powershell
-npx tsx src/index.ts --config examples/chatppt.local.profile.jsonc
-```
+## Publishing To GitHub Packages
 
-What that profile does:
+This package is now scoped for your GitHub Packages namespace as `@aram10/dramaturge`.
 
-- targets `http://localhost:3000`
-- uses `interactive` auth with cached state reuse
-- uses `selector:[data-testid='user-nav-button']` as the post-login signal
-- turns on repo-aware Next.js hints from the parent repo
-- suppresses expected protected-route noise for common ChatPPT API families
-- prioritizes the chat shell, knowledge bases, and `/manage/knowledge-bases`
-- keeps destructive actions disabled
+1. Keep `publishConfig.registry` pointing at `https://npm.pkg.github.com`.
+2. Add a local `.npmrc` with `@aram10:registry=https://npm.pkg.github.com` when publishing or installing from GitHub Packages.
+3. The package metadata already points at `https://github.com/aram10/dramaturge`.
+4. Run `pnpm pack` and `pnpm run verify:standalone`.
+5. If this folder has become the repo root, the bundled workflow at [`./.github/workflows/publish.yml`](./.github/workflows/publish.yml) is ready to publish it.
 
-## What WebProbe Is Not
+## What Dramaturge Is Not
 
 - not a replacement for deterministic Playwright suites
 - not a CI gate you should trust blindly
