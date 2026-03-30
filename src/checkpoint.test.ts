@@ -201,4 +201,74 @@ describe("Checkpoint", () => {
     });
     expect(newCoverage.getBlindSpots()).toHaveLength(1);
   });
+
+  it("preserves pending frontier items when a final checkpoint is saved after report-time drain", () => {
+    const graph = new StateGraph();
+    const node = graph.addNode({
+      url: "https://example.com/page",
+      fingerprint: makeFP("resume-root"),
+      pageType: "list",
+      depth: 0,
+    });
+
+    const frontier = new FrontierQueue();
+    frontier.enqueue({
+      id: "task-pending",
+      nodeId: node.id,
+      workerType: "navigation",
+      objective: "Resume this task",
+      priority: 0.9,
+      reason: "coverage",
+      retryCount: 0,
+      createdAt: new Date().toISOString(),
+      status: "pending",
+    });
+    frontier.enqueue({
+      id: "task-done",
+      nodeId: node.id,
+      workerType: "crud",
+      objective: "Already completed task",
+      priority: 0.2,
+      reason: "history",
+      retryCount: 0,
+      createdAt: new Date().toISOString(),
+      status: "completed",
+    });
+
+    const findings = new Map<string, RawFinding[]>();
+    const evidence = new Map<string, Evidence[]>();
+    const actions = new Map<string, ReplayableAction[]>();
+    const coverage = new CoverageTracker();
+    const resumableFrontierSnapshot = frontier.snapshot();
+
+    frontier.drain();
+
+    saveCheckpoint(
+      tmpDir,
+      graph,
+      frontier,
+      findings,
+      evidence,
+      actions,
+      coverage,
+      [],
+      4,
+      {},
+      { frontierSnapshot: resumableFrontierSnapshot }
+    );
+
+    const loaded = loadCheckpoint(tmpDir)!;
+    const restoredFrontier = new FrontierQueue();
+    hydrateFromCheckpoint(
+      loaded,
+      new StateGraph(),
+      restoredFrontier,
+      new CoverageTracker()
+    );
+
+    expect(
+      loaded.frontierSnapshot.filter((item) => item.status === "pending")
+    ).toHaveLength(1);
+    expect(restoredFrontier.size()).toBe(1);
+  });
 });
