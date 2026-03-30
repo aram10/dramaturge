@@ -117,9 +117,12 @@ export class Navigator {
         success: false,
         reason: `Fingerprint mismatch: expected ${node.fingerprint.hash} (${node.fingerprint.normalizedPath}), got ${currentFp.hash} (${currentFp.normalizedPath})`,
       };
-    } catch {
-      // If fingerprinting fails, assume arrival is OK (best-effort)
-      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        reason: `Navigation verification failed: ${message}`,
+      };
     }
   }
 

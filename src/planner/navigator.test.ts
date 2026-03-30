@@ -79,4 +79,44 @@ describe("Navigator.navigateFromNode", () => {
       stagehand.act.mock.invocationCallOrder[0]
     );
   });
+
+  it("fails restoration when fingerprint verification throws", async () => {
+    vi.mocked(captureFingerprint).mockRejectedValueOnce(
+      new Error("Execution context was destroyed")
+    );
+
+    const page = {
+      goto: vi.fn().mockResolvedValue(undefined),
+      url: vi.fn().mockReturnValue("https://example.com/"),
+    } as any;
+    const stagehand = {
+      act: vi.fn().mockResolvedValue(undefined),
+    } as any;
+    const graph = {
+      getNode: vi.fn().mockReturnValue({
+        id: "wizard-node",
+        url: "https://example.com/wizard?step=2",
+        fingerprint: makeFingerprint("/wizard", "wizard-node"),
+        depth: 1,
+      }),
+      pathToNode: vi.fn().mockReturnValue([]),
+    } as any;
+
+    const navigator = new Navigator();
+    const result = await navigator.navigateFromNode(
+      "wizard-node",
+      { selector: "#wizard-next" },
+      graph,
+      page,
+      stagehand,
+      "https://example.com/"
+    );
+
+    expect(result).toEqual({
+      success: false,
+      reason:
+        "Navigation verification failed: Execution context was destroyed",
+    });
+    expect(stagehand.act).not.toHaveBeenCalled();
+  });
 });
