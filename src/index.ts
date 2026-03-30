@@ -5,8 +5,11 @@ export {
   resolveWorkerModel,
 } from "./config.js";
 export type {
+  ApiTestingConfig,
+  AdversarialConfig,
   FormAuthField,
   FormAuthSubmit,
+  JudgeConfig,
   OAuthRedirectStep,
   DramaturgeConfig,
   LoadedDramaturgeConfig,
@@ -16,10 +19,27 @@ export type { RunEngineOptions } from "./engine.js";
 export { CATEGORY_PREFIX } from "./types.js";
 export { MemoryStore, buildFindingSignature } from "./memory/store.js";
 export { comparePngBuffers, runVisualRegressionScan } from "./coverage/visual-regression.js";
+export { defineEvalFixtures } from "./evals/fixtures.js";
+export { summarizeEvalResults } from "./evals/harness.js";
+export { scanGenericRepo } from "./adaptation/generic.js";
 export {
   generatePlaywrightTests,
   writeGeneratedPlaywrightTests,
 } from "./report/test-gen.js";
+export { inferAssertions } from "./report/assertion-inference.js";
+export {
+  createContractIndex,
+  matchContractOperation,
+  summarizeContractIndex,
+  validateOperationResponse,
+} from "./spec/contract-index.js";
+export { replayApiRequest } from "./api/replay.js";
+export { executeApiWorkerTask } from "./api/worker.js";
+export { loadOpenApiSpec } from "./spec/openapi-loader.js";
+export { buildOpenApiSpec } from "./spec/openapi-spec.js";
+export { addOperation, createEmptyNormalizedSpec } from "./spec/normalized-spec.js";
+export { buildRepoSpec } from "./spec/repo-spec.js";
+export { buildOperationKey, getOperationSpec } from "./spec/validators.js";
 export type {
   Area,
   AreaResult,
@@ -60,6 +80,23 @@ export type {
   WorkerType,
 } from "./types.js";
 export type {
+  ApiProbeTarget,
+  ApiReplayRequest,
+  ApiReplayResponse,
+  ApiRequestContextLike,
+  ApiRequestResponseLike,
+  ExecuteApiWorkerTaskInput,
+} from "./api/types.js";
+export type {
+  ContractIndex,
+} from "./spec/contract-index.js";
+export type {
+  EvalCaseResult,
+  EvalFailureSummary,
+  EvalSummary,
+  EvalTagBreakdown,
+} from "./evals/types.js";
+export type {
   HistoricalAuthHints,
   HistoricalFindingRecord,
   HistoricalFlakyPageRecord,
@@ -68,3 +105,12 @@ export type {
   PlannerMemorySignals,
   WorkerHistoryContext,
 } from "./memory/types.js";
+export type {
+  JsonSchema,
+  NormalizedOperationSpec,
+  NormalizedParamSpec,
+  NormalizedRequestBodySpec,
+  NormalizedResponseSpec,
+  NormalizedSpecArtifact,
+  NormalizedSpecSource,
+} from "./spec/types.js";

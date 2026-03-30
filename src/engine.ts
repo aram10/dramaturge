@@ -3,9 +3,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Stagehand } from "@browserbasehq/stagehand";
+import { request as playwrightRequest } from "playwright";
 import type { LoadedDramaturgeConfig, DramaturgeConfig } from "./config.js";
 import { resolveResumeDir } from "./config-paths.js";
-import type { FrontierItem, WorkerResult, BudgetConfig, MissionConfig } from "./types.js";
+import type { FrontierItem, WorkerResult, BudgetConfig, MissionConfig, WorkerType } from "./types.js";
 import { authenticate } from "./auth/authenticator.js";
 import { captureStorageState } from "./auth/storage-state.js";
 import { captureFingerprint } from "./graph/fingerprint.js";
@@ -31,6 +32,9 @@ import { resolvePolicy } from "./policy/policy.js";
 import { MemoryStore } from "./memory/store.js";
 import { seedGraphFromNavigationMemory } from "./memory/navigation-cache.js";
 import { NetworkTrafficObserver } from "./network/traffic-observer.js";
+import { createContractIndex, type ContractIndex } from "./spec/contract-index.js";
+import { loadOpenApiSpec } from "./spec/openapi-loader.js";
+import { buildRepoSpec } from "./spec/repo-spec.js";
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -45,12 +49,25 @@ function resolveBudget(config: DramaturgeConfig): BudgetConfig {
 }
 
 function buildMission(config: DramaturgeConfig): MissionConfig | undefined {
-  if (!config.mission) return undefined;
+  const enabledFocusModes: WorkerType[] = ["navigation", "form", "crud"];
+  if (config.apiTesting.enabled) {
+    enabledFocusModes.push("api");
+  }
+  if (config.adversarial.enabled) {
+    enabledFocusModes.push("adversarial");
+  }
+
+  const focusModes =
+    config.mission?.focusModes ??
+    (enabledFocusModes.length > 3 ? enabledFocusModes : undefined);
+
+  if (!config.mission && !focusModes) return undefined;
   return {
     ...config.mission,
     appDescription: config.appDescription,
     destructiveActionsAllowed:
-      config.mission.destructiveActionsAllowed ?? false,
+      config.mission?.destructiveActionsAllowed ?? false,
+    focusModes,
   };
 }
 
@@ -102,6 +119,21 @@ function loadRepoHints(config: DramaturgeConfig): RepoHints | undefined {
     repoHints.expectedHttpNoise.length > 0;
 
   return hasHints ? repoHints : undefined;
+}
+
+function loadContractIndex(
+  config: DramaturgeConfig,
+  repoHints?: RepoHints
+): ContractIndex | undefined {
+  const artifacts = [];
+  if (repoHints) {
+    artifacts.push(buildRepoSpec(repoHints));
+  }
+  if (config.repoContext?.specFile) {
+    artifacts.push(loadOpenApiSpec(config.repoContext.specFile));
+  }
+
+  return artifacts.length > 0 ? createContractIndex(artifacts) : undefined;
 }
 
 function startBootstrapProcess(config: DramaturgeConfig): ChildProcess | undefined {
@@ -257,6 +289,7 @@ export async function runEngine(
   const concurrency = config.concurrency.workers;
   const useLLMPlanner = hasLLMApiKey(config.models.planner);
   const repoHints = loadRepoHints(config);
+  const contractIndex = loadContractIndex(config, repoHints);
   const policy = resolvePolicy(config.policy, repoHints);
   const memoryStore = config.memory.enabled ? new MemoryStore(config.memory.dir) : undefined;
   let warmStartApplied = false;
@@ -309,8 +342,13 @@ export async function runEngine(
     completedTaskIds: new Set(),
     workerPool,
     repoHints,
+    contractIndex,
     trafficObserver,
     memoryStore,
+    createIsolatedApiRequestContext: () =>
+      playwrightRequest.newContext({
+        baseURL: config.targetUrl,
+      }),
   };
 
   try {

@@ -23,12 +23,12 @@ afterEach(() => {
 describe("createWorkerTools", () => {
   it("writes screenshots with an internal filename instead of the agent ref", async () => {
     const screenshotDir = createTempDir();
-    const findings: any[] = [];
+    const observations: any[] = [];
     const evidence: any[] = [];
     const screenshots = new Map<string, Buffer>();
     const actionRecorder = new ActionRecorder();
     const tools = createWorkerTools(
-      findings,
+      observations,
       screenshots,
       evidence,
       { recordEvent: vi.fn() } as any,
@@ -66,12 +66,12 @@ describe("createWorkerTools", () => {
 
   it("links evidence back to a stable finding ref instead of an array index", async () => {
     const screenshotDir = createTempDir();
-    const findings: any[] = [];
+    const observations: any[] = [];
     const evidence: any[] = [];
     const screenshots = new Map<string, Buffer>();
     const actionRecorder = new ActionRecorder();
     const tools = createWorkerTools(
-      findings,
+      observations,
       screenshots,
       evidence,
       { recordEvent: vi.fn() } as any,
@@ -105,14 +105,11 @@ describe("createWorkerTools", () => {
       evidenceIds: [shot.evidenceId!],
     });
 
-    expect(findings[0].ref).toMatch(/^fid-/);
-    expect(evidence[0].relatedFindingIds).toEqual([findings[0].ref]);
+    expect(observations[0].id).toMatch(/^obs-/);
+    expect(evidence[0].relatedFindingIds).toEqual([observations[0].id]);
     expect(evidence[0].relatedFindingIds).not.toEqual(["0"]);
-    expect(findings[0].verdict).toMatchObject({
-      hypothesis: "A dialog opens",
-      observation: "Nothing happens",
-      evidenceChain: [shot.evidenceId],
-    });
-    expect(findings[0].meta?.repro?.actionIds).toHaveLength(1);
+    expect(observations[0].verdictHint).toBeUndefined();
+    expect(observations[0].actionIds).toHaveLength(1);
+    expect(observations[0].evidenceIds).toEqual([shot.evidenceId]);
   });
 });

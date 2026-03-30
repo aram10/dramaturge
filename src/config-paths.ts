@@ -52,6 +52,9 @@ export function normalizeConfigPaths(
           hintsFile: config.repoContext.hintsFile
             ? resolve(repoRoot, config.repoContext.hintsFile)
             : undefined,
+          specFile: config.repoContext.specFile
+            ? resolve(repoRoot, config.repoContext.specFile)
+            : undefined,
         };
       })()
     : undefined;

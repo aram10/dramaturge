@@ -88,7 +88,8 @@ describe("loadConfig", () => {
         "repoContext": {
           "root": "../..",
           "framework": "nextjs",
-          "hintsFile": "./dramaturge.hints.jsonc"
+          "hintsFile": "./dramaturge.hints.jsonc",
+          "specFile": "./dramaturge.openapi.json"
         },
         "bootstrap": {
           "command": "pnpm dev",
@@ -107,6 +108,7 @@ describe("loadConfig", () => {
       root: resolve(dir, "../.."),
       framework: "nextjs",
       hintsFile: resolve(dir, "../..", "dramaturge.hints.jsonc"),
+      specFile: resolve(dir, "../..", "dramaturge.openapi.json"),
     });
     expect(config.bootstrap).toMatchObject({
       command: "pnpm dev",
@@ -151,6 +153,24 @@ describe("loadConfig", () => {
         },
       ],
       ignoredConsolePatterns: ["ResizeObserver loop"],
+    });
+    expect(config.apiTesting).toMatchObject({
+      enabled: false,
+      maxEndpointsPerNode: 4,
+      maxProbeCasesPerEndpoint: 6,
+      unauthenticatedProbes: true,
+      allowMutatingProbes: false,
+    });
+    expect(config.adversarial).toMatchObject({
+      enabled: false,
+      maxSequencesPerNode: 3,
+      safeMode: true,
+      includeAuthzProbes: false,
+      includeConcurrencyProbes: false,
+    });
+    expect(config.judge).toMatchObject({
+      enabled: true,
+      requestTimeoutMs: 15000,
     });
   });
 
@@ -307,7 +327,8 @@ describe("loadConfig", () => {
         "repoContext": {
           "root": "../host",
           "framework": "nextjs",
-          "hintsFile": "./hints/dramaturge.hints.jsonc"
+          "hintsFile": "./hints/dramaturge.hints.jsonc",
+          "specFile": "./specs/dramaturge.openapi.json"
         },
         "bootstrap": {
           "command": "pnpm dev",
@@ -337,6 +358,7 @@ describe("loadConfig", () => {
     expect(config.repoContext).toMatchObject({
       root: resolve(configsDir, "../host"),
       hintsFile: resolve(configsDir, "../host", "hints/dramaturge.hints.jsonc"),
+      specFile: resolve(configsDir, "../host", "specs/dramaturge.openapi.json"),
     });
     expect(config.bootstrap).toMatchObject({
       cwd: resolve(configsDir, "../host"),

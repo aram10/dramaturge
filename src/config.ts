@@ -74,6 +74,7 @@ const WorkerModelsSchema = z
     navigation: z.string().optional(),
     form: z.string().optional(),
     crud: z.string().optional(),
+    adversarial: z.string().optional(),
   })
   .optional();
 
@@ -84,6 +85,7 @@ const AgentModesSchema = z
     navigation: z.enum(["cua", "dom"]).optional(),
     form: z.enum(["cua", "dom"]).optional(),
     crud: z.enum(["cua", "dom"]).optional(),
+    adversarial: z.enum(["cua", "dom"]).optional(),
   })
   .optional();
 
@@ -155,13 +157,55 @@ const VisualRegressionSchema = z
     maskSelectors: [],
   });
 
+const ApiTestingSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    maxEndpointsPerNode: z.number().int().min(1).default(4),
+    maxProbeCasesPerEndpoint: z.number().int().min(1).default(6),
+    unauthenticatedProbes: z.boolean().default(true),
+    allowMutatingProbes: z.boolean().default(false),
+  })
+  .default({
+    enabled: false,
+    maxEndpointsPerNode: 4,
+    maxProbeCasesPerEndpoint: 6,
+    unauthenticatedProbes: true,
+    allowMutatingProbes: false,
+  });
+
+const AdversarialSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    maxSequencesPerNode: z.number().int().min(1).default(3),
+    safeMode: z.boolean().default(true),
+    includeAuthzProbes: z.boolean().default(false),
+    includeConcurrencyProbes: z.boolean().default(false),
+  })
+  .default({
+    enabled: false,
+    maxSequencesPerNode: 3,
+    safeMode: true,
+    includeAuthzProbes: false,
+    includeConcurrencyProbes: false,
+  });
+
+const JudgeSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    requestTimeoutMs: z.number().int().min(100).default(15_000),
+  })
+  .default({
+    enabled: true,
+    requestTimeoutMs: 15_000,
+  });
+
 const MissionSchema = z
   .object({
     criticalFlows: z.array(z.string()).optional(),
     destructiveActionsAllowed: z.boolean().default(false),
     excludedAreas: z.array(z.string()).optional(),
     focusModes: z
-      .array(z.enum(["navigation", "form", "crud"]))
+      .array(z.enum(["navigation", "form", "crud", "api", "adversarial"]))
       .optional(),
   })
   .optional();
@@ -246,6 +290,7 @@ const RepoContextSchema = z
     root: z.string().optional(),
     framework: z.enum(["auto", "nextjs", "generic"]).default("auto"),
     hintsFile: z.string().optional(),
+    specFile: z.string().optional(),
   })
   .optional();
 
@@ -288,6 +333,9 @@ export const ConfigSchema = z.object({
   output: OutputSchema,
   memory: MemorySchema,
   visualRegression: VisualRegressionSchema,
+  apiTesting: ApiTestingSchema,
+  adversarial: AdversarialSchema,
+  judge: JudgeSchema,
   autoCapture: AutoCaptureSchema,
   browser: BrowserSchema,
   llm: LlmSchema,
@@ -301,6 +349,9 @@ export const ConfigSchema = z.object({
 
 export type DramaturgeConfig = z.infer<typeof ConfigSchema>;
 export type LoadedDramaturgeConfig = ConfigWithMeta<DramaturgeConfig>;
+export type ApiTestingConfig = z.infer<typeof ApiTestingSchema>;
+export type AdversarialConfig = z.infer<typeof AdversarialSchema>;
+export type JudgeConfig = z.infer<typeof JudgeSchema>;
 export type { ConfigFileContext, LoadedConfigMeta } from "./config-paths.js";
 export type FormAuthField = Extract<DramaturgeConfig["auth"], { type: "form" }>["fields"][number];
 export type FormAuthSubmit = Extract<DramaturgeConfig["auth"], { type: "form" }>["submit"];

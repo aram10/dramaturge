@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ReplayableAction, RunResult } from "../types.js";
 import { collectFindings } from "./collector.js";
+import { inferAssertions } from "./assertion-inference.js";
 
 export interface GeneratedPlaywrightTest {
   filename: string;
@@ -92,7 +93,18 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         }
       }
 
-      lines.push("  expect(true).toBe(true);");
+      const assertions = inferAssertions({
+        title: finding.title,
+        expected: finding.expected,
+        actual: finding.actual,
+      });
+      if (assertions.length > 0) {
+        for (const assertion of assertions) {
+          lines.push(`  ${assertion.code}`);
+        }
+      } else {
+        lines.push("  // No confident assertion could be inferred automatically.");
+      }
       lines.push("});");
 
       return {

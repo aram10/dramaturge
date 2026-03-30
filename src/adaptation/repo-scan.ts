@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import { parseJsoncObject } from "../utils/jsonc.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
+import { scanGenericRepo } from "./generic.js";
 import type {
   RepoHints,
   RepoHintsOverride,
@@ -136,7 +137,11 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
       : options.framework;
 
   const scanned =
-    framework === "nextjs" ? scanNextJsRepo(root) : emptyRepoHints();
+    framework === "nextjs"
+      ? scanNextJsRepo(root)
+      : framework === "generic"
+        ? scanGenericRepo(root)
+        : emptyRepoHints();
 
   return mergeRepoHints(scanned, loadHintsOverride(root, options.hintsFile));
 }

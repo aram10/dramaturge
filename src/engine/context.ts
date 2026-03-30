@@ -18,6 +18,8 @@ import type { RepoHints } from "../adaptation/types.js";
 import type { MemoryStore } from "../memory/store.js";
 import type { RunMemoryMeta } from "../types.js";
 import type { NetworkTrafficObserver } from "../network/traffic-observer.js";
+import type { ContractIndex } from "../spec/contract-index.js";
+import type { ApiRequestContextLike } from "../api/types.js";
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -39,7 +41,9 @@ export interface EngineContext {
   completedTaskIds: Set<string>;
   workerPool: WorkerSession[];
   repoHints?: RepoHints;
+  contractIndex?: ContractIndex;
   trafficObserver?: NetworkTrafficObserver;
   memoryStore?: MemoryStore;
   runMemory?: RunMemoryMeta;
+  createIsolatedApiRequestContext?: () => Promise<ApiRequestContextLike>;
 }

@@ -250,7 +250,7 @@ export interface StateEdge {
 
 // --- Frontier ---
 
-export type WorkerType = "navigation" | "form" | "crud";
+export type WorkerType = "navigation" | "form" | "crud" | "api" | "adversarial";
 
 export type FrontierItemStatus =
   | "pending"

@@ -59,6 +59,24 @@ describe("normalizeConfigPaths", () => {
           fullPage: true,
           maskSelectors: ["[data-testid='clock']"],
         },
+        apiTesting: {
+          enabled: false,
+          maxEndpointsPerNode: 4,
+          maxProbeCasesPerEndpoint: 6,
+          unauthenticatedProbes: true,
+          allowMutatingProbes: false,
+        },
+        adversarial: {
+          enabled: false,
+          maxSequencesPerNode: 3,
+          safeMode: true,
+          includeAuthzProbes: false,
+          includeConcurrencyProbes: false,
+        },
+        judge: {
+          enabled: true,
+          requestTimeoutMs: 15000,
+        },
         budget: {
           globalTimeLimitSeconds: 900,
           maxStepsPerTask: 40,
@@ -87,6 +105,7 @@ describe("normalizeConfigPaths", () => {
           root: "../host-app",
           framework: "nextjs",
           hintsFile: "./hints/dramaturge.hints.jsonc",
+          specFile: "./specs/dramaturge.openapi.json",
         },
         bootstrap: {
           command: "pnpm dev",
@@ -118,6 +137,7 @@ describe("normalizeConfigPaths", () => {
     expect(normalized.repoContext).toMatchObject({
       root: resolve("C:/tmp/dramaturge/host-app"),
       hintsFile: resolve("C:/tmp/dramaturge/host-app/hints/dramaturge.hints.jsonc"),
+      specFile: resolve("C:/tmp/dramaturge/host-app/specs/dramaturge.openapi.json"),
     });
     expect(normalized.bootstrap).toMatchObject({
       cwd: resolve("C:/tmp/dramaturge/host-app"),

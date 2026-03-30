@@ -2,10 +2,12 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 import { resolveAgentMode, resolveWorkerModel } from "../config.js";
 import type { Evidence, FrontierItem, RawFinding, WorkerResult } from "../types.js";
 import type { EngineContext } from "./context.js";
+import { executeApiWorkerTask } from "../api/worker.js";
 import { executeWorkerTask } from "../worker/worker.js";
 import { runAccessibilityScan } from "../coverage/accessibility.js";
 import { runVisualRegressionScan } from "../coverage/visual-regression.js";
 import { buildApiContractArtifacts } from "../api/contract-oracle.js";
+import { summarizeContractIndex } from "../spec/contract-index.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -44,10 +46,26 @@ export async function executeFrontierItem(
 
   ctx.planner.recordDispatch(item.nodeId, item.workerType);
   ctx.graph.recordVisit(item.nodeId);
+  const observedApiEndpoints = ctx.trafficObserver?.snapshot(pageKey) ?? [];
+
+  if (item.workerType === "api") {
+    const result = await executeApiWorkerTask({
+      taskId: item.id,
+      areaName: node.title ?? node.id,
+      pageRoute: node.url ?? ctx.config.targetUrl,
+      targetUrl: ctx.config.targetUrl,
+      observedEndpoints: observedApiEndpoints,
+      contractIndex: ctx.contractIndex,
+      pageRequestContext: (page as any).request,
+      createIsolatedRequestContext: ctx.createIsolatedApiRequestContext,
+      config: ctx.config.apiTesting,
+    });
+
+    return { item, result };
+  }
 
   const model = resolveWorkerModel(ctx.config, item.workerType);
   const history = ctx.memoryStore?.getWorkerContext(node);
-  const observedApiEndpoints = ctx.trafficObserver?.snapshot(pageKey) ?? [];
   const preflightFindings: RawFinding[] = [];
   const preflightEvidence: Evidence[] = [];
 
@@ -96,16 +114,19 @@ export async function executeFrontierItem(
     ctx.config.budget.stagnationThreshold ?? 0,
     ctx.config.appContext,
     ctx.repoHints,
+    ctx.contractIndex ? summarizeContractIndex(ctx.contractIndex) : undefined,
     observedApiEndpoints,
     ctx.mission,
-    history
+    history,
+    ctx.config.adversarial,
+    ctx.config.judge
   );
 
   const apiContract = buildApiContractArtifacts({
     areaName: node.title ?? node.id,
     route: node.url ?? ctx.config.targetUrl,
     observedEndpoints: ctx.trafficObserver?.snapshot(pageKey) ?? [],
-    repoHints: ctx.repoHints,
+    contractIndex: ctx.contractIndex,
   });
 
   if (preflightFindings.length > 0) {
