@@ -1,7 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import type { Stagehand } from "@browserbasehq/stagehand";
 import { request as playwrightRequest } from "playwright";
 import type { LoadedDramaturgeConfig, DramaturgeConfig } from "./config.js";
@@ -42,6 +40,12 @@ import { NetworkTrafficObserver } from "./network/traffic-observer.js";
 import { createContractIndex, type ContractIndex } from "./spec/contract-index.js";
 import { loadOpenApiSpec } from "./spec/openapi-loader.js";
 import { buildRepoSpec } from "./spec/repo-spec.js";
+import {
+  startBootstrapProcess,
+  stopBootstrapProcess,
+  waitForBootstrapReady,
+  type BootstrapStatus,
+} from "./engine/bootstrap.js";
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -103,8 +107,6 @@ interface BatchTaskResult {
   pageKey: string;
 }
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
-
 function loadRepoHints(config: DramaturgeConfig): RepoHints | undefined {
   if (!config.repoContext) return undefined;
   const configBaseDir =
@@ -141,90 +143,6 @@ function loadContractIndex(
   }
 
   return artifacts.length > 0 ? createContractIndex(artifacts) : undefined;
-}
-
-function startBootstrapProcess(config: DramaturgeConfig): ChildProcess | undefined {
-  const command = config.bootstrap?.command;
-  if (!command) return undefined;
-
-  console.log(`Starting bootstrap command: ${command}`);
-  return spawn(command, {
-    cwd: config.bootstrap?.cwd,
-    shell: true,
-    stdio: "ignore",
-  });
-}
-
-async function isReadyUrlReachable(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { redirect: "manual" });
-    return response.ok || (response.status >= 300 && response.status < 400);
-  } catch {
-    return false;
-  }
-}
-
-async function hasReadyIndicator(
-  page: StagehandPage,
-  url: string,
-  selector: string
-): Promise<boolean> {
-  try {
-    await page.goto(url);
-    const found = await page.evaluate(
-      `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
-    );
-    return found === true;
-  } catch {
-    return false;
-  }
-}
-
-async function waitForBootstrapReady(
-  config: DramaturgeConfig,
-  page: StagehandPage
-): Promise<void> {
-  if (!config.bootstrap) return;
-
-  const readyUrl = config.bootstrap.readyUrl
-    ? new URL(config.bootstrap.readyUrl, config.targetUrl).href
-    : config.targetUrl;
-  const readyIndicator = config.bootstrap.readyIndicator;
-
-  if (!config.bootstrap.readyUrl && !readyIndicator) {
-    return;
-  }
-
-  const deadline = Date.now() + config.bootstrap.timeoutSeconds * 1000;
-  while (Date.now() < deadline) {
-    const urlReady = !config.bootstrap.readyUrl || await isReadyUrlReachable(readyUrl);
-    const indicatorReady =
-      !readyIndicator || (await hasReadyIndicator(page, readyUrl, readyIndicator));
-
-    if (urlReady && indicatorReady) {
-      console.log("Bootstrap target is ready.");
-      return;
-    }
-
-    await delay(1000);
-  }
-
-  throw new Error(
-    `Bootstrap did not become ready within ${config.bootstrap.timeoutSeconds}s`
-  );
-}
-
-function stopBootstrapProcess(processRef?: ChildProcess): void {
-  if (!processRef?.pid) return;
-
-  if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(processRef.pid), "/t", "/f"], {
-      stdio: "ignore",
-    });
-    return;
-  }
-
-  processRef.kill("SIGTERM");
 }
 
 /** Run frontier items in parallel across the worker pool. */
@@ -302,7 +220,7 @@ export async function runEngine(
   const memoryStore = config.memory.enabled ? new MemoryStore(config.memory.dir) : undefined;
   let warmStartApplied = false;
   let warmStartRestoredStateCount = 0;
-  let bootstrapProcess: ChildProcess | undefined;
+  let bootstrapProcess: BootstrapStatus | undefined;
 
   if (repoHints) {
     console.log(
