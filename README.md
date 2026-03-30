@@ -74,3 +74,5 @@ pnpm run verify:standalone
 ```
 
 That smoke check packs the package, installs it into a temporary directory outside the repo, runs `dramaturge --help`, and validates that the packaged example config resolves to package-local paths.
+
+The repository CI workflow runs the same `test`, `build`, and `verify:standalone` commands on pull requests and `main`.
