@@ -3,6 +3,10 @@ export interface ObservedApiEndpoint {
   methods: string[];
   statuses: number[];
   failures: string[];
+  responses?: Array<{
+    status: number;
+    body?: unknown;
+  }>;
 }
 
 export class NetworkTrafficObserver {
@@ -87,6 +91,14 @@ export class NetworkTrafficObserver {
       methods: [...endpoint.methods],
       statuses: [...endpoint.statuses],
       failures: [...endpoint.failures],
+      ...(endpoint.responses && endpoint.responses.length > 0
+        ? {
+            responses: endpoint.responses.map((response) => ({
+              status: response.status,
+              body: response.body,
+            })),
+          }
+        : {}),
     }));
   }
 
@@ -118,6 +130,7 @@ export class NetworkTrafficObserver {
       methods: [],
       statuses: [],
       failures: [],
+      responses: [],
     };
 
     current.methods = uniqueSorted([...current.methods, input.method.toUpperCase()]);

@@ -1,11 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { executeFrontierItem } from "./execute-frontier-item.js";
 import { executeWorkerTask } from "../worker/worker.js";
+import { executeApiWorkerTask } from "../api/worker.js";
 import { runAccessibilityScan } from "../coverage/accessibility.js";
 import { runVisualRegressionScan } from "../coverage/visual-regression.js";
 
 vi.mock("../worker/worker.js", () => ({
   executeWorkerTask: vi.fn(),
+}));
+
+vi.mock("../api/worker.js", () => ({
+  executeApiWorkerTask: vi.fn(),
 }));
 
 vi.mock("../coverage/accessibility.js", () => ({
@@ -25,6 +30,7 @@ vi.mock("../coverage/visual-regression.js", () => ({
 describe("executeFrontierItem", () => {
   beforeEach(() => {
     vi.mocked(executeWorkerTask).mockReset();
+    vi.mocked(executeApiWorkerTask).mockReset();
     vi.mocked(runAccessibilityScan).mockReset();
     vi.mocked(runVisualRegressionScan).mockReset();
     vi.mocked(runAccessibilityScan).mockResolvedValue({
@@ -198,6 +204,7 @@ describe("executeFrontierItem", () => {
         },
         expectedHttpNoise: [],
       },
+      undefined,
       [
         {
           route: "/api/widgets",
@@ -211,10 +218,126 @@ describe("executeFrontierItem", () => {
         destructiveActionsAllowed: false,
         criticalFlows: ["knowledge-bases"],
       },
+      undefined,
+      undefined,
       undefined
     );
     expect(ctx.trafficObserver.resetPage).toHaveBeenCalledWith("page-1");
     expect(ctx.trafficObserver.snapshot).toHaveBeenCalledWith("page-1");
+  });
+
+  it("routes api tasks through the api worker without browser preflight scans", async () => {
+    vi.mocked(executeApiWorkerTask).mockResolvedValue({
+      taskId: "task-api",
+      findings: [],
+      evidence: [],
+      coverageSnapshot: {
+        controlsDiscovered: 0,
+        controlsExercised: 0,
+        events: [],
+      },
+      followupRequests: [],
+      discoveredEdges: [],
+      outcome: "completed",
+      summary: "api ok",
+    });
+
+    const isolatedContext = {
+      fetch: vi.fn(),
+      dispose: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const ctx = {
+      config: {
+        targetUrl: "https://example.com",
+        appDescription: "Example app",
+        apiTesting: {
+          enabled: true,
+          maxEndpointsPerNode: 4,
+          maxProbeCasesPerEndpoint: 6,
+          unauthenticatedProbes: true,
+          allowMutatingProbes: false,
+        },
+      },
+      budget: {
+        maxStepsPerTask: 5,
+      },
+      navigator: {
+        navigateTo: vi.fn().mockResolvedValue({ success: true }),
+      },
+      planner: {
+        recordDispatch: vi.fn(),
+      },
+      graph: {
+        getNode: vi.fn().mockReturnValue({
+          id: "node-api",
+          title: "Widgets",
+          pageType: "list",
+          url: "https://example.com/widgets",
+          fingerprint: {
+            hash: "fp-widgets",
+          },
+        }),
+        recordVisit: vi.fn(),
+      },
+      trafficObserver: {
+        resetPage: vi.fn(),
+        snapshot: vi.fn().mockReturnValue([
+          {
+            route: "/api/widgets",
+            methods: ["GET"],
+            statuses: [200],
+            failures: [],
+          },
+        ]),
+      },
+      contractIndex: {
+        operations: [],
+        operationsByKey: {},
+      },
+      createIsolatedApiRequestContext: vi.fn().mockResolvedValue(isolatedContext),
+    } as any;
+
+    const page = {
+      request: {
+        fetch: vi.fn(),
+      },
+      evaluate: vi.fn(),
+      url: () => "https://example.com/widgets",
+    } as any;
+
+    const result = await executeFrontierItem({
+      ctx,
+      stagehand: { name: "worker-api" } as any,
+      page,
+      item: {
+        id: "task-api",
+        nodeId: "node-api",
+        workerType: "api",
+        objective: "Probe related APIs",
+        priority: 0.8,
+        reason: "coverage",
+        retryCount: 0,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+      },
+      taskNumber: 3,
+      pageKey: "page-api",
+    });
+
+    expect(result.result?.summary).toBe("api ok");
+    expect(executeApiWorkerTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskId: "task-api",
+        areaName: "Widgets",
+        pageRoute: "https://example.com/widgets",
+        pageRequestContext: page.request,
+        config: ctx.config.apiTesting,
+      })
+    );
+    expect(runAccessibilityScan).not.toHaveBeenCalled();
+    expect(runVisualRegressionScan).not.toHaveBeenCalled();
+    expect(executeWorkerTask).not.toHaveBeenCalled();
   });
 
   it("runs deterministic scans against the navigated node state before worker exploration", async () => {

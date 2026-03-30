@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { buildApiContractArtifacts } from "./contract-oracle.js";
+import { createContractIndex } from "../spec/contract-index.js";
+import { buildOpenApiSpec } from "../spec/openapi-spec.js";
 
 describe("buildApiContractArtifacts", () => {
-  it("flags unexpected statuses against repo-derived API expectations", () => {
+  it("flags unexpected statuses against contract-index API expectations", () => {
     const artifacts = buildApiContractArtifacts({
       areaName: "Items",
       route: "https://example.com/items/42",
@@ -14,23 +16,26 @@ describe("buildApiContractArtifacts", () => {
           failures: [],
         },
       ],
-      repoHints: {
-        routes: [],
-        routeFamilies: [],
-        stableSelectors: [],
-        apiEndpoints: [
-          {
-            route: "/api/items/[id]",
-            methods: ["GET"],
-            statuses: [200, 404],
+      contractIndex: createContractIndex([
+        {
+          routes: ["/api/items/[id]"],
+          operations: {
+            "GET /api/items/[id]": {
+              id: "GET /api/items/[id]",
+              method: "GET",
+              route: "/api/items/[id]",
+              source: "repo",
+              responses: {
+                "200": { status: "200" },
+                "404": { status: "404" },
+              },
+              queryParams: [],
+              pathParams: [],
+              validationSchemas: [],
+            },
           },
-        ],
-        authHints: {
-          loginRoutes: [],
-          callbackRoutes: [],
         },
-        expectedHttpNoise: [],
-      },
+      ]),
     });
 
     expect(artifacts.findings).toHaveLength(1);
@@ -45,38 +50,55 @@ describe("buildApiContractArtifacts", () => {
     expect(artifacts.evidence[0]?.type).toBe("api-contract");
   });
 
-  it("does not emit findings when observed traffic matches the expected contract", () => {
+  it("flags invalid response bodies when the status is allowed but the schema is wrong", () => {
     const artifacts = buildApiContractArtifacts({
-      areaName: "Members",
-      route: "https://example.com/settings/members",
+      areaName: "Widgets",
+      route: "https://example.com/widgets",
       observedEndpoints: [
         {
-          route: "/api/settings/members",
-          methods: ["GET"],
-          statuses: [200],
+          route: "/api/widgets",
+          methods: ["POST"],
+          statuses: [201],
           failures: [],
+          responses: [
+            {
+              status: 201,
+              body: { ok: true },
+            },
+          ],
         },
       ],
-      repoHints: {
-        routes: [],
-        routeFamilies: [],
-        stableSelectors: [],
-        apiEndpoints: [
-          {
-            route: "/api/settings/members",
-            methods: ["GET"],
-            statuses: [200, 304],
+      contractIndex: createContractIndex([
+        buildOpenApiSpec({
+          openapi: "3.1.0",
+          info: { title: "Widgets API", version: "1.0.0" },
+          paths: {
+            "/api/widgets": {
+              post: {
+                responses: {
+                  "201": {
+                    description: "Created",
+                    content: {
+                      "application/json": {
+                        schema: {
+                          type: "object",
+                          required: ["id"],
+                          properties: {
+                            id: { type: "string" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
-        ],
-        authHints: {
-          loginRoutes: [],
-          callbackRoutes: [],
-        },
-        expectedHttpNoise: [],
-      },
+        }),
+      ]),
     });
 
-    expect(artifacts.findings).toEqual([]);
-    expect(artifacts.evidence).toEqual([]);
+    expect(artifacts.findings).toHaveLength(1);
+    expect(artifacts.findings[0]?.actual).toContain("Schema validation failed");
   });
 });

@@ -85,6 +85,27 @@ function summarizeRepoHints(repoHints?: RepoHints): string | undefined {
   return parts.length > 0 ? parts.join("; ") : undefined;
 }
 
+function relevantApiEndpointsForNode(
+  node: StateNode,
+  repoHints?: RepoHints
+): RepoHints["apiEndpoints"] {
+  if (!repoHints?.apiEndpoints.length) {
+    return [];
+  }
+
+  const urlTokens = (node.url ?? "")
+    .toLowerCase()
+    .split("/")
+    .filter(Boolean)
+    .filter((token) => token !== "api");
+
+  const matches = repoHints.apiEndpoints.filter((endpoint) =>
+    urlTokens.some((token) => endpoint.route.toLowerCase().includes(token))
+  );
+
+  return matches.length > 0 ? matches : repoHints.apiEndpoints;
+}
+
 export class Planner {
   private workerTypesPerNode = new Map<string, Set<WorkerType>>();
 
@@ -140,6 +161,32 @@ export class Planner {
         objective: `Use repo-aware hints to probe likely routes and controls from this page: ${repoHintSummary}`,
         reason: "Repo-aware navigation seed",
         priority: 0.85,
+      });
+    }
+
+    const apiHints = relevantApiEndpointsForNode(node, repoHints);
+    if (allowedTypes.includes("api") && node.timesVisited === 0 && apiHints.length > 0) {
+      proposals.push({
+        workerType: "api",
+        objective: `Probe related API contracts and auth boundaries for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ""}: ${apiHints
+          .slice(0, 2)
+          .map((endpoint) => `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}`)
+          .join(", ")}`,
+        reason: "API-aware follow-up for this page",
+        priority: 0.78,
+      });
+    }
+
+    if (
+      allowedTypes.includes("adversarial") &&
+      node.timesVisited === 0 &&
+      ["form", "list", "detail", "settings", "wizard", "modal"].includes(node.pageType)
+    ) {
+      proposals.push({
+        workerType: "adversarial",
+        objective: `Probe edge cases, stale-state behavior, and replay/idempotency risks for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ""}`,
+        reason: "Low-priority adversarial coverage pass",
+        priority: 0.35,
       });
     }
 

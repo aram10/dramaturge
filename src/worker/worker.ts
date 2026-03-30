@@ -1,10 +1,10 @@
 import type { Stagehand } from "@browserbasehq/stagehand";
+import type { AdversarialConfig, JudgeConfig } from "../config.js";
 import { createWorkerTools } from "./tools.js";
 import { buildWorkerSystemPrompt } from "./prompts.js";
 import type {
   Area,
   AreaResult,
-  RawFinding,
   Evidence,
   PageType,
   WorkerTask,
@@ -21,9 +21,11 @@ import type { RepoHints } from "../adaptation/types.js";
 import { ActionRecorder } from "./action-recorder.js";
 import type { WorkerHistoryContext } from "../memory/types.js";
 import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
+import type { Observation } from "../judge/types.js";
+import { judgeWorkerObservations } from "../judge/judge.js";
 
 interface WorkerSetup {
-  findings: RawFinding[];
+  observations: Observation[];
   screenshots: Map<string, Buffer>;
   evidence: Evidence[];
   coverageTracker: CoverageTracker;
@@ -48,13 +50,17 @@ function initWorker(
     stagnationThreshold: number;
     appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
     repoHints?: RepoHints;
+    contractSummary?: string[];
     observedApiEndpoints?: ObservedApiEndpoint[];
     mission?: MissionConfig;
     history?: WorkerHistoryContext;
     stateId?: string;
+    workerType?: WorkerTask["workerType"];
+    adversarialConfig?: AdversarialConfig;
+    judgeConfig?: JudgeConfig;
   }
 ): WorkerSetup {
-  const findings: RawFinding[] = [];
+  const observations: Observation[] = [];
   const screenshots = new Map<string, Buffer>();
   const evidence: Evidence[] = [];
   const coverageTracker = new CoverageTracker();
@@ -69,7 +75,7 @@ function initWorker(
     : undefined;
 
   const tools = createWorkerTools(
-    findings, screenshots, evidence, coverageTracker, page,
+    observations, screenshots, evidence, coverageTracker, page,
     opts.screenshotDir, opts.areaName,
     followupRequests, discoveredEdges,
     opts.screenshotsEnabled,
@@ -90,9 +96,12 @@ function initWorker(
     opts.pageType,
     opts.appContext,
     opts.repoHints,
+    opts.contractSummary,
     opts.observedApiEndpoints,
     opts.mission,
-    opts.history
+    opts.history,
+    opts.workerType,
+    opts.adversarialConfig
   );
 
   const agent = stagehand.agent({
@@ -103,7 +112,7 @@ function initWorker(
   });
 
   return {
-    findings,
+    observations,
     screenshots,
     evidence,
     coverageTracker,
@@ -112,6 +121,20 @@ function initWorker(
     actionRecorder,
     agent,
   };
+}
+
+async function materializeObservedFindings(input: {
+  observations: Observation[];
+  evidence: Evidence[];
+  actionRecorder: ActionRecorder;
+  judgeConfig?: JudgeConfig;
+}) {
+  return judgeWorkerObservations({
+    observations: input.observations,
+    evidence: input.evidence,
+    actions: input.actionRecorder.getActions(),
+    config: input.judgeConfig,
+  });
 }
 
 export async function exploreArea(
@@ -126,9 +149,11 @@ export async function exploreArea(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
   repoHints?: RepoHints,
+  contractSummary?: string[],
   observedApiEndpoints?: ObservedApiEndpoint[],
   mission?: MissionConfig,
-  history?: WorkerHistoryContext
+  history?: WorkerHistoryContext,
+  judgeConfig?: JudgeConfig
 ): Promise<AreaResult> {
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
@@ -145,7 +170,7 @@ export async function exploreArea(
   }
 
   const {
-    findings,
+    observations,
     screenshots,
     evidence,
     coverageTracker,
@@ -164,9 +189,11 @@ export async function exploreArea(
     stagnationThreshold,
     appContext,
     repoHints,
+    contractSummary,
     observedApiEndpoints,
     mission,
     history,
+    judgeConfig,
   });
 
   try {
@@ -184,7 +211,12 @@ export async function exploreArea(
       name: area.name,
       url: area.url,
       steps: stepCount,
-      findings,
+      findings: await materializeObservedFindings({
+        observations,
+        evidence,
+        actionRecorder,
+        judgeConfig,
+      }),
       replayableActions: actionRecorder.getActions(),
       screenshots,
       evidence,
@@ -201,7 +233,12 @@ export async function exploreArea(
       name: area.name,
       url: area.url,
       steps: 0,
-      findings,
+      findings: await materializeObservedFindings({
+        observations,
+        evidence,
+        actionRecorder,
+        judgeConfig,
+      }),
       replayableActions: actionRecorder.getActions(),
       screenshots,
       evidence,
@@ -226,12 +263,15 @@ export async function executeWorkerTask(
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
   repoHints?: RepoHints,
+  contractSummary?: string[],
   observedApiEndpoints?: ObservedApiEndpoint[],
   mission?: MissionConfig,
-  history?: WorkerHistoryContext
+  history?: WorkerHistoryContext,
+  adversarialConfig?: AdversarialConfig,
+  judgeConfig?: JudgeConfig
 ): Promise<WorkerResult> {
   const {
-    findings,
+    observations,
     evidence,
     coverageTracker,
     followupRequests,
@@ -250,21 +290,33 @@ export async function executeWorkerTask(
     stagnationThreshold,
     appContext,
     repoHints,
+    contractSummary,
     observedApiEndpoints,
     mission,
     history,
     stateId: task.nodeId,
+    workerType: task.workerType,
+    adversarialConfig,
+    judgeConfig,
   });
 
   try {
     await agent.execute({
-      instruction: task.objective,
+      instruction:
+        task.workerType === "adversarial"
+          ? `${task.objective}\nPrioritize stale-state, replay, idempotency, and boundary-value probes. Stay read-only unless the run explicitly allows mutation-dependent adversarial sequences.`
+          : task.objective,
       maxSteps: task.maxSteps,
     });
 
     return {
       taskId: task.id,
-      findings,
+      findings: await materializeObservedFindings({
+        observations,
+        evidence,
+        actionRecorder,
+        judgeConfig,
+      }),
       evidence,
       replayableActions: actionRecorder.getActions(),
       coverageSnapshot: coverageTracker.snapshot(),
@@ -276,7 +328,12 @@ export async function executeWorkerTask(
   } catch (error) {
     return {
       taskId: task.id,
-      findings,
+      findings: await materializeObservedFindings({
+        observations,
+        evidence,
+        actionRecorder,
+        judgeConfig,
+      }),
       evidence,
       replayableActions: actionRecorder.getActions(),
       coverageSnapshot: coverageTracker.snapshot(),

@@ -84,8 +84,10 @@ describe("generatePlaywrightTests", () => {
     expect(generated[0]?.content).toContain("import { test, expect } from \"@playwright/test\";");
     expect(generated[0]?.content).toContain("await page.goto(\"https://example.com/manage/knowledge-bases\");");
     expect(generated[0]?.content).toContain("await page.locator(\"button[data-testid='create']\").click();");
+    expect(generated[0]?.content).toContain('await expect(page.getByRole("dialog")).toBeVisible();');
     expect(generated[0]?.content).toContain("Expected: The create dialog opens");
     expect(generated[0]?.content).toContain("Actual: Nothing happens");
+    expect(generated[0]?.content).not.toContain("expect(true).toBe(true)");
   });
 
   it("falls back to breadcrumb comments when no replayable actions are available", () => {
@@ -130,5 +132,49 @@ describe("generatePlaywrightTests", () => {
     expect(generated[0]?.content).toContain("// Breadcrumbs:");
     expect(generated[0]?.content).toContain("// - Open settings");
     expect(generated[0]?.content).toContain("// - Click Save");
+  });
+
+  it("uses alert assertions for feedback-oriented findings", () => {
+    const generated = generatePlaywrightTests(
+      makeResult({
+        areaResults: [
+          {
+            name: "Settings",
+            steps: 1,
+            findings: [
+              {
+                ref: "fid-settings-feedback",
+                category: "UX Concern",
+                severity: "Minor",
+                title: "Save feedback is unclear",
+                stepsToReproduce: ["Open settings", "Click Save"],
+                expected: "A success message confirms the save",
+                actual: "The page changes without feedback",
+                meta: {
+                  source: "agent",
+                  confidence: "medium",
+                  repro: {
+                    objective: "Inspect save feedback",
+                    route: "https://example.com/settings",
+                    breadcrumbs: ["Open settings", "Click Save"],
+                    evidenceIds: [],
+                  },
+                },
+              },
+            ],
+            replayableActions: [],
+            screenshots: new Map(),
+            evidence: [],
+            coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+            pageType: "settings",
+            status: "explored",
+          },
+        ],
+      })
+    );
+
+    expect(generated[0]?.content).toContain(
+      'await expect(page.getByRole("alert")).toBeVisible();'
+    );
   });
 });

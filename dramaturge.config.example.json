@@ -57,8 +57,41 @@
       "Search and filter the list"
     ],
     "destructiveActionsAllowed": false,
-    "focusModes": ["navigation", "form", "crud"]
+    "focusModes": ["navigation", "form", "crud", "api"]
   },
+
+  // Optional API replay and contract probes. These stay read-oriented by default.
+  "apiTesting": {
+    "enabled": true,
+    "maxEndpointsPerNode": 4,
+    "maxProbeCasesPerEndpoint": 6,
+    "unauthenticatedProbes": true,
+    "allowMutatingProbes": false
+  },
+
+  // Optional adversarial coverage. Safe mode keeps this read-only unless
+  // destructive actions are explicitly allowed for the run.
+  "adversarial": {
+    "enabled": false,
+    "maxSequencesPerNode": 3,
+    "safeMode": true,
+    "includeAuthzProbes": false,
+    "includeConcurrencyProbes": false
+  },
+
+  // Observation-to-judgment handoff. Keep enabled unless you are debugging
+  // raw explorer output.
+  "judge": {
+    "enabled": true,
+    "requestTimeoutMs": 15000
+  },
+
+  // Optional repo-aware scanning. "auto" uses a Next.js adapter when it
+  // detects that structure and otherwise falls back to a generic adapter.
+  // "repoContext": {
+  //   "root": "./host-app",
+  //   "framework": "auto"
+  // },
 
   "budget": {
     "globalTimeLimitSeconds": 900,

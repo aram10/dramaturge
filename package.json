@@ -1,7 +1,7 @@
 {
   "name": "@aram10/dramaturge",
   "version": "0.1.0",
-  "description": "Environment-aware exploratory QA harness for web applications",
+  "description": "Exploratory QA engine for web applications with UI, API, and evidence-backed replay",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/aram10/dramaturge.git"
@@ -50,6 +50,7 @@
   "dependencies": {
     "@axe-core/playwright": "^4.11.1",
     "@browserbasehq/stagehand": "^3.2.0",
+    "ajv": "^8.18.0",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0",

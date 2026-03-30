@@ -55,6 +55,14 @@ export function renderJson(result: RunResult): string {
       screenshot: f.screenshot ?? null,
       evidenceIds: f.evidenceIds ?? [],
       verdict: f.verdict ?? null,
+      trace:
+        (f.meta?.repro?.actionIds?.length ?? 0) > 0 ||
+        (f.meta?.repro?.evidenceIds?.length ?? 0) > 0
+          ? {
+              actionIds: f.meta?.repro?.actionIds ?? [],
+              evidenceIds: f.meta?.repro?.evidenceIds ?? [],
+            }
+          : null,
       occurrenceCount: f.occurrenceCount,
       impactedAreas: f.impactedAreas,
       occurrences: f.occurrences,

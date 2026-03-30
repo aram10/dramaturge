@@ -132,6 +132,14 @@ export function renderMarkdown(result: RunResult): string {
         if ((f.meta.repro?.evidenceIds?.length ?? 0) > 0) {
           lines.push(`- **Repro evidence:** ${f.meta.repro?.evidenceIds.join(", ")}`);
         }
+        if (
+          (f.meta.repro?.actionIds?.length ?? 0) > 0 ||
+          (f.meta.repro?.evidenceIds?.length ?? 0) > 0
+        ) {
+          lines.push(
+            `- **Trace bundle:** actions=${f.meta.repro?.actionIds?.join(", ") || "none"} | evidence=${f.meta.repro?.evidenceIds?.join(", ") || "none"}`
+          );
+        }
       }
       lines.push("");
     }

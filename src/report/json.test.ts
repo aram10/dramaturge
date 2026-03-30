@@ -150,6 +150,10 @@ describe("renderJson", () => {
         hypothesis: "Clicking Create should open a dialog.",
         observation: "Nothing happened after the click.",
       },
+      trace: {
+        actionIds: ["act-1", "act-2"],
+        evidenceIds: ["ev-1", "ev-2"],
+      },
     });
     expect(report.findings[0].occurrences).toHaveLength(2);
     expect(report.evidence[0].relatedFindingIds).toEqual(["BUG-001"]);

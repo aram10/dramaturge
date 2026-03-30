@@ -59,6 +59,39 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
             ...(raw.evidenceIds ?? []),
           ])
         );
+        if (existing.meta?.repro || raw.meta?.repro) {
+          existing.meta = existing.meta ?? raw.meta;
+          if (existing.meta) {
+            existing.meta = {
+              ...existing.meta,
+              repro: {
+                ...(existing.meta.repro ?? raw.meta?.repro),
+                objective:
+                  existing.meta.repro?.objective ??
+                  raw.meta?.repro?.objective ??
+                  "Investigate observed issue",
+                actionIds: Array.from(
+                  new Set([
+                    ...(existing.meta.repro?.actionIds ?? []),
+                    ...(raw.meta?.repro?.actionIds ?? []),
+                  ])
+                ),
+                evidenceIds: Array.from(
+                  new Set([
+                    ...(existing.meta.repro?.evidenceIds ?? []),
+                    ...(raw.meta?.repro?.evidenceIds ?? []),
+                  ])
+                ),
+                breadcrumbs: Array.from(
+                  new Set([
+                    ...(existing.meta.repro?.breadcrumbs ?? []),
+                    ...(raw.meta?.repro?.breadcrumbs ?? []),
+                  ])
+                ),
+              },
+            };
+          }
+        }
         continue;
       }
 

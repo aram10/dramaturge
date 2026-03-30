@@ -2,12 +2,12 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 import { z } from "zod";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { RawFinding, Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from "../types.js";
+import type { Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from "../types.js";
 import { shortId } from "../constants.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
 import type { StagnationTracker } from "./stagnation.js";
-import { buildAgentFindingMeta } from "../repro/repro.js";
 import type { ActionRecorder } from "./action-recorder.js";
+import type { Observation } from "../judge/types.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -59,7 +59,7 @@ const MarkControlExercisedSchema = z.object({
 });
 
 const RequestFollowupSchema = z.object({
-  type: z.enum(["navigation", "form", "crud"]),
+  type: z.enum(["navigation", "form", "crud", "api", "adversarial"]),
   reason: z.string(),
   relatedFindingId: z.string().optional(),
 });
@@ -72,7 +72,7 @@ const ReportDiscoveredEdgeSchema = z.object({
 });
 
 export function createWorkerTools(
-  findings: RawFinding[],
+  observations: Observation[],
   screenshots: Map<string, Buffer>,
   evidence: Evidence[],
   coverageTracker: CoverageTracker,
@@ -106,44 +106,32 @@ export function createWorkerTools(
       inputSchema: LogFindingSchema,
       execute: async (input: z.infer<typeof LogFindingSchema>) => {
         const evidenceIds = input.evidenceIds ?? [];
-        const findingRef = `fid-${shortId()}`;
-        findings.push({
-          ref: findingRef,
+        const observationId = `obs-${shortId()}`;
+        observations.push({
+          id: observationId,
           ...input,
           evidenceIds,
-          verdict: {
-            hypothesis: input.verdict?.hypothesis ?? input.expected,
-            observation: input.verdict?.observation ?? input.actual,
-            evidenceChain: input.verdict?.evidenceChain ?? evidenceIds,
-            alternativesConsidered:
-              input.verdict?.alternativesConsidered ?? [],
-            suggestedVerification:
-              input.verdict?.suggestedVerification ?? [],
-          },
-          meta: buildAgentFindingMeta({
-            stateId: findingContext?.stateId,
-            route: page.url(),
-            objective: findingContext?.objective ?? "Investigate the current page",
-            breadcrumbs: actionRecorder?.getRecentSummaries() ?? [...breadcrumbs],
-            actionIds: actionRecorder?.getRecentActionIds(),
-            evidenceIds,
-          }),
+          route: page.url(),
+          objective: findingContext?.objective ?? "Investigate the current page",
+          breadcrumbs: actionRecorder?.getRecentSummaries() ?? [...breadcrumbs],
+          actionIds: actionRecorder?.getRecentActionIds() ?? [],
+          verdictHint: input.verdict,
         });
         // Cross-link evidence to this finding
         if (evidenceIds.length > 0) {
           for (const eid of evidenceIds) {
             const ev = evidence.find((e) => e.id === eid);
             if (ev) {
-              ev.relatedFindingIds.push(findingRef);
+              ev.relatedFindingIds.push(observationId);
             }
           }
         }
         stagnationTracker?.recordStep({ findings: 1, newControls: 0, edges: 0 });
         return {
           logged: true,
-          findingRef,
-          findingIndex: findings.length - 1,
-          message: `Finding logged: ${input.title}`,
+          observationId,
+          observationIndex: observations.length - 1,
+          message: `Observation logged: ${input.title}`,
         };
       },
     },

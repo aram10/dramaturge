@@ -149,6 +149,71 @@ describe("Planner", () => {
       ).toBe(true);
     });
 
+    it("adds an api worker when api exploration is enabled and api hints are present", () => {
+      const planner = new Planner();
+      const graph = makeGraph();
+      const node = graph.addNode({
+        url: "https://example.com/manage/knowledge-bases",
+        title: "Knowledge bases",
+        fingerprint: makeFp("knowledge-bases"),
+        pageType: "list",
+        depth: 1,
+      });
+
+      const tasks = planner.proposeTasks(
+        node,
+        graph,
+        {
+          appDescription: "Test app",
+          destructiveActionsAllowed: false,
+          focusModes: ["navigation", "crud", "api"],
+        },
+        {
+          routes: ["/manage/knowledge-bases"],
+          routeFamilies: ["/manage"],
+          stableSelectors: [],
+          apiEndpoints: [
+            {
+              route: "/api/manage/knowledge-bases",
+              methods: ["GET"],
+              statuses: [200, 401],
+            },
+          ],
+          authHints: {
+            loginRoutes: [],
+            callbackRoutes: [],
+          },
+          expectedHttpNoise: [],
+        }
+      );
+
+      expect(tasks.some((task) => task.workerType === "api")).toBe(true);
+    });
+
+    it("adds a lower-priority adversarial worker when adversarial exploration is enabled", () => {
+      const planner = new Planner();
+      const graph = makeGraph();
+      const node = graph.addNode({
+        url: "https://example.com/settings/profile",
+        title: "Profile settings",
+        fingerprint: makeFp("settings-profile"),
+        pageType: "settings",
+        depth: 1,
+      });
+
+      const tasks = planner.proposeTasks(node, graph, {
+        appDescription: "Test app",
+        destructiveActionsAllowed: false,
+        focusModes: ["form", "adversarial"],
+      });
+
+      const formTask = tasks.find((task) => task.workerType === "form");
+      const adversarialTask = tasks.find((task) => task.workerType === "adversarial");
+
+      expect(adversarialTask).toBeDefined();
+      expect(adversarialTask?.priority).toBeLessThan(formTask?.priority ?? 1);
+    });
+
     it("suppresses tasks for excluded areas", () => {
       const planner = new Planner();
       const graph = makeGraph();

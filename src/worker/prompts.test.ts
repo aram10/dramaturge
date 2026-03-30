@@ -87,6 +87,7 @@ describe("buildWorkerSystemPrompt", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       [
         {
           route: "/api/widgets",
@@ -103,12 +104,30 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("net::ERR_CONNECTION_RESET");
   });
 
+  it("includes condensed contract summaries when provided", () => {
+    const prompt = buildWorkerSystemPrompt(
+      "A todo app",
+      "Main",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      ["POST /api/widgets (statuses 201, 400; request body required)"],
+      undefined
+    );
+
+    expect(prompt).toContain("Contract Expectations");
+    expect(prompt).toContain("POST /api/widgets");
+    expect(prompt).toContain("request body required");
+  });
+
   it("adds stronger safety guidance when destructive actions are disabled", () => {
     const prompt = buildWorkerSystemPrompt(
       "A todo app",
       "Main",
       undefined,
       "list",
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -130,6 +149,7 @@ describe("buildWorkerSystemPrompt", () => {
       "Settings",
       undefined,
       "settings",
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -157,5 +177,38 @@ describe("buildWorkerSystemPrompt", () => {
     expect(prompt).toContain("historically started at /login");
     expect(prompt).toContain("Historical API hints");
     expect(prompt).toContain("GET/POST /api/settings/members");
+  });
+
+  it("adds adversarial guardrails and scenario guidance when adversarial mode is enabled", () => {
+    const prompt = buildWorkerSystemPrompt(
+      "A todo app",
+      "Profile settings",
+      undefined,
+      "settings",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        appDescription: "A todo app",
+        destructiveActionsAllowed: false,
+      },
+      undefined,
+      "adversarial",
+      {
+        enabled: true,
+        maxSequencesPerNode: 3,
+        safeMode: true,
+        includeAuthzProbes: false,
+        includeConcurrencyProbes: false,
+      }
+    );
+
+    expect(prompt).toContain("Adversarial Mode");
+    expect(prompt).toContain("Safe mode is enabled");
+    expect(prompt).toContain("stale-detail-view");
+    expect(prompt).toContain("back-button-state-mismatch");
+    expect(prompt).not.toContain("double-submit");
+    expect(prompt).toContain("boundary-text");
   });
 });

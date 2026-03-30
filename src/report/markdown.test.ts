@@ -179,6 +179,7 @@ describe("renderMarkdown", () => {
     expect(md).toContain("click create button -> worked");
     expect(md).toContain("**Hypothesis:** Clicking Create should open a creation dialog.");
     expect(md).toContain("**Repro action ids:** act-1, act-2");
+    expect(md).toContain("**Trace bundle:** actions=act-1, act-2 | evidence=ev-1");
     expect(md).toContain("## Action Trace");
     expect(md).toContain("| act-1 | Knowledge bases | click | worker-tool | click create button -> worked | worked |");
   });

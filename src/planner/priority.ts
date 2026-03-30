@@ -38,6 +38,8 @@ export function computePriority(
   const flakyBoost = ctx.memory?.hasFlakyPageNotes ? 0.05 : 0;
   const suppressionPenalty = ctx.memory?.hasSuppressedFindings ? 0.05 : 0;
 
+  const adversarialPenalty = workerType === "adversarial" ? 0.2 : 0;
+
   return Math.max(
     0,
     weights.novelty * unseenRatio +
@@ -46,6 +48,7 @@ export function computePriority(
       weights.revisitPenalty * revisitPenalty +
       historicalBoost +
       flakyBoost -
-      suppressionPenalty
+      suppressionPenalty -
+      adversarialPenalty
   );
 }

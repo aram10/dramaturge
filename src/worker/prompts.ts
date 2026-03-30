@@ -1,7 +1,10 @@
-import type { MissionConfig, PageType } from "../types.js";
+import type { AdversarialConfig } from "../config.js";
+import type { MissionConfig, PageType, WorkerType } from "../types.js";
 import type { RepoHints } from "../adaptation/types.js";
 import type { WorkerHistoryContext } from "../memory/types.js";
 import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
+import { summarizeAdversarialPayloadFamilies } from "../adversarial/payloads.js";
+import { summarizeAdversarialScenarios } from "../adversarial/scenarios.js";
 
 interface AppContext {
   knownPatterns?: string[];
@@ -127,6 +130,15 @@ function buildMissionSection(mission?: MissionConfig): string {
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
 }
 
+function buildContractSummarySection(contractSummary?: string[]): string {
+  if (!contractSummary?.length) return "";
+
+  return `\n\n## Contract Expectations\n${contractSummary
+    .slice(0, 6)
+    .map((summary) => `- ${summary}`)
+    .join("\n")}`;
+}
+
 function buildObservedApiSection(observedApiEndpoints?: ObservedApiEndpoint[]): string {
   if (!observedApiEndpoints?.length) return "";
 
@@ -174,6 +186,40 @@ function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
 }
 
+function buildAdversarialSection(
+  workerType?: WorkerType,
+  adversarialConfig?: AdversarialConfig,
+  mission?: MissionConfig
+): string {
+  if (workerType !== "adversarial" || !adversarialConfig?.enabled) {
+    return "";
+  }
+
+  const scenarios = summarizeAdversarialScenarios(
+    adversarialConfig,
+    mission?.destructiveActionsAllowed ?? false
+  );
+  const payloads = summarizeAdversarialPayloadFamilies({
+    safeMode: adversarialConfig.safeMode,
+  });
+
+  const parts = [
+    "## Adversarial Mode",
+    adversarialConfig.safeMode
+      ? "Safe mode is enabled. Prefer read-only, state-preserving probes and avoid submissions that could create or destroy records."
+      : "Safe mode is disabled. Use stronger payloads carefully and stay within the assigned area.",
+    "Probe sequences:",
+    ...scenarios.map((scenario) => `- ${scenario}`),
+    "Payload families:",
+    ...payloads.map((payload) => `- ${payload}`),
+    !mission?.destructiveActionsAllowed
+      ? "Do not run mutation-dependent probes unless the run explicitly allows destructive actions."
+      : "Keep mutation-dependent probes narrowly scoped and clean up any low-risk test data you create.",
+  ];
+
+  return `\n\n${parts.join("\n")}`;
+}
+
 export function buildWorkerSystemPrompt(
   appDescription: string,
   areaName: string,
@@ -181,9 +227,12 @@ export function buildWorkerSystemPrompt(
   pageType?: PageType,
   appContext?: AppContext,
   repoHints?: RepoHints,
+  contractSummary?: string[],
   observedApiEndpoints?: ObservedApiEndpoint[],
   mission?: MissionConfig,
-  history?: WorkerHistoryContext
+  history?: WorkerHistoryContext,
+  workerType?: WorkerType,
+  adversarialConfig?: AdversarialConfig
 ): string {
   const areaContext = areaDescription
     ? `\n\nAbout this area: ${areaDescription}`
@@ -196,10 +245,10 @@ export function buildWorkerSystemPrompt(
   return `You are an autonomous QA tester exploring a web application. Your job is to find bugs, UX issues, accessibility problems, and visual glitches through hands-on exploration.
 
 ## The Application
-${appDescription}${buildRepoHintsSection(repoHints)}${buildObservedApiSection(observedApiEndpoints)}
+${appDescription}${buildRepoHintsSection(repoHints)}${buildContractSummarySection(contractSummary)}${buildObservedApiSection(observedApiEndpoints)}
 
 ## Your Assignment
-You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}${buildMissionSection(mission)}${buildHistoricalContextSection(history)}
+You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}${buildMissionSection(mission)}${buildHistoricalContextSection(history)}${buildAdversarialSection(workerType, adversarialConfig, mission)}
 
 ## What to Do
 1. Systematically explore all visible UI elements in this area
