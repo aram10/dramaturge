@@ -101,4 +101,58 @@ describe("buildApiContractArtifacts", () => {
     expect(artifacts.findings).toHaveLength(1);
     expect(artifacts.findings[0]?.actual).toContain("Schema validation failed");
   });
+
+  it("does not conflate statuses across different methods on the same route", () => {
+    const artifacts = buildApiContractArtifacts({
+      areaName: "Widgets",
+      route: "https://example.com/widgets",
+      observedEndpoints: [
+        {
+          route: "/api/widgets",
+          methods: ["GET", "POST"],
+          statuses: [200, 201],
+          failures: [],
+          samples: [
+            {
+              method: "GET",
+              status: 200,
+              url: "/api/widgets",
+            },
+            {
+              method: "POST",
+              status: 201,
+              url: "/api/widgets",
+            },
+          ],
+        } as any,
+      ],
+      contractIndex: createContractIndex([
+        buildOpenApiSpec({
+          openapi: "3.1.0",
+          info: { title: "Widgets API", version: "1.0.0" },
+          paths: {
+            "/api/widgets": {
+              get: {
+                responses: {
+                  "200": {
+                    description: "OK",
+                  },
+                },
+              },
+              post: {
+                responses: {
+                  "201": {
+                    description: "Created",
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    });
+
+    expect(artifacts.findings).toEqual([]);
+    expect(artifacts.evidence).toEqual([]);
+  });
 });

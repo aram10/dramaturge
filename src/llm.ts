@@ -1,4 +1,5 @@
 import type { LLMTaskProposal, WorkerType } from "./types.js";
+import type { JudgeDecision } from "./judge/types.js";
 import { TRUNCATE_GROUP_KEY } from "./constants.js";
 
 interface ChatMessage {
@@ -189,4 +190,44 @@ Propose testing tasks for this page.`;
     console.warn(`LLM planner ${label} error (falling back to deterministic): ${msg}`);
     return null;
   }
+}
+
+export async function judgeObservationWithLLM(
+  model: string,
+  prompt: string,
+  requestTimeoutMs = 15_000
+): Promise<JudgeDecision> {
+  const system = `You are a QA evidence judge.
+Return a single JSON object with exactly these keys:
+- "hypothesis": a sentence containing the word "should"
+- "observation": a concise statement of what happened
+- "alternativesConsidered": an array of concise alternative explanations
+- "suggestedVerification": an array of concise next checks
+- "confidence": one of "low", "medium", or "high"
+
+Return ONLY JSON. No markdown fences, no explanation.`;
+
+  const raw = await callLLM(
+    model,
+    system,
+    [{ role: "user", content: prompt }],
+    512,
+    requestTimeoutMs
+  );
+  const jsonStr = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
+  const parsed = JSON.parse(jsonStr) as Partial<JudgeDecision> & {
+    confidence?: "low" | "medium" | "high";
+  };
+
+  return {
+    hypothesis: typeof parsed.hypothesis === "string" ? parsed.hypothesis : "The observed behavior should be verified.",
+    observation: typeof parsed.observation === "string" ? parsed.observation : "The judged observation was inconclusive.",
+    alternativesConsidered: Array.isArray(parsed.alternativesConsidered)
+      ? parsed.alternativesConsidered.map(String)
+      : [],
+    suggestedVerification: Array.isArray(parsed.suggestedVerification)
+      ? parsed.suggestedVerification.map(String)
+      : [],
+    confidence: parsed.confidence ?? "medium",
+  };
 }
