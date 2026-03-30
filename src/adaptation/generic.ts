@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { RepoHints } from "./types.js";
 
 const TEXT_FILE_EXTENSIONS = new Set([
@@ -13,16 +13,59 @@ const TEXT_FILE_EXTENSIONS = new Set([
   ".html",
   ".mdx",
 ]);
+const IGNORED_DIRECTORY_NAMES = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "out",
+  "coverage",
+  ".next",
+  ".nuxt",
+  ".turbo",
+  ".cache",
+  "tests",
+  "test",
+  "__tests__",
+  "fixtures",
+  "__fixtures__",
+  "mocks",
+  "__mocks__",
+  "generated",
+  "__generated__",
+]);
+const IGNORED_FILE_NAME_PATTERNS = [
+  /\.test\./i,
+  /\.spec\./i,
+  /\.fixture\./i,
+  /\.mock\./i,
+  /\.stories\./i,
+];
 
 function isTextFile(path: string): boolean {
   return [...TEXT_FILE_EXTENSIONS].some((extension) => path.endsWith(extension));
+}
+
+function shouldIgnoreEntry(name: string, isDirectory: boolean): boolean {
+  if (IGNORED_DIRECTORY_NAMES.has(name)) {
+    return true;
+  }
+  if (isDirectory) {
+    return false;
+  }
+
+  if (name.endsWith(".d.ts")) {
+    return true;
+  }
+
+  return IGNORED_FILE_NAME_PATTERNS.some((pattern) => pattern.test(name));
 }
 
 function walkFiles(root: string): string[] {
   const results: string[] = [];
 
   for (const entry of readdirSync(root, { withFileTypes: true })) {
-    if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist") {
+    if (shouldIgnoreEntry(entry.name, entry.isDirectory())) {
       continue;
     }
 
@@ -32,7 +75,7 @@ function walkFiles(root: string): string[] {
       continue;
     }
 
-    if (entry.isFile() && isTextFile(fullPath)) {
+    if (entry.isFile() && isTextFile(fullPath) && !shouldIgnoreEntry(basename(fullPath), false)) {
       results.push(fullPath);
     }
   }
