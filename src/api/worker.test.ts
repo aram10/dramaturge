@@ -361,6 +361,73 @@ describe("executeApiWorkerTask", () => {
     );
   });
 
+  it("redacts sensitive body fields in contract findings", async () => {
+    const result = await executeApiWorkerTask({
+      taskId: "task-api-redaction",
+      areaName: "Widgets",
+      pageRoute: "https://example.com/widgets",
+      targetUrl: "https://example.com",
+      observedEndpoints: [
+        {
+          route: "/api/widgets",
+          methods: ["GET"],
+          statuses: [200],
+          failures: [],
+        },
+      ],
+      contractIndex: createContractIndex([
+        buildOpenApiSpec({
+          openapi: "3.1.0",
+          info: { title: "Widgets API", version: "1.0.0" },
+          paths: {
+            "/api/widgets": {
+              get: {
+                responses: {
+                  "200": {
+                    description: "OK",
+                    content: {
+                      "application/json": {
+                        schema: {
+                          type: "object",
+                          required: ["items"],
+                          properties: {
+                            items: { type: "array" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+      authenticatedRequestContext: {
+        fetch: vi.fn().mockResolvedValue(
+          createResponse(200, {
+            csrfToken: "csrf-secret",
+            sessionId: "session-secret",
+            customAuthHeader: "auth-secret",
+          })
+        ),
+      } as any,
+      config: {
+        enabled: true,
+        maxEndpointsPerNode: 4,
+        maxProbeCasesPerEndpoint: 6,
+        unauthenticatedProbes: false,
+        allowMutatingProbes: false,
+      },
+    });
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.actual).toContain("[REDACTED]");
+    expect(result.findings[0]?.actual).not.toContain("csrf-secret");
+    expect(result.findings[0]?.actual).not.toContain("session-secret");
+    expect(result.findings[0]?.actual).not.toContain("auth-secret");
+  });
+
   it("replays observed request shape including query string, headers, and body when sample data exists", async () => {
     const pageFetch = vi.fn().mockResolvedValue(createResponse(201, { id: "widget-1" }));
 

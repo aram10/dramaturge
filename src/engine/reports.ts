@@ -72,7 +72,10 @@ export function writeReports(
         maxStateNodes: ctx.budget.maxStateNodes,
       },
       checkpointInterval: config.checkpoint.intervalTasks,
-      autoCaptureEnabled: config.autoCapture.consoleErrors || config.autoCapture.networkErrors,
+      autoCaptureEnabled:
+        config.autoCapture.consoleErrors ||
+        config.autoCapture.consoleWarnings ||
+        config.autoCapture.networkErrors,
       llmPlannerEnabled: hasLLMApiKey(config.models.planner),
       memoryEnabled: config.memory.enabled,
       visualRegressionEnabled: config.visualRegression.enabled,

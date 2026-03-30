@@ -26,6 +26,7 @@ describe("BrowserErrorCollector", () => {
   it("captures console errors", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
+      captureConsoleWarnings: false,
       captureNetwork: false,
       networkErrorMinStatus: 400,
     });
@@ -37,21 +38,38 @@ describe("BrowserErrorCollector", () => {
     page.emit("console", { type: () => "log", text: () => "normal log" }); // should be ignored
     page.emit("console", { type: () => "warning", text: () => "deprecation warning" });
 
-    expect(collector.pendingCount()).toBe(2);
+    expect(collector.pendingCount()).toBe(1);
 
     const { findings, evidence } = collector.flush();
-    expect(findings).toHaveLength(2);
+    expect(findings).toHaveLength(1);
     expect(findings[0].title).toContain("console error");
     expect(findings[0].severity).toBe("Major");
-    expect(findings[1].title).toContain("console warning");
-    expect(findings[1].severity).toBe("Minor");
-    expect(evidence).toHaveLength(2);
+    expect(evidence).toHaveLength(1);
     expect(collector.pendingCount()).toBe(0);
+  });
+
+  it("captures console warnings only when explicitly enabled", () => {
+    const collector = new BrowserErrorCollector({
+      captureConsole: true,
+      captureConsoleWarnings: true,
+      captureNetwork: false,
+      networkErrorMinStatus: 400,
+    });
+    const page = createMockPage();
+    collector.attach(page as any);
+
+    page.emit("console", { type: () => "warning", text: () => "deprecation warning" });
+
+    const { findings } = collector.flush();
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toContain("console warning");
+    expect(findings[0].severity).toBe("Minor");
   });
 
   it("captures page errors (uncaught exceptions)", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
+      captureConsoleWarnings: false,
       captureNetwork: false,
       networkErrorMinStatus: 400,
     });
@@ -69,6 +87,7 @@ describe("BrowserErrorCollector", () => {
   it("captures network errors (4xx/5xx)", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
     });
@@ -106,6 +125,7 @@ describe("BrowserErrorCollector", () => {
   it("captures failed requests (dns failures, etc.)", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
     });
@@ -127,6 +147,7 @@ describe("BrowserErrorCollector", () => {
   it("deduplicates repeated console errors", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
+      captureConsoleWarnings: false,
       captureNetwork: false,
       networkErrorMinStatus: 400,
     });
@@ -146,6 +167,7 @@ describe("BrowserErrorCollector", () => {
   it("deduplicates repeated network errors by URL+status", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
     });
@@ -170,6 +192,7 @@ describe("BrowserErrorCollector", () => {
   it("detach removes all listeners", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
     });
@@ -190,6 +213,7 @@ describe("BrowserErrorCollector", () => {
   it("does not stack duplicate listeners when attaching the same page key twice", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
     });
@@ -208,6 +232,7 @@ describe("BrowserErrorCollector", () => {
   it("returns empty when nothing captured", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
     });
@@ -220,6 +245,7 @@ describe("BrowserErrorCollector", () => {
   it("respects networkErrorMinStatus threshold", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 500, // only 500+
     });
@@ -247,6 +273,7 @@ describe("BrowserErrorCollector", () => {
   it("suppresses expected auth noise while preserving unexpected failures", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
       policy: {

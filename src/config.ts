@@ -231,12 +231,14 @@ const BudgetSchema = z
 const AutoCaptureSchema = z
   .object({
     consoleErrors: z.boolean().default(true),
+    consoleWarnings: z.boolean().default(false),
     networkErrors: z.boolean().default(true),
     /** Minimum HTTP status code to capture as network error (default: 400). */
     networkErrorMinStatus: z.number().int().min(400).max(599).default(400),
   })
   .default({
     consoleErrors: true,
+    consoleWarnings: false,
     networkErrors: true,
     networkErrorMinStatus: 400,
   });

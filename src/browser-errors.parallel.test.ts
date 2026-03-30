@@ -25,6 +25,7 @@ describe("BrowserErrorCollector page isolation", () => {
   it("flushes only the errors captured for the requested page key", () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
+      captureConsoleWarnings: false,
       captureNetwork: true,
       networkErrorMinStatus: 400,
     });
