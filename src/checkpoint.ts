@@ -14,6 +14,10 @@ import type { CoverageTracker } from "./coverage/tracker.js";
 
 const CHECKPOINT_FILE = "checkpoint.json";
 
+interface SaveCheckpointOptions {
+  frontierSnapshot?: FrontierItem[];
+}
+
 export function saveCheckpoint(
   outputDir: string,
   graph: StateGraph,
@@ -24,7 +28,8 @@ export function saveCheckpoint(
   coverage: CoverageTracker,
   completedTaskIds: string[],
   tasksExecuted: number,
-  plannerState: Record<string, FrontierItem["workerType"][]>
+  plannerState: Record<string, FrontierItem["workerType"][]>,
+  options?: SaveCheckpointOptions
 ): void {
   const checkpoint: Checkpoint = {
     version: 1,
@@ -34,7 +39,9 @@ export function saveCheckpoint(
       nodes: graph.getAllNodes(),
       edges: graph.getAllEdges(),
     },
-    frontierSnapshot: frontier.snapshot(),
+    frontierSnapshot:
+      options?.frontierSnapshot?.map((item) => ({ ...item })) ??
+      frontier.snapshot(),
     findingsByNode: Object.fromEntries(findingsByNode.entries()),
     evidenceByNode: Object.fromEntries(evidenceByNode.entries()),
     actionsByNode: Object.fromEntries(actionsByNode.entries()),

@@ -599,6 +599,9 @@ export async function runEngine(
       }
     }
 
+    const finalFrontierSnapshot =
+      checkpointInterval > 0 ? ctx.frontier.snapshot() : undefined;
+
     // Record remaining frontier as blind spots
     const remaining = ctx.frontier.drain();
     for (const r of remaining) {
@@ -622,7 +625,10 @@ export async function runEngine(
         ctx.globalCoverage,
         [...ctx.completedTaskIds],
         tasksExecuted,
-        ctx.planner.snapshotDispatchState()
+        ctx.planner.snapshotDispatchState(),
+        {
+          frontierSnapshot: finalFrontierSnapshot,
+        }
       );
     }
 
