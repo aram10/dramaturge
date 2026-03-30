@@ -308,6 +308,59 @@ describe("executeApiWorkerTask", () => {
     expect(result.findings).toEqual([]);
   });
 
+  it("records probe diagnostics when replay attempts fail", async () => {
+    const result = await executeApiWorkerTask({
+      taskId: "task-api-diagnostics",
+      areaName: "Widgets",
+      pageRoute: "https://example.com/widgets",
+      targetUrl: "https://example.com",
+      observedEndpoints: [
+        {
+          route: "/api/widgets",
+          methods: ["GET"],
+          statuses: [200],
+          failures: [],
+        },
+      ],
+      contractIndex: createContractIndex([
+        buildOpenApiSpec({
+          openapi: "3.1.0",
+          info: { title: "Widgets API", version: "1.0.0" },
+          paths: {
+            "/api/widgets": {
+              get: {
+                responses: {
+                  "200": { description: "OK" },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+      authenticatedRequestContext: {
+        fetch: vi.fn().mockRejectedValue(new Error("socket hang up")),
+      } as any,
+      config: {
+        enabled: true,
+        maxEndpointsPerNode: 4,
+        maxProbeCasesPerEndpoint: 6,
+        unauthenticatedProbes: false,
+        allowMutatingProbes: false,
+      },
+    });
+
+    expect(result.summary).toContain("attempted 1");
+    expect(result.summary).toContain("succeeded 0");
+    expect(result.summary).toContain("failed 1");
+    expect(result.evidence).toContainEqual(
+      expect.objectContaining({
+        type: "api-contract",
+        summary: expect.stringContaining("socket hang up"),
+        relatedFindingIds: [],
+      })
+    );
+  });
+
   it("replays observed request shape including query string, headers, and body when sample data exists", async () => {
     const pageFetch = vi.fn().mockResolvedValue(createResponse(201, { id: "widget-1" }));
 
