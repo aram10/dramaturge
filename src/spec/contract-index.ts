@@ -66,6 +66,13 @@ export function matchContractOperation(
   );
 }
 
+export function matchContractOperationsForRoute(
+  index: ContractIndex,
+  route: string
+): NormalizedOperationSpec[] {
+  return index.operations.filter((operation) => routeMatches(operation.route, route));
+}
+
 export function summarizeContractIndex(index: ContractIndex, limit = 4): string[] {
   return index.operations.slice(0, limit).map((operation) => {
     const parts = [

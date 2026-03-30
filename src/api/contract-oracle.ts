@@ -7,6 +7,7 @@ import type {
 } from "../network/traffic-observer.js";
 import {
   matchContractOperation,
+  matchContractOperationsForRoute,
   type ContractIndex,
   validateOperationResponse,
 } from "../spec/contract-index.js";
@@ -123,30 +124,28 @@ export function buildApiContractArtifacts(input: {
     const methodSlices = buildObservedMethodSlices(observed);
 
     for (const slice of methodSlices) {
-      const matchingOperations = [slice.method]
-        .map((method) =>
-          input.contractIndex
-            ? matchContractOperation(input.contractIndex, method, observed.route)
-            : undefined
-        )
-        .filter((operation): operation is NonNullable<typeof operation> => Boolean(operation));
-      const contract = matchingOperations[0];
-      if (!contract) {
+      const routeOperations = input.contractIndex
+        ? matchContractOperationsForRoute(input.contractIndex, observed.route)
+        : [];
+      const contract = input.contractIndex
+        ? matchContractOperation(input.contractIndex, slice.method, observed.route)
+        : undefined;
+      const expectedOperations = contract ? [contract] : routeOperations;
+      if (expectedOperations.length === 0) {
         continue;
       }
 
-      const expectedStatuses = Object.keys(contract.responses).map((status) =>
-        Number.parseInt(status, 10)
-      );
-      const unexpectedStatuses = slice.statuses.filter(
-        (status) => !expectedStatuses.includes(status)
-      );
-      const unexpectedMethods = matchingOperations.some(
-        (operation) => operation.method === slice.method
-      )
-        ? []
-        : [slice.method];
+      const expectedStatuses = contract
+        ? Object.keys(contract.responses).map((status) => Number.parseInt(status, 10))
+        : [];
+      const unexpectedStatuses = contract
+        ? slice.statuses.filter((status) => !expectedStatuses.includes(status))
+        : [];
+      const unexpectedMethods = contract ? [] : [slice.method];
       const schemaErrors = slice.responses.flatMap((response) => {
+        if (!contract) {
+          return [];
+        }
         return [slice.method].flatMap((method) => {
           const validation = input.contractIndex
             ? validateOperationResponse(
@@ -180,7 +179,7 @@ export function buildApiContractArtifacts(input: {
       const findingRef = `fid-${shortId()}`;
       const methods = slice.method || "ANY";
       const expectedContract = [
-        `methods=${uniqueSorted(matchingOperations.map((operation) => operation.method)).join("/") || "ANY"}`,
+        `methods=${uniqueSorted(expectedOperations.map((operation) => operation.method)).join("/") || "ANY"}`,
         `statuses=${expectedStatuses.join(", ") || "none"}`,
       ].join("; ");
       const observedContract = [
@@ -213,11 +212,11 @@ export function buildApiContractArtifacts(input: {
         }),
         title: `API contract deviation: ${methods} ${observed.route}`,
         stepsToReproduce: [`Navigate to ${input.route}`],
-        expected: `Contract for ${contract.route}: ${expectedContract}`,
+        expected: `Contract for ${expectedOperations[0]?.route ?? observed.route}: ${expectedContract}`,
         actual: `Observed API behavior for ${observed.route}: ${observedContract}`,
         evidenceIds: [evidenceId],
         verdict: {
-          hypothesis: `The endpoint ${contract.route} should follow the configured contract.`,
+          hypothesis: `The endpoint ${expectedOperations[0]?.route ?? observed.route} should follow the configured contract.`,
           observation: `Observed behavior differed for ${observed.route}.`,
           evidenceChain: uniqueSorted([
             `expected:${expectedContract}`,

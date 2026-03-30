@@ -1,4 +1,4 @@
-const REDACTED_VALUE = "[REDACTED]";
+export const REDACTED_VALUE = "[REDACTED]";
 const TRUNCATED_VALUE = "[Truncated]";
 
 function normalizeSensitiveKey(key: string): string {
@@ -38,6 +38,20 @@ export function sanitizeHeaders(headers: Record<string, string>): Record<string,
   );
 }
 
+export function stripRedactedHeaders(headers?: Record<string, string>): Record<string, string> | undefined {
+  if (!headers) {
+    return undefined;
+  }
+
+  const filtered = Object.fromEntries(
+    Object.entries(headers).filter(
+      ([key, value]) => !isSensitiveKey(key) && value !== REDACTED_VALUE
+    )
+  );
+
+  return Object.keys(filtered).length > 0 ? filtered : undefined;
+}
+
 export function redactSensitiveValue(value: unknown, depth = 0): unknown {
   if (depth > 3) {
     return TRUNCATED_VALUE;
@@ -57,6 +71,37 @@ export function redactSensitiveValue(value: unknown, depth = 0): unknown {
         key,
         isSensitiveKey(key) ? REDACTED_VALUE : redactSensitiveValue(entry, depth + 1),
       ])
+    );
+  }
+
+  return value;
+}
+
+export function stripRedactedValue(value: unknown): unknown {
+  if (value === REDACTED_VALUE) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => stripRedactedValue(entry))
+      .filter((entry) => entry !== undefined);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).flatMap(([key, entry]) => {
+        if (isSensitiveKey(key)) {
+          return [];
+        }
+
+        const next = stripRedactedValue(entry);
+        if (next === undefined) {
+          return [];
+        }
+
+        return [[key, next]];
+      })
     );
   }
 

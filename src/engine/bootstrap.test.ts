@@ -123,7 +123,7 @@ describe("bootstrap supervision", () => {
     ).rejects.toThrow(/did not become ready within 1s/);
   });
 
-  it("times out when the ready indicator never appears", async () => {
+  it("checks DOM readiness on the app target page even when a health endpoint is configured", async () => {
     let nowMs = 0;
     const page = {
       goto: vi.fn().mockResolvedValue(undefined),
@@ -152,7 +152,7 @@ describe("bootstrap supervision", () => {
       )
     ).rejects.toThrow(/did not become ready within 1s/);
 
-    expect(page.goto).toHaveBeenCalledWith("https://example.com/health");
+    expect(page.goto).toHaveBeenCalledWith("https://example.com");
     expect(page.evaluate).toHaveBeenCalled();
   });
 

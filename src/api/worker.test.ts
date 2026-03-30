@@ -428,6 +428,54 @@ describe("executeApiWorkerTask", () => {
     expect(result.findings[0]?.actual).not.toContain("auth-secret");
   });
 
+  it("does not replay redacted sensitive headers back to the server", async () => {
+    const pageFetch = vi.fn().mockResolvedValue(createResponse(200, { items: [] }));
+
+    await executeApiWorkerTask({
+      taskId: "task-api-safe-headers",
+      areaName: "Widgets",
+      pageRoute: "https://example.com/widgets",
+      targetUrl: "https://example.com",
+      observedEndpoints: [
+        {
+          route: "/api/widgets",
+          methods: ["GET"],
+          statuses: [200],
+          failures: [],
+          samples: [
+            {
+              method: "GET",
+              status: 200,
+              url: "/api/widgets",
+              headers: {
+                accept: "application/json",
+                authorization: "[REDACTED]",
+                "x-csrf-token": "[REDACTED]",
+              },
+            },
+          ],
+        } as any,
+      ],
+      authenticatedRequestContext: {
+        fetch: pageFetch,
+      } as any,
+      config: {
+        enabled: true,
+        maxEndpointsPerNode: 4,
+        maxProbeCasesPerEndpoint: 6,
+        unauthenticatedProbes: false,
+        allowMutatingProbes: false,
+      },
+    });
+
+    expect(pageFetch).toHaveBeenCalledWith("https://example.com/api/widgets", {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+      },
+    });
+  });
+
   it("replays observed request shape including query string, headers, and body when sample data exists", async () => {
     const pageFetch = vi.fn().mockResolvedValue(createResponse(201, { id: "widget-1" }));
 
@@ -451,7 +499,7 @@ describe("executeApiWorkerTask", () => {
                 "content-type": "application/json",
                 "x-requested-with": "fetch",
               },
-              data: { name: "Widget" },
+              data: { name: "Widget", csrfToken: "[REDACTED]" },
             },
           ],
         } as any,

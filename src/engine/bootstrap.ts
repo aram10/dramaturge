@@ -143,11 +143,11 @@ async function isReadyUrlReachable(
 
 async function hasReadyIndicator(
   page: StagehandPage,
-  url: string,
+  pageUrl: string,
   selector: string
 ): Promise<boolean> {
   try {
-    await page.goto(url);
+    await page.goto(pageUrl);
     const found = await page.evaluate(
       `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
     );
@@ -170,6 +170,7 @@ export async function waitForBootstrapReady(
   const readyUrl = config.bootstrap.readyUrl
     ? new URL(config.bootstrap.readyUrl, config.targetUrl).href
     : config.targetUrl;
+  const readyIndicatorUrl = config.targetUrl;
   const readyIndicator = config.bootstrap.readyIndicator;
 
   if (!config.bootstrap.readyUrl && !readyIndicator) {
@@ -194,7 +195,8 @@ export async function waitForBootstrapReady(
       !config.bootstrap.readyUrl ||
       (await isReadyUrlReachable(readyUrl, fetchImpl, requestTimeoutMs));
     const indicatorReady =
-      !readyIndicator || (await hasReadyIndicator(page, readyUrl, readyIndicator));
+      !readyIndicator ||
+      (await hasReadyIndicator(page, readyIndicatorUrl, readyIndicator));
 
     if (urlReady && indicatorReady) {
       console.log("Bootstrap target is ready.");
