@@ -157,3 +157,24 @@ export function flushBrowserErrors(
 
   console.log(`  Auto-captured ${findings.length} browser error(s)`);
 }
+
+export function assignPageNodeOwner(
+  ctx: EngineContext,
+  pageKey: string,
+  nodeId: string
+): void {
+  const currentOwner = ctx.pageNodeOwners.get(pageKey);
+  if (currentOwner && currentOwner !== nodeId) {
+    flushBrowserErrors(ctx, currentOwner, pageKey);
+  }
+  ctx.pageNodeOwners.set(pageKey, nodeId);
+}
+
+export function flushOwnedBrowserErrors(
+  ctx: EngineContext,
+  pageKey: string
+): void {
+  const owner = ctx.pageNodeOwners.get(pageKey);
+  if (!owner) return;
+  flushBrowserErrors(ctx, owner, pageKey);
+}

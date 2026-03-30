@@ -22,7 +22,14 @@ import { hasLLMApiKey } from "./llm.js";
 import { MAX_NAV_RETRIES } from "./constants.js";
 import type { EngineContext } from "./engine/context.js";
 import { initWorkerPool, closeWorkerPool, createStagehand } from "./engine/worker-pool.js";
-import { collectResults, expandGraph, routeFollowups, maintainFrontier, flushBrowserErrors } from "./engine/graph-ops.js";
+import {
+  collectResults,
+  expandGraph,
+  routeFollowups,
+  maintainFrontier,
+  assignPageNodeOwner,
+  flushOwnedBrowserErrors,
+} from "./engine/graph-ops.js";
 import { buildAreaResults, writeReports } from "./engine/reports.js";
 import { executeFrontierItem } from "./engine/execute-frontier-item.js";
 import type { WorkerSession } from "./engine/worker-pool.js";
@@ -236,6 +243,7 @@ async function processTaskBatch(
   const promises = batchItems.map(async (item, i): Promise<BatchTaskResult> => {
     const worker = workers[i % workers.length];
     const taskNumber = taskNumberStart + i;
+    assignPageNodeOwner(ctx, worker.key, item.nodeId);
     const result = await executeFrontierItem({
       ctx,
       stagehand: worker.stagehand,
@@ -339,6 +347,7 @@ export async function runEngine(
     evidenceByNode: new Map(),
     actionsByNode: new Map(),
     errorCollector,
+    pageNodeOwners: new Map(),
     completedTaskIds: new Set(),
     workerPool,
     repoHints,
@@ -429,6 +438,7 @@ export async function runEngine(
       console.log(
         `Root state: ${rootPageType} (fingerprint: ${rootFingerprint.hash})`
       );
+      assignPageNodeOwner(ctx, "primary", rootNode.id);
 
       // Seed initial tasks — use LLM planner if available
       let seedTasks: FrontierItem[];
@@ -458,6 +468,7 @@ export async function runEngine(
         ctx.graph.getAllNodes().find((node) => node.depth === 0) ??
         ctx.graph.getAllNodes()[0];
       if (rootNode) {
+        assignPageNodeOwner(ctx, "primary", rootNode.id);
         const seedTasks = useLLMPlanner
           ? await ctx.planner.proposeTasksWithLLM(
               rootNode,
@@ -478,6 +489,13 @@ export async function runEngine(
         ctx.frontier.enqueueMany(seedTasks);
         console.log(`Seeded frontier with ${seedTasks.length} warm-start task(s)\n`);
       }
+    }
+
+    const existingRootNode =
+      ctx.graph.getAllNodes().find((node) => node.depth === 0) ??
+      ctx.graph.getAllNodes()[0];
+    if (existingRootNode) {
+      assignPageNodeOwner(ctx, "primary", existingRootNode.id);
     }
 
     // === Main planner loop ===
@@ -516,7 +534,7 @@ export async function runEngine(
 
       // Collect results and expand graph
       for (const { item, result, pageKey } of batchResults) {
-        flushBrowserErrors(ctx, item.nodeId, pageKey);
+        flushOwnedBrowserErrors(ctx, pageKey);
         if (!result) continue;
 
         collectResults(ctx, item.nodeId, result);
@@ -563,6 +581,10 @@ export async function runEngine(
 
       // Navigate primary browser back to root
       try {
+        const rootNode = ctx.graph.getAllNodes().find((node) => node.depth === 0);
+        if (rootNode) {
+          assignPageNodeOwner(ctx, "primary", rootNode.id);
+        }
         await ctx.page.goto(config.targetUrl);
       } catch {
         console.warn("  Failed to navigate back to root URL.");
@@ -571,12 +593,9 @@ export async function runEngine(
 
     // Flush any remaining browser errors
     if (ctx.graph.nodeCount() > 0) {
-      const rootNode = ctx.graph.getAllNodes().find((n) => n.depth === 0);
-      if (rootNode) {
-        flushBrowserErrors(ctx, rootNode.id, "primary");
-        for (const worker of ctx.workerPool) {
-          flushBrowserErrors(ctx, rootNode.id, worker.key);
-        }
+      flushOwnedBrowserErrors(ctx, "primary");
+      for (const worker of ctx.workerPool) {
+        flushOwnedBrowserErrors(ctx, worker.key);
       }
     }
 

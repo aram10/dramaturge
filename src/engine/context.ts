@@ -38,6 +38,7 @@ export interface EngineContext {
   evidenceByNode: Map<string, Evidence[]>;
   actionsByNode: Map<string, ReplayableAction[]>;
   errorCollector: BrowserErrorCollector;
+  pageNodeOwners: Map<string, string>;
   completedTaskIds: Set<string>;
   workerPool: WorkerSession[];
   repoHints?: RepoHints;
