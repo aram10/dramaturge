@@ -1,5 +1,12 @@
 import type { CoverageSnapshot, WorkerResult } from "../types.js";
 import { buildAuthBoundaryFailureArtifacts, buildContractReplayArtifacts } from "./assertions.js";
+import {
+  buildApiProbeDiagnosticsEvidence,
+  createApiProbeDiagnostics,
+  formatApiProbeSummary,
+  recordApiProbeFailure,
+  recordApiProbeSuccess,
+} from "./diagnostics.js";
 import { selectApiProbeTargets } from "./correlation.js";
 import { buildProbeCases, filterProbeTargets } from "./probes.js";
 import { replayApiRequest } from "./replay.js";
@@ -18,6 +25,7 @@ export async function executeApiWorkerTask(
 ): Promise<WorkerResult> {
   const findings: WorkerResult["findings"] = [];
   const evidence: WorkerResult["evidence"] = [];
+  const diagnostics = createApiProbeDiagnostics();
   const targets = filterProbeTargets(
     selectApiProbeTargets({
       pageRoute: input.pageRoute,
@@ -52,10 +60,17 @@ export async function executeApiWorkerTask(
       const url = new URL(target.route, input.targetUrl).href;
 
       for (const probeCase of cases) {
+        diagnostics.attempted += 1;
         const requestContext = probeCase.isolated
           ? isolatedContext
           : input.authenticatedRequestContext;
         if (!requestContext) {
+          recordApiProbeFailure(
+            diagnostics,
+            probeCase.isolated
+              ? `Missing isolated request context for ${target.method} ${target.route}`
+              : `Missing authenticated request context for ${target.method} ${target.route}`
+          );
           continue;
         }
 
@@ -71,6 +86,7 @@ export async function executeApiWorkerTask(
               data: target.sample?.data,
             }
           );
+          recordApiProbeSuccess(diagnostics);
 
           if (!probeCase.isolated) {
             const contractArtifacts = buildContractReplayArtifacts({
@@ -97,14 +113,26 @@ export async function executeApiWorkerTask(
             findings.push(authArtifacts.finding);
             evidence.push(authArtifacts.evidence);
           }
-        } catch {
-          // Keep the worker conservative on probe failures: record what succeeds and
-          // avoid turning transient transport issues into duplicate findings here.
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          recordApiProbeFailure(
+            diagnostics,
+            `${probeCase.name} ${target.method} ${target.route}: ${message}`
+          );
         }
       }
     }
   } finally {
     await isolatedContext?.dispose?.();
+  }
+
+  const diagnosticsEvidence = buildApiProbeDiagnosticsEvidence(
+    input.areaName,
+    diagnostics
+  );
+  if (diagnosticsEvidence) {
+    evidence.push(diagnosticsEvidence);
   }
 
   return {
@@ -115,6 +143,6 @@ export async function executeApiWorkerTask(
     followupRequests: [],
     discoveredEdges: [],
     outcome: "completed",
-    summary: `Completed api task with ${targets.length} probe target(s)`,
+    summary: formatApiProbeSummary(targets.length, diagnostics),
   };
 }
