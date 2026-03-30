@@ -4,7 +4,10 @@ import type { DramaturgeConfig } from "../config.js";
 import type { AreaResult, RawFinding, RunMemoryMeta } from "../types.js";
 import type { StateGraph } from "../graph/state-graph.js";
 import { collectFindings, buildFindingGroupKey } from "../report/collector.js";
-import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
+import type {
+  ObservedApiEndpoint,
+  ObservedApiRequestSample,
+} from "../network/traffic-observer.js";
 import type {
   FlakyPageInput,
   HistoricalFlakyPageRecord,
@@ -66,6 +69,89 @@ function uniqueNumbers(values: number[]): number[] {
   return Array.from(new Set(values)).sort((left, right) => left - right);
 }
 
+function cloneObservedApiSample(
+  sample: ObservedApiRequestSample
+): ObservedApiRequestSample {
+  return {
+    method: sample.method,
+    status: sample.status,
+    url: sample.url,
+    ...(sample.headers ? { headers: { ...sample.headers } } : {}),
+    ...(sample.data !== undefined ? { data: sample.data } : {}),
+    ...(sample.responseBody !== undefined
+      ? { responseBody: sample.responseBody }
+      : {}),
+    ...(sample.failure ? { failure: sample.failure } : {}),
+  };
+}
+
+function cloneObservedEndpoint(
+  endpoint: ObservedApiEndpoint
+): ObservedApiEndpoint {
+  const samples = endpoint.samples?.map((sample) => cloneObservedApiSample(sample)) ?? [];
+  const responses =
+    endpoint.responses?.map((response) => ({
+      status: response.status,
+      ...(response.body !== undefined ? { body: response.body } : {}),
+    })) ?? [];
+
+  return {
+    route: endpoint.route,
+    methods: [...endpoint.methods],
+    statuses: [...endpoint.statuses],
+    failures: [...endpoint.failures],
+    ...(samples.length > 0 ? { samples } : {}),
+    ...(responses.length > 0 ? { responses } : {}),
+  };
+}
+
+function uniqueObservedSamples(
+  samples: ObservedApiRequestSample[]
+): ObservedApiRequestSample[] {
+  const seen = new Set<string>();
+  const results: ObservedApiRequestSample[] = [];
+
+  for (const sample of samples) {
+    const signature = JSON.stringify([
+      sample.method,
+      sample.status,
+      sample.url,
+      sample.failure,
+      sample.headers ?? null,
+      sample.data ?? null,
+      sample.responseBody ?? null,
+    ]);
+    if (seen.has(signature)) {
+      continue;
+    }
+    seen.add(signature);
+    results.push(cloneObservedApiSample(sample));
+  }
+
+  return results;
+}
+
+function uniqueObservedResponses(
+  responses: NonNullable<ObservedApiEndpoint["responses"]>
+): NonNullable<ObservedApiEndpoint["responses"]> {
+  const seen = new Set<string>();
+  const results: NonNullable<ObservedApiEndpoint["responses"]> = [];
+
+  for (const response of responses) {
+    const signature = JSON.stringify([response.status, response.body ?? null]);
+    if (seen.has(signature)) {
+      continue;
+    }
+    seen.add(signature);
+    results.push({
+      status: response.status,
+      ...(response.body !== undefined ? { body: response.body } : {}),
+    });
+  }
+
+  return results;
+}
+
 function routeTokens(urlOrPath?: string): string[] {
   const route = normalizeRoute(urlOrPath);
   if (!route) {
@@ -125,7 +211,12 @@ export class MemoryStore {
           },
           findingHistory: raw.findingHistory ?? {},
           flakyPages: raw.flakyPages ?? [],
-          observedApiCatalog: raw.observedApiCatalog ?? [],
+          observedApiCatalog: (raw.observedApiCatalog ?? []).map((record) => ({
+            ...cloneObservedEndpoint(record),
+            firstSeenAt: record.firstSeenAt,
+            lastSeenAt: record.lastSeenAt,
+            runCount: record.runCount,
+          })),
         };
       }
     }
@@ -238,6 +329,24 @@ export class MemoryStore {
           ...existing.failures,
           ...endpoint.failures,
         ]);
+        const mergedSamples = uniqueObservedSamples([
+          ...(existing.samples ?? []),
+          ...(endpoint.samples ?? []),
+        ]);
+        if (mergedSamples.length > 0) {
+          existing.samples = mergedSamples;
+        } else {
+          delete existing.samples;
+        }
+        const mergedResponses = uniqueObservedResponses([
+          ...(existing.responses ?? []),
+          ...(endpoint.responses ?? []),
+        ]);
+        if (mergedResponses.length > 0) {
+          existing.responses = mergedResponses;
+        } else {
+          delete existing.responses;
+        }
         existing.lastSeenAt = runAt;
         existing.runCount += 1;
         continue;
@@ -248,6 +357,12 @@ export class MemoryStore {
         methods: uniqueSortedStrings(endpoint.methods),
         statuses: uniqueNumbers(endpoint.statuses),
         failures: uniqueSortedStrings(endpoint.failures),
+        ...(endpoint.samples
+          ? { samples: uniqueObservedSamples(endpoint.samples) }
+          : {}),
+        ...(endpoint.responses
+          ? { responses: uniqueObservedResponses(endpoint.responses) }
+          : {}),
         firstSeenAt: runAt,
         lastSeenAt: runAt,
         runCount: 1,
@@ -396,6 +511,21 @@ export class MemoryStore {
       methods: [...record.methods],
       statuses: [...record.statuses],
       failures: [...record.failures],
+      ...(record.samples
+        ? {
+            samples: record.samples.map((sample) =>
+              cloneObservedApiSample(sample)
+            ),
+          }
+        : {}),
+      ...(record.responses
+        ? {
+            responses: record.responses.map((response) => ({
+              status: response.status,
+              ...(response.body !== undefined ? { body: response.body } : {}),
+            })),
+          }
+        : {}),
     }));
   }
 
