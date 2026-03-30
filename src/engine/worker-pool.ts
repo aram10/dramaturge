@@ -1,5 +1,8 @@
 import { Stagehand } from "@browserbasehq/stagehand";
-import type { DramaturgeConfig } from "../config.js";
+import {
+  resolveBrowserOpsModel,
+  type DramaturgeConfig,
+} from "../config.js";
 import { authenticate } from "../auth/authenticator.js";
 import type { BrowserErrorCollector } from "../browser-errors.js";
 import { applyStorageState, type BrowserStorageState } from "../auth/storage-state.js";
@@ -14,7 +17,7 @@ export interface WorkerSession {
 export function createStagehand(config: DramaturgeConfig): Stagehand {
   return new Stagehand({
     env: "LOCAL",
-    model: config.models.planner,
+    model: resolveBrowserOpsModel(config),
     localBrowserLaunchOptions: { headless: config.browser?.headless ?? false },
     verbose: 0,
   });

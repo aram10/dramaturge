@@ -55,6 +55,22 @@ describe("worker-pool", () => {
     );
   });
 
+  it("uses the browser-ops model for base Stagehand instances when configured", () => {
+    createStagehand({
+      models: {
+        planner: "anthropic/claude-sonnet-4-6",
+        browserOps: "openai/gpt-4.1-mini",
+      },
+      browser: { headless: false },
+    } as any);
+
+    expect(stagehandCtor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "openai/gpt-4.1-mini",
+      })
+    );
+  });
+
   it("reuses shared storage state for worker browsers instead of reauthenticating", async () => {
     const errorCollector = { attach: vi.fn() };
     const trafficObserver = { attach: vi.fn() };
