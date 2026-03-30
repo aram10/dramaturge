@@ -56,7 +56,7 @@ export async function executeFrontierItem(
       targetUrl: ctx.config.targetUrl,
       observedEndpoints: observedApiEndpoints,
       contractIndex: ctx.contractIndex,
-      pageRequestContext: (page as any).request,
+      authenticatedRequestContext: (page as any).request,
       createIsolatedRequestContext: ctx.createIsolatedApiRequestContext,
       config: ctx.config.apiTesting,
     });

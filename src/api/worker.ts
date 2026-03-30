@@ -54,7 +54,7 @@ export async function executeApiWorkerTask(
       for (const probeCase of cases) {
         const requestContext = probeCase.isolated
           ? isolatedContext
-          : input.pageRequestContext;
+          : input.authenticatedRequestContext;
         if (!requestContext) {
           continue;
         }

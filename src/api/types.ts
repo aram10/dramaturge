@@ -48,7 +48,7 @@ export interface ExecuteApiWorkerTaskInput {
   targetUrl: string;
   observedEndpoints: ObservedApiEndpoint[];
   contractIndex?: ContractIndex;
-  pageRequestContext: ApiRequestContextLike;
+  authenticatedRequestContext: ApiRequestContextLike;
   createIsolatedRequestContext?: () => Promise<ApiRequestContextLike>;
   config: ApiTestingConfig;
 }
