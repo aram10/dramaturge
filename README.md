@@ -51,7 +51,7 @@ pnpm exec dramaturge-auth-state \
 - Browser-only target, no repo access: supported
 - Repo-aware generic web app: supported through heuristic route, selector, auth, and API hint extraction
 - Next.js repo-aware app: strongest support today
-- External OpenAPI contract file: supported
+- External OpenAPI contract file (`.json`, `.jsonc`, `.yaml`, `.yml`): supported
 - GraphQL-specific contract handling: not first-class yet
 - Destructive API probes and concurrency probes: opt-in only
 
