@@ -139,12 +139,41 @@ describe("MemoryStore", () => {
         methods: ["GET"],
         statuses: [200],
         failures: [],
+        samples: [
+          {
+            method: "GET",
+            status: 200,
+            url: "/api/settings/members?tab=active",
+            headers: {
+              accept: "application/json",
+            },
+            responseBody: {
+              members: 3,
+            },
+          },
+        ],
       },
       {
         route: "/api/settings/members",
         methods: ["POST"],
         statuses: [400],
         failures: ["validation failed"],
+        samples: [
+          {
+            method: "POST",
+            status: 400,
+            url: "/api/settings/members",
+            headers: {
+              "content-type": "application/json",
+            },
+            data: {
+              role: "owner",
+            },
+            responseBody: {
+              error: "validation failed",
+            },
+          },
+        ],
       },
     ]);
     store.markFindingSuppressed(buildFindingSignature(finding), "Known transient render");
@@ -185,6 +214,33 @@ describe("MemoryStore", () => {
         methods: ["GET", "POST"],
         statuses: [200, 400],
         failures: ["validation failed"],
+        samples: [
+          {
+            method: "GET",
+            status: 200,
+            url: "/api/settings/members?tab=active",
+            headers: {
+              accept: "application/json",
+            },
+            responseBody: {
+              members: 3,
+            },
+          },
+          {
+            method: "POST",
+            status: 400,
+            url: "/api/settings/members",
+            headers: {
+              "content-type": "application/json",
+            },
+            data: {
+              role: "owner",
+            },
+            responseBody: {
+              error: "validation failed",
+            },
+          },
+        ],
       },
     ]);
     expect(plannerSignals).toEqual({
@@ -192,5 +248,61 @@ describe("MemoryStore", () => {
       hasFlakyPageNotes: true,
       hasNavigationHints: true,
     });
+  });
+
+  it("persists API request samples across reloads", () => {
+    const store = new MemoryStore(tempDir);
+    store.recordObservedApiTraffic("2026-03-27T12:00:00.000Z", [
+      {
+        route: "/api/billing/invoices",
+        methods: ["POST"],
+        statuses: [422],
+        failures: ["validation failed"],
+        samples: [
+          {
+            method: "POST",
+            status: 422,
+            url: "/api/billing/invoices?draft=true",
+            headers: {
+              "content-type": "application/json",
+            },
+            data: {
+              amount: 0,
+            },
+            responseBody: {
+              error: "amount must be positive",
+            },
+          },
+        ],
+      },
+    ]);
+
+    const reloaded = new MemoryStore(tempDir);
+    const snapshot = reloaded.getSnapshot();
+
+    expect(snapshot.observedApiCatalog).toEqual([
+      expect.objectContaining({
+        route: "/api/billing/invoices",
+        methods: ["POST"],
+        statuses: [422],
+        failures: ["validation failed"],
+        samples: [
+          {
+            method: "POST",
+            status: 422,
+            url: "/api/billing/invoices?draft=true",
+            headers: {
+              "content-type": "application/json",
+            },
+            data: {
+              amount: 0,
+            },
+            responseBody: {
+              error: "amount must be positive",
+            },
+          },
+        ],
+      }),
+    ]);
   });
 });
