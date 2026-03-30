@@ -331,7 +331,7 @@ describe("executeFrontierItem", () => {
         taskId: "task-api",
         areaName: "Widgets",
         pageRoute: "https://example.com/widgets",
-        pageRequestContext: page.request,
+        authenticatedRequestContext: page.request,
         config: ctx.config.apiTesting,
       })
     );

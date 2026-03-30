@@ -15,7 +15,69 @@ function createResponse(status: number, body: unknown, contentType = "applicatio
 }
 
 describe("executeApiWorkerTask", () => {
+  it("uses the authenticated request context for authenticated contract replays", async () => {
+    const authenticatedFetch = vi
+      .fn()
+      .mockResolvedValue(createResponse(200, { items: [] }));
+
+    await executeApiWorkerTask({
+      taskId: "task-api-authenticated",
+      areaName: "Widgets",
+      pageRoute: "https://example.com/widgets",
+      targetUrl: "https://example.com",
+      observedEndpoints: [
+        {
+          route: "/api/widgets",
+          methods: ["GET"],
+          statuses: [200],
+          failures: [],
+        },
+      ],
+      contractIndex: createContractIndex([
+        buildOpenApiSpec({
+          openapi: "3.1.0",
+          info: { title: "Widgets API", version: "1.0.0" },
+          paths: {
+            "/api/widgets": {
+              get: {
+                responses: {
+                  "200": {
+                    description: "OK",
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+      authenticatedRequestContext: {
+        fetch: authenticatedFetch,
+      },
+      config: {
+        enabled: true,
+        maxEndpointsPerNode: 4,
+        maxProbeCasesPerEndpoint: 6,
+        unauthenticatedProbes: false,
+        allowMutatingProbes: false,
+      },
+    } as any);
+
+    expect(authenticatedFetch).toHaveBeenCalledWith(
+      "https://example.com/api/widgets",
+      {
+        method: "GET",
+      }
+    );
+  });
+
   it("reports an authorization-boundary finding when an auth-required endpoint succeeds without auth", async () => {
+    const authenticatedFetch = vi
+      .fn()
+      .mockResolvedValue(createResponse(200, { items: [] }));
+    const isolatedFetch = vi
+      .fn()
+      .mockResolvedValue(createResponse(200, { items: [] }));
+
     const result = await executeApiWorkerTask({
       taskId: "task-api-1",
       areaName: "Widgets",
@@ -61,11 +123,11 @@ describe("executeApiWorkerTask", () => {
           },
         }),
       ]),
-      pageRequestContext: {
-        fetch: vi.fn().mockResolvedValue(createResponse(200, { items: [] })),
+      authenticatedRequestContext: {
+        fetch: authenticatedFetch,
       } as any,
       createIsolatedRequestContext: vi.fn().mockResolvedValue({
-        fetch: vi.fn().mockResolvedValue(createResponse(200, { items: [] })),
+        fetch: isolatedFetch,
         dispose: vi.fn().mockResolvedValue(undefined),
       }),
       config: {
@@ -80,6 +142,8 @@ describe("executeApiWorkerTask", () => {
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0]?.title).toContain("Authorization boundary failure");
     expect(result.findings[0]?.actual).toContain("Unauthenticated probe returned 200");
+    expect(authenticatedFetch).toHaveBeenCalledTimes(1);
+    expect(isolatedFetch).toHaveBeenCalledTimes(1);
   });
 
   it("skips mutating probes when mutating probes are disabled", async () => {
@@ -128,7 +192,7 @@ describe("executeApiWorkerTask", () => {
           },
         }),
       ]),
-      pageRequestContext: {
+      authenticatedRequestContext: {
         fetch: pageFetch,
       } as any,
       createIsolatedRequestContext: vi.fn(),
@@ -177,7 +241,7 @@ describe("executeApiWorkerTask", () => {
           },
         }),
       ]),
-      pageRequestContext: {
+      authenticatedRequestContext: {
         fetch: pageFetch,
       } as any,
       createIsolatedRequestContext: vi.fn().mockRejectedValue(new Error("no isolated context")),
@@ -225,7 +289,7 @@ describe("executeApiWorkerTask", () => {
           },
         }),
       ]),
-      pageRequestContext: {
+      authenticatedRequestContext: {
         fetch: vi.fn().mockResolvedValue(createResponse(200, { items: [] })),
       } as any,
       createIsolatedRequestContext: vi.fn().mockResolvedValue({
@@ -272,7 +336,7 @@ describe("executeApiWorkerTask", () => {
           ],
         } as any,
       ],
-      pageRequestContext: {
+      authenticatedRequestContext: {
         fetch: pageFetch,
       } as any,
       createIsolatedRequestContext: vi.fn(),
