@@ -57,8 +57,11 @@ describe("NetworkTrafficObserver", () => {
         headers: () => ({
           "content-type": "application/json",
           cookie: "session=secret",
+          authorization: "Bearer secret-token",
+          "x-csrf-token": "csrf-secret",
+          "x-api-key": "api-secret",
         }),
-        postData: () => '{"name":"Widget"}',
+        postData: () => '{"name":"Widget","csrfToken":"hidden"}',
       }),
       headers: () => ({
         "content-type": "application/json",
@@ -97,9 +100,14 @@ describe("NetworkTrafficObserver", () => {
             status: 201,
             url: "/api/widgets",
             headers: {
+              authorization: "[REDACTED]",
+              cookie: "[REDACTED]",
               "content-type": "application/json",
+              "x-api-key": "[REDACTED]",
+              "x-csrf-token": "[REDACTED]",
             },
             data: {
+              csrfToken: "[REDACTED]",
               name: "Widget",
             },
             responseBody: {
@@ -204,6 +212,47 @@ describe("NetworkTrafficObserver", () => {
             method: "GET",
             status: 200,
             url: "/api/widgets",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("redacts custom auth and session-oriented headers in failed request samples", async () => {
+    const observer = new NetworkTrafficObserver();
+    const page = createMockPage();
+
+    observer.attach(page as any, "primary");
+
+    page.emit("requestfailed", {
+      url: () => "https://example.com/api/session",
+      method: () => "GET",
+      resourceType: () => "xhr",
+      headers: () => ({
+        "x-session-token": "session-secret",
+        "x-xsrf-token": "xsrf-secret",
+      }),
+      failure: () => ({ errorText: "net::ERR_ABORTED" }),
+    });
+
+    await flushObserverWork();
+
+    expect(observer.snapshot()).toEqual([
+      {
+        route: "/api/session",
+        methods: ["GET"],
+        statuses: [0],
+        failures: ["net::ERR_ABORTED"],
+        samples: [
+          {
+            method: "GET",
+            status: 0,
+            url: "/api/session",
+            headers: {
+              "x-session-token": "[REDACTED]",
+              "x-xsrf-token": "[REDACTED]",
+            },
+            failure: "net::ERR_ABORTED",
           },
         ],
       },

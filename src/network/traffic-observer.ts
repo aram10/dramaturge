@@ -1,3 +1,5 @@
+import { redactSensitiveValue, sanitizeHeaders, truncateString } from "../redaction.js";
+
 export interface ObservedApiRequestSample {
   method: string;
   status: number;
@@ -63,6 +65,8 @@ export class NetworkTrafficObserver {
       const route = normalizeRoute(request.url?.() ?? "");
       if (!shouldRecordRoute(route, request.resourceType?.())) return;
 
+      const headers = sanitizeHeaders(readHeadersSync(request));
+
       this.record({
         pageKey,
         route,
@@ -73,6 +77,7 @@ export class NetworkTrafficObserver {
           method: request.method().toUpperCase(),
           status: 0,
           url: normalizeRequestUrl(request.url?.() ?? route),
+          ...(Object.keys(headers).length > 0 ? { headers } : {}),
           failure: request.failure?.()?.errorText ?? undefined,
         },
       });
@@ -314,12 +319,6 @@ function normalizeHeaderNames(headers: Record<string, string>): Record<string, s
   );
 }
 
-function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(headers).filter(([key]) => !/^(authorization|cookie)$/i.test(key))
-  );
-}
-
 function parseRequestData(raw: string | null | undefined, contentType?: string): unknown {
   if (!raw) {
     return undefined;
@@ -346,37 +345,6 @@ function parseBody(contentType: string | undefined, text: string): unknown {
   }
 
   return truncateString(text);
-}
-
-function truncateString(value: string, max = 320): string {
-  return value.length > max ? `${value.slice(0, max - 3)}...` : value;
-}
-
-function redactSensitiveValue(value: unknown, depth = 0): unknown {
-  if (depth > 3) {
-    return "[Truncated]";
-  }
-
-  if (typeof value === "string") {
-    return truncateString(value, 160);
-  }
-
-  if (Array.isArray(value)) {
-    return value.slice(0, 8).map((entry) => redactSensitiveValue(entry, depth + 1));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
-        key,
-        /(authorization|cookie|password|secret|token|api[-_]?key|session)/i.test(key)
-          ? "[REDACTED]"
-          : redactSensitiveValue(entry, depth + 1),
-      ])
-    );
-  }
-
-  return value;
 }
 
 function appendSample(

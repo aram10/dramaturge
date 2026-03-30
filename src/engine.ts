@@ -231,6 +231,7 @@ export async function runEngine(
   // Browser error auto-capture
   const errorCollector = new BrowserErrorCollector({
     captureConsole: config.autoCapture.consoleErrors,
+    captureConsoleWarnings: config.autoCapture.consoleWarnings,
     captureNetwork: config.autoCapture.networkErrors,
     networkErrorMinStatus: config.autoCapture.networkErrorMinStatus,
     policy,

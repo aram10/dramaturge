@@ -15,6 +15,7 @@ type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
 export interface BrowserErrorCollectorOptions {
   captureConsole: boolean;
+  captureConsoleWarnings: boolean;
   captureNetwork: boolean;
   networkErrorMinStatus: number;
   policy?: PolicyConfig;
@@ -46,10 +47,13 @@ export class BrowserErrorCollector {
     const bucket = this.getBucket(pageKey);
     const teardowns = this.teardownFns.get(pageKey) ?? [];
 
-    if (this.options.captureConsole) {
+    if (this.options.captureConsole || this.options.captureConsoleWarnings) {
       const onConsole = (msg: { type: () => string; text: () => string }) => {
         const type = msg.type();
-        if (type === "error" || type === "warning") {
+        const shouldCapture =
+          (type === "error" && this.options.captureConsole) ||
+          (type === "warning" && this.options.captureConsoleWarnings);
+        if (shouldCapture) {
           bucket.consoleErrors.push({
             level: type as "error" | "warning",
             text: msg.text(),
@@ -60,7 +64,9 @@ export class BrowserErrorCollector {
       };
       p.on("console", onConsole);
       teardowns.push(() => p.off("console", onConsole));
+    }
 
+    if (this.options.captureConsole) {
       const onPageError = (error: Error) => {
         bucket.pageErrors.push({
           message: error.message,

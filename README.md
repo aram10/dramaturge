@@ -41,7 +41,7 @@ pnpm exec dramaturge-auth-state \
 - supports `interactive`, `stored-state`, `form`, `oauth-redirect`, and `none` auth modes
 - replays observed API traffic against normalized contract expectations and auth boundaries
 - converts explorer observations into judged findings with trace-backed repro metadata
-- captures console and network failures as evidence-backed findings
+- captures console errors, uncaught exceptions, and network failures as evidence-backed findings, with browser warnings available as an opt-in
 - stores cross-run memory under `.dramaturge/` for warm starts and finding history
 - supports deterministic visual regression baselines with `pixelmatch`
 - emits Markdown and JSON reports with structured repro details and generated Playwright specs with inferred assertions
@@ -62,6 +62,8 @@ The bundled [`dramaturge.config.example.json`](./dramaturge.config.example.json)
 For repo-aware runs, use `repoContext.framework: "nextjs"` when you know the target repo is Next.js. Leave it on `"auto"` if you want Dramaturge to fall back to the generic adapter when no Next.js structure is present.
 
 If you want navigation, auth, and other base Stagehand operations to use a different model than the planner, set `models.browserOps`. When omitted, Dramaturge falls back to `models.planner`.
+
+`autoCapture.consoleWarnings` is intentionally off by default. Enable it when you want broader browser telemetry, but the default report posture stays focused on console errors, uncaught exceptions, and network failures.
 
 ## Verify The Package
 

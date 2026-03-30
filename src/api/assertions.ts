@@ -1,5 +1,6 @@
 import { shortId } from "../constants.js";
 import { buildConfirmedFindingMeta } from "../repro/repro.js";
+import { redactSensitiveValue, truncateString } from "../redaction.js";
 import {
   validateOperationResponse,
   type ContractIndex,
@@ -12,40 +13,13 @@ interface ApiAssertionArtifact {
   evidence: Evidence;
 }
 
-function redactValue(value: unknown, depth = 0): unknown {
-  if (depth > 3) {
-    return "[Truncated]";
-  }
-
-  if (typeof value === "string") {
-    return value.length > 160 ? `${value.slice(0, 157)}...` : value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.slice(0, 8).map((entry) => redactValue(entry, depth + 1));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
-        key,
-        /(authorization|cookie|password|secret|token|api[-_]?key|session)/i.test(key)
-          ? "[REDACTED]"
-          : redactValue(entry, depth + 1),
-      ])
-    );
-  }
-
-  return value;
-}
-
 function describeBody(body: unknown): string {
   if (body === undefined) {
     return "no body";
   }
 
   try {
-    const serialized = JSON.stringify(redactValue(body));
+    const serialized = JSON.stringify(redactSensitiveValue(body));
     return serialized.length > 320 ? `${serialized.slice(0, 317)}...` : serialized;
   } catch {
     return "[Unserializable body]";

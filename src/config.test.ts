@@ -168,6 +168,12 @@ describe("loadConfig", () => {
       includeAuthzProbes: false,
       includeConcurrencyProbes: false,
     });
+    expect(config.autoCapture).toMatchObject({
+      consoleErrors: true,
+      consoleWarnings: false,
+      networkErrors: true,
+      networkErrorMinStatus: 400,
+    });
     expect(config.judge).toMatchObject({
       enabled: true,
       requestTimeoutMs: 15000,

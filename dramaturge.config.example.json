@@ -138,5 +138,14 @@
 
   "llm": {
     "requestTimeoutMs": 30000
-  }
+  },
+
+  // Optional browser auto-capture. Console warnings stay off by default so
+  // report noise stays focused on stronger signals.
+  // "autoCapture": {
+  //   "consoleErrors": true,
+  //   "consoleWarnings": false,
+  //   "networkErrors": true,
+  //   "networkErrorMinStatus": 400
+  // }
 }
