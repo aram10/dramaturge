@@ -61,6 +61,8 @@ The bundled [`dramaturge.config.example.json`](./dramaturge.config.example.json)
 
 For repo-aware runs, use `repoContext.framework: "nextjs"` when you know the target repo is Next.js. Leave it on `"auto"` if you want Dramaturge to fall back to the generic adapter when no Next.js structure is present.
 
+If you want navigation, auth, and other base Stagehand operations to use a different model than the planner, set `models.browserOps`. When omitted, Dramaturge falls back to `models.planner`.
+
 ## Verify The Package
 
 From the package root:

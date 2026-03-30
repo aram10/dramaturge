@@ -42,6 +42,10 @@
   "models": {
     "planner": "anthropic/claude-sonnet-4-6",
     "worker": "anthropic/claude-haiku-4-5",
+    // Optional: use a separate model for Stagehand browser operations like
+    // auth, navigation restoration, and other base act()-driven flows.
+    // Defaults to the planner model when omitted.
+    // "browserOps": "anthropic/claude-haiku-4-5",
     "agentMode": "cua",
     "agentModes": {
       "navigation": "dom",

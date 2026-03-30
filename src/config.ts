@@ -93,6 +93,7 @@ const ModelsSchema = z
   .object({
     planner: z.string().default("anthropic/claude-sonnet-4-6"),
     worker: z.string().default("anthropic/claude-haiku-4-5"),
+    browserOps: z.string().optional(),
     workers: WorkerModelsSchema,
     agentMode: AgentModeSchema,
     agentModes: AgentModesSchema,
@@ -415,6 +416,10 @@ export function resolveWorkerModel(
     if (specific) return specific;
   }
   return config.models.worker;
+}
+
+export function resolveBrowserOpsModel(config: DramaturgeConfig): string {
+  return config.models.browserOps ?? config.models.planner;
 }
 
 export function resolveAgentMode(
