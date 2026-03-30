@@ -54,4 +54,34 @@ describe("loadOpenApiSpec", () => {
       source: "openapi",
     });
   });
+
+  it("loads an OpenAPI YAML document from disk and normalizes it", () => {
+    const dir = createTempDir();
+    const filePath = join(dir, "dramaturge.openapi.yaml");
+    writeFileSync(
+      filePath,
+      [
+        "openapi: 3.1.0",
+        "info:",
+        "  title: Test API",
+        "  version: 1.0.0",
+        "paths:",
+        "  /api/widgets:",
+        "    post:",
+        "      responses:",
+        "        '201':",
+        "          description: Created",
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const spec = loadOpenApiSpec(filePath);
+
+    expect(spec.routes).toContain("/api/widgets");
+    expect(spec.operations["POST /api/widgets"]).toMatchObject({
+      method: "POST",
+      route: "/api/widgets",
+      source: "openapi",
+    });
+  });
 });
