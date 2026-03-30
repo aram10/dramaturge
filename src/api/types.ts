@@ -1,5 +1,8 @@
 import type { DramaturgeConfig } from "../config.js";
-import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
+import type {
+  ObservedApiEndpoint,
+  ObservedApiRequestSample,
+} from "../network/traffic-observer.js";
 import type { ContractIndex } from "../spec/contract-index.js";
 import type { NormalizedOperationSpec } from "../spec/types.js";
 
@@ -35,6 +38,7 @@ export interface ApiProbeTarget {
   operation?: NormalizedOperationSpec;
   observedStatuses: number[];
   source: "observed" | "contract";
+  sample?: ObservedApiRequestSample;
 }
 
 export interface ExecuteApiWorkerTaskInput {

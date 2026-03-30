@@ -66,7 +66,7 @@ export function buildAuthBoundaryFailureArtifacts(input: {
   target: ApiProbeTarget;
   response: ApiReplayResponse;
 }): ApiAssertionArtifact | undefined {
-  if (input.response.status >= 400) {
+  if (input.response.status < 200 || input.response.status >= 300) {
     return undefined;
   }
 

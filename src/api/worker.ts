@@ -52,12 +52,23 @@ export async function executeApiWorkerTask(
       const url = new URL(target.route, input.targetUrl).href;
 
       for (const probeCase of cases) {
+        const requestContext = probeCase.isolated
+          ? isolatedContext
+          : input.pageRequestContext;
+        if (!requestContext) {
+          continue;
+        }
+
         try {
           const response = await replayApiRequest(
-            probeCase.isolated ? isolatedContext ?? input.pageRequestContext : input.pageRequestContext,
+            requestContext,
             {
-              url,
+              url: target.sample?.url
+                ? new URL(target.sample.url, input.targetUrl).href
+                : url,
               method: target.method,
+              headers: target.sample?.headers,
+              data: target.sample?.data,
             }
           );
 

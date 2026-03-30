@@ -21,8 +21,12 @@ function createMockPage() {
   };
 }
 
+async function flushObserverWork() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe("NetworkTrafficObserver", () => {
-  it("records observed API responses and failed requests", () => {
+  it("records observed API responses and failed requests", async () => {
     const observer = new NetworkTrafficObserver();
     const page = createMockPage();
 
@@ -34,7 +38,15 @@ describe("NetworkTrafficObserver", () => {
       request: () => ({
         method: () => "GET",
         resourceType: () => "fetch",
+        headers: () => ({
+          accept: "application/json",
+        }),
+        postData: () => null,
       }),
+      headers: () => ({
+        "content-type": "application/json",
+      }),
+      text: async () => '{"items":[]}',
     });
     page.emit("response", {
       status: () => 201,
@@ -42,7 +54,16 @@ describe("NetworkTrafficObserver", () => {
       request: () => ({
         method: () => "POST",
         resourceType: () => "xhr",
+        headers: () => ({
+          "content-type": "application/json",
+          cookie: "session=secret",
+        }),
+        postData: () => '{"name":"Widget"}',
       }),
+      headers: () => ({
+        "content-type": "application/json",
+      }),
+      text: async () => '{"id":"widget-1"}',
     });
     page.emit("requestfailed", {
       url: () => "https://example.com/api/widgets",
@@ -51,12 +72,47 @@ describe("NetworkTrafficObserver", () => {
       failure: () => ({ errorText: "net::ERR_CONNECTION_RESET" }),
     });
 
+    await flushObserverWork();
+
     expect(observer.snapshot()).toEqual([
       {
         route: "/api/widgets",
         methods: ["GET", "POST"],
         statuses: [0, 200, 201],
         failures: ["net::ERR_CONNECTION_RESET"],
+        samples: [
+          {
+            method: "GET",
+            status: 200,
+            url: "/api/widgets?view=full",
+            headers: {
+              accept: "application/json",
+            },
+            responseBody: {
+              items: [],
+            },
+          },
+          {
+            method: "POST",
+            status: 201,
+            url: "/api/widgets",
+            headers: {
+              "content-type": "application/json",
+            },
+            data: {
+              name: "Widget",
+            },
+            responseBody: {
+              id: "widget-1",
+            },
+          },
+          {
+            method: "POST",
+            status: 0,
+            url: "/api/widgets",
+            failure: "net::ERR_CONNECTION_RESET",
+          },
+        ],
       },
     ]);
   });
@@ -101,7 +157,7 @@ describe("NetworkTrafficObserver", () => {
     expect(page._handlers.get("requestfailed")).toHaveLength(initialFailedListeners);
   });
 
-  it("resets page-scoped traffic without losing the global catalog", () => {
+  it("resets page-scoped traffic without losing the global catalog", async () => {
     const observer = new NetworkTrafficObserver();
     const page = createMockPage();
 
@@ -116,12 +172,21 @@ describe("NetworkTrafficObserver", () => {
       }),
     });
 
+    await flushObserverWork();
+
     expect(observer.snapshot("primary")).toEqual([
       {
         route: "/api/widgets",
         methods: ["GET"],
         statuses: [200],
         failures: [],
+        samples: [
+          {
+            method: "GET",
+            status: 200,
+            url: "/api/widgets",
+          },
+        ],
       },
     ]);
 
@@ -134,6 +199,13 @@ describe("NetworkTrafficObserver", () => {
         methods: ["GET"],
         statuses: [200],
         failures: [],
+        samples: [
+          {
+            method: "GET",
+            status: 200,
+            url: "/api/widgets",
+          },
+        ],
       },
     ]);
   });

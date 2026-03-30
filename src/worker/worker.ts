@@ -23,6 +23,7 @@ import type { WorkerHistoryContext } from "../memory/types.js";
 import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
 import type { Observation } from "../judge/types.js";
 import { judgeWorkerObservations } from "../judge/judge.js";
+import { hasLLMApiKey, judgeObservationWithLLM } from "../llm.js";
 
 interface WorkerSetup {
   observations: Observation[];
@@ -128,12 +129,24 @@ async function materializeObservedFindings(input: {
   evidence: Evidence[];
   actionRecorder: ActionRecorder;
   judgeConfig?: JudgeConfig;
+  judgeModel?: string;
 }) {
   return judgeWorkerObservations({
     observations: input.observations,
     evidence: input.evidence,
     actions: input.actionRecorder.getActions(),
     config: input.judgeConfig,
+    judgeText:
+      input.judgeConfig?.enabled !== false &&
+      input.judgeModel &&
+      hasLLMApiKey(input.judgeModel)
+        ? (prompt, timeoutMs) =>
+            judgeObservationWithLLM(
+              input.judgeModel as string,
+              prompt,
+              timeoutMs
+            )
+        : undefined,
   });
 }
 
@@ -216,6 +229,7 @@ export async function exploreArea(
         evidence,
         actionRecorder,
         judgeConfig,
+        judgeModel: model,
       }),
       replayableActions: actionRecorder.getActions(),
       screenshots,
@@ -238,6 +252,7 @@ export async function exploreArea(
         evidence,
         actionRecorder,
         judgeConfig,
+        judgeModel: model,
       }),
       replayableActions: actionRecorder.getActions(),
       screenshots,
@@ -316,6 +331,7 @@ export async function executeWorkerTask(
         evidence,
         actionRecorder,
         judgeConfig,
+        judgeModel: model,
       }),
       evidence,
       replayableActions: actionRecorder.getActions(),
@@ -333,6 +349,7 @@ export async function executeWorkerTask(
         evidence,
         actionRecorder,
         judgeConfig,
+        judgeModel: model,
       }),
       evidence,
       replayableActions: actionRecorder.getActions(),

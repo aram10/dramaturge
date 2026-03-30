@@ -71,12 +71,26 @@ export function selectApiProbeTargets(
 
   for (const endpoint of input.observedEndpoints) {
     for (const method of endpoint.methods) {
+      const sample = endpoint.samples?.find(
+        (candidate) => candidate.method.toUpperCase() === method.toUpperCase()
+      );
+      const observedStatuses =
+        endpoint.samples && endpoint.samples.length > 0
+          ? [
+              ...new Set(
+                endpoint.samples
+                  .filter((candidate) => candidate.method.toUpperCase() === method.toUpperCase())
+                  .map((candidate) => candidate.status)
+              ),
+            ].sort((left, right) => left - right)
+          : endpoint.statuses;
       upsert({
         route: endpoint.route,
         method,
         authRequired: false,
-        observedStatuses: endpoint.statuses,
+        observedStatuses,
         source: "observed",
+        sample,
         score: computeRouteScore(pageTokens, endpoint.route, 1),
       });
     }
