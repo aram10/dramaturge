@@ -155,4 +155,48 @@ describe("buildApiContractArtifacts", () => {
     expect(artifacts.findings).toEqual([]);
     expect(artifacts.evidence).toEqual([]);
   });
+
+  it("flags unexpected methods when a route is observed outside the normalized contract", () => {
+    const artifacts = buildApiContractArtifacts({
+      areaName: "Widgets",
+      route: "https://example.com/widgets",
+      observedEndpoints: [
+        {
+          route: "/api/widgets",
+          methods: ["DELETE"],
+          statuses: [204],
+          failures: [],
+          samples: [
+            {
+              method: "DELETE",
+              status: 204,
+              url: "/api/widgets",
+            },
+          ],
+        } as any,
+      ],
+      contractIndex: createContractIndex([
+        buildOpenApiSpec({
+          openapi: "3.1.0",
+          info: { title: "Widgets API", version: "1.0.0" },
+          paths: {
+            "/api/widgets": {
+              get: {
+                responses: {
+                  "200": {
+                    description: "OK",
+                  },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    });
+
+    expect(artifacts.findings).toHaveLength(1);
+    expect(artifacts.findings[0]?.title).toContain("DELETE /api/widgets");
+    expect(artifacts.findings[0]?.actual).toContain("methods=DELETE");
+    expect(artifacts.findings[0]?.expected).toContain("methods=GET");
+  });
 });

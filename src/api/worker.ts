@@ -1,4 +1,5 @@
 import type { CoverageSnapshot, WorkerResult } from "../types.js";
+import { stripRedactedHeaders, stripRedactedValue } from "../redaction.js";
 import { buildAuthBoundaryFailureArtifacts, buildContractReplayArtifacts } from "./assertions.js";
 import {
   buildApiProbeDiagnosticsEvidence,
@@ -82,8 +83,8 @@ export async function executeApiWorkerTask(
                 ? new URL(target.sample.url, input.targetUrl).href
                 : url,
               method: target.method,
-              headers: target.sample?.headers,
-              data: target.sample?.data,
+              headers: stripRedactedHeaders(target.sample?.headers),
+              data: stripRedactedValue(target.sample?.data),
             }
           );
           recordApiProbeSuccess(diagnostics);
