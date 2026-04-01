@@ -2,9 +2,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { parseJsoncObject } from "../utils/jsonc.js";
-import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
+import { canScanDjangoRepo, scanDjangoRepo } from "./django.js";
+import { canScanExpressRepo, scanExpressRepo } from "./express.js";
 import { scanGenericRepo } from "./generic.js";
+import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
+import { canScanReactRouterRepo, scanReactRouterRepo } from "./react-router.js";
+import { canScanTanStackRouterRepo, scanTanStackRouterRepo } from "./tanstack-router.js";
+import { canScanVueRouterRepo, scanVueRouterRepo } from "./vue-router.js";
 import type {
+  RepoFramework,
   RepoHints,
   RepoHintsOverride,
   RepoScanOptions,
@@ -127,21 +133,50 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
   return RepoHintsOverrideSchema.parse(parseJsoncObject(raw));
 }
 
+function detectFramework(root: string): RepoFramework {
+  if (canScanNextJsRepo(root)) return "nextjs";
+  if (canScanTanStackRouterRepo(root)) return "tanstack-router";
+  if (canScanReactRouterRepo(root)) return "react-router";
+  if (canScanVueRouterRepo(root)) return "vue-router";
+  if (canScanExpressRepo(root)) return "express";
+  if (canScanDjangoRepo(root)) return "django";
+  return "generic";
+}
+
 export function scanRepository(options: RepoScanOptions): RepoHints {
   const root = options.root;
   const framework =
     options.framework === "auto"
-      ? canScanNextJsRepo(root)
-        ? "nextjs"
-        : "generic"
+      ? detectFramework(root)
       : options.framework;
 
-  const scanned =
-    framework === "nextjs"
-      ? scanNextJsRepo(root)
-      : framework === "generic"
-        ? scanGenericRepo(root)
-        : emptyRepoHints();
+  let scanned: RepoHints;
+  switch (framework) {
+    case "nextjs":
+      scanned = scanNextJsRepo(root);
+      break;
+    case "react-router":
+      scanned = scanReactRouterRepo(root);
+      break;
+    case "express":
+      scanned = scanExpressRepo(root);
+      break;
+    case "vue-router":
+      scanned = scanVueRouterRepo(root);
+      break;
+    case "django":
+      scanned = scanDjangoRepo(root);
+      break;
+    case "tanstack-router":
+      scanned = scanTanStackRouterRepo(root);
+      break;
+    case "generic":
+      scanned = scanGenericRepo(root);
+      break;
+    default:
+      scanned = emptyRepoHints();
+      break;
+  }
 
   return mergeRepoHints(scanned, loadHintsOverride(root, options.hintsFile));
 }
