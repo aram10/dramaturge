@@ -77,8 +77,8 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         'import { test, expect } from "@playwright/test";',
         "",
         `test(${escapeString(`${finding.id}: ${finding.title}`)}, async ({ page }) => {`,
-        `  // Expected: ${finding.expected}`,
-        `  // Actual: ${finding.actual}`,
+        `  // Expected: ${finding.expected.replace(/[\r\n]+/g, " ")}`,
+        `  // Actual: ${finding.actual.replace(/[\r\n]+/g, " ")}`,
         `  await page.goto(${escapeString(route)});`,
       ];
 
@@ -89,7 +89,7 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
       } else if (breadcrumbs.length > 0) {
         lines.push("  // Breadcrumbs:");
         for (const breadcrumb of breadcrumbs) {
-          lines.push(`  // - ${breadcrumb}`);
+          lines.push(`  // - ${breadcrumb.replace(/[\r\n]+/g, " ")}`);
         }
       }
 

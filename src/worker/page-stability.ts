@@ -2,12 +2,12 @@ import type { Stagehand } from "@browserbasehq/stagehand";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
-/** Builds a browser-eval script that resolves once DOM mutations quiet for 300ms (or 5s timeout). */
-export function buildStabilityChecker(): string {
+/** Builds a browser-eval script that resolves once DOM mutations quiet for 300ms (or timeout). */
+export function buildStabilityChecker(timeoutMs = 5000): string {
   return `
     () => new Promise((resolve) => {
       const QUIET_MS = 300;
-      const TIMEOUT_MS = 5000;
+      const TIMEOUT_MS = ${timeoutMs};
       let timer;
       let settled = false;
 
@@ -46,7 +46,7 @@ export async function waitForPageStable(
 ): Promise<"stable" | "timeout"> {
   try {
     const result = await Promise.race([
-      page.evaluate(buildStabilityChecker()) as Promise<string>,
+      page.evaluate(buildStabilityChecker(timeoutMs)) as Promise<string>,
       new Promise<string>((resolve) =>
         setTimeout(() => resolve("timeout"), timeoutMs + 1000),
       ),

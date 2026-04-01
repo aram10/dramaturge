@@ -53,7 +53,7 @@ function materializeFinding(
     verdict: {
       hypothesis: ensureShouldHypothesis(decision.hypothesis),
       observation: decision.observation,
-      evidenceChain: [...new Set([...observation.evidenceIds, ...traceBundle.actionIds])],
+      evidenceChain: [...new Set([...observation.evidenceIds, ...traceBundle.evidenceIds])],
       alternativesConsidered: decision.alternativesConsidered,
       suggestedVerification: decision.suggestedVerification,
     },

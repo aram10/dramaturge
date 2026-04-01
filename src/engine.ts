@@ -434,7 +434,8 @@ export async function runEngine(
       for (let i = 0; i < concurrency && ctx.frontier.hasItems(); i++) {
         const item = ctx.frontier.dequeueHighest();
         if (!item) break;
-        // Skip already-completed tasks (from resume)
+        // Skip already-completed tasks (from resume).
+        // Setting status to "completed" removes them from hasItems() naturally.
         if (ctx.completedTaskIds.has(item.id)) {
           item.status = "completed";
           i--; // don't count this toward batch size
