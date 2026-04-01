@@ -20,7 +20,7 @@ export async function authenticateStoredState(
   try {
     state = JSON.parse(raw) as BrowserStorageState;
   } catch {
-    throw new Error(`Invalid JSON in storage state file: ${stateFile}`);
+    throw new Error(`Failed to parse storage state JSON: ${stateFile}`);
   }
   await applyStorageState(stagehand, targetUrl, state);
 

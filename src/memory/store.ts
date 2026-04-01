@@ -203,7 +203,7 @@ export class MemoryStore {
         try {
           raw = JSON.parse(readFileSync(path, "utf-8")) as MemorySnapshot;
         } catch {
-          throw new Error(`Invalid JSON in memory store file: ${path}`);
+          throw new Error(`Failed to parse memory store JSON: ${path}`);
         }
         if (raw.version !== CURRENT_MEMORY_VERSION) {
           throw new Error(`Unsupported memory snapshot version: ${raw.version}`);

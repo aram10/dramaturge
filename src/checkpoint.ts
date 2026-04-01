@@ -63,7 +63,7 @@ export function loadCheckpoint(runDir: string): Checkpoint | null {
   try {
     data = JSON.parse(raw) as Checkpoint;
   } catch {
-    throw new Error(`Invalid JSON in checkpoint file: ${path}`);
+    throw new Error(`Failed to parse checkpoint JSON: ${path}`);
   }
   if (data.version !== 1) {
     throw new Error(`Unsupported checkpoint version: ${data.version}`);
