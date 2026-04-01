@@ -14,7 +14,7 @@ export interface SafetyGuardConfig {
   allowedUrlPatterns: string[];
   /** URL patterns the agent must never visit or interact with. */
   blockedUrlPatterns: string[];
-  /** Block destructive HTTP methods (DELETE, PUT to dangerous endpoints). */
+  /** Block destructive HTTP methods (currently DELETE requests). */
   blockDestructiveRequests: boolean;
   /** Patterns in button/link text that indicate destructive actions. */
   destructiveActionKeywords: string[];
@@ -161,8 +161,11 @@ function normalizePathname(url: string): string {
 }
 
 function matchesPattern(pathname: string, pattern: string): boolean {
-  // Support simple glob: * matches any segment, ** matches any number of segments
-  const regexStr = pattern
+  // Support simple glob: * matches any segment, ** matches any number of segments.
+  // Treat the pattern as a glob, not a raw regular expression: escape regex metacharacters
+  // other than the glob wildcards before expanding * / **.
+  const escapedPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  const regexStr = escapedPattern
     .replace(/\*\*/g, "___DOUBLESTAR___")
     .replace(/\*/g, "[^/]*")
     .replace(/___DOUBLESTAR___/g, ".*");
