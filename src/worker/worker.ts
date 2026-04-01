@@ -243,17 +243,26 @@ export async function exploreArea(
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Worker failed for area "${area.name}": ${message}`);
 
-    return {
-      name: area.name,
-      url: area.url,
-      steps: 0,
-      findings: await materializeObservedFindings({
+    let findings: Awaited<ReturnType<typeof materializeObservedFindings>> = [];
+    try {
+      findings = await materializeObservedFindings({
         observations,
         evidence,
         actionRecorder,
         judgeConfig,
         judgeModel: model,
-      }),
+      });
+    } catch (judgeError) {
+      console.warn(
+        `Could not materialize findings for "${area.name}": ${judgeError instanceof Error ? judgeError.message : String(judgeError)}`
+      );
+    }
+
+    return {
+      name: area.name,
+      url: area.url,
+      steps: 0,
+      findings,
       replayableActions: actionRecorder.getActions(),
       screenshots,
       evidence,
@@ -342,15 +351,24 @@ export async function executeWorkerTask(
       summary: `Completed ${task.workerType} task: ${task.objective}`,
     };
   } catch (error) {
-    return {
-      taskId: task.id,
-      findings: await materializeObservedFindings({
+    let findings: Awaited<ReturnType<typeof materializeObservedFindings>> = [];
+    try {
+      findings = await materializeObservedFindings({
         observations,
         evidence,
         actionRecorder,
         judgeConfig,
         judgeModel: model,
-      }),
+      });
+    } catch (judgeError) {
+      console.warn(
+        `Could not materialize findings for task "${task.id}": ${judgeError instanceof Error ? judgeError.message : String(judgeError)}`
+      );
+    }
+
+    return {
+      taskId: task.id,
+      findings,
       evidence,
       replayableActions: actionRecorder.getActions(),
       coverageSnapshot: coverageTracker.snapshot(),

@@ -380,6 +380,7 @@ export class MemoryStore {
   rememberAuthHint(loginUrl: string): void {
     const snapshot = this.getSnapshot();
     const loginRoute = normalizeRoute(loginUrl);
+    if (!loginRoute) return;
     snapshot.authHints.successfulLoginRoutes = uniqueStrings([
       ...snapshot.authHints.successfulLoginRoutes,
       loginRoute,

@@ -1,6 +1,10 @@
 import type { RunResult } from "../types.js";
 import { collectFindings } from "./collector.js";
 
+function escapeTableCell(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
+}
+
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -154,7 +158,7 @@ export function renderMarkdown(result: RunResult): string {
       ? `${area.coverage.controlsExercised}/${area.coverage.controlsDiscovered}`
       : "—";
     lines.push(
-      `| ${area.name} | ${area.pageType} | ${area.steps} | ${area.findings.length} | ${coverageStr} | ${area.status} |`
+      `| ${escapeTableCell(area.name)} | ${escapeTableCell(area.pageType)} | ${area.steps} | ${area.findings.length} | ${coverageStr} | ${escapeTableCell(area.status)} |`
     );
   }
   lines.push("");
@@ -185,7 +189,7 @@ export function renderMarkdown(result: RunResult): string {
         new Set(ev.relatedFindingIds.map((ref) => findingIdByRef.get(ref) ?? ref))
       );
       lines.push(
-        `| ${ev.id} | ${ev.type} | ${ev.areaName ?? "—"} | ${ev.summary} | ${ev.path ?? "—"} | ${relatedFindings.join(", ") || "—"} |`
+        `| ${escapeTableCell(ev.id)} | ${escapeTableCell(ev.type)} | ${escapeTableCell(ev.areaName ?? "—")} | ${escapeTableCell(ev.summary)} | ${escapeTableCell(ev.path ?? "—")} | ${escapeTableCell(relatedFindings.join(", ") || "—")} |`
       );
     }
     lines.push("");
@@ -203,7 +207,7 @@ export function renderMarkdown(result: RunResult): string {
     lines.push("|----|------|------|--------|---------|--------|");
     for (const action of allActions) {
       lines.push(
-        `| ${action.id} | ${action.areaName} | ${action.kind} | ${action.source} | ${action.summary} | ${action.status} |`
+        `| ${escapeTableCell(action.id)} | ${escapeTableCell(action.areaName)} | ${escapeTableCell(action.kind)} | ${escapeTableCell(action.source)} | ${escapeTableCell(action.summary)} | ${escapeTableCell(action.status)} |`
       );
     }
     lines.push("");
@@ -228,7 +232,7 @@ export function renderMarkdown(result: RunResult): string {
     lines.push("| Severity | Reason | Summary |");
     lines.push("|----------|--------|---------|");
     for (const spot of result.blindSpots) {
-      lines.push(`| ${spot.severity} | ${spot.reason} | ${spot.summary} |`);
+      lines.push(`| ${escapeTableCell(spot.severity)} | ${escapeTableCell(spot.reason)} | ${escapeTableCell(spot.summary)} |`);
     }
     lines.push("");
   }
