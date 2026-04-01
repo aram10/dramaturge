@@ -110,13 +110,14 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         `test(${escapeString(`${finding.id}: ${finding.title}`)}, async ({ page }) => {`,
         `  // Expected: ${finding.expected.replace(/[\r\n]+/g, " ")}`,
         `  // Actual: ${finding.actual.replace(/[\r\n]+/g, " ")}`,
-        `  await page.goto(${escapeString(route)});`,
       ];
 
-      // Preamble code (event listeners) must appear before actions.
+      // Preamble code (event listeners) must appear before navigation to capture all events.
       for (const preamble of preambles) {
         lines.push(`  ${preamble}`);
       }
+
+      lines.push(`  await page.goto(${escapeString(route)});`);
 
       if (renderedActions.length > 0) {
         for (const action of renderedActions) {

@@ -240,11 +240,12 @@ describe("generatePlaywrightTests", () => {
     expect(generated).toHaveLength(1);
     const content = generated[0]!.content;
     // Preamble (console listener) appears before actions
+    // Preamble (console listener) appears before navigation
     const consoleListenerPos = content.indexOf('page.on("console"');
     const navActionPos = content.indexOf("await page.goto");
     const assertionPos = content.indexOf('expect(consoleErrors, "No console errors expected")');
-    expect(consoleListenerPos).toBeGreaterThan(navActionPos);
-    expect(assertionPos).toBeGreaterThan(consoleListenerPos);
+    expect(consoleListenerPos).toBeLessThan(navActionPos);
+    expect(assertionPos).toBeGreaterThan(navActionPos);
     expect(content).toContain("const consoleErrors: string[] = [];");
     expect(content).toContain('expect(consoleErrors, "No console errors expected").toHaveLength(0);');
   });
