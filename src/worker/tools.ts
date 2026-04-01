@@ -144,14 +144,25 @@ export function createWorkerTools(
         if (!screenshotsEnabled) {
           return { captured: false, ref: input.ref, message: "Screenshots disabled in config" };
         }
-        const buffer = await page.screenshot({
-          fullPage: false,
-          type: "png",
-        });
+        let buffer: Buffer;
+        try {
+          buffer = await page.screenshot({
+            fullPage: false,
+            type: "png",
+          });
+        } catch (screenshotError) {
+          const msg = screenshotError instanceof Error ? screenshotError.message : String(screenshotError);
+          return { captured: false, ref: input.ref, message: `Screenshot failed: ${msg}` };
+        }
         const screenshotId = `ss-${shortId()}`;
         screenshots.set(screenshotId, buffer);
         const filename = `${screenshotId}.png`;
-        writeFileSync(join(screenshotDir, filename), buffer);
+        try {
+          writeFileSync(join(screenshotDir, filename), buffer);
+        } catch (writeError) {
+          const msg = writeError instanceof Error ? writeError.message : String(writeError);
+          console.warn(`Failed to write screenshot file ${filename}: ${msg}`);
+        }
 
         const evidenceId = `ev-${shortId()}`;
         const ev: Evidence = {
