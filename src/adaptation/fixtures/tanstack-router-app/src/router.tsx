@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRoute } from "@tanstack/react-router";
+import { createRouter, createRoute, createRootRoute, createFileRoute } from "@tanstack/react-router";
 
 const rootRoute = createRootRoute();
 
