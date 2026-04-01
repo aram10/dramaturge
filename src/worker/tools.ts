@@ -162,6 +162,11 @@ export function createWorkerTools(
         } catch (writeError) {
           const msg = writeError instanceof Error ? writeError.message : String(writeError);
           console.warn(`Failed to write screenshot file ${filename}: ${msg}`);
+          return {
+            captured: false,
+            ref: input.ref,
+            message: `Screenshot captured in memory but failed to write to disk: ${msg}`,
+          };
         }
 
         const evidenceId = `ev-${shortId()}`;
