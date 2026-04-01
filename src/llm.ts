@@ -53,8 +53,8 @@ const PROVIDERS: Record<Provider, ProviderSpec> = {
       model, max_tokens: maxTokens, system,
       messages: messages.filter((m) => m.role !== "system").map((m) => ({ role: m.role, content: m.content })),
     }),
-    extract: (data) => (data as { content: Array<{ type: string; text: string }> }).content
-      .filter((c) => c.type === "text").map((c) => c.text).join(""),
+    extract: (data) => (data as { content?: Array<{ type: string; text: string }> }).content
+      ?.filter((c) => c.type === "text").map((c) => c.text).join("") ?? "",
   },
   openai: {
     envKey: "OPENAI_API_KEY",
@@ -151,7 +151,8 @@ Propose testing tasks for this page.`;
     ], 1024, requestTimeoutMs);
 
     // Extract JSON from response (handle possible markdown code fences)
-    const jsonStr = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
+    const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+    const jsonStr = fenceMatch ? fenceMatch[1].trim() : raw.trim();
     const parsed = JSON.parse(jsonStr) as unknown[];
 
     if (!Array.isArray(parsed)) return null;
@@ -214,7 +215,8 @@ Return ONLY JSON. No markdown fences, no explanation.`;
     512,
     requestTimeoutMs
   );
-  const jsonStr = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
+  const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  const jsonStr = fenceMatch ? fenceMatch[1].trim() : raw.trim();
   let parsed: Partial<JudgeDecision> & {
     confidence?: "low" | "medium" | "high";
   };
