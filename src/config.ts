@@ -299,7 +299,7 @@ const AppContextSchema = z
 const RepoContextSchema = z
   .object({
     root: z.string().optional(),
-    framework: z.enum(["auto", "nextjs", "generic"]).default("auto"),
+    framework: z.enum(["auto", "nextjs", "react-router", "express", "vue-router", "django", "tanstack-router", "generic"]).default("auto"),
     hintsFile: z.string().optional(),
     specFile: z.string().optional(),
   })

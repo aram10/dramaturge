@@ -1,4 +1,12 @@
-export type RepoFramework = "auto" | "nextjs" | "generic";
+export type RepoFramework =
+  | "auto"
+  | "nextjs"
+  | "react-router"
+  | "express"
+  | "vue-router"
+  | "django"
+  | "tanstack-router"
+  | "generic";
 
 export interface ExpectedHttpNoise {
   method?: string;
