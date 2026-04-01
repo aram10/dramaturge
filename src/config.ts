@@ -219,6 +219,13 @@ const BudgetSchema = z
     maxStateNodes: z.number().int().min(5).default(50),
     /** Abort a worker after this many consecutive steps with no findings, controls, or edges (0 = disabled). */
     stagnationThreshold: z.number().int().min(0).default(8),
+    /**
+     * Maximum estimated LLM cost in USD before stopping the run (0 = unlimited).
+     * Experimental — the engine does not yet enforce this automatically.
+     * Use `CostTracker` from `src/coverage/cost-tracker.ts` to track spend and
+     * check `overBudget` in a custom integration.
+     */
+    costLimitUsd: z.number().min(0).default(0),
   })
   .default({
     globalTimeLimitSeconds: 900,
@@ -226,6 +233,7 @@ const BudgetSchema = z
     maxFrontierSize: 200,
     maxStateNodes: 50,
     stagnationThreshold: 8,
+    costLimitUsd: 0,
   });
 
 const AutoCaptureSchema = z

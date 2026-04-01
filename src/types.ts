@@ -361,6 +361,13 @@ export interface BudgetConfig {
   maxStepsPerTask: number;
   maxFrontierSize: number;
   maxStateNodes: number;
+  /**
+   * Maximum estimated LLM cost in USD before stopping the run (0 = unlimited).
+   *
+   * Experimental — cost tracking is approximate and based on published per-token rates.
+   * Wire a `CostTracker` from `src/coverage/cost-tracker.ts` into the engine loop to enforce.
+   */
+  costLimitUsd?: number;
 }
 
 // --- Browser Error Capture ---
