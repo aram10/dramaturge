@@ -90,19 +90,14 @@ describe("SafetyGuard", () => {
   });
 
   describe("audit log", () => {
-    it("records all check actions in audit log", () => {
+    it("logs navigations and blocked actions", () => {
       const guard = new SafetyGuard(createDefaultSafetyConfig(false));
 
-      guard.checkUrl("http://example.com/page");
-      guard.checkRequest("DELETE", "/api/data");
-      guard.checkActionLabel("Save", "/form");
+      guard.checkUrl("http://example.com/page"); // logged (allowed navigation)
+      guard.checkRequest("DELETE", "/api/data");  // logged (blocked destructive request)
+      guard.checkActionLabel("Save", "/form");    // not logged ("Save" isn't a destructive keyword)
 
       const log = guard.getAuditLog();
-      // checkUrl logs, checkRequest(DELETE) logs (blocked), checkActionLabel("Save") doesn't
-      // log because "Save" is not a destructive keyword; but the call itself should log if blocked.
-      // Actually checkRequest("GET") returns early before logging when it's not destructive.
-      // So: checkUrl (1 log) + checkRequest DELETE (1 log blocked) = 2 logs
-      // checkActionLabel("Save") doesn't match any keyword so returns null before logging.
       expect(log.length).toBe(2);
     });
 
