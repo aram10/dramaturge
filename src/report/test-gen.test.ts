@@ -177,4 +177,122 @@ describe("generatePlaywrightTests", () => {
       'await expect(page.getByRole("alert")).toBeVisible();'
     );
   });
+
+  it("places preamble listeners before actions for console-error evidence", () => {
+    const generated = generatePlaywrightTests(
+      makeResult({
+        areaResults: [
+          {
+            name: "Dashboard",
+            url: "https://example.com/dashboard",
+            steps: 2,
+            findings: [
+              {
+                ref: "fid-console-err",
+                category: "Bug",
+                severity: "Major",
+                title: "Uncaught TypeError on page load",
+                stepsToReproduce: ["Open dashboard"],
+                expected: "No console errors",
+                actual: "Uncaught TypeError thrown",
+                evidenceIds: ["ev-console-1"],
+                meta: {
+                  source: "auto-capture",
+                  confidence: "high",
+                  repro: {
+                    objective: "Reproduce console error",
+                    route: "https://example.com/dashboard",
+                    breadcrumbs: ["Open dashboard"],
+                    evidenceIds: ["ev-console-1"],
+                  },
+                },
+              },
+            ],
+            replayableActions: [
+              {
+                id: "act-nav-dash",
+                kind: "navigate",
+                url: "https://example.com/dashboard",
+                summary: "navigate to dashboard",
+                source: "page",
+                status: "worked",
+                timestamp: "2026-03-25T10:01:00Z",
+              },
+            ],
+            screenshots: new Map(),
+            evidence: [
+              {
+                id: "ev-console-1",
+                type: "console-error",
+                summary: "Uncaught TypeError: Cannot read properties of null",
+                timestamp: "2026-03-25T10:01:01Z",
+                relatedFindingIds: ["fid-console-err"],
+              },
+            ],
+            coverage: { controlsDiscovered: 1, controlsExercised: 1, events: [] },
+            pageType: "dashboard",
+            status: "explored",
+          },
+        ],
+      })
+    );
+
+    expect(generated).toHaveLength(1);
+    const content = generated[0]!.content;
+    // Preamble (console listener) appears before actions
+    const consoleListenerPos = content.indexOf('page.on("console"');
+    const navActionPos = content.indexOf("await page.goto");
+    const assertionPos = content.indexOf('expect(consoleErrors, "No console errors expected")');
+    expect(consoleListenerPos).toBeGreaterThan(navActionPos);
+    expect(assertionPos).toBeGreaterThan(consoleListenerPos);
+    expect(content).toContain("const consoleErrors: string[] = [];");
+    expect(content).toContain('expect(consoleErrors, "No console errors expected").toHaveLength(0);');
+  });
+
+  it("includes HTTP response listener preamble for server-error findings", () => {
+    const generated = generatePlaywrightTests(
+      makeResult({
+        areaResults: [
+          {
+            name: "API page",
+            url: "https://example.com/api-page",
+            steps: 1,
+            findings: [
+              {
+                ref: "fid-500",
+                category: "Bug",
+                severity: "Critical",
+                title: "500 Internal Server Error on submit",
+                stepsToReproduce: ["Submit form"],
+                expected: "Form submits successfully",
+                actual: "Server returns 500 error",
+                meta: {
+                  source: "agent",
+                  confidence: "high",
+                  repro: {
+                    objective: "Reproduce server error",
+                    route: "https://example.com/api-page",
+                    breadcrumbs: ["Submit form"],
+                    evidenceIds: [],
+                  },
+                },
+              },
+            ],
+            replayableActions: [],
+            screenshots: new Map(),
+            evidence: [],
+            coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+            pageType: "form",
+            status: "explored",
+          },
+        ],
+      })
+    );
+
+    expect(generated).toHaveLength(1);
+    const content = generated[0]!.content;
+    expect(content).toContain("const serverErrors: string[] = [];");
+    expect(content).toContain('page.on("response"');
+    expect(content).toContain('expect(serverErrors, "No server errors expected").toHaveLength(0);');
+  });
 });

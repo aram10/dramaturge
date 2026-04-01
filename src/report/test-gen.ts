@@ -73,6 +73,37 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
       const filename = `${finding.id.toLowerCase()}-${slugify(finding.title)}.spec.ts`;
       const breadcrumbs = finding.meta?.repro?.breadcrumbs ?? [];
 
+      // Resolve evidence types linked to this finding for richer inference.
+      const areaEvidence = area?.evidence ?? [];
+      const reproEvidenceIds = new Set(finding.meta?.repro?.evidenceIds ?? []);
+      const findingEvidenceIds = new Set([
+        ...(finding.evidenceIds ?? []),
+        ...reproEvidenceIds,
+      ]);
+      const evidenceTypes = [
+        ...new Set(
+          areaEvidence
+            .filter(
+              (e) =>
+                findingEvidenceIds.has(e.id) ||
+                (finding.ref != null && e.relatedFindingIds.includes(finding.ref))
+            )
+            .map((e) => e.type)
+        ),
+      ];
+
+      const assertions = inferAssertions({
+        title: finding.title,
+        expected: finding.expected,
+        actual: finding.actual,
+        category: finding.category,
+        evidenceTypes,
+      });
+
+      const preambles = assertions
+        .filter((a) => a.preamble)
+        .map((a) => a.preamble!);
+
       const lines = [
         'import { test, expect } from "@playwright/test";',
         "",
@@ -81,6 +112,11 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         `  // Actual: ${finding.actual.replace(/[\r\n]+/g, " ")}`,
         `  await page.goto(${escapeString(route)});`,
       ];
+
+      // Preamble code (event listeners) must appear before actions.
+      for (const preamble of preambles) {
+        lines.push(`  ${preamble}`);
+      }
 
       if (renderedActions.length > 0) {
         for (const action of renderedActions) {
@@ -93,11 +129,6 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         }
       }
 
-      const assertions = inferAssertions({
-        title: finding.title,
-        expected: finding.expected,
-        actual: finding.actual,
-      });
       if (assertions.length > 0) {
         for (const assertion of assertions) {
           lines.push(`  ${assertion.code}`);
