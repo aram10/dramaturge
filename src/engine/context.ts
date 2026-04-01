@@ -12,6 +12,7 @@ import type { FrontierQueue } from "../graph/frontier.js";
 import type { Planner } from "../planner/planner.js";
 import type { Navigator } from "../planner/navigator.js";
 import type { CoverageTracker } from "../coverage/tracker.js";
+import type { CostTracker } from "../coverage/cost-tracker.js";
 import type { BrowserErrorCollector } from "../browser-errors.js";
 import type { WorkerSession } from "./worker-pool.js";
 import type { RepoHints } from "../adaptation/types.js";
@@ -32,6 +33,7 @@ export interface EngineContext {
   planner: Planner;
   navigator: Navigator;
   globalCoverage: CoverageTracker;
+  costTracker?: CostTracker;
   screenshotDir: string;
   outputDir: string;
   findingsByNode: Map<string, RawFinding[]>;
