@@ -59,7 +59,12 @@ export function loadCheckpoint(runDir: string): Checkpoint | null {
   if (!existsSync(path)) return null;
 
   const raw = readFileSync(path, "utf-8");
-  const data = JSON.parse(raw) as Checkpoint;
+  let data: Checkpoint;
+  try {
+    data = JSON.parse(raw) as Checkpoint;
+  } catch {
+    throw new Error(`Invalid JSON in checkpoint file: ${path}`);
+  }
   if (data.version !== 1) {
     throw new Error(`Unsupported checkpoint version: ${data.version}`);
   }

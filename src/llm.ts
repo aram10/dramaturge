@@ -215,9 +215,16 @@ Return ONLY JSON. No markdown fences, no explanation.`;
     requestTimeoutMs
   );
   const jsonStr = raw.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "").trim();
-  const parsed = JSON.parse(jsonStr) as Partial<JudgeDecision> & {
+  let parsed: Partial<JudgeDecision> & {
     confidence?: "low" | "medium" | "high";
   };
+  try {
+    parsed = JSON.parse(jsonStr) as Partial<JudgeDecision> & {
+      confidence?: "low" | "medium" | "high";
+    };
+  } catch {
+    parsed = {};
+  }
 
   return {
     hypothesis: typeof parsed.hypothesis === "string" ? parsed.hypothesis : "The observed behavior should be verified.",
