@@ -159,7 +159,7 @@ function filePathToRoute(relPath: string): string {
     return "/";
   }
 
-  const segments = route.split(sep).join("/").split("/");
+  const segments = route.split(sep);
   const result: string[] = [];
 
   for (const segment of segments) {
