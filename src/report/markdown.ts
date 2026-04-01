@@ -2,7 +2,7 @@ import type { RunResult } from "../types.js";
 import { collectFindings } from "./collector.js";
 
 function escapeTableCell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  return text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
 function formatDuration(ms: number): string {
