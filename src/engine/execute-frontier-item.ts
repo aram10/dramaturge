@@ -109,6 +109,7 @@ export async function executeFrontierItem(
       preflightEvidence.push(...webVitalsResult.evidence);
     }
 
+    // Responsive regression requires visual regression infrastructure (baselines, pixel diff)
     if (ctx.config.responsiveRegression.enabled && ctx.config.visualRegression.enabled) {
       const responsive = await runMultiViewportVisualRegression(page, {
         areaName: node.title ?? node.id,

@@ -251,10 +251,11 @@ export async function runEngine(
   let workerPool: WorkerSession[] = [];
 
   const costLimitUsd = budget.costLimitUsd ?? config.budget.costLimitUsd;
-  const costTracker =
-    costLimitUsd && costLimitUsd > 0
-      ? new CostTracker(costLimitUsd)
-      : new CostTracker();
+  // CostTracker is always instantiated for tracking; budget enforcement is only
+  // active when costLimitUsd > 0 (default 0 means unlimited → Infinity).
+  const costTracker = new CostTracker(
+    costLimitUsd && costLimitUsd > 0 ? costLimitUsd : Infinity
+  );
 
   const ctx: EngineContext = {
     config,
