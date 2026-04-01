@@ -14,6 +14,7 @@ import { FrontierQueue } from "./graph/frontier.js";
 import { Planner } from "./planner/planner.js";
 import { Navigator } from "./planner/navigator.js";
 import { CoverageTracker } from "./coverage/tracker.js";
+import { CostTracker } from "./coverage/cost-tracker.js";
 import { BrowserErrorCollector } from "./browser-errors.js";
 import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from "./checkpoint.js";
 import { hasLLMApiKey } from "./llm.js";
@@ -249,6 +250,12 @@ export async function runEngine(
 
   let workerPool: WorkerSession[] = [];
 
+  const costLimitUsd = budget.costLimitUsd ?? config.budget.costLimitUsd;
+  const costTracker =
+    costLimitUsd && costLimitUsd > 0
+      ? new CostTracker(costLimitUsd)
+      : new CostTracker();
+
   const ctx: EngineContext = {
     config,
     budget,
@@ -260,6 +267,7 @@ export async function runEngine(
     planner: new Planner(),
     navigator: new Navigator(),
     globalCoverage: new CoverageTracker(),
+    costTracker,
     screenshotDir,
     outputDir,
     findingsByNode: new Map(),
