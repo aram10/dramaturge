@@ -172,8 +172,8 @@ describe("runDeterministicGraders", () => {
     ];
 
     const { combinedConfidence, allConfirmed } = runDeterministicGraders(obs, evidence);
-    // Console-error and network-error graders pass-through at medium (no applicable evidence),
-    // evidence-completeness gives high (2 types). Lowest = medium.
+    // Expected: medium confidence (lowest among console-error and network-error
+    // pass-through at medium, evidence-completeness at high for 2 types).
     expect(combinedConfidence).toBe("medium");
     expect(allConfirmed).toBe(true);
   });
