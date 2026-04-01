@@ -16,7 +16,12 @@ export async function authenticateStoredState(
     throw new Error(`Storage state file not found: ${stateFile}`);
   }
 
-  const state = JSON.parse(raw) as BrowserStorageState;
+  let state: BrowserStorageState;
+  try {
+    state = JSON.parse(raw) as BrowserStorageState;
+  } catch {
+    throw new Error(`Invalid JSON in storage state file: ${stateFile}`);
+  }
   await applyStorageState(stagehand, targetUrl, state);
 
   // Verify that injected state is actually valid

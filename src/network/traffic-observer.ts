@@ -56,7 +56,9 @@ export class NetworkTrafficObserver {
     const teardowns: Array<() => void> = [];
 
     const onResponse = (response: ResponseLike) => {
-      void this.recordResponse(pageKey, response);
+      void this.recordResponse(pageKey, response).catch(() => {
+        /* best-effort: recording failures should not crash the observer */
+      });
     };
     page.on("response", onResponse);
     teardowns.push(() => page.off("response", onResponse));

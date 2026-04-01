@@ -199,7 +199,12 @@ export class MemoryStore {
       if (!existsSync(path)) {
         this.snapshot = createEmptySnapshot();
       } else {
-        const raw = JSON.parse(readFileSync(path, "utf-8")) as MemorySnapshot;
+        let raw: MemorySnapshot;
+        try {
+          raw = JSON.parse(readFileSync(path, "utf-8")) as MemorySnapshot;
+        } catch {
+          throw new Error(`Invalid JSON in memory store file: ${path}`);
+        }
         if (raw.version !== CURRENT_MEMORY_VERSION) {
           throw new Error(`Unsupported memory snapshot version: ${raw.version}`);
         }
