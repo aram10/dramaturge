@@ -96,14 +96,30 @@ function normalisePath(p: string): string {
 }
 
 /**
- * Convert a parameterised route pattern (e.g. `/users/:id`) into a regex.
+ * Convert a parameterised route pattern (e.g. `/users/:id`) into a regex
+ * that matches concrete paths like `/users/42`.
  */
 function routeToRegex(route: string): RegExp {
-  const escaped = route
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    .replace(/\\:[a-zA-Z_]\w*/g, "[^/]+")
-    .replace(/\\\[\\.\\.\\.[^\]]*\\\]/g, ".*");
-  return new RegExp(`^${escaped}$`, "i");
+  // Split on parameter-like segments, escape the literal parts, rejoin
+  const PARAM_RE = /:[a-zA-Z_]\w*|\[\.\.\.[\w]*\]|\[[\w]+\]/g;
+  let pattern = "";
+  let lastIndex = 0;
+
+  for (const m of route.matchAll(PARAM_RE)) {
+    // Escape the literal part before this param
+    pattern += escapeRegex(route.slice(lastIndex, m.index));
+    // Replace param with a wildcard
+    pattern += m[0].startsWith("[...") ? ".*" : "[^/]+";
+    lastIndex = m.index! + m[0].length;
+  }
+  // Escape remaining literal tail
+  pattern += escapeRegex(route.slice(lastIndex));
+
+  return new RegExp(`^${pattern}$`, "i");
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function routeMatchesPath(route: string, path: string): boolean {
