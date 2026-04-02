@@ -6,6 +6,8 @@ import { executeApiWorkerTask } from "../api/worker.js";
 import { executeWorkerTask } from "../worker/worker.js";
 import { runAccessibilityScan } from "../coverage/accessibility.js";
 import { runVisualRegressionScan } from "../coverage/visual-regression.js";
+import { collectWebVitals, evaluateWebVitals } from "../coverage/web-vitals.js";
+import { runMultiViewportVisualRegression } from "../coverage/responsive-regression.js";
 import { buildApiContractArtifacts } from "../api/contract-oracle.js";
 import { summarizeContractIndex } from "../spec/contract-index.js";
 
@@ -104,6 +106,37 @@ export async function executeFrontierItem(
       });
       preflightFindings.push(...visualRegression.findings);
       preflightEvidence.push(...visualRegression.evidence);
+    }
+
+    if (ctx.config.webVitals.enabled) {
+      const vitals = await collectWebVitals(page);
+      const webVitalsResult = evaluateWebVitals(
+        vitals,
+        node.url ?? ctx.config.targetUrl,
+        node.title ?? node.id,
+        ctx.config.webVitals.thresholds
+      );
+      preflightFindings.push(...webVitalsResult.findings);
+      preflightEvidence.push(...webVitalsResult.evidence);
+    }
+
+    // Responsive regression requires visual regression infrastructure (baselines, pixel diff)
+    if (ctx.config.responsiveRegression.enabled && ctx.config.visualRegression.enabled) {
+      const responsive = await runMultiViewportVisualRegression(page, {
+        areaName: node.title ?? node.id,
+        route: node.url ?? ctx.config.targetUrl,
+        fingerprintHash: node.fingerprint.hash,
+        baselineDir: ctx.config.visualRegression.baselineDir,
+        outputDir: ctx.outputDir,
+        diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
+        includeAA: ctx.config.visualRegression.includeAA,
+        fullPage: ctx.config.visualRegression.fullPage,
+        maskSelectors: ctx.config.visualRegression.maskSelectors,
+        breakpoints: ctx.config.responsiveRegression.breakpoints,
+        memoryStore: ctx.memoryStore,
+      });
+      preflightFindings.push(...responsive.findings);
+      preflightEvidence.push(...responsive.evidence);
     }
   }
 
