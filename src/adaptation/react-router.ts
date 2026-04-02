@@ -43,8 +43,6 @@ const REACT_ROUTER_IMPORT_RE =
   /(?:from|require\()\s*["'](?:react-router-dom|react-router|@remix-run\/router)["']/;
 
 // Route extraction patterns
-const CREATE_ROUTER_RE =
-  /create(?:Browser|Hash|Memory)Router\s*\(\s*\[/g;
 const ROUTE_JSX_PATH_RE =
   /<Route\s[^>]*?path\s*=\s*["'`]([^"'`]+)["'`]/g;
 const ROUTE_CONFIG_PATH_RE =
@@ -58,10 +56,6 @@ const GET_BY_TESTID_RE = /getByTestId\(["'`]([^"'`]+)["'`]\)/g;
 // API / fetch patterns
 const FETCH_RE =
   /fetch\(\s*["'`](\/api\/[^"'`\s]+)["'`](?:\s*,\s*\{[\s\S]*?method:\s*["'`](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["'`][\s\S]*?\})?/g;
-
-// loader / action exports (data-fetching endpoints in React Router)
-const LOADER_ACTION_RE =
-  /\bexport\s+(?:async\s+)?(?:function|const)\s+(loader|action)\b/;
 
 function isSourceFile(path: string): boolean {
   return [...SOURCE_EXTENSIONS].some((ext) => path.endsWith(ext));

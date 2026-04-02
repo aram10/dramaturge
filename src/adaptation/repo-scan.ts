@@ -1,14 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { z } from "zod";
 import { parseJsoncObject } from "../utils/jsonc.js";
-import { canScanDjangoRepo, scanDjangoRepo } from "./django.js";
-import { canScanExpressRepo, scanExpressRepo } from "./express.js";
+import { scanDjangoRepo } from "./django.js";
+import { scanExpressRepo } from "./express.js";
 import { scanGenericRepo } from "./generic.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
-import { canScanReactRouterRepo, scanReactRouterRepo } from "./react-router.js";
-import { canScanTanStackRouterRepo, scanTanStackRouterRepo } from "./tanstack-router.js";
-import { canScanVueRouterRepo, scanVueRouterRepo } from "./vue-router.js";
+import { scanReactRouterRepo } from "./react-router.js";
+import { scanTanStackRouterRepo } from "./tanstack-router.js";
+import { scanVueRouterRepo } from "./vue-router.js";
 import type {
   RepoFramework,
   RepoHints,
@@ -134,12 +134,101 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
 }
 
 function detectFramework(root: string): RepoFramework {
+  // Check Next.js first via directory marker (no file walk needed)
   if (canScanNextJsRepo(root)) return "nextjs";
-  if (canScanTanStackRouterRepo(root)) return "tanstack-router";
-  if (canScanReactRouterRepo(root)) return "react-router";
-  if (canScanVueRouterRepo(root)) return "vue-router";
-  if (canScanExpressRepo(root)) return "express";
-  if (canScanDjangoRepo(root)) return "django";
+
+  // Single-pass walk for remaining framework detection
+  const signatures = {
+    tanstackRouter: false,
+    reactRouter: false,
+    vueRouter: false,
+    express: false,
+    django: false,
+  };
+
+  const TANSTACK_RE = /(?:from|require\()\s*["'](?:@tanstack\/react-router|@tanstack\/router)["']/;
+  const REACT_ROUTER_RE = /(?:from|require\()\s*["'](?:react-router-dom|react-router|@remix-run\/router)["']/;
+  const VUE_ROUTER_RE = /(?:from|require\()\s*["']vue-router["']/;
+  const VUE_CREATE_ROUTER_RE = /\bcreateRouter\s*\(/;
+  const EXPRESS_RE = /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+)["']/;
+  const DJANGO_SETTINGS_RE = /(?:INSTALLED_APPS|django)/;
+
+  if (existsSync(join(resolve(root), "manage.py"))) {
+    signatures.django = true;
+  }
+
+  try {
+    const jsExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+    const ignoredDirs = new Set([
+      "node_modules", ".git", "dist", "build", "out", "coverage",
+      ".next", ".nuxt", ".turbo", ".cache",
+      "tests", "test", "__tests__", "fixtures", "__fixtures__",
+      "mocks", "__mocks__", "generated", "__generated__",
+      "__pycache__", ".venv", "venv", "env", "migrations", "static", "media",
+    ]);
+
+    const queue = [resolve(root)];
+    while (queue.length > 0) {
+      const dir = queue.pop()!;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (ignoredDirs.has(entry.name)) continue;
+        const fullPath = join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          queue.push(fullPath);
+          continue;
+        }
+
+        if (!entry.isFile()) continue;
+
+        const name = entry.name;
+        const isJs = jsExtensions.has(name.slice(name.lastIndexOf(".")));
+        const isPy = name.endsWith(".py");
+
+        if (!isJs && !isPy) continue;
+
+        // Django detection via urls.py or settings.py
+        if (isPy) {
+          if (name === "urls.py") {
+            signatures.django = true;
+          } else if (name === "settings.py") {
+            const content = readFileSync(fullPath, "utf-8");
+            if (DJANGO_SETTINGS_RE.test(content)) {
+              signatures.django = true;
+            }
+          }
+          continue;
+        }
+
+        // JS/TS framework detection
+        const content = readFileSync(fullPath, "utf-8");
+        if (!signatures.tanstackRouter && TANSTACK_RE.test(content)) {
+          signatures.tanstackRouter = true;
+        }
+        if (!signatures.reactRouter && REACT_ROUTER_RE.test(content)) {
+          signatures.reactRouter = true;
+        }
+        if (!signatures.vueRouter && (VUE_ROUTER_RE.test(content) || VUE_CREATE_ROUTER_RE.test(content))) {
+          signatures.vueRouter = true;
+        }
+        if (!signatures.express && EXPRESS_RE.test(content)) {
+          signatures.express = true;
+        }
+
+        // Early exit if the highest-priority remaining framework is found
+        if (signatures.tanstackRouter) break;
+      }
+      if (signatures.tanstackRouter) break;
+    }
+  } catch {
+    // Fall through to generic
+  }
+
+  if (signatures.tanstackRouter) return "tanstack-router";
+  if (signatures.reactRouter) return "react-router";
+  if (signatures.vueRouter) return "vue-router";
+  if (signatures.express) return "express";
+  if (signatures.django) return "django";
   return "generic";
 }
 
