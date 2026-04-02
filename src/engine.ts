@@ -454,6 +454,7 @@ export async function runEngine(
     const startMs = Date.now();
     const checkpointInterval = config.checkpoint.intervalTasks;
     let tasksSinceCheckpoint = 0;
+    let totalFindingsCount = 0;
 
     while (ctx.frontier.hasItems()) {
       const elapsedMs = Date.now() - startMs;
@@ -519,6 +520,8 @@ export async function runEngine(
           });
         }
 
+        totalFindingsCount += result.findings.length;
+
         await expandGraph(ctx, item.nodeId, result, useLLMPlanner);
         routeFollowups(ctx, item.nodeId, result);
 
@@ -531,16 +534,12 @@ export async function runEngine(
       maintainFrontier(ctx);
 
       // Emit progress event after each batch
-      const totalFindings = [...ctx.findingsByNode.values()].reduce(
-        (sum, f) => sum + f.length,
-        0
-      );
       const elapsedSinceStart = Date.now() - startMs;
       const timeBudgetMs = budget.globalTimeLimitSeconds * 1000;
       emitEngineEvent(eventStream, "progress", {
         tasksExecuted,
         tasksRemaining: ctx.frontier.size(),
-        totalFindings,
+        totalFindings: totalFindingsCount,
         statesDiscovered: ctx.graph.nodeCount(),
         elapsedMs: elapsedSinceStart,
         estimatedProgress: Math.min(1, elapsedSinceStart / timeBudgetMs),
@@ -660,7 +659,7 @@ export async function runEngine(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    emitEngineEvent(eventStream, "error", { message, phase: "engine" });
+    emitEngineEvent(eventStream, "run:error", { message, phase: "engine" });
     console.error(`\nFatal error: ${message}`);
     throw error;
   } finally {

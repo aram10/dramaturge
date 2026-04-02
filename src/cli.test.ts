@@ -211,4 +211,19 @@ describe("attachCliListeners", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0]).not.toContain("coverage");
   });
+
+  it("logs run:error events", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("run:error", {
+      message: "Browser crashed",
+      phase: "engine",
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Error:");
+    expect(messages[0]).toContain("Browser crashed");
+  });
 });
