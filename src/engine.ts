@@ -14,6 +14,7 @@ import { FrontierQueue } from "./graph/frontier.js";
 import { Planner } from "./planner/planner.js";
 import { Navigator } from "./planner/navigator.js";
 import { CoverageTracker } from "./coverage/tracker.js";
+import { CostTracker } from "./coverage/cost-tracker.js";
 import { BrowserErrorCollector } from "./browser-errors.js";
 import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from "./checkpoint.js";
 import { hasLLMApiKey } from "./llm.js";
@@ -56,6 +57,7 @@ function resolveBudget(config: DramaturgeConfig): BudgetConfig {
       config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
     maxFrontierSize: config.budget.maxFrontierSize ?? 200,
     maxStateNodes: config.budget.maxStateNodes ?? 50,
+    costLimitUsd: config.budget.costLimitUsd,
   };
 }
 
@@ -249,6 +251,12 @@ export async function runEngine(
 
   let workerPool: WorkerSession[] = [];
 
+  // CostTracker is always instantiated for tracking; budget enforcement is only
+  // active when costLimitUsd > 0 (default 0 means unlimited → Infinity).
+  const costTracker = new CostTracker(
+    budget.costLimitUsd && budget.costLimitUsd > 0 ? budget.costLimitUsd : Infinity
+  );
+
   const ctx: EngineContext = {
     config,
     budget,
@@ -260,6 +268,7 @@ export async function runEngine(
     planner: new Planner(),
     navigator: new Navigator(),
     globalCoverage: new CoverageTracker(),
+    costTracker,
     screenshotDir,
     outputDir,
     findingsByNode: new Map(),
