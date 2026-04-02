@@ -40,10 +40,10 @@ const IGNORED_FILE_NAME_PATTERNS = [
 ];
 
 const EXPRESS_IMPORT_RE =
-  /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+|koa|hapi)["']/;
+  /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+)["']/;
 
-const ROUTE_HANDLER_RE =
-  /(?:app|router|server|fastify)\.(get|post|put|patch|delete|options|head)\s*\(\s*["'`](\/[^"'`]*)["'`]/g;
+const ROUTE_HANDLER_BLOCK_RE =
+  /(?:app|router|server|fastify)\.(get|post|put|patch|delete|options|head)\s*\(\s*["'`](\/[^"'`]*)["'`][^)]*(?:\([^)]*\))*[^;]*;/g;
 
 const STATUS_CODE_RE = /\.status\(\s*(\d{3})\s*\)/g;
 
@@ -118,10 +118,11 @@ function normalizeRoute(raw: string): string {
 
 function extractRouteHandlers(
   content: string,
-): { method: string; route: string }[] {
-  return [...content.matchAll(ROUTE_HANDLER_RE)].map((m) => ({
+): { method: string; route: string; block: string }[] {
+  return [...content.matchAll(ROUTE_HANDLER_BLOCK_RE)].map((m) => ({
     method: (m[1] ?? "").toUpperCase(),
     route: normalizeRoute(m[2] ?? ""),
+    block: m[0],
   }));
 }
 
@@ -174,11 +175,12 @@ export function scanExpressRepo(root: string): RepoHints {
     const content = readFileSync(filePath, "utf-8");
 
     const handlers = extractRouteHandlers(content);
-    const fileStatuses = extractStatusCodes(content);
-    const hasAuthMiddleware = AUTH_MIDDLEWARE_RE.test(content);
 
-    for (const { method, route } of handlers) {
+    for (const { method, route, block } of handlers) {
       routes.push(route);
+
+      const handlerStatuses = extractStatusCodes(block);
+      const handlerHasAuth = AUTH_MIDDLEWARE_RE.test(block);
 
       const existing = apiEndpoints.get(route) ?? {
         route,
@@ -188,8 +190,8 @@ export function scanExpressRepo(root: string): RepoHints {
         validationSchemas: [],
       };
       existing.methods = uniqueSorted([...existing.methods, method]);
-      existing.statuses = uniqueNumbers([...existing.statuses, ...fileStatuses]);
-      if (hasAuthMiddleware) {
+      existing.statuses = uniqueNumbers([...existing.statuses, ...handlerStatuses]);
+      if (handlerHasAuth) {
         existing.authRequired = true;
       }
       apiEndpoints.set(route, existing);
@@ -202,8 +204,9 @@ export function scanExpressRepo(root: string): RepoHints {
         callbackRoutes.push(route);
       }
 
-      // Expected HTTP noise for routes with 401/403
-      if (fileStatuses.includes(401) || fileStatuses.includes(403)) {
+      // Expected HTTP noise for handlers with 401/403
+      const authStatuses = handlerStatuses.filter((s) => s === 401 || s === 403);
+      if (authStatuses.length > 0) {
         const key = `${method}:${route}`;
         const existingNoise = noiseMap.get(key) ?? {
           method,
@@ -212,7 +215,7 @@ export function scanExpressRepo(root: string): RepoHints {
         };
         existingNoise.statuses = uniqueNumbers([
           ...existingNoise.statuses,
-          ...fileStatuses.filter((s) => s === 401 || s === 403),
+          ...authStatuses,
         ]);
         noiseMap.set(key, existingNoise);
       }

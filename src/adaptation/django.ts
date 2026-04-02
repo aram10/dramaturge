@@ -54,9 +54,6 @@ const VIEWSET_CLASS_RE = /class\s+(\w+)\s*\([^)]*ViewSet[^)]*\)/g;
 const ACTION_DECORATOR_RE =
   /@action\s*\(\s*[^)]*methods\s*=\s*\[([^\]]*)\][^)]*\)/g;
 
-// View function detection in views.py
-const VIEW_FUNCTION_RE = /def\s+(\w+)\s*\(\s*request\b/g;
-
 // Selector patterns in templates
 const SELECTOR_RE = /data-testid=["']([^"']+)["']/g;
 const ID_SELECTOR_RE = /\bid\s*=\s*["']([^"']+)["']/g;
@@ -260,13 +257,14 @@ export function scanDjangoRepo(root: string): RepoHints {
         allMethods.push("GET", "POST", "PUT", "PATCH", "DELETE");
       }
 
-      // Associate methods with routes from the same app's urls.py
+      // Associate methods with API routes from the same app's urls.py
       if (allMethods.length > 0 && name === "views.py") {
         const siblingUrls = join(dirname(filePath), "urls.py");
         if (existsSync(siblingUrls)) {
           const urlsContent = readFileSync(siblingUrls, "utf-8");
           const fileRoutes = extractDjangoRoutes(urlsContent);
           for (const route of fileRoutes) {
+            if (!/^\/api\//i.test(route)) continue;
             const existing = apiEndpoints.get(route) ?? {
               route,
               methods: [],
@@ -280,7 +278,7 @@ export function scanDjangoRepo(root: string): RepoHints {
         }
       }
 
-      // Detect auth-related patterns and scope them to the same app's routes
+      // Detect auth-related patterns and scope them to API routes in the same app
       if (name === "views.py") {
         const hasAuthMiddleware =
           /(?:login_required|permission_required|IsAuthenticated|IsAdminUser)\b/.test(content);
@@ -290,12 +288,13 @@ export function scanDjangoRepo(root: string): RepoHints {
             const urlsContent = readFileSync(siblingUrls, "utf-8");
             const appRoutes = extractDjangoRoutes(urlsContent).map(normalizeRoute);
             for (const route of appRoutes) {
+              if (!/^\/api\//i.test(route)) continue;
               const ep = apiEndpoints.get(route);
               if (ep) {
                 ep.authRequired = true;
               }
 
-              // Expected HTTP noise for auth-guarded views
+              // Expected HTTP noise for auth-guarded API views
               const key = route;
               const existingNoise = noiseMap.get(key) ?? {
                 pathPrefix: route,

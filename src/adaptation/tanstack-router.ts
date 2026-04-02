@@ -43,10 +43,6 @@ const TANSTACK_ROUTER_IMPORT_RE =
   /(?:from|require\()\s*["'](?:@tanstack\/react-router|@tanstack\/router)["']/;
 
 // Route extraction patterns
-const CREATE_ROUTER_RE = /\bcreateRouter\s*\(/g;
-const CREATE_ROUTE_RE =
-  /\b(?:createRootRoute|createRoute|createFileRoute)\s*\(/g;
-const NEW_ROUTE_RE = /\bnew\s+(?:Route|RootRoute)\s*\(/g;
 const ROUTE_CONFIG_PATH_RE = /\bpath\s*:\s*["'`](\/[^"'`]*)["'`]/g;
 const CREATE_FILE_ROUTE_PATH_RE =
   /\bcreateFileRoute\s*\(\s*["'`](\/[^"'`]*)["'`]\s*\)/g;
@@ -59,10 +55,6 @@ const GET_BY_TESTID_RE = /getByTestId\(["'`]([^"'`]+)["'`]\)/g;
 // API / fetch patterns
 const FETCH_RE =
   /fetch\(\s*["'`](\/api\/[^"'`\s]+)["'`](?:\s*,\s*\{[\s\S]*?method:\s*["'`](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["'`][\s\S]*?\})?/g;
-
-// loader / action patterns for TanStack Router
-const LOADER_ACTION_RE =
-  /\b(?:loader\s*:|beforeLoad\s*:|export\s+(?:async\s+)?(?:function|const)\s+loader)\b/;
 
 function isSourceFile(path: string): boolean {
   return [...SOURCE_EXTENSIONS].some((ext) => path.endsWith(ext));
