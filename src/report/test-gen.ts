@@ -73,14 +73,54 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
       const filename = `${finding.id.toLowerCase()}-${slugify(finding.title)}.spec.ts`;
       const breadcrumbs = finding.meta?.repro?.breadcrumbs ?? [];
 
+      // Resolve evidence types linked to this finding across all impacted areas.
+      const impactedAreaNames = new Set(finding.impactedAreas);
+      const allLinkedEvidence = result.areaResults
+        .filter((a) => impactedAreaNames.has(a.name))
+        .flatMap((a) => a.evidence);
+      const reproEvidenceIds = new Set(finding.meta?.repro?.evidenceIds ?? []);
+      const findingEvidenceIds = new Set([
+        ...(finding.evidenceIds ?? []),
+        ...reproEvidenceIds,
+      ]);
+      const evidenceTypes = [
+        ...new Set(
+          allLinkedEvidence
+            .filter(
+              (e) =>
+                findingEvidenceIds.has(e.id) ||
+                (finding.ref != null && e.relatedFindingIds.includes(finding.ref))
+            )
+            .map((e) => e.type)
+        ),
+      ];
+
+      const assertions = inferAssertions({
+        title: finding.title,
+        expected: finding.expected,
+        actual: finding.actual,
+        category: finding.category,
+        evidenceTypes,
+      });
+
+      const preambles = assertions
+        .filter((a) => a.preamble)
+        .map((a) => a.preamble!);
+
       const lines = [
         'import { test, expect } from "@playwright/test";',
         "",
         `test(${escapeString(`${finding.id}: ${finding.title}`)}, async ({ page }) => {`,
         `  // Expected: ${finding.expected.replace(/[\r\n]+/g, " ")}`,
         `  // Actual: ${finding.actual.replace(/[\r\n]+/g, " ")}`,
-        `  await page.goto(${escapeString(route)});`,
       ];
+
+      // Preamble code (event listeners) must appear before navigation to capture all events.
+      for (const preamble of preambles) {
+        lines.push(`  ${preamble}`);
+      }
+
+      lines.push(`  await page.goto(${escapeString(route)});`);
 
       if (renderedActions.length > 0) {
         for (const action of renderedActions) {
@@ -93,11 +133,6 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         }
       }
 
-      const assertions = inferAssertions({
-        title: finding.title,
-        expected: finding.expected,
-        actual: finding.actual,
-      });
       if (assertions.length > 0) {
         for (const assertion of assertions) {
           lines.push(`  ${assertion.code}`);
