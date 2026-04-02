@@ -42,7 +42,20 @@ describe("inferAssertions", () => {
     expect(preamble?.preamble).toContain("resp.status() >= 500");
   });
 
-  it("infers an HTTP response assertion via network-error evidence", () => {
+  it("infers an HTTP response assertion for any 5xx status code", () => {
+    const assertions = inferAssertions({
+      title: "Storage quota exceeded",
+      expected: "Upload succeeds",
+      actual: "Server responds with 507 Insufficient Storage",
+    });
+
+    const codes = assertions.map((a) => a.code);
+    expect(codes).toContain(
+      'expect(serverErrors, "No server errors expected").toHaveLength(0);'
+    );
+  });
+
+  it("infers an HTTP response assertion via network-error evidence with broader status check", () => {
     const assertions = inferAssertions({
       title: "Data fetch fails silently",
       expected: "Data loads",
@@ -53,6 +66,8 @@ describe("inferAssertions", () => {
     expect(assertions.map((a) => a.code)).toContain(
       'expect(serverErrors, "No server errors expected").toHaveLength(0);'
     );
+    const preamble = assertions.find((a) => a.preamble?.includes("serverErrors"));
+    expect(preamble?.preamble).toContain("resp.status() >= 400 || resp.status() === 0");
   });
 
   it("infers a form validation assertion when validation is missing", () => {
@@ -81,14 +96,14 @@ describe("inferAssertions", () => {
     );
   });
 
-  it("infers a CRUD/list assertion for table row changes", () => {
+  it("does not infer a CRUD/list assertion for deletion scenarios", () => {
     const assertions = inferAssertions({
       title: "Deleted row still visible",
       expected: "Row is removed from the table",
       actual: "Deleted row remains in the table after deletion",
     });
 
-    expect(assertions.map((a) => a.code)).toContain(
+    expect(assertions.map((a) => a.code)).not.toContain(
       `await expect(page.locator('table tbody tr, [role="row"], [role="listitem"]')).not.toHaveCount(0);`
     );
   });
@@ -134,7 +149,7 @@ describe("inferAssertions", () => {
     expect(preamble?.preamble).toContain("resp.status() >= 400");
   });
 
-  it("infers an API contract assertion via api-contract evidence", () => {
+  it("infers a TODO comment for api-contract evidence without text match", () => {
     const assertions = inferAssertions({
       title: "Response shape changed",
       expected: "Valid shape",
@@ -142,7 +157,9 @@ describe("inferAssertions", () => {
       evidenceTypes: ["api-contract"],
     });
 
-    expect(assertions.map((a) => a.code)).toContain(
+    const codes = assertions.map((a) => a.code);
+    expect(codes.some((c) => c.includes("TODO: Validate API response body"))).toBe(true);
+    expect(codes).not.toContain(
       'expect(apiErrors, "No API errors expected").toHaveLength(0);'
     );
   });
