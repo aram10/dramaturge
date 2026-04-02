@@ -182,7 +182,8 @@ function detectFramework(root: string): RepoFramework {
         if (!entry.isFile()) continue;
 
         const name = entry.name;
-        const isJs = jsExtensions.has(name.slice(name.lastIndexOf(".")));
+        const dotIdx = name.lastIndexOf(".");
+        const isJs = dotIdx >= 0 && jsExtensions.has(name.slice(dotIdx));
         const isPy = name.endsWith(".py");
 
         if (!isJs && !isPy) continue;
@@ -214,11 +215,7 @@ function detectFramework(root: string): RepoFramework {
         if (!signatures.express && EXPRESS_RE.test(content)) {
           signatures.express = true;
         }
-
-        // Early exit if the highest-priority remaining framework is found
-        if (signatures.tanstackRouter) break;
       }
-      if (signatures.tanstackRouter) break;
     }
   } catch {
     // Fall through to generic
