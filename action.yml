@@ -83,7 +83,7 @@ runs:
 
     - name: Install Playwright browsers
       shell: bash
-      run: playwright install --with-deps chromium
+      run: npx playwright install --with-deps chromium
 
     - name: Prepare config
       id: config
@@ -108,7 +108,7 @@ runs:
 
     - name: Parse results
       id: parse
-      if: steps.run.outcome == 'success'
+      if: always() && steps.config.outcome == 'success'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
@@ -117,14 +117,14 @@ runs:
           "${{ inputs.fail-on-severity }}"
 
     - name: Fail on Dramaturge error
-      if: steps.run.outcome == 'failure' && steps.parse.outcome == 'skipped'
+      if: always() && steps.run.outcome == 'failure' && steps.parse.outputs.finding-count == '0'
       shell: bash
       run: |
         echo "::error::Dramaturge failed to run. Check the 'Run Dramaturge' step for details."
         exit 1
 
     - name: Post PR comment
-      if: inputs.post-comment == 'true' && github.event_name == 'pull_request' && steps.parse.outcome == 'success'
+      if: always() && inputs.post-comment == 'true' && github.event_name == 'pull_request' && steps.parse.outcome == 'success'
       uses: actions/github-script@v7
       with:
         script: |
@@ -171,7 +171,7 @@ runs:
           }
 
     - name: Upload report artifact
-      if: inputs.upload-report == 'true' && steps.parse.outcome == 'success'
+      if: always() && inputs.upload-report == 'true' && steps.parse.outcome == 'success'
       uses: actions/upload-artifact@v4
       with:
         name: dramaturge-report
@@ -179,7 +179,7 @@ runs:
         if-no-files-found: warn
 
     - name: Check severity threshold
-      if: inputs.fail-on-severity != '' && steps.parse.outputs.threshold-exceeded == 'true'
+      if: always() && inputs.fail-on-severity != '' && steps.parse.outputs.threshold-exceeded == 'true'
       shell: bash
       run: |
         echo "::error::Dramaturge found findings at or above '${{ inputs.fail-on-severity }}' severity (max: ${{ steps.parse.outputs.max-severity }})"
