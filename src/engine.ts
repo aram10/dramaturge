@@ -47,6 +47,7 @@ import {
   waitForBootstrapReady,
   type BootstrapStatus,
 } from "./engine/bootstrap.js";
+import { emitEngineEvent, type EngineEventEmitter } from "./engine/event-stream.js";
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -164,6 +165,15 @@ async function processTaskBatch(
     const worker = workers[i % workers.length];
     const taskNumber = taskNumberStart + i;
     assignPageNodeOwner(ctx, worker.key, item.nodeId);
+
+    emitEngineEvent(ctx.eventStream, "task:start", {
+      taskId: item.id,
+      taskNumber,
+      nodeId: item.nodeId,
+      workerType: item.workerType,
+      objective: item.objective,
+    });
+
     const result = await executeFrontierItem({
       ctx,
       stagehand: worker.stagehand,
@@ -192,6 +202,8 @@ async function processTaskBatch(
 
 export interface RunEngineOptions {
   resumeDir?: string;
+  /** Optional event emitter for streaming engine progress. */
+  eventStream?: EngineEventEmitter;
 }
 
 export async function runEngine(
@@ -212,6 +224,7 @@ export async function runEngine(
   console.log(`Dramaturge v2 starting — target: ${config.targetUrl}`);
   console.log(`Output: ${outputDir}`);
 
+  const eventStream = options.eventStream;
   const budget = resolveBudget(config);
   const mission = buildMission(config);
   const concurrency = config.concurrency.workers;
@@ -282,11 +295,22 @@ export async function runEngine(
     contractIndex,
     trafficObserver,
     memoryStore,
+    eventStream,
     createIsolatedApiRequestContext: () =>
       playwrightRequest.newContext({
         baseURL: config.targetUrl,
       }),
   };
+
+  emitEngineEvent(eventStream, "run:start", {
+    targetUrl: config.targetUrl,
+    timestamp: startTime.toISOString(),
+    budget: {
+      timeLimitSeconds: budget.globalTimeLimitSeconds,
+      maxStepsPerTask: budget.maxStepsPerTask,
+    },
+    concurrency,
+  });
 
   try {
     // Authenticate primary browser
@@ -430,6 +454,7 @@ export async function runEngine(
     const startMs = Date.now();
     const checkpointInterval = config.checkpoint.intervalTasks;
     let tasksSinceCheckpoint = 0;
+    let totalFindingsCount = 0;
 
     while (ctx.frontier.hasItems()) {
       const elapsedMs = Date.now() - startMs;
@@ -476,6 +501,27 @@ export async function runEngine(
           `  ${result.outcome}: ${result.findings.length} findings${coverageInfo}`
         );
 
+        emitEngineEvent(eventStream, "task:complete", {
+          taskId: item.id,
+          taskNumber: tasksExecuted + 1,
+          nodeId: item.nodeId,
+          outcome: result.outcome,
+          findingsCount: result.findings.length,
+          coverageExercised: result.coverageSnapshot.controlsExercised,
+          coverageDiscovered: result.coverageSnapshot.controlsDiscovered,
+        });
+
+        for (const finding of result.findings) {
+          emitEngineEvent(eventStream, "finding", {
+            taskId: item.id,
+            title: finding.title,
+            severity: finding.severity,
+            category: finding.category,
+          });
+        }
+
+        totalFindingsCount += result.findings.length;
+
         await expandGraph(ctx, item.nodeId, result, useLLMPlanner);
         routeFollowups(ctx, item.nodeId, result);
 
@@ -486,6 +532,18 @@ export async function runEngine(
       }
 
       maintainFrontier(ctx);
+
+      // Emit progress event after each batch
+      const elapsedSinceStart = Date.now() - startMs;
+      const timeBudgetMs = budget.globalTimeLimitSeconds * 1000;
+      emitEngineEvent(eventStream, "progress", {
+        tasksExecuted,
+        tasksRemaining: ctx.frontier.size(),
+        totalFindings: totalFindingsCount,
+        statesDiscovered: ctx.graph.nodeCount(),
+        elapsedMs: elapsedSinceStart,
+        estimatedProgress: Math.min(1, elapsedSinceStart / timeBudgetMs),
+      });
 
       // Periodic checkpoint
       if (
@@ -506,6 +564,10 @@ export async function runEngine(
         );
         tasksSinceCheckpoint = 0;
         console.log(`  Checkpoint saved (${tasksExecuted} tasks completed)`);
+        emitEngineEvent(eventStream, "checkpoint", {
+          tasksExecuted,
+          outputDir,
+        });
       }
 
       // Navigate primary browser back to root
@@ -586,8 +648,18 @@ export async function runEngine(
     console.log(
       `\nDone. ${tasksExecuted} tasks executed, ${totalFindings} finding(s), ${ctx.graph.nodeCount()} states discovered, ${blindSpots.length} blind spot(s).`
     );
+
+    emitEngineEvent(eventStream, "run:end", {
+      timestamp: new Date().toISOString(),
+      tasksExecuted,
+      totalFindings,
+      statesDiscovered: ctx.graph.nodeCount(),
+      blindSpots: blindSpots.length,
+      durationMs: Date.now() - startTime.getTime(),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    emitEngineEvent(eventStream, "run:error", { message, phase: "engine" });
     console.error(`\nFatal error: ${message}`);
     throw error;
   } finally {

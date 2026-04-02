@@ -22,6 +22,7 @@ import type { NetworkTrafficObserver } from "../network/traffic-observer.js";
 import type { ContractIndex } from "../spec/contract-index.js";
 import type { ApiRequestContextLike } from "../api/types.js";
 import type { SafetyGuard } from "../policy/safety-guard.js";
+import type { EngineEventEmitter } from "./event-stream.js";
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -51,4 +52,5 @@ export interface EngineContext {
   runMemory?: RunMemoryMeta;
   createIsolatedApiRequestContext?: () => Promise<ApiRequestContextLike>;
   safetyGuard?: SafetyGuard;
+  eventStream?: EngineEventEmitter;
 }

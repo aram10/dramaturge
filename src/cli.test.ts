@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { resolve } from "node:path";
-import { buildHelpText, parseCliArgs, runCli } from "./cli.js";
+import { buildHelpText, parseCliArgs, runCli, attachCliListeners } from "./cli.js";
+import { EngineEventEmitter } from "./engine/event-stream.js";
 
 describe("parseCliArgs", () => {
   it("parses config and resume arguments", () => {
@@ -67,9 +68,12 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(0);
     expect(loadConfig).toHaveBeenCalledWith("custom.json");
-    expect(runEngineMock).toHaveBeenCalledWith(config, {
+    expect(runEngineMock).toHaveBeenCalledWith(config, expect.objectContaining({
       resumeDir: resolve("C:/tmp/dramaturge/configs/run"),
-    });
+    }));
+    // Event stream should be wired up
+    const passedOptions = runEngineMock.mock.calls[0][1];
+    expect(passedOptions.eventStream).toBeDefined();
   });
 
   it("reports errors and returns a failing exit code", async () => {
@@ -88,5 +92,138 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(1);
     expect(errors).toEqual(["Error: missing config"]);
+  });
+});
+
+describe("attachCliListeners", () => {
+  it("logs task:start events", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("task:start", {
+      taskId: "t1",
+      taskNumber: 1,
+      nodeId: "n1",
+      workerType: "navigation",
+      objective: "Explore home page",
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("[task 1]");
+    expect(messages[0]).toContain("navigation");
+    expect(messages[0]).toContain("Explore home page");
+  });
+
+  it("logs task:complete events", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("task:complete", {
+      taskId: "t1",
+      taskNumber: 1,
+      nodeId: "n1",
+      outcome: "completed",
+      findingsCount: 2,
+      coverageExercised: 5,
+      coverageDiscovered: 10,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("completed");
+    expect(messages[0]).toContain("2 finding(s)");
+    expect(messages[0]).toContain("coverage: 5/10");
+  });
+
+  it("logs finding events with severity marker", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("finding", {
+      taskId: "t1",
+      title: "Broken link",
+      severity: "Critical",
+      category: "Bug",
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("⚠");
+    expect(messages[0]).toContain("[Critical]");
+    expect(messages[0]).toContain("Broken link");
+  });
+
+  it("logs state:discovered events", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("state:discovered", {
+      nodeId: "n2",
+      url: "https://example.com/about",
+      pageType: "detail",
+      depth: 1,
+      totalStates: 3,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("new state");
+    expect(messages[0]).toContain("detail");
+    expect(messages[0]).toContain("3 total");
+  });
+
+  it("logs progress events with percentage", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("progress", {
+      tasksExecuted: 5,
+      tasksRemaining: 10,
+      totalFindings: 2,
+      statesDiscovered: 4,
+      elapsedMs: 30_000,
+      estimatedProgress: 0.33,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("33%");
+    expect(messages[0]).toContain("5 done");
+    expect(messages[0]).toContain("10 queued");
+  });
+
+  it("omits coverage from task:complete when zero", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("task:complete", {
+      taskId: "t1",
+      taskNumber: 1,
+      nodeId: "n1",
+      outcome: "blocked",
+      findingsCount: 0,
+      coverageExercised: 0,
+      coverageDiscovered: 0,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).not.toContain("coverage");
+  });
+
+  it("logs run:error events", () => {
+    const emitter = new EngineEventEmitter();
+    const messages: string[] = [];
+    attachCliListeners(emitter, (msg) => messages.push(msg));
+
+    emitter.emit("run:error", {
+      message: "Browser crashed",
+      phase: "engine",
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain("Error:");
+    expect(messages[0]).toContain("Browser crashed");
   });
 });
