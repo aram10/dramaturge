@@ -1,0 +1,186 @@
+name: "Dramaturge"
+description: "Run Dramaturge exploratory QA engine against your web application"
+
+branding:
+  icon: "search"
+  color: "purple"
+
+inputs:
+  config:
+    description: "Path to Dramaturge config file"
+    required: false
+    default: "dramaturge.config.json"
+  target-url:
+    description: "Target URL to test (overrides config value)"
+    required: false
+  anthropic-api-key:
+    description: "Anthropic API key"
+    required: false
+  openai-api-key:
+    description: "OpenAI API key"
+    required: false
+  google-api-key:
+    description: "Google Generative AI API key"
+    required: false
+  fail-on-severity:
+    description: >
+      Fail the step if findings at or above this severity are found.
+      Accepted values: critical, major, minor, trivial.
+      Leave empty to never fail on findings.
+    required: false
+    default: ""
+  upload-report:
+    description: "Upload the report as a workflow artifact"
+    required: false
+    default: "true"
+  post-comment:
+    description: "Post a summary comment on the PR"
+    required: false
+    default: "true"
+  report-dir:
+    description: "Directory for report output (overrides config value)"
+    required: false
+    default: ""
+  working-directory:
+    description: "Working directory for running Dramaturge"
+    required: false
+    default: "."
+  node-version:
+    description: "Node.js version to use"
+    required: false
+    default: "20"
+  dramaturge-version:
+    description: 'Dramaturge package version to install (e.g. "0.1.0" or "latest")'
+    required: false
+    default: "latest"
+
+outputs:
+  report-path:
+    description: "Path to the generated report directory"
+    value: ${{ steps.parse.outputs.report-path }}
+  finding-count:
+    description: "Total number of findings"
+    value: ${{ steps.parse.outputs.finding-count }}
+  max-severity:
+    description: "Highest severity level found (Critical, Major, Minor, Trivial, or none)"
+    value: ${{ steps.parse.outputs.max-severity }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        registry-url: "https://npm.pkg.github.com"
+        scope: "@aram10"
+
+    - name: Install Dramaturge
+      shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ github.token }}
+      run: npm install -g @aram10/dramaturge@${{ inputs.dramaturge-version }}
+
+    - name: Install Playwright browsers
+      shell: bash
+      run: npx playwright install --with-deps chromium
+
+    - name: Prepare config
+      id: config
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_TARGET_URL: ${{ inputs.target-url }}
+        INPUT_REPORT_DIR: ${{ inputs.report-dir }}
+      run: node "${{ github.action_path }}/action/prepare-config.js"
+
+    - name: Run Dramaturge
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        GOOGLE_GENERATIVE_AI_API_KEY: ${{ inputs.google-api-key }}
+      run: dramaturge --config "${{ steps.config.outputs.config-path }}"
+      continue-on-error: true
+
+    - name: Parse results
+      id: parse
+      if: always() && steps.config.outcome == 'success'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        node "${{ github.action_path }}/action/parse-results.js" \
+          "${{ steps.config.outputs.report-dir }}" \
+          "${{ inputs.fail-on-severity }}"
+
+    - name: Fail on Dramaturge error
+      if: always() && steps.run.outcome == 'failure' && steps.parse.outputs.finding-count == '0'
+      shell: bash
+      run: |
+        echo "::error::Dramaturge failed to run. Check the 'Run Dramaturge' step for details."
+        exit 1
+
+    - name: Post PR comment
+      if: always() && inputs.post-comment == 'true' && github.event_name == 'pull_request' && steps.parse.outcome == 'success'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const summaryPath = '${{ steps.parse.outputs.summary-path }}';
+          if (!summaryPath || !fs.existsSync(summaryPath)) {
+            core.info('No summary file found, skipping PR comment');
+            return;
+          }
+          const summary = fs.readFileSync(summaryPath, 'utf-8');
+
+          const marker = '<!-- dramaturge-report -->';
+          const body = marker + '\n' + summary;
+
+          // Paginate through all comments to find an existing marker
+          let existing = null;
+          for await (const response of github.paginate.iterator(
+            github.rest.issues.listComments,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            }
+          )) {
+            existing = response.data.find(c => c.body?.includes(marker));
+            if (existing) break;
+          }
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
+
+    - name: Upload report artifact
+      if: always() && inputs.upload-report == 'true' && steps.parse.outcome == 'success'
+      uses: actions/upload-artifact@v4
+      with:
+        name: dramaturge-report
+        path: ${{ steps.parse.outputs.report-path }}
+        if-no-files-found: warn
+
+    - name: Check severity threshold
+      if: always() && inputs.fail-on-severity != '' && steps.parse.outputs.threshold-exceeded == 'true'
+      shell: bash
+      run: |
+        echo "::error::Dramaturge found findings at or above '${{ inputs.fail-on-severity }}' severity (max: ${{ steps.parse.outputs.max-severity }})"
+        exit 1
