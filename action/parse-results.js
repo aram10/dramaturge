@@ -23,6 +23,14 @@ const SEVERITY_ORDER = ["Critical", "Major", "Minor", "Trivial"];
 /** Numeric rank for each severity (lower = more severe). */
 const SEVERITY_RANK = { Critical: 0, Major: 1, Minor: 2, Trivial: 3 };
 
+/** Emoji icons for each severity level. */
+const SEVERITY_ICON = {
+  Critical: "\u{1F534}",
+  Major: "\u{1F7E0}",
+  Minor: "\u{1F7E1}",
+  Trivial: "\u26AA",
+};
+
 /**
  * Finds the most recent timestamped report directory that contains
  * a report.json file.
@@ -84,12 +92,6 @@ export function buildSummary(report) {
   }
 
   const topFindings = findings.slice(0, 10);
-  const severityIcon = {
-    Critical: "\u{1F534}",
-    Major: "\u{1F7E0}",
-    Minor: "\u{1F7E1}",
-    Trivial: "\u26AA",
-  };
 
   const duration = meta.durationMs ? formatDuration(meta.durationMs) : "unknown";
 
@@ -107,7 +109,7 @@ export function buildSummary(report) {
   md += `| Severity | Count |\n`;
   md += `|----------|-------|\n`;
   for (const sev of SEVERITY_ORDER) {
-    md += `| ${severityIcon[sev]} ${sev} | ${bySeverity[sev] || 0} |\n`;
+    md += `| ${SEVERITY_ICON[sev]} ${sev} | ${bySeverity[sev] || 0} |\n`;
   }
 
   if (topFindings.length > 0) {
