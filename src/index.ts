@@ -19,9 +19,20 @@ export type { RunEngineOptions } from "./engine.js";
 export { CATEGORY_PREFIX } from "./types.js";
 export { MemoryStore, buildFindingSignature } from "./memory/store.js";
 export { comparePngBuffers, runVisualRegressionScan } from "./coverage/visual-regression.js";
+export { collectWebVitals, evaluateWebVitals } from "./coverage/web-vitals.js";
+export type { WebVitalsResult, WebVitalsThresholds } from "./coverage/web-vitals.js";
+export { runMultiViewportVisualRegression, DEFAULT_BREAKPOINTS } from "./coverage/responsive-regression.js";
+export type { ResponsiveBreakpoint, MultiViewportOptions } from "./coverage/responsive-regression.js";
+export { CostTracker, estimateCallCost, approximateTokenCount } from "./coverage/cost-tracker.js";
+export type { CostRecord, CostSummary } from "./coverage/cost-tracker.js";
 export { defineEvalFixtures } from "./evals/fixtures.js";
 export { summarizeEvalResults } from "./evals/harness.js";
 export { scanGenericRepo } from "./adaptation/generic.js";
+export { scanReactRouterRepo, canScanReactRouterRepo } from "./adaptation/react-router.js";
+export { scanExpressRepo, canScanExpressRepo } from "./adaptation/express.js";
+export { scanVueRouterRepo, canScanVueRouterRepo } from "./adaptation/vue-router.js";
+export { scanDjangoRepo, canScanDjangoRepo } from "./adaptation/django.js";
+export { scanTanStackRouterRepo, canScanTanStackRouterRepo } from "./adaptation/tanstack-router.js";
 export {
   generatePlaywrightTests,
   writeGeneratedPlaywrightTests,

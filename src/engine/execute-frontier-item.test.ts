@@ -4,6 +4,8 @@ import { executeWorkerTask } from "../worker/worker.js";
 import { executeApiWorkerTask } from "../api/worker.js";
 import { runAccessibilityScan } from "../coverage/accessibility.js";
 import { runVisualRegressionScan } from "../coverage/visual-regression.js";
+import { collectWebVitals, evaluateWebVitals } from "../coverage/web-vitals.js";
+import { runMultiViewportVisualRegression } from "../coverage/responsive-regression.js";
 import { SafetyGuard } from "../policy/safety-guard.js";
 
 vi.mock("../worker/worker.js", () => ({
@@ -28,17 +30,52 @@ vi.mock("../coverage/visual-regression.js", () => ({
   }),
 }));
 
+vi.mock("../coverage/web-vitals.js", () => ({
+  collectWebVitals: vi.fn().mockResolvedValue({
+    lcp: null,
+    cls: null,
+    inp: null,
+  }),
+  evaluateWebVitals: vi.fn().mockReturnValue({
+    findings: [],
+    evidence: [],
+  }),
+}));
+
+vi.mock("../coverage/responsive-regression.js", () => ({
+  runMultiViewportVisualRegression: vi.fn().mockResolvedValue({
+    findings: [],
+    evidence: [],
+  }),
+}));
+
 describe("executeFrontierItem", () => {
   beforeEach(() => {
     vi.mocked(executeWorkerTask).mockReset();
     vi.mocked(executeApiWorkerTask).mockReset();
     vi.mocked(runAccessibilityScan).mockReset();
     vi.mocked(runVisualRegressionScan).mockReset();
+    vi.mocked(collectWebVitals).mockReset();
+    vi.mocked(evaluateWebVitals).mockReset();
+    vi.mocked(runMultiViewportVisualRegression).mockReset();
     vi.mocked(runAccessibilityScan).mockResolvedValue({
       findings: [],
       evidence: [],
     });
     vi.mocked(runVisualRegressionScan).mockResolvedValue({
+      findings: [],
+      evidence: [],
+    });
+    vi.mocked(collectWebVitals).mockResolvedValue({
+      lcp: null,
+      cls: null,
+      inp: null,
+    });
+    vi.mocked(evaluateWebVitals).mockReturnValue({
+      findings: [],
+      evidence: [],
+    });
+    vi.mocked(runMultiViewportVisualRegression).mockResolvedValue({
       findings: [],
       evidence: [],
     });
@@ -98,6 +135,8 @@ describe("executeFrontierItem", () => {
         appContext: {
           knownPatterns: ["401s are expected before login"],
         },
+        webVitals: { enabled: false, thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 } },
+        responsiveRegression: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 12,
@@ -392,6 +431,8 @@ describe("executeFrontierItem", () => {
           fullPage: true,
           maskSelectors: [],
         },
+        webVitals: { enabled: false, thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 } },
+        responsiveRegression: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 5,
@@ -441,6 +482,149 @@ describe("executeFrontierItem", () => {
     });
 
     expect(order).toEqual(["accessibility", "visual", "worker"]);
+  });
+
+  it("runs web vitals and responsive regression scans when enabled", async () => {
+    const order: string[] = [];
+    vi.mocked(runAccessibilityScan).mockImplementation(async () => {
+      order.push("accessibility");
+      return { findings: [], evidence: [] };
+    });
+    vi.mocked(runVisualRegressionScan).mockImplementation(async () => {
+      order.push("visual");
+      return { findings: [], evidence: [] };
+    });
+    vi.mocked(collectWebVitals).mockImplementation(async () => {
+      order.push("webvitals-collect");
+      return { lcp: 1500, cls: 0.05, inp: 100 };
+    });
+    vi.mocked(evaluateWebVitals).mockImplementation(() => {
+      order.push("webvitals-evaluate");
+      return { findings: [], evidence: [] };
+    });
+    vi.mocked(runMultiViewportVisualRegression).mockImplementation(async () => {
+      order.push("responsive");
+      return { findings: [], evidence: [] };
+    });
+    vi.mocked(executeWorkerTask).mockImplementation(async () => {
+      order.push("worker");
+      return {
+        taskId: "task-3",
+        findings: [],
+        evidence: [],
+        coverageSnapshot: {
+          controlsDiscovered: 0,
+          controlsExercised: 0,
+          events: [],
+        },
+        followupRequests: [],
+        discoveredEdges: [],
+        outcome: "completed",
+        summary: "ok",
+      };
+    });
+
+    const ctx = {
+      config: {
+        targetUrl: "https://example.com",
+        appDescription: "Example app",
+        models: {
+          planner: "anthropic/claude-sonnet-4-6",
+          worker: "anthropic/claude-haiku-4-5",
+          agentMode: "dom",
+        },
+        budget: {
+          stagnationThreshold: 3,
+        },
+        output: {
+          screenshots: true,
+        },
+        visualRegression: {
+          enabled: true,
+          baselineDir: "C:/tmp/baselines",
+          diffPixelRatioThreshold: 0.01,
+          includeAA: false,
+          fullPage: true,
+          maskSelectors: [],
+        },
+        webVitals: {
+          enabled: true,
+          thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 },
+        },
+        responsiveRegression: {
+          enabled: true,
+        },
+      },
+      budget: {
+        maxStepsPerTask: 5,
+      },
+      screenshotDir: "C:/tmp/screenshots",
+      outputDir: "C:/tmp/output",
+      navigator: {
+        navigateTo: vi.fn().mockResolvedValue({ success: true }),
+      },
+      planner: {
+        recordDispatch: vi.fn(),
+      },
+      graph: {
+        getNode: vi.fn().mockReturnValue({
+          id: "node-3",
+          title: "Dashboard",
+          pageType: "dashboard",
+          url: "https://example.com/dashboard",
+          fingerprint: {
+            hash: "fp-dashboard",
+          },
+        }),
+        recordVisit: vi.fn(),
+      },
+    } as any;
+
+    await executeFrontierItem({
+      ctx,
+      stagehand: { name: "worker-3" } as any,
+      page: {
+        evaluate: vi.fn(),
+        url: () => "https://example.com/dashboard",
+      } as any,
+      item: {
+        id: "task-3",
+        nodeId: "node-3",
+        workerType: "navigation",
+        objective: "Inspect the dashboard",
+        priority: 0.7,
+        reason: "coverage",
+        retryCount: 0,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+      },
+      taskNumber: 3,
+      pageKey: "page-3",
+    });
+
+    expect(order).toEqual([
+      "accessibility",
+      "visual",
+      "webvitals-collect",
+      "webvitals-evaluate",
+      "responsive",
+      "worker",
+    ]);
+    expect(collectWebVitals).toHaveBeenCalled();
+    expect(evaluateWebVitals).toHaveBeenCalledWith(
+      { lcp: 1500, cls: 0.05, inp: 100 },
+      "https://example.com/dashboard",
+      "Dashboard",
+      { lcpMs: 2500, cls: 0.1, inpMs: 200 },
+    );
+    expect(runMultiViewportVisualRegression).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        areaName: "Dashboard",
+        route: "https://example.com/dashboard",
+        fingerprintHash: "fp-dashboard",
+      }),
+    );
   });
 
   it("skips execution when safety guard blocks the node URL", async () => {
