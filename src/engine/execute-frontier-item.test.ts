@@ -6,6 +6,7 @@ import { runAccessibilityScan } from "../coverage/accessibility.js";
 import { runVisualRegressionScan } from "../coverage/visual-regression.js";
 import { collectWebVitals, evaluateWebVitals } from "../coverage/web-vitals.js";
 import { runMultiViewportVisualRegression } from "../coverage/responsive-regression.js";
+import { SafetyGuard } from "../policy/safety-guard.js";
 
 vi.mock("../worker/worker.js", () => ({
   executeWorkerTask: vi.fn(),
@@ -624,5 +625,61 @@ describe("executeFrontierItem", () => {
         fingerprintHash: "fp-dashboard",
       }),
     );
+  });
+
+  it("skips execution when safety guard blocks the node URL", async () => {
+    const guard = new SafetyGuard({
+      allowedUrlPatterns: [],
+      blockedUrlPatterns: ["/admin/**"],
+      blockDestructiveRequests: true,
+      destructiveActionKeywords: [],
+    });
+
+    const ctx = {
+      config: {
+        targetUrl: "https://example.com",
+      },
+      safetyGuard: guard,
+      navigator: {
+        navigateTo: vi.fn().mockResolvedValue({ success: true }),
+      },
+      graph: {
+        getNode: vi.fn().mockReturnValue({
+          id: "node-blocked",
+          pageType: "list",
+          url: "https://example.com/admin/delete",
+        }),
+      },
+      planner: {
+        recordDispatch: vi.fn(),
+      },
+      trafficObserver: {
+        resetPage: vi.fn(),
+        snapshot: vi.fn().mockReturnValue([]),
+      },
+    } as any;
+
+    const result = await executeFrontierItem({
+      ctx,
+      stagehand: {} as any,
+      page: {} as any,
+      item: {
+        id: "task-blocked",
+        nodeId: "node-blocked",
+        workerType: "navigation",
+        objective: "Explore admin area",
+        priority: 0.5,
+        reason: "coverage",
+        retryCount: 0,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+      } as const,
+      taskNumber: 1,
+      pageKey: "page-blocked",
+    });
+
+    expect(result.result).toBeNull();
+    expect(ctx.navigator.navigateTo).not.toHaveBeenCalled();
+    expect(executeWorkerTask).not.toHaveBeenCalled();
   });
 });
