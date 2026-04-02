@@ -21,6 +21,7 @@ import type { RunMemoryMeta } from "../types.js";
 import type { NetworkTrafficObserver } from "../network/traffic-observer.js";
 import type { ContractIndex } from "../spec/contract-index.js";
 import type { ApiRequestContextLike } from "../api/types.js";
+import type { SafetyGuard } from "../policy/safety-guard.js";
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -49,4 +50,5 @@ export interface EngineContext {
   memoryStore?: MemoryStore;
   runMemory?: RunMemoryMeta;
   createIsolatedApiRequestContext?: () => Promise<ApiRequestContextLike>;
+  safetyGuard?: SafetyGuard;
 }
