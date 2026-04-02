@@ -23,12 +23,55 @@ const reportDir = process.env.INPUT_REPORT_DIR || "";
 const runnerTemp = process.env.RUNNER_TEMP || "/tmp";
 const githubOutput = process.env.GITHUB_OUTPUT || "";
 
+/**
+ * Strips JSONC comments while preserving content inside strings
+ * (e.g. URLs containing "//"). Mirrors src/utils/jsonc.ts.
+ */
+function stripJsonComments(input) {
+  let output = "";
+  let inString = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const current = input[i];
+    const next = input[i + 1];
+
+    if (inString) {
+      output += current;
+      if (isEscaped) { isEscaped = false; }
+      else if (current === "\\") { isEscaped = true; }
+      else if (current === "\"") { inString = false; }
+      continue;
+    }
+
+    if (current === "\"") { inString = true; output += current; continue; }
+
+    if (current === "/" && next === "/") {
+      i += 2;
+      while (i < input.length && input[i] !== "\n") { i++; }
+      if (i < input.length) { output += input[i]; }
+      continue;
+    }
+
+    if (current === "/" && next === "*") {
+      i += 2;
+      while (i < input.length - 1) {
+        if (input[i] === "*" && input[i + 1] === "/") { i++; break; }
+        i++;
+      }
+      continue;
+    }
+
+    output += current;
+  }
+
+  return output;
+}
+
 let config = {};
 if (existsSync(configPath)) {
   const raw = readFileSync(configPath, "utf-8");
-  // Strip JSONC single-line and multi-line comments
-  const stripped = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
-  config = JSON.parse(stripped);
+  config = JSON.parse(stripJsonComments(raw));
 }
 
 if (targetUrl) config.targetUrl = targetUrl;
