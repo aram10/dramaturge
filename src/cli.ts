@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from "./config.js";
 import { resolveResumeDir } from "./config-paths.js";
 import { runEngine, type RunEngineOptions } from "./engine.js";
+import { EngineEventEmitter } from "./engine/event-stream.js";
+import type { FindingEvent, ProgressEvent, StateDiscoveredEvent, TaskStartEvent, TaskCompleteEvent } from "./engine/event-stream.js";
 
 export interface ParsedCliArgs {
   configPath?: string;
@@ -100,8 +102,13 @@ export async function runCli(
     }
 
     const config = dependencies.loadConfig(parsedArgs.configPath);
+
+    const eventStream = new EngineEventEmitter();
+    attachCliListeners(eventStream, dependencies.log);
+
     await dependencies.runEngine(config, {
       resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
+      eventStream,
     });
     return 0;
   } catch (error) {
@@ -109,6 +116,42 @@ export async function runCli(
     dependencies.error(`Error: ${message}`);
     return 1;
   }
+}
+
+/**
+ * Wire event-stream listeners that provide live terminal output during a run.
+ * Exposed as a named export so tests can verify the wiring without running the engine.
+ */
+export function attachCliListeners(
+  emitter: EngineEventEmitter,
+  log: (message: string) => void
+): void {
+  emitter.on("task:start", (evt: TaskStartEvent) => {
+    log(`[task ${evt.taskNumber}] ${evt.workerType}: ${evt.objective}`);
+  });
+
+  emitter.on("task:complete", (evt: TaskCompleteEvent) => {
+    const coverage =
+      evt.coverageExercised > 0
+        ? ` | coverage: ${evt.coverageExercised}/${evt.coverageDiscovered}`
+        : "";
+    log(`[task ${evt.taskNumber}] ${evt.outcome}: ${evt.findingsCount} finding(s)${coverage}`);
+  });
+
+  emitter.on("finding", (evt: FindingEvent) => {
+    log(`  ⚠ [${evt.severity}] ${evt.title}`);
+  });
+
+  emitter.on("state:discovered", (evt: StateDiscoveredEvent) => {
+    log(`  ↳ new state: ${evt.pageType} (${evt.totalStates} total)`);
+  });
+
+  emitter.on("progress", (evt: ProgressEvent) => {
+    const pct = Math.round(evt.estimatedProgress * 100);
+    log(
+      `── progress: ${pct}% | ${evt.tasksExecuted} done, ${evt.tasksRemaining} queued, ${evt.totalFindings} finding(s), ${evt.statesDiscovered} state(s)`
+    );
+  });
 }
 
 const executedDirectly =

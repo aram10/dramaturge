@@ -2,6 +2,7 @@ import type { EngineContext } from "./context.js";
 import type { WorkerResult, FrontierItem } from "../types.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
+import { emitEngineEvent } from "./event-stream.js";
 
 function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): void {
   const existing = map.get(nodeId) ?? [];
@@ -82,6 +83,14 @@ export async function expandGraph(
           );
       ctx.frontier.enqueueMany(newTasks);
       console.log(`  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`);
+
+      emitEngineEvent(ctx.eventStream, "state:discovered", {
+        nodeId: newNode.id,
+        url: edge.navigationHint.url,
+        pageType: newNode.pageType,
+        depth: newNode.depth,
+        totalStates: ctx.graph.nodeCount(),
+      });
     }
   }
 }
