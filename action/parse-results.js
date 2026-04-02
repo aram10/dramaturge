@@ -74,12 +74,17 @@ export function buildSummary(report) {
   const summary = report.summary || {};
   const findings = report.findings || [];
 
-  const bySeverity = summary.bySeverity || {
-    Critical: 0,
-    Major: 0,
-    Minor: 0,
-    Trivial: 0,
-  };
+  let bySeverity = summary.bySeverity;
+  if (!bySeverity) {
+    // Compute severity counts from the findings array when the summary
+    // block does not include pre-computed counts.
+    bySeverity = { Critical: 0, Major: 0, Minor: 0, Trivial: 0 };
+    for (const f of findings) {
+      if (f.severity && bySeverity[f.severity] !== undefined) {
+        bySeverity[f.severity]++;
+      }
+    }
+  }
   const totalFindings = summary.totalFindings ?? findings.length;
 
   // Determine highest severity present
