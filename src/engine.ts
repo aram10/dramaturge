@@ -57,6 +57,7 @@ function resolveBudget(config: DramaturgeConfig): BudgetConfig {
       config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
     maxFrontierSize: config.budget.maxFrontierSize ?? 200,
     maxStateNodes: config.budget.maxStateNodes ?? 50,
+    costLimitUsd: config.budget.costLimitUsd,
   };
 }
 
@@ -250,11 +251,10 @@ export async function runEngine(
 
   let workerPool: WorkerSession[] = [];
 
-  const costLimitUsd = budget.costLimitUsd ?? config.budget.costLimitUsd;
   // CostTracker is always instantiated for tracking; budget enforcement is only
   // active when costLimitUsd > 0 (default 0 means unlimited → Infinity).
   const costTracker = new CostTracker(
-    costLimitUsd && costLimitUsd > 0 ? costLimitUsd : Infinity
+    budget.costLimitUsd && budget.costLimitUsd > 0 ? budget.costLimitUsd : Infinity
   );
 
   const ctx: EngineContext = {
