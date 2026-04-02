@@ -16,6 +16,21 @@ export type {
 } from "./config.js";
 export { runEngine } from "./engine.js";
 export type { RunEngineOptions } from "./engine.js";
+export { EngineEventEmitter, emitEngineEvent } from "./engine/event-stream.js";
+export type {
+  EngineEventMap,
+  EngineEventName,
+  RunStartEvent,
+  RunEndEvent,
+  TaskStartEvent,
+  TaskCompleteEvent,
+  FindingEvent,
+  StateDiscoveredEvent,
+  ProgressEvent,
+  CheckpointEvent,
+  ErrorEvent,
+} from "./engine/event-stream.js";
+export { attachCliListeners } from "./cli.js";
 export { CATEGORY_PREFIX } from "./types.js";
 export { MemoryStore, buildFindingSignature } from "./memory/store.js";
 export { comparePngBuffers, runVisualRegressionScan } from "./coverage/visual-regression.js";
