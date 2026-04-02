@@ -2,6 +2,7 @@ import { shortId } from "../constants.js";
 import { buildAgentFindingMeta } from "../repro/repro.js";
 import type { RawFinding } from "../types.js";
 import { buildTraceBundle } from "./bundle.js";
+import { runDeterministicGraders } from "./deterministic-graders.js";
 import { buildJudgePrompt } from "./prompt.js";
 import type {
   JudgeDecision,
@@ -77,7 +78,18 @@ export async function judgeWorkerObservations(
     const traceBundle = buildTraceBundle(observation, input.evidence, input.actions);
     let decision = buildDeterministicDecision(observation);
 
-    if (input.config?.enabled !== false && input.judgeText) {
+    // Run deterministic graders before LLM judge
+    const graderResult = runDeterministicGraders(observation, input.evidence);
+    decision.confidence = graderResult.combinedConfidence;
+
+    const graderNotes = graderResult.results
+      .filter((r) => !r.confirmed)
+      .map((r) => `Deterministic grader "${r.grader}": ${r.reason}`);
+
+    const deterministicFullyConfident =
+      graderResult.combinedConfidence === "high" && graderResult.allConfirmed;
+
+    if (!deterministicFullyConfident && input.config?.enabled !== false && input.judgeText) {
       try {
         decision = await input.judgeText(
           buildJudgePrompt(observation, traceBundle),
@@ -92,6 +104,14 @@ export async function judgeWorkerObservations(
           ],
         };
       }
+    }
+
+    // Append deterministic grader notes to final decision
+    if (graderNotes.length > 0) {
+      decision.alternativesConsidered = [
+        ...decision.alternativesConsidered,
+        ...graderNotes,
+      ];
     }
 
     const finding = materializeFinding(observation, decision, traceBundle);

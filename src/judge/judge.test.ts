@@ -88,4 +88,96 @@ describe("judgeWorkerObservations", () => {
       "Judge fallback used because the preferred judgment path failed."
     );
   });
+
+  it("skips LLM judge when deterministic graders are fully confident", async () => {
+    const judgeText = vi.fn();
+
+    const evidence = [
+      {
+        id: "ev-1",
+        type: "console-error" as const,
+        summary: "Console error captured",
+        timestamp: "2026-03-30T12:00:00Z",
+        relatedFindingIds: ["obs-3"],
+      },
+      {
+        id: "ev-2",
+        type: "network-error" as const,
+        summary: "Network error captured",
+        timestamp: "2026-03-30T12:00:01Z",
+        relatedFindingIds: ["obs-3"],
+      },
+    ];
+
+    const findings = await judgeWorkerObservations({
+      observations: [
+        {
+          id: "obs-3",
+          category: "Bug",
+          severity: "Major",
+          title: "Page crashes with errors",
+          stepsToReproduce: ["Load the page"],
+          expected: "Page loads cleanly",
+          actual: "Console and network errors appear",
+          evidenceIds: ["ev-1", "ev-2"],
+          route: "/dashboard",
+          objective: "Test page load",
+          breadcrumbs: [],
+          actionIds: [],
+        },
+      ],
+      evidence,
+      actions: [],
+      config: { enabled: true, requestTimeoutMs: 10_000 },
+      judgeText,
+    });
+
+    // All three graders give high confidence → LLM judge should be skipped
+    expect(judgeText).not.toHaveBeenCalled();
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.meta?.confidence).toBe("high");
+  });
+
+  it("calls LLM judge when deterministic graders do not fully confirm", async () => {
+    const judgeText = vi.fn().mockResolvedValue({
+      hypothesis: "The form should submit successfully",
+      observation: "Form submission failed",
+      alternativesConsidered: ["LLM considered alternatives"],
+      suggestedVerification: ["Try submitting again"],
+      confidence: "high",
+    });
+
+    const findings = await judgeWorkerObservations({
+      observations: [
+        {
+          id: "obs-4",
+          category: "Bug",
+          severity: "Major",
+          title: "Form fails silently",
+          stepsToReproduce: ["Fill form", "Click submit"],
+          expected: "Success message",
+          actual: "Nothing happens",
+          evidenceIds: [],
+          route: "/form",
+          objective: "Test form submission",
+          breadcrumbs: [],
+          actionIds: [],
+        },
+      ],
+      evidence: [],
+      actions: [],
+      config: { enabled: true, requestTimeoutMs: 10_000 },
+      judgeText,
+    });
+
+    // No evidence → graders give low confidence → LLM judge should be called
+    expect(judgeText).toHaveBeenCalled();
+    expect(findings).toHaveLength(1);
+    // Grader notes should be appended to LLM decision
+    expect(
+      findings[0]?.verdict?.alternativesConsidered.some((a: string) =>
+        a.includes("Deterministic grader")
+      )
+    ).toBe(true);
+  });
 });
