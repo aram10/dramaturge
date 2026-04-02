@@ -3,6 +3,7 @@ import type { WorkerResult, FrontierItem } from "../types.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
 import { emitEngineEvent } from "./event-stream.js";
+import { isNodeAffectedByDiff } from "../diff/diff-hints.js";
 
 function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): void {
   const existing = map.get(nodeId) ?? [];
@@ -56,6 +57,15 @@ export async function expandGraph(
 
     const existing = ctx.graph.findByFingerprint(fingerprint);
     if (!existing) {
+      // When restrictToChanged is enabled, skip nodes outside the diff scope
+      if (
+        ctx.diffContext &&
+        ctx.config.diffAware.restrictToChanged &&
+        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext)
+      ) {
+        continue;
+      }
+
       const newNode = ctx.graph.addNode({
         fingerprint, pageType,
         url: edge.navigationHint.url,
@@ -72,14 +82,16 @@ export async function expandGraph(
             ctx.mission,
             ctx.repoHints,
             ctx.config.llm.requestTimeoutMs,
-            ctx.memoryStore?.getPlannerSignals(newNode)
+            ctx.memoryStore?.getPlannerSignals(newNode),
+            ctx.diffContext,
           )
         : ctx.planner.proposeTasks(
             newNode,
             ctx.graph,
             ctx.mission,
             ctx.repoHints,
-            ctx.memoryStore?.getPlannerSignals(newNode)
+            ctx.memoryStore?.getPlannerSignals(newNode),
+            ctx.diffContext,
           );
       ctx.frontier.enqueueMany(newTasks);
       console.log(`  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`);

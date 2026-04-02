@@ -1,6 +1,7 @@
 import type {
   AreaResult,
   BlindSpot,
+  DiffSummary,
   Finding,
   FindingSeverity,
   RunConfigMeta,
@@ -140,7 +141,8 @@ export function buildRunResult(
   blindSpots: BlindSpot[] = [],
   stateGraphMermaid?: string,
   runConfig?: RunConfigMeta,
-  runMemory?: RunMemoryMeta
+  runMemory?: RunMemoryMeta,
+  diffSummary?: DiffSummary,
 ): RunResult {
   return {
     targetUrl,
@@ -153,5 +155,6 @@ export function buildRunResult(
     stateGraphMermaid,
     runConfig,
     runMemory,
+    diffSummary,
   };
 }

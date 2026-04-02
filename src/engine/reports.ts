@@ -7,6 +7,7 @@ import { renderMarkdown } from "../report/markdown.js";
 import { renderJson } from "../report/json.js";
 import { writeGeneratedPlaywrightTests } from "../report/test-gen.js";
 import { hasLLMApiKey } from "../llm.js";
+import type { DiffSummary } from "../types.js";
 
 export function buildAreaResults(ctx: EngineContext): AreaResult[] {
   const results: AreaResult[] = [];
@@ -54,6 +55,15 @@ export function writeReports(
   const blindSpots = ctx.globalCoverage.getBlindSpots();
   const stateGraphMermaid = ctx.graph.nodeCount() > 0 ? ctx.graph.toMermaid() : undefined;
 
+  const diffSummary: DiffSummary | undefined = ctx.diffContext
+    ? {
+        baseRef: ctx.diffContext.baseRef,
+        changedFileCount: ctx.diffContext.changedFiles.length,
+        affectedRoutes: ctx.diffContext.affectedRoutes,
+        affectedApiEndpoints: ctx.diffContext.affectedApiEndpoints,
+      }
+    : undefined;
+
   const runResult = buildRunResult(
     config.targetUrl,
     startTime,
@@ -81,7 +91,8 @@ export function writeReports(
       visualRegressionEnabled: config.visualRegression.enabled,
       warmStartEnabled: config.memory.enabled && config.memory.warmStart,
     },
-    ctx.runMemory
+    ctx.runMemory,
+    diffSummary,
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);
 
