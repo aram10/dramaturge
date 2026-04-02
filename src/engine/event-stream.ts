@@ -89,7 +89,7 @@ export interface EngineEventMap {
   "state:discovered": [StateDiscoveredEvent];
   progress: [ProgressEvent];
   checkpoint: [CheckpointEvent];
-  error: [ErrorEvent];
+  "run:error": [ErrorEvent];
 }
 
 export type EngineEventName = keyof EngineEventMap;

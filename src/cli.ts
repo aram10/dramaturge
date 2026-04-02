@@ -4,7 +4,7 @@ import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from "
 import { resolveResumeDir } from "./config-paths.js";
 import { runEngine, type RunEngineOptions } from "./engine.js";
 import { EngineEventEmitter } from "./engine/event-stream.js";
-import type { FindingEvent, ProgressEvent, StateDiscoveredEvent, TaskStartEvent, TaskCompleteEvent } from "./engine/event-stream.js";
+import type { ErrorEvent, FindingEvent, ProgressEvent, StateDiscoveredEvent, TaskStartEvent, TaskCompleteEvent } from "./engine/event-stream.js";
 
 export interface ParsedCliArgs {
   configPath?: string;
@@ -151,6 +151,10 @@ export function attachCliListeners(
     log(
       `── progress: ${pct}% | ${evt.tasksExecuted} done, ${evt.tasksRemaining} queued, ${evt.totalFindings} finding(s), ${evt.statesDiscovered} state(s)`
     );
+  });
+
+  emitter.on("run:error", (evt: ErrorEvent) => {
+    log(`Error: ${evt.message}`);
   });
 }
 

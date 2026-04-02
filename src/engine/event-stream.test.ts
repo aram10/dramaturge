@@ -144,16 +144,16 @@ describe("EngineEventEmitter", () => {
     expect(handler).toHaveBeenCalledWith(payload);
   });
 
-  it("emits error events", () => {
+  it("emits run:error events", () => {
     const emitter = new EngineEventEmitter();
     const handler = vi.fn();
-    emitter.on("error", handler);
+    emitter.on("run:error", handler);
 
     const payload: ErrorEvent = {
       message: "Browser crashed",
       phase: "engine",
     };
-    emitter.emit("error", payload);
+    emitter.emit("run:error", payload);
 
     expect(handler).toHaveBeenCalledWith(payload);
   });

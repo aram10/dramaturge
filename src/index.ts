@@ -30,7 +30,6 @@ export type {
   CheckpointEvent,
   ErrorEvent,
 } from "./engine/event-stream.js";
-export { attachCliListeners } from "./cli.js";
 export { CATEGORY_PREFIX } from "./types.js";
 export { MemoryStore, buildFindingSignature } from "./memory/store.js";
 export { comparePngBuffers, runVisualRegressionScan } from "./coverage/visual-regression.js";
