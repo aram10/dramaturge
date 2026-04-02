@@ -244,6 +244,7 @@ describe("generatePlaywrightTests", () => {
     const consoleListenerPos = content.indexOf('page.on("console"');
     const navActionPos = content.indexOf("await page.goto");
     const assertionPos = content.indexOf('expect(consoleErrors, "No console errors expected")');
+    expect(consoleListenerPos).toBeGreaterThan(-1);
     expect(consoleListenerPos).toBeLessThan(navActionPos);
     expect(assertionPos).toBeGreaterThan(navActionPos);
     expect(content).toContain("const consoleErrors: string[] = [];");

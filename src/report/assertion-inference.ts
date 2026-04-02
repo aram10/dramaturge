@@ -49,16 +49,20 @@ export function inferAssertions(
   }
 
   // --- HTTP response errors ---
-  if (
-    /\b(500|502|503|504|server error|internal server error|bad gateway|service unavailable)\b/.test(text) ||
-    hasEvidence(input, "network-error")
-  ) {
+  const hasServerErrorText = /\b(5\d{2}|server error|internal server error|bad gateway|service unavailable)\b/.test(text);
+  const hasNetworkErrorEvidence = hasEvidence(input, "network-error");
+  if (hasServerErrorText || hasNetworkErrorEvidence) {
+    const statusCondition = hasNetworkErrorEvidence
+      ? "resp.status() >= 400 || resp.status() === 0"
+      : "resp.status() >= 500";
     assertions.push({
       preamble:
         "const serverErrors: string[] = [];\n" +
-        '  page.on("response", (resp) => { if (resp.status() >= 500) serverErrors.push(`${resp.status()} ${resp.url()}`); });',
+        '  page.on("response", (resp) => { if (' +
+        statusCondition +
+        ") serverErrors.push(`${resp.status()} ${resp.url()}`); });",
       code: 'expect(serverErrors, "No server errors expected").toHaveLength(0);',
-      reason: "Finding indicates server-side HTTP errors; response listener verifies none occur.",
+      reason: "Finding indicates HTTP/network errors; response listener verifies none occur.",
     });
   }
 
@@ -76,7 +80,7 @@ export function inferAssertions(
   // --- CRUD / list changes ---
   if (
     /\b(list|table|row|rows|item|items|entry|entries|record|records)\b/.test(text) &&
-    /\b(added|created|deleted|removed|updated|changed|empty|missing|count|appears|disappears)\b/.test(text)
+    /\b(added|created|empty|missing|count|appears)\b/.test(text)
   ) {
     assertions.push({
       code: `await expect(page.locator('table tbody tr, [role="row"], [role="listitem"]')).not.toHaveCount(0);`,
@@ -96,17 +100,24 @@ export function inferAssertions(
   }
 
   // --- API contract deviations ---
-  if (
-    (/\b(api|endpoint|contract|schema|payload|response body|rest api)\b/.test(text) &&
-      /\b(mismatch|violation|invalid|unexpected|deviat|broke|fail|error)\b/.test(text)) ||
-    hasEvidence(input, "api-contract")
-  ) {
+  const hasApiContractText =
+    /\b(api|endpoint|contract|schema|payload|response body|rest api)\b/.test(text) &&
+    /\b(mismatch|violation|invalid|unexpected|deviat|broke|fail|error)\b/.test(text);
+  const hasApiContractEvidence = hasEvidence(input, "api-contract");
+  if (hasApiContractText) {
     assertions.push({
       preamble:
         "const apiErrors: string[] = [];\n" +
         '  page.on("response", (resp) => { if (/\\/api\\//.test(resp.url()) && resp.status() >= 400) apiErrors.push(`${resp.status()} ${resp.url()}`); });',
       code: 'expect(apiErrors, "No API errors expected").toHaveLength(0);',
       reason: "Finding describes an API contract deviation; response listener validates API calls succeed.",
+    });
+  } else if (hasApiContractEvidence) {
+    assertions.push({
+      code: "// TODO: Validate API response body against the expected contract schema.\n" +
+        "  // The linked api-contract evidence indicates a schema mismatch that may occur\n" +
+        "  // even on 2xx responses. Add a runtime schema check or snapshot assertion here.",
+      reason: "API-contract evidence linked; schema validation cannot be inferred at test-gen time.",
     });
   }
 

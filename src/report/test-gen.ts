@@ -73,8 +73,11 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
       const filename = `${finding.id.toLowerCase()}-${slugify(finding.title)}.spec.ts`;
       const breadcrumbs = finding.meta?.repro?.breadcrumbs ?? [];
 
-      // Resolve evidence types linked to this finding for richer inference.
-      const areaEvidence = area?.evidence ?? [];
+      // Resolve evidence types linked to this finding across all impacted areas.
+      const impactedAreaNames = new Set(finding.impactedAreas);
+      const allLinkedEvidence = result.areaResults
+        .filter((a) => impactedAreaNames.has(a.name))
+        .flatMap((a) => a.evidence);
       const reproEvidenceIds = new Set(finding.meta?.repro?.evidenceIds ?? []);
       const findingEvidenceIds = new Set([
         ...(finding.evidenceIds ?? []),
@@ -82,7 +85,7 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
       ]);
       const evidenceTypes = [
         ...new Set(
-          areaEvidence
+          allLinkedEvidence
             .filter(
               (e) =>
                 findingEvidenceIds.has(e.id) ||
