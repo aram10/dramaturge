@@ -26,6 +26,17 @@ export async function executeFrontierItem(
 ): Promise<{ item: FrontierItem; result: WorkerResult | null }> {
   const { ctx, stagehand, page, item, taskNumber, pageKey, logPrefix = "" } = deps;
   const node = ctx.graph.getNode(item.nodeId);
+  const nodeUrl = node.url ?? ctx.config.targetUrl;
+
+  if (ctx.safetyGuard) {
+    const blocked = ctx.safetyGuard.checkUrl(nodeUrl);
+    if (blocked) {
+      console.log(
+        `${logPrefix}[${taskNumber}] Blocked by safety guard: ${blocked}`
+      );
+      return { item, result: null };
+    }
+  }
 
   console.log(
     `${logPrefix}[${taskNumber}] ${item.workerType} task on ${node.pageType} (${node.url ?? node.id}): ${item.objective}`
