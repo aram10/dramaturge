@@ -158,6 +158,47 @@ const VisualRegressionSchema = z
     maskSelectors: [],
   });
 
+const WebVitalsSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    thresholds: z
+      .object({
+        lcpMs: z.number().min(0).default(2500),
+        cls: z.number().min(0).default(0.1),
+        inpMs: z.number().min(0).default(200),
+      })
+      .default({
+        lcpMs: 2500,
+        cls: 0.1,
+        inpMs: 200,
+      }),
+  })
+  .default({
+    enabled: false,
+    thresholds: {
+      lcpMs: 2500,
+      cls: 0.1,
+      inpMs: 200,
+    },
+  });
+
+const ResponsiveRegressionSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    breakpoints: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          width: z.number().int().min(1),
+          height: z.number().int().min(1),
+        })
+      )
+      .optional(),
+  })
+  .default({
+    enabled: false,
+  });
+
 const ApiTestingSchema = z
   .object({
     enabled: z.boolean().default(false),
@@ -344,6 +385,8 @@ export const ConfigSchema = z.object({
   output: OutputSchema,
   memory: MemorySchema,
   visualRegression: VisualRegressionSchema,
+  webVitals: WebVitalsSchema,
+  responsiveRegression: ResponsiveRegressionSchema,
   apiTesting: ApiTestingSchema,
   adversarial: AdversarialSchema,
   judge: JudgeSchema,
