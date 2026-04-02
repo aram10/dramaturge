@@ -1,10 +1,18 @@
 import type { StateNode, WorkerType } from "../types.js";
 import type { PlannerMemorySignals } from "../memory/types.js";
+import type { DiffContext } from "../diff/types.js";
+import { isNodeAffectedByDiff } from "../diff/diff-hints.js";
 
 export interface PriorityContext {
   /** Set of worker types already dispatched for this node. */
   visitedWorkerTypes: Set<WorkerType>;
   memory?: PlannerMemorySignals;
+  /** Diff context for diff-aware priority boosting. */
+  diffContext?: DiffContext;
+  /** Priority boost for nodes matching changed areas (0-1). */
+  diffPriorityBoost?: number;
+  /** URL of the node being scored — used for diff matching. */
+  nodeUrl?: string;
 }
 
 export function computePriority(
@@ -40,6 +48,11 @@ export function computePriority(
 
   const adversarialPenalty = workerType === "adversarial" ? 0.2 : 0;
 
+  const diffBoost =
+    ctx.diffContext && ctx.nodeUrl && isNodeAffectedByDiff(ctx.nodeUrl, ctx.diffContext)
+      ? (ctx.diffPriorityBoost ?? 0.3)
+      : 0;
+
   return Math.max(
     0,
     weights.novelty * unseenRatio +
@@ -49,6 +62,7 @@ export function computePriority(
       historicalBoost +
       flakyBoost -
       suppressionPenalty -
-      adversarialPenalty
+      adversarialPenalty +
+      diffBoost
   );
 }
