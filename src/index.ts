@@ -22,6 +22,11 @@ export { comparePngBuffers, runVisualRegressionScan } from "./coverage/visual-re
 export { defineEvalFixtures } from "./evals/fixtures.js";
 export { summarizeEvalResults } from "./evals/harness.js";
 export { scanGenericRepo } from "./adaptation/generic.js";
+export { scanReactRouterRepo, canScanReactRouterRepo } from "./adaptation/react-router.js";
+export { scanExpressRepo, canScanExpressRepo } from "./adaptation/express.js";
+export { scanVueRouterRepo, canScanVueRouterRepo } from "./adaptation/vue-router.js";
+export { scanDjangoRepo, canScanDjangoRepo } from "./adaptation/django.js";
+export { scanTanStackRouterRepo, canScanTanStackRouterRepo } from "./adaptation/tanstack-router.js";
 export {
   generatePlaywrightTests,
   writeGeneratedPlaywrightTests,
