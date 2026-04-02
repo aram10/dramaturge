@@ -72,14 +72,18 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
+        registry-url: "https://npm.pkg.github.com"
+        scope: "@aram10"
 
     - name: Install Dramaturge
       shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ github.token }}
       run: npm install -g @aram10/dramaturge@${{ inputs.dramaturge-version }}
 
     - name: Install Playwright browsers
       shell: bash
-      run: npx playwright install --with-deps chromium
+      run: playwright install --with-deps chromium
 
     - name: Prepare config
       id: config
@@ -92,16 +96,19 @@ runs:
       run: node "${{ github.action_path }}/action/prepare-config.js"
 
     - name: Run Dramaturge
+      id: run
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         GOOGLE_GENERATIVE_AI_API_KEY: ${{ inputs.google-api-key }}
-      run: dramaturge --config "${{ steps.config.outputs.config-path }}" || true
+      run: dramaturge --config "${{ steps.config.outputs.config-path }}"
+      continue-on-error: true
 
     - name: Parse results
       id: parse
+      if: steps.run.outcome == 'success'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
@@ -109,8 +116,15 @@ runs:
           "${{ steps.config.outputs.report-dir }}" \
           "${{ inputs.fail-on-severity }}"
 
+    - name: Fail on Dramaturge error
+      if: steps.run.outcome == 'failure' && steps.parse.outcome == 'skipped'
+      shell: bash
+      run: |
+        echo "::error::Dramaturge failed to run. Check the 'Run Dramaturge' step for details."
+        exit 1
+
     - name: Post PR comment
-      if: inputs.post-comment == 'true' && github.event_name == 'pull_request'
+      if: inputs.post-comment == 'true' && github.event_name == 'pull_request' && steps.parse.outcome == 'success'
       uses: actions/github-script@v7
       with:
         script: |
@@ -122,15 +136,23 @@ runs:
           }
           const summary = fs.readFileSync(summaryPath, 'utf-8');
 
-          const { data: comments } = await github.rest.issues.listComments({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.issue.number,
-          });
-
           const marker = '<!-- dramaturge-report -->';
           const body = marker + '\n' + summary;
-          const existing = comments.find(c => c.body?.includes(marker));
+
+          // Paginate through all comments to find an existing marker
+          let existing = null;
+          for await (const response of github.paginate.iterator(
+            github.rest.issues.listComments,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            }
+          )) {
+            existing = response.data.find(c => c.body?.includes(marker));
+            if (existing) break;
+          }
 
           if (existing) {
             await github.rest.issues.updateComment({
@@ -149,7 +171,7 @@ runs:
           }
 
     - name: Upload report artifact
-      if: inputs.upload-report == 'true'
+      if: inputs.upload-report == 'true' && steps.parse.outcome == 'success'
       uses: actions/upload-artifact@v4
       with:
         name: dramaturge-report

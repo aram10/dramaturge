@@ -251,6 +251,29 @@ describe("parse-results", () => {
       };
       expect(buildSummary(report).totalFindings).toBe(2);
     });
+
+    it("computes severity summary from findings when bySeverity is missing", () => {
+      const report = {
+        meta: {},
+        summary: {
+          totalFindings: 3,
+        },
+        findings: [
+          { id: "BUG-001", severity: "Critical", title: "A" },
+          { id: "BUG-002", severity: "Major", title: "B" },
+          { id: "BUG-003", severity: "Minor", title: "C" },
+        ],
+      };
+
+      const result = buildSummary(report);
+      expect(result.maxSeverity).toBe("Critical");
+      expect(result.bySeverity).toEqual({
+        Critical: 1,
+        Major: 1,
+        Minor: 1,
+        Trivial: 0,
+      });
+    });
   });
 
   // ---------------------------------------------------------------------------

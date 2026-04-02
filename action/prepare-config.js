@@ -90,7 +90,7 @@ if (reportDir) config.output.dir = reportDir;
 config.browser = config.browser || {};
 config.browser.headless = true;
 
-const tmpConfig = join(runnerTemp, "dramaturge-ci-config.json");
+const tmpConfig = join(runnerTemp, `dramaturge-ci-config-${process.pid}.json`);
 writeFileSync(tmpConfig, JSON.stringify(config, null, 2));
 
 const effectiveReportDir = config.output.dir || "./dramaturge-reports";
