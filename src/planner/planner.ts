@@ -109,6 +109,8 @@ function relevantApiEndpointsForNode(
 
 export class Planner {
   private workerTypesPerNode = new Map<string, Set<WorkerType>>();
+  /** Configurable diff priority boost; set from config.diffAware.priorityBoost. */
+  diffPriorityBoost = 0.3;
 
   /**
    * Propose tasks for a newly discovered state node.
@@ -258,7 +260,7 @@ export class Planner {
         this.workerTypesPerNode.get(node.id) ?? new Set(),
       memory: memorySignals,
       diffContext,
-      diffPriorityBoost: diffContext ? 0.3 : undefined,
+      diffPriorityBoost: diffContext ? this.diffPriorityBoost : undefined,
       nodeUrl: node.url,
     };
 

@@ -343,7 +343,7 @@ const DiffAwareSchema = z
     enabled: z.boolean().default(false),
     /** Git ref to diff against (e.g. "origin/main"). Overridden by --diff CLI flag. */
     baseRef: z.string().optional(),
-    /** When true, restrict exploration to only changed areas and their immediate dependencies. */
+    /** When true, restrict exploration to only areas matching the detected diff. */
     restrictToChanged: z.boolean().default(false),
     /** Priority boost applied to state graph nodes matching changed areas (0-1). */
     priorityBoost: z.number().min(0).max(1).default(0.3),

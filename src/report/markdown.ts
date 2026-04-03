@@ -323,7 +323,7 @@ function buildDiffScopeMap(result: RunResult): Map<string, "changed" | "unchange
     changedFiles: [],
     affectedRoutes: result.diffSummary.affectedRoutes,
     affectedApiEndpoints: result.diffSummary.affectedApiEndpoints,
-    affectedRouteFamilies: [],
+    affectedRouteFamilies: result.diffSummary.affectedRouteFamilies,
   };
 
   for (const area of result.areaResults) {

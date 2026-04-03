@@ -7,8 +7,8 @@ import { getChangedFiles } from "./diff-parser.js";
  * the changed files against the provided `RepoHints`.
  *
  * If `repoHints` is not available the context will still contain the raw
- * changed-files list — priority boosting will just be limited to
- * path-based heuristics.
+ * changed-files list, but no affected routes, API endpoints, or route
+ * families will be derived.
  */
 export function buildDiffContext(
   baseRef: string,

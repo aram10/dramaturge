@@ -298,6 +298,9 @@ export async function runEngine(
     budget.costLimitUsd && budget.costLimitUsd > 0 ? budget.costLimitUsd : Infinity
   );
 
+  const planner = new Planner();
+  planner.diffPriorityBoost = config.diffAware.priorityBoost;
+
   const ctx: EngineContext = {
     config,
     budget,
@@ -306,7 +309,7 @@ export async function runEngine(
     page: stagehand.context.pages()[0],
     graph: new StateGraph(),
     frontier: new FrontierQueue(),
-    planner: new Planner(),
+    planner,
     navigator: new Navigator(),
     globalCoverage: new CoverageTracker(),
     costTracker,

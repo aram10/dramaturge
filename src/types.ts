@@ -177,6 +177,7 @@ export interface DiffSummary {
   baseRef: string;
   changedFileCount: number;
   affectedRoutes: string[];
+  affectedRouteFamilies: string[];
   affectedApiEndpoints: string[];
 }
 
@@ -195,7 +196,7 @@ export interface RunResult {
   runConfig?: RunConfigMeta;
   /** Historical-memory summary when run memory is enabled. */
   runMemory?: RunMemoryMeta;
-  /** Diff-aware exploration summary, present when --diff was used. */
+  /** Diff-aware exploration summary, present when diff-aware mode is enabled. */
   diffSummary?: DiffSummary;
 }
 
