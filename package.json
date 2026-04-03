@@ -10,6 +10,19 @@
   "bugs": {
     "url": "https://github.com/aram10/dramaturge/issues"
   },
+  "license": "GPL-3.0-only",
+  "author": "Alex Rambasek (https://github.com/aram10)",
+  "keywords": [
+    "qa",
+    "testing",
+    "exploratory-testing",
+    "playwright",
+    "browser-testing",
+    "test-automation",
+    "web-testing",
+    "agentic",
+    "llm"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
