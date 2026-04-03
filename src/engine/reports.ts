@@ -60,6 +60,7 @@ export function writeReports(
         baseRef: ctx.diffContext.baseRef,
         changedFileCount: ctx.diffContext.changedFiles.length,
         affectedRoutes: ctx.diffContext.affectedRoutes,
+        affectedRouteFamilies: ctx.diffContext.affectedRouteFamilies,
         affectedApiEndpoints: ctx.diffContext.affectedApiEndpoints,
       }
     : undefined;

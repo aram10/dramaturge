@@ -57,11 +57,18 @@ export async function expandGraph(
 
     const existing = ctx.graph.findByFingerprint(fingerprint);
     if (!existing) {
-      // When restrictToChanged is enabled, skip nodes outside the diff scope
-      if (
+      // When restrictToChanged is enabled and the diff scope is non-empty,
+      // skip nodes outside the diff scope. If the scope is empty (no repo
+      // hints or no matched routes), fall through to avoid stalling exploration.
+      const diffHasScope =
         ctx.diffContext &&
+        (ctx.diffContext.affectedRoutes.length > 0 ||
+         ctx.diffContext.affectedApiEndpoints.length > 0 ||
+         ctx.diffContext.affectedRouteFamilies.length > 0);
+      if (
+        diffHasScope &&
         ctx.config.diffAware.restrictToChanged &&
-        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext)
+        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext!)
       ) {
         continue;
       }

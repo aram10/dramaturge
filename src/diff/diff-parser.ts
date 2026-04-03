@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import type { DiffFileEntry } from "./types.js";
 
 /**
@@ -52,7 +52,7 @@ export function getChangedFiles(
   repoRoot: string,
 ): DiffFileEntry[] {
   try {
-    const output = execSync(`git diff --name-status ${baseRef}`, {
+    const output = execFileSync("git", ["diff", "--name-status", baseRef], {
       cwd: repoRoot,
       encoding: "utf-8",
       timeout: 30_000,
