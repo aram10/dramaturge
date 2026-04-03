@@ -2,9 +2,8 @@ name: Publish Dramaturge
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "dramaturge-v*"
+  release:
+    types: [published]
 
 jobs:
   publish:
