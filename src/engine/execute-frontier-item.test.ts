@@ -137,6 +137,7 @@ describe("executeFrontierItem", () => {
         },
         webVitals: { enabled: false, thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 } },
         responsiveRegression: { enabled: false },
+        visionAnalysis: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 12,
@@ -258,6 +259,7 @@ describe("executeFrontierItem", () => {
         destructiveActionsAllowed: false,
         criticalFlows: ["knowledge-bases"],
       },
+      undefined,
       undefined,
       undefined,
       undefined
@@ -433,6 +435,7 @@ describe("executeFrontierItem", () => {
         },
         webVitals: { enabled: false, thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 } },
         responsiveRegression: { enabled: false },
+        visionAnalysis: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 5,
@@ -554,6 +557,7 @@ describe("executeFrontierItem", () => {
         responsiveRegression: {
           enabled: true,
         },
+        visionAnalysis: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 5,

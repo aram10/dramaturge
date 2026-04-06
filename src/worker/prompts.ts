@@ -186,6 +186,11 @@ function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
   return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
 }
 
+function buildVisionContextSection(visionContext?: string): string {
+  if (!visionContext) return "";
+  return `\n\n## Visual Page Analysis (from vision model)\n${visionContext}`;
+}
+
 function buildAdversarialSection(
   workerType?: WorkerType,
   adversarialConfig?: AdversarialConfig,
@@ -232,7 +237,8 @@ export function buildWorkerSystemPrompt(
   mission?: MissionConfig,
   history?: WorkerHistoryContext,
   workerType?: WorkerType,
-  adversarialConfig?: AdversarialConfig
+  adversarialConfig?: AdversarialConfig,
+  visionContext?: string
 ): string {
   const areaContext = areaDescription
     ? `\n\nAbout this area: ${areaDescription}`
@@ -248,7 +254,7 @@ export function buildWorkerSystemPrompt(
 ${appDescription}${buildRepoHintsSection(repoHints)}${buildContractSummarySection(contractSummary)}${buildObservedApiSection(observedApiEndpoints)}
 
 ## Your Assignment
-You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildAppContextSection(appContext)}${buildMissionSection(mission)}${buildHistoricalContextSection(history)}${buildAdversarialSection(workerType, adversarialConfig, mission)}
+You are exploring the "${areaName}" area of the application.${areaContext}${pageTypeContext}${buildVisionContextSection(visionContext)}${buildAppContextSection(appContext)}${buildMissionSection(mission)}${buildHistoricalContextSection(history)}${buildAdversarialSection(workerType, adversarialConfig, mission)}
 
 ## What to Do
 1. Systematically explore all visible UI elements in this area
