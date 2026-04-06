@@ -7,6 +7,7 @@ import { scanExpressRepo } from "./express.js";
 import { scanGenericRepo } from "./generic.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
 import { canScanNuxtRepo, scanNuxtRepo } from "./nuxt.js";
+import { canScanRemixRepo, scanRemixRepo } from "./remix.js";
 import { scanReactRouterRepo } from "./react-router.js";
 import { canScanSvelteKitRepo, scanSvelteKitRepo } from "./sveltekit.js";
 import { scanTanStackRouterRepo } from "./tanstack-router.js";
@@ -136,10 +137,12 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
 }
 
 function detectFramework(root: string): RepoFramework {
-  // Check Next.js, Nuxt, and SvelteKit first via file markers (no file walk needed)
-  if (canScanNextJsRepo(root)) return "nextjs";
+  // Check framework-specific markers first (no full file walk needed)
   if (canScanNuxtRepo(root)) return "nuxt";
   if (canScanSvelteKitRepo(root)) return "sveltekit";
+  // Remix before Next.js: Next.js only checks for `app/` which Remix also has
+  if (canScanRemixRepo(root)) return "remix";
+  if (canScanNextJsRepo(root)) return "nextjs";
 
   // Single-pass walk for remaining framework detection
   const signatures = {
@@ -250,6 +253,9 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
       break;
     case "sveltekit":
       scanned = scanSvelteKitRepo(root);
+      break;
+    case "remix":
+      scanned = scanRemixRepo(root);
       break;
     case "react-router":
       scanned = scanReactRouterRepo(root);

@@ -10,6 +10,7 @@ const vueRouterFixture = fileURLToPath(new URL("./fixtures/vue-router-app", impo
 const djangoFixture = fileURLToPath(new URL("./fixtures/django-app", import.meta.url));
 const tanstackFixture = fileURLToPath(new URL("./fixtures/tanstack-router-app", import.meta.url));
 const nuxtFixture = fileURLToPath(new URL("./fixtures/nuxt-app", import.meta.url));
+const remixFixture = fileURLToPath(new URL("./fixtures/remix-app", import.meta.url));
 const genericFixture = fileURLToPath(new URL("./fixtures/generic-app", import.meta.url));
 
 describe("scanRepository", () => {
@@ -94,6 +95,13 @@ describe("scanRepository", () => {
 
     it("detects Nuxt via nuxt.config.ts", () => {
       const hints = scanRepository({ root: nuxtFixture, framework: "auto" });
+      expect(hints.routes).toContain("/");
+      expect(hints.routes).toContain("/login");
+      expect(hints.apiEndpoints.length).toBeGreaterThan(0);
+    });
+
+    it("detects Remix via @remix-run/ imports", () => {
+      const hints = scanRepository({ root: remixFixture, framework: "auto" });
       expect(hints.routes).toContain("/");
       expect(hints.routes).toContain("/login");
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);

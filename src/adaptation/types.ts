@@ -3,6 +3,7 @@ export type RepoFramework =
   | "nextjs"
   | "nuxt"
   | "sveltekit"
+  | "remix"
   | "react-router"
   | "express"
   | "vue-router"
