@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import { parseJsoncObject } from "../utils/jsonc.js";
+import { canScanAstroRepo, scanAstroRepo } from "./astro.js";
 import { scanDjangoRepo } from "./django.js";
 import { scanExpressRepo } from "./express.js";
 import { scanGenericRepo } from "./generic.js";
@@ -140,6 +141,7 @@ function detectFramework(root: string): RepoFramework {
   // Check framework-specific markers first (no full file walk needed)
   if (canScanNuxtRepo(root)) return "nuxt";
   if (canScanSvelteKitRepo(root)) return "sveltekit";
+  if (canScanAstroRepo(root)) return "astro";
   // Remix before Next.js: Next.js only checks for `app/` which Remix also has
   if (canScanRemixRepo(root)) return "remix";
   if (canScanNextJsRepo(root)) return "nextjs";
@@ -256,6 +258,9 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
       break;
     case "remix":
       scanned = scanRemixRepo(root);
+      break;
+    case "astro":
+      scanned = scanAstroRepo(root);
       break;
     case "react-router":
       scanned = scanReactRouterRepo(root);

@@ -4,6 +4,7 @@ export type RepoFramework =
   | "nuxt"
   | "sveltekit"
   | "remix"
+  | "astro"
   | "react-router"
   | "express"
   | "vue-router"
