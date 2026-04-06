@@ -116,4 +116,43 @@ describe("computePriority", () => {
 
     expect(suppressed).toBeLessThan(baseline);
   });
+
+  it("boosts priority when node URL matches diff-affected route", () => {
+    const node = makeNode({ url: "https://app.com/dashboard" });
+    const baseline = computePriority(node, "navigation", emptyCtx);
+    const boosted = computePriority(node, "navigation", {
+      visitedWorkerTypes: new Set(),
+      diffContext: {
+        baseRef: "origin/main",
+        changedFiles: [],
+        affectedRoutes: ["/dashboard"],
+        affectedApiEndpoints: [],
+        affectedRouteFamilies: [],
+      },
+      diffPriorityBoost: 0.3,
+      nodeUrl: node.url,
+    });
+
+    expect(boosted).toBeGreaterThan(baseline);
+    expect(boosted - baseline).toBeCloseTo(0.3);
+  });
+
+  it("does not boost when node URL is outside diff scope", () => {
+    const node = makeNode({ url: "https://app.com/about" });
+    const baseline = computePriority(node, "navigation", emptyCtx);
+    const notBoosted = computePriority(node, "navigation", {
+      visitedWorkerTypes: new Set(),
+      diffContext: {
+        baseRef: "origin/main",
+        changedFiles: [],
+        affectedRoutes: ["/dashboard"],
+        affectedApiEndpoints: [],
+        affectedRouteFamilies: [],
+      },
+      diffPriorityBoost: 0.3,
+      nodeUrl: node.url,
+    });
+
+    expect(notBoosted).toBeCloseTo(baseline);
+  });
 });

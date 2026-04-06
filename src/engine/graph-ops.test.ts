@@ -204,3 +204,129 @@ describe("browser error ownership", () => {
     expect(ctx.evidenceByNode.get("node-detail")).toHaveLength(1);
   });
 });
+
+describe("expandGraph restrictToChanged", () => {
+  function makeSourceGraph() {
+    const graph = new StateGraph();
+    const source = graph.addNode({
+      url: "https://example.com",
+      title: "Home",
+      fingerprint: {
+        normalizedPath: "/",
+        signature: { pathname: "/", query: [], uiMarkers: [] },
+        title: "Home",
+        heading: "Home",
+        dialogTitles: [],
+        hash: "fp-home",
+      },
+      pageType: "landing",
+      depth: 0,
+    });
+    return { graph, source };
+  }
+
+  function makeEdge(url: string, hash: string) {
+    return {
+      actionLabel: `Go to ${url}`,
+      navigationHint: { url, actionDescription: `Go to ${url}` },
+      targetFingerprint: {
+        normalizedPath: new URL(url).pathname,
+        signature: { pathname: new URL(url).pathname, query: [], uiMarkers: [] },
+        title: url,
+        heading: url,
+        dialogTitles: [],
+        hash,
+      },
+      targetPageType: "detail" as const,
+    };
+  }
+
+  function makeCtx(graph: any, overrides: any = {}) {
+    return {
+      graph,
+      budget: { maxStateNodes: 10 },
+      navigator: { navigateFromNode: vi.fn().mockResolvedValue({ success: true }) },
+      page: { url: () => "https://example.com", goto: vi.fn() },
+      stagehand: { context: { pages: () => [] } },
+      config: {
+        targetUrl: "https://example.com",
+        diffAware: { restrictToChanged: true, priorityBoost: 0.3 },
+        ...overrides.config,
+      },
+      planner: { proposeTasks: vi.fn().mockReturnValue([]) },
+      frontier: { enqueueMany: vi.fn() },
+      mission: undefined,
+      repoHints: undefined,
+      memoryStore: undefined,
+      diffContext: overrides.diffContext ?? undefined,
+      ...overrides,
+    } as any;
+  }
+
+  it("keeps nodes inside the diff scope", async () => {
+    const { graph, source } = makeSourceGraph();
+    const ctx = makeCtx(graph, {
+      diffContext: {
+        baseRef: "origin/main",
+        changedFiles: [],
+        affectedRoutes: ["/dashboard"],
+        affectedApiEndpoints: [],
+        affectedRouteFamilies: [],
+      },
+    });
+
+    await expandGraph(ctx, source.id, {
+      taskId: "t1", findings: [], evidence: [],
+      coverageSnapshot: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+      followupRequests: [], outcome: "completed", summary: "ok",
+      discoveredEdges: [makeEdge("https://example.com/dashboard", "fp-dash")],
+    }, false);
+
+    expect(graph.nodeCount()).toBe(2);
+  });
+
+  it("skips nodes outside the diff scope", async () => {
+    const { graph, source } = makeSourceGraph();
+    const ctx = makeCtx(graph, {
+      diffContext: {
+        baseRef: "origin/main",
+        changedFiles: [],
+        affectedRoutes: ["/dashboard"],
+        affectedApiEndpoints: [],
+        affectedRouteFamilies: [],
+      },
+    });
+
+    await expandGraph(ctx, source.id, {
+      taskId: "t1", findings: [], evidence: [],
+      coverageSnapshot: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+      followupRequests: [], outcome: "completed", summary: "ok",
+      discoveredEdges: [makeEdge("https://example.com/about", "fp-about")],
+    }, false);
+
+    expect(graph.nodeCount()).toBe(1); // only source
+  });
+
+  it("does not restrict when diff scope is empty", async () => {
+    const { graph, source } = makeSourceGraph();
+    const ctx = makeCtx(graph, {
+      diffContext: {
+        baseRef: "origin/main",
+        changedFiles: [{ path: "README.md", status: "modified" }],
+        affectedRoutes: [],
+        affectedApiEndpoints: [],
+        affectedRouteFamilies: [],
+      },
+    });
+
+    await expandGraph(ctx, source.id, {
+      taskId: "t1", findings: [], evidence: [],
+      coverageSnapshot: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+      followupRequests: [], outcome: "completed", summary: "ok",
+      discoveredEdges: [makeEdge("https://example.com/about", "fp-about")],
+    }, false);
+
+    // Should still add the node because scope is empty → no restriction
+    expect(graph.nodeCount()).toBe(2);
+  });
+});

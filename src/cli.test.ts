@@ -10,6 +10,7 @@ describe("parseCliArgs", () => {
     ).toEqual({
       configPath: "custom.json",
       resumeDir: "./reports/run-1",
+      diffRef: undefined,
       showHelp: false,
     });
   });
@@ -17,6 +18,22 @@ describe("parseCliArgs", () => {
   it("detects help flags", () => {
     expect(parseCliArgs(["-h"]).showHelp).toBe(true);
     expect(parseCliArgs(["--help"]).showHelp).toBe(true);
+  });
+
+  it("parses --diff flag", () => {
+    const result = parseCliArgs(["--diff", "origin/main"]);
+    expect(result.diffRef).toBe("origin/main");
+    expect(result.showHelp).toBe(false);
+  });
+
+  it("parses --diff alongside other flags", () => {
+    const result = parseCliArgs(["--config", "c.json", "--diff", "origin/main"]);
+    expect(result.configPath).toBe("c.json");
+    expect(result.diffRef).toBe("origin/main");
+  });
+
+  it("throws when --diff has no value", () => {
+    expect(() => parseCliArgs(["--diff"])).toThrow("Missing value for --diff");
   });
 });
 

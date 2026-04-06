@@ -173,6 +173,14 @@ export interface Area {
   description?: string;
 }
 
+export interface DiffSummary {
+  baseRef: string;
+  changedFileCount: number;
+  affectedRoutes: string[];
+  affectedRouteFamilies: string[];
+  affectedApiEndpoints: string[];
+}
+
 export interface RunResult {
   targetUrl: string;
   startTime: Date;
@@ -188,6 +196,8 @@ export interface RunResult {
   runConfig?: RunConfigMeta;
   /** Historical-memory summary when run memory is enabled. */
   runMemory?: RunMemoryMeta;
+  /** Diff-aware exploration summary, present when diff-aware mode is enabled. */
+  diffSummary?: DiffSummary;
 }
 
 export interface RunConfigMeta {

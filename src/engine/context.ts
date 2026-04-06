@@ -23,6 +23,7 @@ import type { ContractIndex } from "../spec/contract-index.js";
 import type { ApiRequestContextLike } from "../api/types.js";
 import type { SafetyGuard } from "../policy/safety-guard.js";
 import type { EngineEventEmitter } from "./event-stream.js";
+import type { DiffContext } from "../diff/types.js";
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -47,6 +48,7 @@ export interface EngineContext {
   workerPool: WorkerSession[];
   repoHints?: RepoHints;
   contractIndex?: ContractIndex;
+  diffContext?: DiffContext;
   trafficObserver?: NetworkTrafficObserver;
   memoryStore?: MemoryStore;
   runMemory?: RunMemoryMeta;

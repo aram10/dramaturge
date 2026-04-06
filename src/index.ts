@@ -65,6 +65,9 @@ export { buildOpenApiSpec } from "./spec/openapi-spec.js";
 export { addOperation, createEmptyNormalizedSpec } from "./spec/normalized-spec.js";
 export { buildRepoSpec } from "./spec/repo-spec.js";
 export { buildOperationKey, getOperationSpec } from "./spec/validators.js";
+export { buildDiffContext, buildDiffContextFromFiles, isNodeAffectedByDiff } from "./diff/diff-hints.js";
+export { parseDiffNameStatus, getChangedFiles } from "./diff/diff-parser.js";
+export type { DiffContext, DiffFileEntry } from "./diff/types.js";
 export type {
   Area,
   AreaResult,
@@ -76,6 +79,7 @@ export type {
   ControlOutcome,
   CoverageEvent,
   CoverageSnapshot,
+  DiffSummary,
   DiscoveredEdge,
   Evidence,
   Finding,
