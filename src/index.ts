@@ -119,6 +119,12 @@ export type {
 export type {
   ContractIndex,
 } from "./spec/contract-index.js";
+export { renderDashboard } from "./dashboard/render.js";
+export type {
+  DashboardState,
+  ActivityItem,
+  ActivityKind,
+} from "./dashboard/state.js";
 export type {
   EvalCaseResult,
   EvalFailureSummary,
