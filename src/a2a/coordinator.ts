@@ -1,7 +1,7 @@
 /**
  * Coordinator — multi-agent task assignment and orchestration.
  *
- * Extends the Planner to route tasks to specialised agents based on
+ * Extends the Planner to route tasks to specialized agents based on
  * their Agent Cards. The Coordinator maintains agent state, tracks
  * task status per the A2A Task lifecycle, and mediates inter-agent
  * communication via the Blackboard and MessageBus.
