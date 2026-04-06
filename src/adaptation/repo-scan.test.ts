@@ -13,6 +13,7 @@ const tanstackFixture = fileURLToPath(new URL("./fixtures/tanstack-router-app", 
 const nuxtFixture = fileURLToPath(new URL("./fixtures/nuxt-app", import.meta.url));
 const remixFixture = fileURLToPath(new URL("./fixtures/remix-app", import.meta.url));
 const astroFixture = fileURLToPath(new URL("./fixtures/astro-app", import.meta.url));
+const railsFixture = fileURLToPath(new URL("./fixtures/rails-app", import.meta.url));
 const genericFixture = fileURLToPath(new URL("./fixtures/generic-app", import.meta.url));
 
 describe("scanRepository", () => {
@@ -86,6 +87,13 @@ describe("scanRepository", () => {
 
     it("detects FastAPI via fastapi import", () => {
       const hints = scanRepository({ root: fastapiFixture, framework: "auto" });
+      expect(hints.routes).toContain("/");
+      expect(hints.routes).toContain("/login");
+      expect(hints.apiEndpoints.length).toBeGreaterThan(0);
+    });
+
+    it("detects Rails via config/routes.rb", () => {
+      const hints = scanRepository({ root: railsFixture, framework: "auto" });
       expect(hints.routes).toContain("/");
       expect(hints.routes).toContain("/login");
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
