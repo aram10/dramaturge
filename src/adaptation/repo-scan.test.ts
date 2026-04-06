@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { scanRepository } from "./repo-scan.js";
 
 const nextFixture = fileURLToPath(new URL("./fixtures/next-app", import.meta.url));
+const sveltekitFixture = fileURLToPath(new URL("./fixtures/sveltekit-app", import.meta.url));
 const reactRouterFixture = fileURLToPath(new URL("./fixtures/react-router-app", import.meta.url));
 const expressFixture = fileURLToPath(new URL("./fixtures/express-app", import.meta.url));
 const vueRouterFixture = fileURLToPath(new URL("./fixtures/vue-router-app", import.meta.url));
@@ -55,6 +56,12 @@ describe("scanRepository", () => {
       const hints = scanRepository({ root: nextFixture, framework: "auto" });
       expect(hints.routes).toContain("/login");
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
+    });
+
+    it("detects SvelteKit via svelte.config", () => {
+      const hints = scanRepository({ root: sveltekitFixture, framework: "auto" });
+      expect(hints.routes).toContain("/");
+      expect(hints.routes).toContain("/login");
     });
 
     it("detects React Router via react-router-dom import", () => {

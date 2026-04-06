@@ -1,6 +1,7 @@
 export type RepoFramework =
   | "auto"
   | "nextjs"
+  | "sveltekit"
   | "react-router"
   | "express"
   | "vue-router"
