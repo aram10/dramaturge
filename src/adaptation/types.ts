@@ -10,6 +10,7 @@ export type RepoFramework =
   | "vue-router"
   | "django"
   | "fastapi"
+  | "rails"
   | "tanstack-router"
   | "generic";
 

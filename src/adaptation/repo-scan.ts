@@ -4,13 +4,14 @@ import { z } from "zod";
 import { parseJsoncObject } from "../utils/jsonc.js";
 import { canScanAstroRepo, scanAstroRepo } from "./astro.js";
 import { scanDjangoRepo } from "./django.js";
-import { canScanFastApiRepo, scanFastApiRepo } from "./fastapi.js";
 import { scanExpressRepo } from "./express.js";
+import { canScanFastApiRepo, scanFastApiRepo } from "./fastapi.js";
 import { scanGenericRepo } from "./generic.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
 import { canScanNuxtRepo, scanNuxtRepo } from "./nuxt.js";
-import { canScanRemixRepo, scanRemixRepo } from "./remix.js";
+import { canScanRailsRepo, scanRailsRepo } from "./rails.js";
 import { scanReactRouterRepo } from "./react-router.js";
+import { canScanRemixRepo, scanRemixRepo } from "./remix.js";
 import { canScanSvelteKitRepo, scanSvelteKitRepo } from "./sveltekit.js";
 import { scanTanStackRouterRepo } from "./tanstack-router.js";
 import { scanVueRouterRepo } from "./vue-router.js";
@@ -145,6 +146,8 @@ function detectFramework(root: string): RepoFramework {
   if (canScanAstroRepo(root)) return "astro";
   // Remix before Next.js: Next.js only checks for `app/` which Remix also has
   if (canScanRemixRepo(root)) return "remix";
+  // Rails before Next.js: Next.js only checks for `app/` which Rails also has
+  if (canScanRailsRepo(root)) return "rails";
   if (canScanNextJsRepo(root)) return "nextjs";
 
   // Single-pass walk for remaining framework detection
@@ -283,6 +286,9 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
       break;
     case "django":
       scanned = scanDjangoRepo(root);
+      break;
+    case "rails":
+      scanned = scanRailsRepo(root);
       break;
     case "fastapi":
       scanned = scanFastApiRepo(root);
