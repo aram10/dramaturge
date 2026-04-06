@@ -8,6 +8,7 @@ const reactRouterFixture = fileURLToPath(new URL("./fixtures/react-router-app", 
 const expressFixture = fileURLToPath(new URL("./fixtures/express-app", import.meta.url));
 const vueRouterFixture = fileURLToPath(new URL("./fixtures/vue-router-app", import.meta.url));
 const djangoFixture = fileURLToPath(new URL("./fixtures/django-app", import.meta.url));
+const fastapiFixture = fileURLToPath(new URL("./fixtures/fastapi-app", import.meta.url));
 const tanstackFixture = fileURLToPath(new URL("./fixtures/tanstack-router-app", import.meta.url));
 const nuxtFixture = fileURLToPath(new URL("./fixtures/nuxt-app", import.meta.url));
 const remixFixture = fileURLToPath(new URL("./fixtures/remix-app", import.meta.url));
@@ -81,6 +82,13 @@ describe("scanRepository", () => {
     it("detects Vue Router via vue-router import", () => {
       const hints = scanRepository({ root: vueRouterFixture, framework: "auto" });
       expect(hints.routes.length).toBeGreaterThan(0);
+    });
+
+    it("detects FastAPI via fastapi import", () => {
+      const hints = scanRepository({ root: fastapiFixture, framework: "auto" });
+      expect(hints.routes).toContain("/");
+      expect(hints.routes).toContain("/login");
+      expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
     it("detects Django via manage.py", () => {
