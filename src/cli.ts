@@ -9,6 +9,7 @@ import type { ErrorEvent, FindingEvent, ProgressEvent, StateDiscoveredEvent, Tas
 export interface ParsedCliArgs {
   configPath?: string;
   resumeDir?: string;
+  diffRef?: string;
   showHelp: boolean;
 }
 
@@ -22,11 +23,12 @@ export interface CliDependencies {
   error: (message: string) => void;
 }
 
-const HELP_TEXT = `Usage: dramaturge [--config <path>] [--resume <run-dir>]
+const HELP_TEXT = `Usage: dramaturge [--config <path>] [--resume <run-dir>] [--diff <base-ref>]
 
 Options:
   --config <path>      Path to config file (default: dramaturge.config.json)
   --resume <run-dir>   Resume a previous run from its output directory
+  --diff <base-ref>    Enable diff-aware mode against a git ref (e.g. origin/main)
   --help, -h           Show this help message
 
 Repo-aware config:
@@ -57,11 +59,12 @@ export function buildHelpText(): string {
 export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let configPath: string | undefined;
   let resumeDir: string | undefined;
+  let diffRef: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--help" || arg === "-h") {
-      return { configPath, resumeDir, showHelp: true };
+      return { configPath, resumeDir, diffRef, showHelp: true };
     }
 
     if (arg === "--config") {
@@ -84,10 +87,20 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === "--diff") {
+      const value = args[i + 1];
+      if (!value) {
+        throw new Error("Missing value for --diff");
+      }
+      diffRef = value;
+      i++;
+      continue;
+    }
+
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  return { configPath, resumeDir, showHelp: false };
+  return { configPath, resumeDir, diffRef, showHelp: false };
 }
 
 export async function runCli(
@@ -109,6 +122,7 @@ export async function runCli(
     await dependencies.runEngine(config, {
       resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
       eventStream,
+      diffRef: parsedArgs.diffRef,
     });
     return 0;
   } catch (error) {

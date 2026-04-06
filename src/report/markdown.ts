@@ -1,5 +1,7 @@
 import type { RunResult } from "../types.js";
 import { collectFindings } from "./collector.js";
+import { isNodeAffectedByDiff } from "../diff/diff-hints.js";
+import type { DiffContext } from "../diff/types.js";
 
 function escapeTableCell(text: string): string {
   return text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
@@ -27,6 +29,11 @@ export function renderMarkdown(result: RunResult): string {
       findingIdByRef.set(occurrence.ref, finding.id);
     }
   }
+
+  // Build diff-scope lookup: area name → "changed" | "unchanged"
+  const diffScope = result.diffSummary
+    ? buildDiffScopeMap(result)
+    : undefined;
 
   const bugs = findings.filter((f) => f.category === "Bug");
   const ux = findings.filter((f) => f.category === "UX Concern");
@@ -81,6 +88,10 @@ export function renderMarkdown(result: RunResult): string {
       const steps = f.stepsToReproduce.map((s, i) => `  ${i + 1}. ${s}`).join("\n");
       lines.push(`### [${f.id}] ${f.severity}: ${f.title}`);
       lines.push(`- **Area:** ${f.area}`);
+      if (diffScope) {
+        const scope = diffScope.get(f.area) ?? "unchanged";
+        lines.push(`- **Diff scope:** ${scope}`);
+      }
       lines.push(`- **Category:** ${f.category}`);
       lines.push(`- **Severity:** ${f.severity}`);
       lines.push(`- **Steps to reproduce:**`);
@@ -247,6 +258,23 @@ export function renderMarkdown(result: RunResult): string {
     lines.push("");
   }
 
+  // Diff Summary
+  if (result.diffSummary) {
+    const ds = result.diffSummary;
+    lines.push("## Diff Summary");
+    lines.push(`- **Base ref:** ${ds.baseRef}`);
+    lines.push(`- **Changed files:** ${ds.changedFileCount}`);
+    lines.push(`- **Affected routes:** ${ds.affectedRoutes.length > 0 ? ds.affectedRoutes.join(", ") : "none detected"}`);
+    lines.push(`- **Affected API endpoints:** ${ds.affectedApiEndpoints.length > 0 ? ds.affectedApiEndpoints.join(", ") : "none detected"}`);
+    if (diffScope) {
+      const changedCount = [...diffScope.values()].filter((v) => v === "changed").length;
+      const unchangedCount = [...diffScope.values()].filter((v) => v === "unchanged").length;
+      lines.push(`- **Areas in changed code paths:** ${changedCount}`);
+      lines.push(`- **Areas in unchanged code paths:** ${unchangedCount}`);
+    }
+    lines.push("");
+  }
+
   // Run Configuration
   if (result.runMemory) {
     const rm = result.runMemory;
@@ -280,4 +308,28 @@ export function renderMarkdown(result: RunResult): string {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * Build a lookup of area name → "changed" | "unchanged" based on the
+ * diff summary's affected routes.
+ */
+function buildDiffScopeMap(result: RunResult): Map<string, "changed" | "unchanged"> {
+  const map = new Map<string, "changed" | "unchanged">();
+  if (!result.diffSummary) return map;
+
+  const diffContext: DiffContext = {
+    baseRef: result.diffSummary.baseRef,
+    changedFiles: [],
+    affectedRoutes: result.diffSummary.affectedRoutes,
+    affectedApiEndpoints: result.diffSummary.affectedApiEndpoints,
+    affectedRouteFamilies: result.diffSummary.affectedRouteFamilies,
+  };
+
+  for (const area of result.areaResults) {
+    const affected = isNodeAffectedByDiff(area.url, diffContext);
+    map.set(area.name, affected ? "changed" : "unchanged");
+  }
+
+  return map;
 }

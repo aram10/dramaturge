@@ -34,6 +34,8 @@ import { executeFrontierItem } from "./engine/execute-frontier-item.js";
 import type { WorkerSession } from "./engine/worker-pool.js";
 import { scanRepository } from "./adaptation/repo-scan.js";
 import type { RepoHints } from "./adaptation/types.js";
+import { buildDiffContext } from "./diff/diff-hints.js";
+import type { DiffContext } from "./diff/types.js";
 import { resolvePolicy } from "./policy/policy.js";
 import { MemoryStore } from "./memory/store.js";
 import { seedGraphFromNavigationMemory } from "./memory/navigation-cache.js";
@@ -148,6 +150,23 @@ function loadContractIndex(
   return artifacts.length > 0 ? createContractIndex(artifacts) : undefined;
 }
 
+function loadDiffContext(
+  config: DramaturgeConfig,
+  repoHints: RepoHints | undefined,
+  cliDiffRef?: string,
+): DiffContext | undefined {
+  const baseRef = cliDiffRef ?? config.diffAware.baseRef;
+  const enabled = cliDiffRef ? true : config.diffAware.enabled;
+
+  if (!enabled || !baseRef) return undefined;
+
+  const configBaseDir =
+    (config as Partial<LoadedDramaturgeConfig>)._meta?.configDir ?? process.cwd();
+  const repoRoot = config.repoContext?.root ?? configBaseDir;
+
+  return buildDiffContext(baseRef, repoRoot, repoHints);
+}
+
 /** Run frontier items in parallel across the worker pool. */
 async function processTaskBatch(
   ctx: EngineContext,
@@ -204,6 +223,8 @@ export interface RunEngineOptions {
   resumeDir?: string;
   /** Optional event emitter for streaming engine progress. */
   eventStream?: EngineEventEmitter;
+  /** Git ref to diff against for diff-aware exploration. Overrides config.diffAware.baseRef. */
+  diffRef?: string;
 }
 
 export async function runEngine(
@@ -231,6 +252,7 @@ export async function runEngine(
   const useLLMPlanner = hasLLMApiKey(config.models.planner);
   const repoHints = loadRepoHints(config);
   const contractIndex = loadContractIndex(config, repoHints);
+  const diffContext = loadDiffContext(config, repoHints, options.diffRef);
   const policy = resolvePolicy(config.policy, repoHints);
   const memoryStore = config.memory.enabled ? new MemoryStore(config.memory.dir) : undefined;
   let warmStartApplied = false;
@@ -240,6 +262,12 @@ export async function runEngine(
   if (repoHints) {
     console.log(
       `Repo-aware mode: ${repoHints.routes.length} routes, ${repoHints.stableSelectors.length} selectors, ${repoHints.expectedHttpNoise.length} expected-noise rule(s)`
+    );
+  }
+
+  if (diffContext) {
+    console.log(
+      `Diff-aware mode: ${diffContext.changedFiles.length} changed file(s), ${diffContext.affectedRoutes.length} affected route(s), ${diffContext.affectedApiEndpoints.length} affected endpoint(s)`
     );
   }
 
@@ -270,6 +298,9 @@ export async function runEngine(
     budget.costLimitUsd && budget.costLimitUsd > 0 ? budget.costLimitUsd : Infinity
   );
 
+  const planner = new Planner();
+  planner.diffPriorityBoost = config.diffAware.priorityBoost;
+
   const ctx: EngineContext = {
     config,
     budget,
@@ -278,7 +309,7 @@ export async function runEngine(
     page: stagehand.context.pages()[0],
     graph: new StateGraph(),
     frontier: new FrontierQueue(),
-    planner: new Planner(),
+    planner,
     navigator: new Navigator(),
     globalCoverage: new CoverageTracker(),
     costTracker,
@@ -293,6 +324,7 @@ export async function runEngine(
     workerPool,
     repoHints,
     contractIndex,
+    diffContext,
     trafficObserver,
     memoryStore,
     eventStream,
@@ -402,7 +434,8 @@ export async function runEngine(
           mission,
           ctx.repoHints,
           config.llm.requestTimeoutMs,
-          ctx.memoryStore?.getPlannerSignals(rootNode)
+          ctx.memoryStore?.getPlannerSignals(rootNode),
+          ctx.diffContext,
         );
       } else {
         seedTasks = ctx.planner.proposeTasks(
@@ -410,7 +443,8 @@ export async function runEngine(
           ctx.graph,
           mission,
           ctx.repoHints,
-          ctx.memoryStore?.getPlannerSignals(rootNode)
+          ctx.memoryStore?.getPlannerSignals(rootNode),
+          ctx.diffContext,
         );
       }
       ctx.frontier.enqueueMany(seedTasks);
@@ -429,14 +463,16 @@ export async function runEngine(
               mission,
               ctx.repoHints,
               config.llm.requestTimeoutMs,
-              ctx.memoryStore?.getPlannerSignals(rootNode)
+              ctx.memoryStore?.getPlannerSignals(rootNode),
+              ctx.diffContext,
             )
           : ctx.planner.proposeTasks(
               rootNode,
               ctx.graph,
               mission,
               ctx.repoHints,
-              ctx.memoryStore?.getPlannerSignals(rootNode)
+              ctx.memoryStore?.getPlannerSignals(rootNode),
+              ctx.diffContext,
             );
         ctx.frontier.enqueueMany(seedTasks);
         console.log(`Seeded frontier with ${seedTasks.length} warm-start task(s)\n`);

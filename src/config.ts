@@ -337,6 +337,23 @@ const AppContextSchema = z
   })
   .optional();
 
+const DiffAwareSchema = z
+  .object({
+    /** Enable diff-aware exploration mode. */
+    enabled: z.boolean().default(false),
+    /** Git ref to diff against (e.g. "origin/main"). Overridden by --diff CLI flag. */
+    baseRef: z.string().optional(),
+    /** When true, restrict exploration to only areas matching the detected diff. */
+    restrictToChanged: z.boolean().default(false),
+    /** Priority boost applied to state graph nodes matching changed areas (0-1). */
+    priorityBoost: z.number().min(0).max(1).default(0.3),
+  })
+  .default({
+    enabled: false,
+    restrictToChanged: false,
+    priorityBoost: 0.3,
+  });
+
 const RepoContextSchema = z
   .object({
     root: z.string().optional(),
@@ -397,6 +414,7 @@ export const ConfigSchema = z.object({
   checkpoint: CheckpointSchema,
   appContext: AppContextSchema,
   repoContext: RepoContextSchema,
+  diffAware: DiffAwareSchema,
   bootstrap: BootstrapSchema,
   policy: PolicySchema,
 });

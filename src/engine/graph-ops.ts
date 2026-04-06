@@ -3,6 +3,7 @@ import type { WorkerResult, FrontierItem } from "../types.js";
 import { captureFingerprint } from "../graph/fingerprint.js";
 import { classifyPage } from "../planner/page-classifier.js";
 import { emitEngineEvent } from "./event-stream.js";
+import { isNodeAffectedByDiff } from "../diff/diff-hints.js";
 
 function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): void {
   const existing = map.get(nodeId) ?? [];
@@ -56,6 +57,22 @@ export async function expandGraph(
 
     const existing = ctx.graph.findByFingerprint(fingerprint);
     if (!existing) {
+      // When restrictToChanged is enabled and the diff scope is non-empty,
+      // skip nodes outside the diff scope. If the scope is empty (no repo
+      // hints or no matched routes), fall through to avoid stalling exploration.
+      const diffHasScope =
+        ctx.diffContext &&
+        (ctx.diffContext.affectedRoutes.length > 0 ||
+         ctx.diffContext.affectedApiEndpoints.length > 0 ||
+         ctx.diffContext.affectedRouteFamilies.length > 0);
+      if (
+        diffHasScope &&
+        ctx.config.diffAware.restrictToChanged &&
+        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext!)
+      ) {
+        continue;
+      }
+
       const newNode = ctx.graph.addNode({
         fingerprint, pageType,
         url: edge.navigationHint.url,
@@ -72,14 +89,16 @@ export async function expandGraph(
             ctx.mission,
             ctx.repoHints,
             ctx.config.llm.requestTimeoutMs,
-            ctx.memoryStore?.getPlannerSignals(newNode)
+            ctx.memoryStore?.getPlannerSignals(newNode),
+            ctx.diffContext,
           )
         : ctx.planner.proposeTasks(
             newNode,
             ctx.graph,
             ctx.mission,
             ctx.repoHints,
-            ctx.memoryStore?.getPlannerSignals(newNode)
+            ctx.memoryStore?.getPlannerSignals(newNode),
+            ctx.diffContext,
           );
       ctx.frontier.enqueueMany(newTasks);
       console.log(`  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`);

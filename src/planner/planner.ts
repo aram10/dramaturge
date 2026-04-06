@@ -12,6 +12,7 @@ import { computePriority, type PriorityContext } from "./priority.js";
 import { proposeLLMTasks } from "../llm.js";
 import { shortId } from "../constants.js";
 import type { PlannerMemorySignals } from "../memory/types.js";
+import type { DiffContext } from "../diff/types.js";
 
 /** Default page-type → worker-type mapping. */
 const PAGE_TYPE_WORKER_MAP: Record<PageType, WorkerType> = {
@@ -108,6 +109,8 @@ function relevantApiEndpointsForNode(
 
 export class Planner {
   private workerTypesPerNode = new Map<string, Set<WorkerType>>();
+  /** Configurable diff priority boost; set from config.diffAware.priorityBoost. */
+  diffPriorityBoost = 0.3;
 
   /**
    * Propose tasks for a newly discovered state node.
@@ -118,7 +121,8 @@ export class Planner {
     _graph: StateGraph,
     mission?: MissionConfig,
     repoHints?: RepoHints,
-    memorySignals?: PlannerMemorySignals
+    memorySignals?: PlannerMemorySignals,
+    diffContext?: DiffContext,
   ): FrontierItem[] {
     const proposals: PlannerProposal[] = [];
 
@@ -190,7 +194,7 @@ export class Planner {
       });
     }
 
-    return this.toFrontierItems(node, proposals, mission, memorySignals);
+    return this.toFrontierItems(node, proposals, mission, memorySignals, diffContext);
   }
 
   /**
@@ -205,7 +209,8 @@ export class Planner {
     mission?: MissionConfig,
     repoHints?: RepoHints,
     llmRequestTimeoutMs?: number,
-    memorySignals?: PlannerMemorySignals
+    memorySignals?: PlannerMemorySignals,
+    diffContext?: DiffContext,
   ): Promise<FrontierItem[]> {
     const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
     const repoHintSummary = summarizeRepoHints(repoHints);
@@ -234,10 +239,10 @@ export class Planner {
 
     if (!llmProposals) {
       // LLM failed — fall back to deterministic
-      return this.proposeTasks(node, graph, mission, repoHints, memorySignals);
+      return this.proposeTasks(node, graph, mission, repoHints, memorySignals, diffContext);
     }
 
-    return this.toFrontierItems(node, llmProposals, mission, memorySignals);
+    return this.toFrontierItems(node, llmProposals, mission, memorySignals, diffContext);
   }
 
   /**
@@ -247,12 +252,16 @@ export class Planner {
     node: StateNode,
     proposals: PlannerProposal[],
     mission?: MissionConfig,
-    memorySignals?: PlannerMemorySignals
+    memorySignals?: PlannerMemorySignals,
+    diffContext?: DiffContext,
   ): FrontierItem[] {
     const priorityCtx: PriorityContext = {
       visitedWorkerTypes:
         this.workerTypesPerNode.get(node.id) ?? new Set(),
       memory: memorySignals,
+      diffContext,
+      diffPriorityBoost: diffContext ? this.diffPriorityBoost : undefined,
+      nodeUrl: node.url,
     };
 
     return proposals
