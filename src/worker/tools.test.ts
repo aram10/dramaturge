@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActionRecorder } from "./action-recorder.js";
 import { createWorkerTools } from "./tools.js";
+import { Blackboard } from "../a2a/blackboard.js";
 
 const tempDirs: string[] = [];
 
@@ -111,5 +112,78 @@ describe("createWorkerTools", () => {
     expect(observations[0].verdictHint).toBeUndefined();
     expect(observations[0].actionIds).toHaveLength(1);
     expect(observations[0].evidenceIds).toEqual([shot.evidenceId]);
+  });
+
+  it("includes post_to_blackboard tool when blackboard is provided", () => {
+    const screenshotDir = createTempDir();
+    const blackboard = new Blackboard();
+    const tools = createWorkerTools(
+      [],
+      new Map(),
+      [],
+      { recordEvent: vi.fn() } as any,
+      { url: () => "https://example.com" } as any,
+      screenshotDir,
+      "Test area",
+      [],
+      [],
+      true,
+      undefined,
+      undefined,
+      undefined,
+      blackboard,
+      "agent-tester"
+    );
+
+    expect(tools.post_to_blackboard).toBeDefined();
+  });
+
+  it("post_to_blackboard posts an entry to the blackboard", async () => {
+    const screenshotDir = createTempDir();
+    const blackboard = new Blackboard();
+    const tools = createWorkerTools(
+      [],
+      new Map(),
+      [],
+      { recordEvent: vi.fn() } as any,
+      { url: () => "https://example.com/settings" } as any,
+      screenshotDir,
+      "Settings",
+      [],
+      [],
+      true,
+      undefined,
+      undefined,
+      undefined,
+      blackboard,
+      "agent-tester"
+    );
+
+    const result = await (tools as any).post_to_blackboard.execute({
+      kind: "finding",
+      summary: "Broken save button",
+      tags: ["critical"],
+    });
+
+    expect(result.posted).toBe(true);
+    expect(result.entryId).toMatch(/^bb-/);
+    expect(blackboard.size()).toBe(1);
+    expect(blackboard.query("finding")[0].agentId).toBe("agent-tester");
+    expect(blackboard.query("finding")[0].data.summary).toBe("Broken save button");
+  });
+
+  it("omits post_to_blackboard tool when blackboard is not provided", () => {
+    const screenshotDir = createTempDir();
+    const tools = createWorkerTools(
+      [],
+      new Map(),
+      [],
+      { recordEvent: vi.fn() } as any,
+      { url: () => "https://example.com" } as any,
+      screenshotDir,
+      "Test area"
+    );
+
+    expect((tools as any).post_to_blackboard).toBeUndefined();
   });
 });
