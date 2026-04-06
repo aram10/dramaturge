@@ -199,6 +199,27 @@ const ResponsiveRegressionSchema = z
     enabled: false,
   });
 
+const VisionAnalysisSchema = z
+  .object({
+    /** Enable vision-based page understanding during preflight scans. */
+    enabled: z.boolean().default(false),
+    /** LLM model to use for vision analysis (must support image input). */
+    model: z.string().default("anthropic/claude-sonnet-4-20250514"),
+    /** Capture full-page screenshots for vision analysis. */
+    fullPage: z.boolean().default(false),
+    /** Maximum tokens for the vision model response. */
+    maxResponseTokens: z.number().int().min(64).default(1024),
+    /** Request timeout in milliseconds for vision API calls. */
+    requestTimeoutMs: z.number().int().min(1000).default(30_000),
+  })
+  .default({
+    enabled: false,
+    model: "anthropic/claude-sonnet-4-20250514",
+    fullPage: false,
+    maxResponseTokens: 1024,
+    requestTimeoutMs: 30_000,
+  });
+
 const ApiTestingSchema = z
   .object({
     enabled: z.boolean().default(false),
@@ -404,6 +425,7 @@ export const ConfigSchema = z.object({
   visualRegression: VisualRegressionSchema,
   webVitals: WebVitalsSchema,
   responsiveRegression: ResponsiveRegressionSchema,
+  visionAnalysis: VisionAnalysisSchema,
   apiTesting: ApiTestingSchema,
   adversarial: AdversarialSchema,
   judge: JudgeSchema,
@@ -424,6 +446,7 @@ export type LoadedDramaturgeConfig = ConfigWithMeta<DramaturgeConfig>;
 export type ApiTestingConfig = z.infer<typeof ApiTestingSchema>;
 export type AdversarialConfig = z.infer<typeof AdversarialSchema>;
 export type JudgeConfig = z.infer<typeof JudgeSchema>;
+export type VisionAnalysisConfig = z.infer<typeof VisionAnalysisSchema>;
 export type { ConfigFileContext, LoadedConfigMeta } from "./config-paths.js";
 export type FormAuthField = Extract<DramaturgeConfig["auth"], { type: "form" }>["fields"][number];
 export type FormAuthSubmit = Extract<DramaturgeConfig["auth"], { type: "form" }>["submit"];
