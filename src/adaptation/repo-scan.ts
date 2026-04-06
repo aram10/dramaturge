@@ -4,6 +4,7 @@ import { z } from "zod";
 import { parseJsoncObject } from "../utils/jsonc.js";
 import { canScanAstroRepo, scanAstroRepo } from "./astro.js";
 import { scanDjangoRepo } from "./django.js";
+import { canScanFastApiRepo, scanFastApiRepo } from "./fastapi.js";
 import { scanExpressRepo } from "./express.js";
 import { scanGenericRepo } from "./generic.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
@@ -152,6 +153,7 @@ function detectFramework(root: string): RepoFramework {
     reactRouter: false,
     vueRouter: false,
     express: false,
+    fastapi: false,
     django: false,
   };
 
@@ -160,6 +162,7 @@ function detectFramework(root: string): RepoFramework {
   const VUE_ROUTER_RE = /(?:from|require\()\s*["']vue-router["']/;
   const VUE_CREATE_ROUTER_RE = /\bcreateRouter\s*\(/;
   const EXPRESS_RE = /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+)["']/;
+  const FASTAPI_IMPORT_RE = /(?:from\s+fastapi\s+import|import\s+fastapi)\b/;
   const DJANGO_SETTINGS_RE = /(?:INSTALLED_APPS|django)/;
 
   if (existsSync(join(resolve(root), "manage.py"))) {
@@ -197,8 +200,14 @@ function detectFramework(root: string): RepoFramework {
 
         if (!isJs && !isPy) continue;
 
-        // Django detection via urls.py or settings.py
+        // Python framework detection
         if (isPy) {
+          if (!signatures.fastapi) {
+            const content = readFileSync(fullPath, "utf-8");
+            if (FASTAPI_IMPORT_RE.test(content)) {
+              signatures.fastapi = true;
+            }
+          }
           if (name === "urls.py") {
             signatures.django = true;
           } else if (name === "settings.py") {
@@ -234,6 +243,7 @@ function detectFramework(root: string): RepoFramework {
   if (signatures.reactRouter) return "react-router";
   if (signatures.vueRouter) return "vue-router";
   if (signatures.express) return "express";
+  if (signatures.fastapi) return "fastapi";
   if (signatures.django) return "django";
   return "generic";
 }
@@ -273,6 +283,9 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
       break;
     case "django":
       scanned = scanDjangoRepo(root);
+      break;
+    case "fastapi":
+      scanned = scanFastApiRepo(root);
       break;
     case "tanstack-router":
       scanned = scanTanStackRouterRepo(root);
