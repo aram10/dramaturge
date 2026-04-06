@@ -6,6 +6,7 @@ import { scanDjangoRepo } from "./django.js";
 import { scanExpressRepo } from "./express.js";
 import { scanGenericRepo } from "./generic.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
+import { canScanNuxtRepo, scanNuxtRepo } from "./nuxt.js";
 import { scanReactRouterRepo } from "./react-router.js";
 import { canScanSvelteKitRepo, scanSvelteKitRepo } from "./sveltekit.js";
 import { scanTanStackRouterRepo } from "./tanstack-router.js";
@@ -135,8 +136,9 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
 }
 
 function detectFramework(root: string): RepoFramework {
-  // Check Next.js and SvelteKit first via file markers (no file walk needed)
+  // Check Next.js, Nuxt, and SvelteKit first via file markers (no file walk needed)
   if (canScanNextJsRepo(root)) return "nextjs";
+  if (canScanNuxtRepo(root)) return "nuxt";
   if (canScanSvelteKitRepo(root)) return "sveltekit";
 
   // Single-pass walk for remaining framework detection
@@ -242,6 +244,9 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
   switch (framework) {
     case "nextjs":
       scanned = scanNextJsRepo(root);
+      break;
+    case "nuxt":
+      scanned = scanNuxtRepo(root);
       break;
     case "sveltekit":
       scanned = scanSvelteKitRepo(root);
