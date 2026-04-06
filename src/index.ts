@@ -143,3 +143,29 @@ export type {
   NormalizedSpecArtifact,
   NormalizedSpecSource,
 } from "./spec/types.js";
+export {
+  AGENT_CARDS,
+  agentRoleForWorkerType,
+  agentCardForWorkerType,
+  findCapableAgents,
+  Blackboard,
+  MessageBus,
+  Coordinator,
+} from "./a2a/index.js";
+export type {
+  AgentRole,
+  AgentCard,
+  AgentSkill,
+  A2AMessage,
+  A2ATask,
+  A2ATaskStatus,
+  A2ATaskStatusUpdate,
+  A2AArtifact,
+  Part,
+  TextPart,
+  DataPart,
+  FilePart,
+  BlackboardEntry,
+  BlackboardEntryKind,
+  CoordinatorDeps,
+} from "./a2a/index.js";
