@@ -11,6 +11,7 @@ const djangoFixture = fileURLToPath(new URL("./fixtures/django-app", import.meta
 const tanstackFixture = fileURLToPath(new URL("./fixtures/tanstack-router-app", import.meta.url));
 const nuxtFixture = fileURLToPath(new URL("./fixtures/nuxt-app", import.meta.url));
 const remixFixture = fileURLToPath(new URL("./fixtures/remix-app", import.meta.url));
+const astroFixture = fileURLToPath(new URL("./fixtures/astro-app", import.meta.url));
 const genericFixture = fileURLToPath(new URL("./fixtures/generic-app", import.meta.url));
 
 describe("scanRepository", () => {
@@ -102,6 +103,13 @@ describe("scanRepository", () => {
 
     it("detects Remix via @remix-run/ imports", () => {
       const hints = scanRepository({ root: remixFixture, framework: "auto" });
+      expect(hints.routes).toContain("/");
+      expect(hints.routes).toContain("/login");
+      expect(hints.apiEndpoints.length).toBeGreaterThan(0);
+    });
+
+    it("detects Astro via astro.config.mjs", () => {
+      const hints = scanRepository({ root: astroFixture, framework: "auto" });
       expect(hints.routes).toContain("/");
       expect(hints.routes).toContain("/login");
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
