@@ -9,6 +9,7 @@ const expressFixture = fileURLToPath(new URL("./fixtures/express-app", import.me
 const vueRouterFixture = fileURLToPath(new URL("./fixtures/vue-router-app", import.meta.url));
 const djangoFixture = fileURLToPath(new URL("./fixtures/django-app", import.meta.url));
 const tanstackFixture = fileURLToPath(new URL("./fixtures/tanstack-router-app", import.meta.url));
+const nuxtFixture = fileURLToPath(new URL("./fixtures/nuxt-app", import.meta.url));
 const genericFixture = fileURLToPath(new URL("./fixtures/generic-app", import.meta.url));
 
 describe("scanRepository", () => {
@@ -89,6 +90,13 @@ describe("scanRepository", () => {
     it("detects TanStack Router via @tanstack/react-router import", () => {
       const hints = scanRepository({ root: tanstackFixture, framework: "auto" });
       expect(hints.routes.length).toBeGreaterThan(0);
+    });
+
+    it("detects Nuxt via nuxt.config.ts", () => {
+      const hints = scanRepository({ root: nuxtFixture, framework: "auto" });
+      expect(hints.routes).toContain("/");
+      expect(hints.routes).toContain("/login");
+      expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
     it("falls back to generic for unrecognized projects", () => {
