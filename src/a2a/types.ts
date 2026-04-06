@@ -29,7 +29,7 @@ export interface AgentSkill {
 }
 
 /**
- * An Agent Card describes a specialised agent's identity and capabilities.
+ * An Agent Card describes a specialized agent's identity and capabilities.
  *
  * Modeled after the A2A AgentCard specification — each agent advertises
  * what it can do so the Coordinator can route tasks to the best fit.
@@ -41,7 +41,7 @@ export interface AgentCard {
   name: string;
   /** One-line description of the agent's purpose. */
   description: string;
-  /** The specialised role this agent fills. */
+  /** The specialized role this agent fills. */
   role: AgentRole;
   /** Skills the agent can perform. */
   skills: AgentSkill[];
@@ -63,7 +63,7 @@ export interface TextPart {
 export interface DataPart {
   kind: "data";
   mimeType: string;
-  /** Serialised JSON payload. */
+  /** Serialized JSON payload. */
   data: Record<string, unknown>;
 }
 

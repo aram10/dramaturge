@@ -1,7 +1,7 @@
 /**
  * Pre-defined Agent Cards for the multi-agent orchestration team.
  *
- * Each card describes a specialised agent's capabilities so the
+ * Each card describes a specialized agent's capabilities so the
  * Coordinator can match incoming tasks to the best-fit agent.
  */
 

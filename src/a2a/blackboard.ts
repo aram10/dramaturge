@@ -1,7 +1,7 @@
 /**
  * Blackboard — shared state layer for multi-agent coordination.
  *
- * The Blackboard acts as a centralised communication surface where agents
+ * The Blackboard acts as a centralized communication surface where agents
  * post findings, coverage signals, navigation discoveries, and directives.
  * Other agents (notably the Reviewer) observe the board and react.
  *

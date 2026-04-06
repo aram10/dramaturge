@@ -263,7 +263,7 @@ export interface StateEdge {
 export type WorkerType = "navigation" | "form" | "crud" | "api" | "adversarial";
 
 /**
- * Specialised agent roles within the multi-agent orchestration.
+ * Specialized agent roles within the multi-agent orchestration.
  * @see src/a2a/types.ts for the full A2A protocol types.
  */
 export type AgentRole = "scout" | "tester" | "security" | "reviewer" | "reporter";
