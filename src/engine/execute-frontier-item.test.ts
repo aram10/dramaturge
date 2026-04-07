@@ -798,23 +798,9 @@ describe("executeFrontierItem", () => {
     expect(result.result!.findings).toHaveLength(2);
     expect(result.result!.evidence[0]).toEqual(visionEvidence);
 
-    // 3. executeWorkerTask receives the visionContext argument
-    expect(executeWorkerTask).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
+    // 3. executeWorkerTask receives the visionContext argument (last positional arg)
+    const workerCallArgs = vi.mocked(executeWorkerTask).mock.calls[0];
+    expect(workerCallArgs[workerCallArgs.length - 1]).toBe(
       "A dashboard with sidebar and main content area.",
     );
   });
