@@ -261,11 +261,13 @@ export class ActionRecorder {
     }
 
     const policy = getInputRecordingPolicy(this.page, selector);
-    if (policy === 'safe') {
-      return normalized;
+    switch (policy) {
+      case 'safe':
+        return normalized;
+      case 'secret':
+      case undefined:
+        return REDACTED_VALUE;
     }
-
-    return REDACTED_VALUE;
   }
 
   private patchPageNavigation(method: 'goto' | 'goBack' | 'goForward' | 'reload'): void {
