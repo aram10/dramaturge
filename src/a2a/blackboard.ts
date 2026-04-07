@@ -37,9 +37,9 @@ export class Blackboard {
       id: `bb-${shortId()}`,
       kind,
       agentId,
-      data,
+      data: { ...data },
       timestamp: new Date().toISOString(),
-      tags,
+      tags: [...tags],
     };
     this.entries.push(entry);
 
