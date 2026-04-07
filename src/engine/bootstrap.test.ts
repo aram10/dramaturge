@@ -153,9 +153,32 @@ describe('bootstrap supervision', () => {
     expect(page.evaluate).toHaveBeenCalled();
   });
 
-  it('uses taskkill on Windows and kill on other platforms during cleanup', () => {
+  it('starts bootstrap commands in a separate process group on Unix', () => {
+    const processRef = createMockProcess();
+    const spawnImpl = vi.fn().mockReturnValue(processRef);
+
+    startBootstrapProcess(
+      {
+        bootstrap: {
+          command: 'pnpm dev',
+          cwd: '/tmp/app',
+        },
+      } as any,
+      spawnImpl as any
+    );
+
+    expect(spawnImpl).toHaveBeenCalledWith('pnpm dev', {
+      cwd: '/tmp/app',
+      detached: process.platform !== 'win32',
+      shell: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  });
+
+  it('uses taskkill on Windows and terminates the process group on Unix during cleanup', () => {
     const processRef = createMockProcess();
     const spawnImpl = vi.fn();
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
 
     stopBootstrapProcess({ process: processRef } as any, spawnImpl as any, 'win32');
     expect(spawnImpl).toHaveBeenCalledWith('taskkill', ['/pid', '4321', '/t', '/f'], {
@@ -163,6 +186,21 @@ describe('bootstrap supervision', () => {
     });
 
     stopBootstrapProcess({ process: processRef } as any, spawnImpl as any, 'linux');
+    expect(killSpy).toHaveBeenCalledWith(-4321, 'SIGTERM');
+    expect(processRef.kill).not.toHaveBeenCalled();
+
+    killSpy.mockRestore();
+  });
+
+  it('falls back to killing the shell process when process-group termination fails', () => {
+    const processRef = createMockProcess();
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw new Error('no such process group');
+    });
+
+    stopBootstrapProcess({ process: processRef } as any, vi.fn() as any, 'linux');
+
     expect(processRef.kill).toHaveBeenCalledWith('SIGTERM');
+    killSpy.mockRestore();
   });
 });
