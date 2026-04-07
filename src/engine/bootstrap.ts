@@ -96,6 +96,7 @@ export function startBootstrapProcess(
   console.log(`Starting bootstrap command: ${command}`);
   const processRef = spawnImpl(command, {
     cwd: config.bootstrap?.cwd,
+    detached: process.platform !== 'win32',
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -219,5 +220,9 @@ export function stopBootstrapProcess(
     return;
   }
 
-  processRef.kill?.('SIGTERM');
+  try {
+    process.kill(-processRef.pid, 'SIGTERM');
+  } catch {
+    processRef.kill?.('SIGTERM');
+  }
 }
