@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Text, Box, Newline } from "ink";
+import { Text, Box } from "ink";
 import type { EngineEventEmitter } from "../engine/event-stream.js";
 import {
   type DashboardState,
@@ -103,7 +103,7 @@ function ActivityFeed({
       {visible.length === 0 ? (
         <Text dimColor>Waiting for events…</Text>
       ) : (
-        visible.map((item, i) => {
+        visible.map((item) => {
           let color: string | undefined;
           if (item.kind === "finding") color = "yellow";
           else if (item.kind === "error") color = "red";
