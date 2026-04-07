@@ -3,6 +3,7 @@ import { resolveBrowserOpsModel, type DramaturgeConfig } from '../config.js';
 import { authenticate } from '../auth/authenticator.js';
 import type { BrowserErrorCollector } from '../browser-errors.js';
 import { applyStorageState, type BrowserStorageState } from '../auth/storage-state.js';
+import { adaptStagehand } from '../browser/page-interface.js';
 import type { NetworkTrafficObserver } from '../network/traffic-observer.js';
 
 export interface WorkerSession {
@@ -33,7 +34,7 @@ export async function initWorkerPool(
     const sh = createStagehand(config);
     await sh.init();
     if (sharedState) {
-      await applyStorageState(sh, config.targetUrl, sharedState);
+      await applyStorageState(adaptStagehand(sh), config.targetUrl, sharedState);
     } else {
       await authenticate(sh, config);
     }

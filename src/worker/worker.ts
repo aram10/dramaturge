@@ -69,7 +69,7 @@ function initWorker(
   const followupRequests: FollowupRequest[] = [];
   const discoveredEdges: DiscoveredEdge[] = [];
   const page = stagehand.context.pages()[0];
-  const actionRecorder = new ActionRecorder(page as any);
+  const actionRecorder = new ActionRecorder(page);
   actionRecorder.start();
 
   const stagnationTracker =
