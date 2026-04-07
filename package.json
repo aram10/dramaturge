@@ -1,6 +1,6 @@
 {
   "name": "@aram10/dramaturge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Exploratory QA engine for web applications with UI, API, and evidence-backed replay",
   "repository": {
     "type": "git",
