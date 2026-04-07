@@ -32,7 +32,7 @@ export function setInputRecordingPolicy(
   selector: string,
   policy: InputRecordingPolicy
 ): void {
-  if (!selector) {
+  if (!selector || selector.trim() === '') {
     return;
   }
 
@@ -43,7 +43,7 @@ export function getInputRecordingPolicy(
   target: object | undefined,
   selector: string
 ): InputRecordingPolicy | undefined {
-  if (!selector) {
+  if (!selector || selector.trim() === '') {
     return undefined;
   }
 
