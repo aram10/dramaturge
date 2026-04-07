@@ -3,25 +3,22 @@
 /**
  * Prepares a Dramaturge config for CI execution.
  *
- * Reads the user config (if present), ensures JSON output is enabled,
- * forces headless mode, and writes a temporary config file.
+ * Reads the user config (if present), applies explicit action overrides,
+ * and writes a temporary config file.
  *
  * Environment variables:
  *   INPUT_CONFIG      – path to the user config file
  *   INPUT_TARGET_URL  – target URL override
  *   INPUT_REPORT_DIR  – report directory override
+ *   INPUT_FORCE_JSON_OUTPUT – whether to ensure JSON output is enabled
+ *   INPUT_FORCE_HEADLESS – whether to force browser.headless=true
  *   RUNNER_TEMP       – GitHub Actions runner temp directory
  *   GITHUB_OUTPUT     – GitHub Actions output file
  */
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-const configPath = process.env.INPUT_CONFIG || 'dramaturge.config.json';
-const targetUrl = process.env.INPUT_TARGET_URL || '';
-const reportDir = process.env.INPUT_REPORT_DIR || '';
-const runnerTemp = process.env.RUNNER_TEMP || '/tmp';
-const githubOutput = process.env.GITHUB_OUTPUT || '';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Strips JSONC comments while preserving content inside strings
@@ -83,37 +80,103 @@ function stripJsonComments(input) {
   return output;
 }
 
-let config = {};
-if (existsSync(configPath)) {
-  const raw = readFileSync(configPath, 'utf-8');
-  config = JSON.parse(stripJsonComments(raw));
+export function parseBooleanInput(value, defaultValue) {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+
+  return value.toLowerCase() === 'true';
 }
 
-if (targetUrl) config.targetUrl = targetUrl;
+export function applyActionOverrides(
+  config,
+  { targetUrl = '', reportDir = '', forceJsonOutput = true, forceHeadless = true } = {}
+) {
+  const nextConfig = { ...config };
 
-// Ensure JSON output is available for result parsing
-config.output = config.output || {};
-if (config.output.format === 'markdown') {
-  config.output.format = 'both';
-} else if (!config.output.format) {
-  config.output.format = 'json';
+  if (targetUrl) {
+    nextConfig.targetUrl = targetUrl;
+  }
+
+  if (forceJsonOutput || reportDir) {
+    nextConfig.output = { ...(config.output || {}) };
+  }
+
+  // Ensure JSON output is available for result parsing when explicitly enabled.
+  if (forceJsonOutput) {
+    if (nextConfig.output.format === 'markdown') {
+      nextConfig.output.format = 'both';
+    } else if (!nextConfig.output.format) {
+      nextConfig.output.format = 'json';
+    }
+  }
+
+  if (reportDir) {
+    nextConfig.output.dir = reportDir;
+  }
+
+  if (forceHeadless) {
+    nextConfig.browser = { ...(config.browser || {}) };
+    nextConfig.browser.headless = true;
+  }
+
+  return nextConfig;
 }
 
-if (reportDir) config.output.dir = reportDir;
+export function prepareConfig({
+  configPath = 'dramaturge.config.json',
+  targetUrl = '',
+  reportDir = '',
+  forceJsonOutput = true,
+  forceHeadless = true,
+  runnerTemp = '/tmp',
+  githubOutput = '',
+} = {}) {
+  let config = {};
+  if (existsSync(configPath)) {
+    const raw = readFileSync(configPath, 'utf-8');
+    config = JSON.parse(stripJsonComments(raw));
+  }
 
-// Force headless mode in CI
-config.browser = config.browser || {};
-config.browser.headless = true;
+  const preparedConfig = applyActionOverrides(config, {
+    targetUrl,
+    reportDir,
+    forceJsonOutput,
+    forceHeadless,
+  });
 
-const tmpConfig = join(runnerTemp, `dramaturge-ci-config-${process.pid}.json`);
-writeFileSync(tmpConfig, JSON.stringify(config, null, 2));
+  const tmpConfig = join(runnerTemp, `dramaturge-ci-config-${process.pid}.json`);
+  writeFileSync(tmpConfig, JSON.stringify(preparedConfig, null, 2));
 
-const effectiveReportDir = config.output.dir || './dramaturge-reports';
+  const effectiveReportDir = preparedConfig.output?.dir || './dramaturge-reports';
 
-if (githubOutput) {
-  appendFileSync(githubOutput, `config-path=${tmpConfig}\n`);
-  appendFileSync(githubOutput, `report-dir=${effectiveReportDir}\n`);
+  if (githubOutput) {
+    appendFileSync(githubOutput, `config-path=${tmpConfig}\n`);
+    appendFileSync(githubOutput, `report-dir=${effectiveReportDir}\n`);
+  }
+
+  return {
+    config: preparedConfig,
+    configPath: tmpConfig,
+    reportDir: effectiveReportDir,
+  };
 }
 
-console.log(`Config written to: ${tmpConfig}`);
-console.log(`Report dir: ${effectiveReportDir}`);
+function main() {
+  const result = prepareConfig({
+    configPath: process.env.INPUT_CONFIG || 'dramaturge.config.json',
+    targetUrl: process.env.INPUT_TARGET_URL || '',
+    reportDir: process.env.INPUT_REPORT_DIR || '',
+    forceJsonOutput: parseBooleanInput(process.env.INPUT_FORCE_JSON_OUTPUT, true),
+    forceHeadless: parseBooleanInput(process.env.INPUT_FORCE_HEADLESS, true),
+    runnerTemp: process.env.RUNNER_TEMP || '/tmp',
+    githubOutput: process.env.GITHUB_OUTPUT || '',
+  });
+
+  console.log(`Config written to: ${result.configPath}`);
+  console.log(`Report dir: ${result.reportDir}`);
+}
+
+if (resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

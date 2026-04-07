@@ -41,6 +41,21 @@ inputs:
     description: 'Directory for report output (overrides config value)'
     required: false
     default: ''
+  force-json-output:
+    description: >
+      When true, the action explicitly overrides config.output.format to ensure a
+      JSON report is available for parsing. A markdown-only config becomes both;
+      an unset format becomes json. Set to false to preserve the configured
+      output.format.
+    required: false
+    default: 'true'
+  force-headless:
+    description: >
+      When true, the action explicitly overrides config.browser.headless to true
+      for the action run. Set to false to preserve the configured headless
+      value.
+    required: false
+    default: 'true'
   working-directory:
     description: 'Working directory for running Dramaturge'
     required: false
@@ -93,6 +108,8 @@ runs:
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_TARGET_URL: ${{ inputs.target-url }}
         INPUT_REPORT_DIR: ${{ inputs.report-dir }}
+        INPUT_FORCE_JSON_OUTPUT: ${{ inputs.force-json-output }}
+        INPUT_FORCE_HEADLESS: ${{ inputs.force-headless }}
       run: node "${{ github.action_path }}/action/prepare-config.js"
 
     - name: Run Dramaturge
