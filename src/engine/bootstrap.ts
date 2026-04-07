@@ -214,7 +214,8 @@ export function stopBootstrapProcess(
     return;
   }
 
-  if (platform === 'win32') {
+  const isWindows = platform === 'win32';
+  if (isWindows) {
     spawnImpl('taskkill', ['/pid', String(processRef.pid), '/t', '/f'], {
       stdio: 'ignore',
     });
@@ -223,7 +224,10 @@ export function stopBootstrapProcess(
 
   try {
     process.kill(-processRef.pid, 'SIGTERM');
+    return;
   } catch {
-    processRef.kill?.('SIGTERM');
+    // Fall through to direct child termination when process-group shutdown is unavailable.
   }
+
+  processRef.kill?.('SIGTERM');
 }
