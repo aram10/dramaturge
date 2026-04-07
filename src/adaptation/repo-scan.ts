@@ -2,11 +2,17 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
 import { parseJsoncObject } from "../utils/jsonc.js";
+import { canScanAstroRepo, scanAstroRepo } from "./astro.js";
 import { scanDjangoRepo } from "./django.js";
 import { scanExpressRepo } from "./express.js";
+import { scanFastApiRepo } from "./fastapi.js";
 import { scanGenericRepo } from "./generic.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
+import { canScanNuxtRepo, scanNuxtRepo } from "./nuxt.js";
+import { canScanRailsRepo, scanRailsRepo } from "./rails.js";
 import { scanReactRouterRepo } from "./react-router.js";
+import { canScanRemixRepo, scanRemixRepo } from "./remix.js";
+import { canScanSvelteKitRepo, scanSvelteKitRepo } from "./sveltekit.js";
 import { scanTanStackRouterRepo } from "./tanstack-router.js";
 import { scanVueRouterRepo } from "./vue-router.js";
 import type {
@@ -134,7 +140,14 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
 }
 
 function detectFramework(root: string): RepoFramework {
-  // Check Next.js first via directory marker (no file walk needed)
+  // Check framework-specific markers first (no full file walk needed)
+  if (canScanNuxtRepo(root)) return "nuxt";
+  if (canScanSvelteKitRepo(root)) return "sveltekit";
+  if (canScanAstroRepo(root)) return "astro";
+  // Remix before Next.js: Next.js only checks for `app/` which Remix also has
+  if (canScanRemixRepo(root)) return "remix";
+  // Rails before Next.js: Next.js only checks for `app/` which Rails also has
+  if (canScanRailsRepo(root)) return "rails";
   if (canScanNextJsRepo(root)) return "nextjs";
 
   // Single-pass walk for remaining framework detection
@@ -143,6 +156,7 @@ function detectFramework(root: string): RepoFramework {
     reactRouter: false,
     vueRouter: false,
     express: false,
+    fastapi: false,
     django: false,
   };
 
@@ -151,6 +165,7 @@ function detectFramework(root: string): RepoFramework {
   const VUE_ROUTER_RE = /(?:from|require\()\s*["']vue-router["']/;
   const VUE_CREATE_ROUTER_RE = /\bcreateRouter\s*\(/;
   const EXPRESS_RE = /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+)["']/;
+  const FASTAPI_IMPORT_RE = /(?:from\s+fastapi\s+import|import\s+fastapi)\b/;
   const DJANGO_SETTINGS_RE = /(?:INSTALLED_APPS|django)/;
 
   if (existsSync(join(resolve(root), "manage.py"))) {
@@ -188,8 +203,14 @@ function detectFramework(root: string): RepoFramework {
 
         if (!isJs && !isPy) continue;
 
-        // Django detection via urls.py or settings.py
+        // Python framework detection
         if (isPy) {
+          if (!signatures.fastapi) {
+            const content = readFileSync(fullPath, "utf-8");
+            if (FASTAPI_IMPORT_RE.test(content)) {
+              signatures.fastapi = true;
+            }
+          }
           if (name === "urls.py") {
             signatures.django = true;
           } else if (name === "settings.py") {
@@ -225,6 +246,7 @@ function detectFramework(root: string): RepoFramework {
   if (signatures.reactRouter) return "react-router";
   if (signatures.vueRouter) return "vue-router";
   if (signatures.express) return "express";
+  if (signatures.fastapi) return "fastapi";
   if (signatures.django) return "django";
   return "generic";
 }
@@ -241,6 +263,18 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
     case "nextjs":
       scanned = scanNextJsRepo(root);
       break;
+    case "nuxt":
+      scanned = scanNuxtRepo(root);
+      break;
+    case "sveltekit":
+      scanned = scanSvelteKitRepo(root);
+      break;
+    case "remix":
+      scanned = scanRemixRepo(root);
+      break;
+    case "astro":
+      scanned = scanAstroRepo(root);
+      break;
     case "react-router":
       scanned = scanReactRouterRepo(root);
       break;
@@ -252,6 +286,12 @@ export function scanRepository(options: RepoScanOptions): RepoHints {
       break;
     case "django":
       scanned = scanDjangoRepo(root);
+      break;
+    case "rails":
+      scanned = scanRailsRepo(root);
+      break;
+    case "fastapi":
+      scanned = scanFastApiRepo(root);
       break;
     case "tanstack-router":
       scanned = scanTanStackRouterRepo(root);

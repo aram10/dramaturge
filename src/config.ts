@@ -357,7 +357,7 @@ const DiffAwareSchema = z
 const RepoContextSchema = z
   .object({
     root: z.string().optional(),
-    framework: z.enum(["auto", "nextjs", "react-router", "express", "vue-router", "django", "tanstack-router", "generic"]).default("auto"),
+    framework: z.enum(["auto", "nextjs", "nuxt", "sveltekit", "remix", "astro", "react-router", "express", "vue-router", "django", "fastapi", "rails", "tanstack-router", "generic"]).default("auto"),
     hintsFile: z.string().optional(),
     specFile: z.string().optional(),
   })

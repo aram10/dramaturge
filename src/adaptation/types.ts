@@ -1,10 +1,16 @@
 export type RepoFramework =
   | "auto"
   | "nextjs"
+  | "nuxt"
+  | "sveltekit"
+  | "remix"
+  | "astro"
   | "react-router"
   | "express"
   | "vue-router"
   | "django"
+  | "fastapi"
+  | "rails"
   | "tanstack-router"
   | "generic";
 

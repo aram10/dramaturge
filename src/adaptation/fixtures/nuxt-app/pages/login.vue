@@ -1,0 +1,6 @@
+<template>
+  <form data-testid="login-form">
+    <input name="email" />
+    <button type="submit">Login</button>
+  </form>
+</template>
