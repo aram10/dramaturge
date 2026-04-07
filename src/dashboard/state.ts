@@ -314,8 +314,18 @@ export function applyA2AMessage(
   const target = evt.toAgent === "*" ? "all" : evt.toAgent;
   const text = `✉ ${evt.fromAgent} → ${target}: ${evt.text}`;
 
+  // Increment messagesSent on the sender's agent if already tracked
+  let agents = state.agents;
+  const sender = agents[evt.fromAgent];
+  if (sender) {
+    agents = {
+      ...agents,
+      [evt.fromAgent]: { ...sender, messagesSent: sender.messagesSent + 1 },
+    };
+  }
+
   return pushActivity(
-    { ...state, a2aEnabled: true, a2aMessagesTotal: state.a2aMessagesTotal + 1 },
+    { ...state, a2aEnabled: true, agents, a2aMessagesTotal: state.a2aMessagesTotal + 1 },
     "a2a-message",
     text,
     now

@@ -3,13 +3,11 @@ import { render } from "ink";
 import type { EngineEventEmitter } from "../engine/event-stream.js";
 import type { Blackboard } from "../a2a/blackboard.js";
 import type { MessageBus } from "../a2a/message-bus.js";
-import type { Coordinator } from "../a2a/coordinator.js";
 import { Dashboard } from "./app.js";
 
 export interface RenderDashboardOptions {
   blackboard?: Blackboard;
   messageBus?: MessageBus;
-  coordinator?: Coordinator;
 }
 
 /**
@@ -32,7 +30,6 @@ export function renderDashboard(
       eventStream,
       blackboard: options?.blackboard,
       messageBus: options?.messageBus,
-      coordinator: options?.coordinator,
     })
   );
 
