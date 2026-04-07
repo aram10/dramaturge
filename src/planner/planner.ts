@@ -5,30 +5,37 @@ import type {
   WorkerType,
   MissionConfig,
   PageType,
-} from "../types.js";
-import type { RepoHints } from "../adaptation/types.js";
-import type { StateGraph } from "../graph/state-graph.js";
-import { computePriority, type PriorityContext } from "./priority.js";
-import { proposeLLMTasks } from "../llm.js";
-import { shortId } from "../constants.js";
-import type { PlannerMemorySignals } from "../memory/types.js";
-import type { DiffContext } from "../diff/types.js";
+} from '../types.js';
+import type { RepoHints } from '../adaptation/types.js';
+import type { StateGraph } from '../graph/state-graph.js';
+import {
+  MAX_ROUTES_IN_PLANNER,
+  MAX_ROUTE_FAMILIES_IN_PLANNER,
+  MAX_STABLE_SELECTORS_IN_PLANNER,
+  MAX_API_ENDPOINTS_IN_PLANNER,
+  MAX_LOGIN_ROUTES_IN_PLANNER,
+} from '../constants.js';
+import { computePriority, type PriorityContext } from './priority.js';
+import { proposeLLMTasks } from '../llm.js';
+import { shortId } from '../constants.js';
+import type { PlannerMemorySignals } from '../memory/types.js';
+import type { DiffContext } from '../diff/types.js';
 
 /** Default page-type → worker-type mapping. */
 const PAGE_TYPE_WORKER_MAP: Record<PageType, WorkerType> = {
-  form: "form",
-  list: "crud",
-  detail: "crud",
-  dashboard: "navigation",
-  settings: "form",
-  wizard: "form",
-  modal: "form",
-  auth: "navigation",
-  landing: "navigation",
-  unknown: "navigation",
+  form: 'form',
+  list: 'crud',
+  detail: 'crud',
+  dashboard: 'navigation',
+  settings: 'form',
+  wizard: 'form',
+  modal: 'form',
+  auth: 'navigation',
+  landing: 'navigation',
+  unknown: 'navigation',
 };
 
-const DEFAULT_FOCUS_MODES: WorkerType[] = ["navigation", "form", "crud"];
+const DEFAULT_FOCUS_MODES: WorkerType[] = ['navigation', 'form', 'crud'];
 
 interface PlannerProposal {
   workerType: WorkerType;
@@ -59,46 +66,48 @@ function summarizeRepoHints(repoHints?: RepoHints): string | undefined {
 
   const parts: string[] = [];
   if (repoHints.routes.length > 0) {
-    parts.push(`routes: ${repoHints.routes.slice(0, 3).join(", ")}`);
+    parts.push(`routes: ${repoHints.routes.slice(0, MAX_ROUTES_IN_PLANNER).join(', ')}`);
   }
   if ((repoHints.routeFamilies?.length ?? 0) > 0) {
-    parts.push(`route families: ${repoHints.routeFamilies.slice(0, 3).join(", ")}`);
+    parts.push(
+      `route families: ${repoHints.routeFamilies.slice(0, MAX_ROUTE_FAMILIES_IN_PLANNER).join(', ')}`
+    );
   }
   if (repoHints.stableSelectors.length > 0) {
     parts.push(
-      `stable selectors: ${repoHints.stableSelectors.slice(0, 3).join(", ")}`
+      `stable selectors: ${repoHints.stableSelectors.slice(0, MAX_STABLE_SELECTORS_IN_PLANNER).join(', ')}`
     );
   }
   if ((repoHints.apiEndpoints?.length ?? 0) > 0) {
     parts.push(
       `api endpoints: ${repoHints.apiEndpoints
-        .slice(0, 2)
-        .map((endpoint) => `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}`)
-        .join(", ")}`
+        .slice(0, MAX_API_ENDPOINTS_IN_PLANNER)
+        .map((endpoint) => `${endpoint.methods.join('/') || 'ANY'} ${endpoint.route}`)
+        .join(', ')}`
     );
   }
   if (repoHints.authHints.loginRoutes.length > 0) {
     parts.push(
-      `login routes: ${repoHints.authHints.loginRoutes.slice(0, 2).join(", ")}`
+      `login routes: ${repoHints.authHints.loginRoutes.slice(0, MAX_LOGIN_ROUTES_IN_PLANNER).join(', ')}`
     );
   }
 
-  return parts.length > 0 ? parts.join("; ") : undefined;
+  return parts.length > 0 ? parts.join('; ') : undefined;
 }
 
 function relevantApiEndpointsForNode(
   node: StateNode,
   repoHints?: RepoHints
-): RepoHints["apiEndpoints"] {
+): RepoHints['apiEndpoints'] {
   if (!repoHints?.apiEndpoints.length) {
     return [];
   }
 
-  const urlTokens = (node.url ?? "")
+  const urlTokens = (node.url ?? '')
     .toLowerCase()
-    .split("/")
+    .split('/')
     .filter(Boolean)
-    .filter((token) => token !== "api");
+    .filter((token) => token !== 'api');
 
   const matches = repoHints.apiEndpoints.filter((endpoint) =>
     urlTokens.some((token) => endpoint.route.toLowerCase().includes(token))
@@ -122,7 +131,7 @@ export class Planner {
     mission?: MissionConfig,
     repoHints?: RepoHints,
     memorySignals?: PlannerMemorySignals,
-    diffContext?: DiffContext,
+    diffContext?: DiffContext
   ): FrontierItem[] {
     const proposals: PlannerProposal[] = [];
 
@@ -135,61 +144,61 @@ export class Planner {
     if (allowedTypes.includes(defaultWorker)) {
       proposals.push({
         workerType: defaultWorker,
-        objective: `Explore ${node.pageType} page${node.url ? ` at ${node.url}` : ""}: ${node.title ?? "untitled"}`,
+        objective: `Explore ${node.pageType} page${node.url ? ` at ${node.url}` : ''}: ${node.title ?? 'untitled'}`,
         reason: `Auto-assigned ${defaultWorker} worker for ${node.pageType} page`,
       });
     }
 
     // For non-navigation pages, also add a navigation task to discover links
     if (
-      defaultWorker !== "navigation" &&
-      allowedTypes.includes("navigation") &&
+      defaultWorker !== 'navigation' &&
+      allowedTypes.includes('navigation') &&
       node.timesVisited === 0
     ) {
       proposals.push({
-        workerType: "navigation",
-        objective: `Discover navigation targets from ${node.pageType} page${node.url ? ` at ${node.url}` : ""}`,
-        reason: "Navigation discovery for new page",
+        workerType: 'navigation',
+        objective: `Discover navigation targets from ${node.pageType} page${node.url ? ` at ${node.url}` : ''}`,
+        reason: 'Navigation discovery for new page',
       });
     }
 
     const repoHintSummary = summarizeRepoHints(repoHints);
     if (
       repoHintSummary &&
-      allowedTypes.includes("navigation") &&
+      allowedTypes.includes('navigation') &&
       node.depth === 0 &&
       node.timesVisited === 0
     ) {
       proposals.push({
-        workerType: "navigation",
+        workerType: 'navigation',
         objective: `Use repo-aware hints to probe likely routes and controls from this page: ${repoHintSummary}`,
-        reason: "Repo-aware navigation seed",
+        reason: 'Repo-aware navigation seed',
         priority: 0.85,
       });
     }
 
     const apiHints = relevantApiEndpointsForNode(node, repoHints);
-    if (allowedTypes.includes("api") && node.timesVisited === 0 && apiHints.length > 0) {
+    if (allowedTypes.includes('api') && node.timesVisited === 0 && apiHints.length > 0) {
       proposals.push({
-        workerType: "api",
-        objective: `Probe related API contracts and auth boundaries for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ""}: ${apiHints
-          .slice(0, 2)
-          .map((endpoint) => `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}`)
-          .join(", ")}`,
-        reason: "API-aware follow-up for this page",
+        workerType: 'api',
+        objective: `Probe related API contracts and auth boundaries for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ''}: ${apiHints
+          .slice(0, MAX_API_ENDPOINTS_IN_PLANNER)
+          .map((endpoint) => `${endpoint.methods.join('/') || 'ANY'} ${endpoint.route}`)
+          .join(', ')}`,
+        reason: 'API-aware follow-up for this page',
         priority: 0.78,
       });
     }
 
     if (
-      allowedTypes.includes("adversarial") &&
+      allowedTypes.includes('adversarial') &&
       node.timesVisited === 0 &&
-      ["form", "list", "detail", "settings", "wizard", "modal"].includes(node.pageType)
+      ['form', 'list', 'detail', 'settings', 'wizard', 'modal'].includes(node.pageType)
     ) {
       proposals.push({
-        workerType: "adversarial",
-        objective: `Probe edge cases, stale-state behavior, and replay/idempotency risks for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ""}`,
-        reason: "Low-priority adversarial coverage pass",
+        workerType: 'adversarial',
+        objective: `Probe edge cases, stale-state behavior, and replay/idempotency risks for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ''}`,
+        reason: 'Low-priority adversarial coverage pass',
         priority: 0.35,
       });
     }
@@ -210,7 +219,7 @@ export class Planner {
     repoHints?: RepoHints,
     llmRequestTimeoutMs?: number,
     memorySignals?: PlannerMemorySignals,
-    diffContext?: DiffContext,
+    diffContext?: DiffContext
   ): Promise<FrontierItem[]> {
     const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
     const repoHintSummary = summarizeRepoHints(repoHints);
@@ -227,7 +236,7 @@ export class Planner {
       repoHintSummary ? `Repo hints: ${repoHintSummary}` : null,
     ]
       .filter(Boolean)
-      .join("\n");
+      .join('\n');
 
     const llmProposals = await proposeLLMTasks(
       plannerModel,
@@ -253,11 +262,10 @@ export class Planner {
     proposals: PlannerProposal[],
     mission?: MissionConfig,
     memorySignals?: PlannerMemorySignals,
-    diffContext?: DiffContext,
+    diffContext?: DiffContext
   ): FrontierItem[] {
     const priorityCtx: PriorityContext = {
-      visitedWorkerTypes:
-        this.workerTypesPerNode.get(node.id) ?? new Set(),
+      visitedWorkerTypes: this.workerTypesPerNode.get(node.id) ?? new Set(),
       memory: memorySignals,
       diffContext,
       diffPriorityBoost: diffContext ? this.diffPriorityBoost : undefined,
@@ -279,30 +287,30 @@ export class Planner {
           : 0;
 
         return {
-        id: `task-${shortId()}`,
-        nodeId: node.id,
-        workerType: p.workerType,
-        objective: p.objective,
-        priority: Math.min(
-          1,
-          (p.priority != null ? Math.max(p.priority, computed) : computed) +
-            criticalFlowBoost
-        ),
-        reason: p.reason,
-        retryCount: 0,
-        createdAt: new Date().toISOString(),
-        status: "pending" as const,
+          id: `task-${shortId()}`,
+          nodeId: node.id,
+          workerType: p.workerType,
+          objective: p.objective,
+          priority: Math.min(
+            1,
+            (p.priority != null ? Math.max(p.priority, computed) : computed) + criticalFlowBoost
+          ),
+          reason: p.reason,
+          retryCount: 0,
+          createdAt: new Date().toISOString(),
+          status: 'pending' as const,
         };
       })
-      .filter((item) =>
-        !matchesMissionPattern(
-          mission?.excludedAreas,
-          item.objective,
-          item.reason,
-          node.url,
-          node.title,
-          node.pageType
-        )
+      .filter(
+        (item) =>
+          !matchesMissionPattern(
+            mission?.excludedAreas,
+            item.objective,
+            item.reason,
+            node.url,
+            node.title,
+            node.pageType
+          )
       );
   }
 
@@ -326,30 +334,24 @@ export class Planner {
 
   restoreDispatchState(snapshot: Record<string, WorkerType[]>): void {
     this.workerTypesPerNode = new Map(
-      Object.entries(snapshot).map(([nodeId, workerTypes]) => [
-        nodeId,
-        new Set(workerTypes),
-      ])
+      Object.entries(snapshot).map(([nodeId, workerTypes]) => [nodeId, new Set(workerTypes)])
     );
   }
 
   /**
    * Convert a follow-up request from a worker into a frontier item.
    */
-  routeFollowup(
-    request: FollowupRequest,
-    sourceNodeId: string
-  ): FrontierItem {
+  routeFollowup(request: FollowupRequest, sourceNodeId: string): FrontierItem {
     return {
       id: `task-${shortId()}`,
       nodeId: request.targetNodeId ?? sourceNodeId,
       workerType: request.type,
       objective: request.reason,
       priority: 0.8,
-      reason: `Follow-up from finding: ${request.relatedFindingId ?? "general"}`,
+      reason: `Follow-up from finding: ${request.relatedFindingId ?? 'general'}`,
       retryCount: 0,
       createdAt: new Date().toISOString(),
-      status: "pending",
+      status: 'pending',
     };
   }
 }
