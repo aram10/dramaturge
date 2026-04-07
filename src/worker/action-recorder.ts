@@ -1,4 +1,5 @@
 import { shortId } from '../constants.js';
+import { isSensitiveKey, REDACTED_VALUE } from '../redaction.js';
 import type {
   ControlAction,
   ControlOutcome,
@@ -135,6 +136,18 @@ function normalizeActionValue(value: unknown): string | undefined {
   return String(value);
 }
 
+function sanitizeRecordedActionValue(
+  kind: ReplayableActionKind,
+  selector: string | undefined,
+  value: string | undefined
+): string | undefined {
+  if (kind === 'input' && value != null && selector && isSensitiveKey(selector)) {
+    return REDACTED_VALUE;
+  }
+
+  return value;
+}
+
 export class ActionRecorder {
   private actions: ReplayableAction[] = [];
   private restores: Array<() => void> = [];
@@ -247,6 +260,7 @@ export class ActionRecorder {
       id: `act-${shortId()}`,
       timestamp: new Date().toISOString(),
       ...action,
+      value: sanitizeRecordedActionValue(action.kind, action.selector, action.value),
     };
     this.actions.push(recorded);
     return recorded;
