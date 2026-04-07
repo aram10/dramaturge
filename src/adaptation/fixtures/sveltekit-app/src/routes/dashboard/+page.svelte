@@ -1,0 +1,3 @@
+<div data-testid="dashboard-main">
+  <h1>Dashboard</h1>
+</div>
