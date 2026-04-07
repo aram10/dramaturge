@@ -1,4 +1,5 @@
 import { shortId } from '../constants.js';
+import { REDACTED_VALUE } from '../redaction.js';
 import type {
   ControlAction,
   ControlOutcome,
@@ -6,6 +7,7 @@ import type {
   ReplayableActionKind,
   ReplayableActionStatus,
 } from '../types.js';
+import { getInputRecordingPolicy } from './input-recording-policy.js';
 
 type QueryMethod =
   | 'locator'
@@ -252,6 +254,15 @@ export class ActionRecorder {
     return recorded;
   }
 
+  private getRecordedInputValue(selector: string, value: unknown): string | undefined {
+    const normalized = normalizeActionValue(value);
+    if (normalized == null) {
+      return undefined;
+    }
+
+    return getInputRecordingPolicy(this.page, selector) === 'safe' ? normalized : REDACTED_VALUE;
+  }
+
   private patchPageNavigation(method: 'goto' | 'goBack' | 'goForward' | 'reload'): void {
     if (typeof this.page?.[method] !== 'function') {
       return;
@@ -309,7 +320,7 @@ export class ActionRecorder {
             selector,
             value:
               method === 'fill' || method === 'type' || method === 'selectOption'
-                ? normalizeActionValue(args[1])
+                ? this.getRecordedInputValue(selector, args[1])
                 : undefined,
             key: method === 'press' ? String(args[1] ?? '') : undefined,
             summary: summarizeAction(mapActionMethodToKind(method), selector, 'worked'),
@@ -391,7 +402,7 @@ export class ActionRecorder {
                 selector: selectorHint,
                 value:
                   prop === 'fill' || prop === 'type' || prop === 'selectOption'
-                    ? normalizeActionValue(args[0])
+                    ? this.getRecordedInputValue(selectorHint, args[0])
                     : undefined,
                 key: prop === 'press' ? String(args[0] ?? '') : undefined,
                 summary: summarizeAction(kind, selectorHint, 'worked'),

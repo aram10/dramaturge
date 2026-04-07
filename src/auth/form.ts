@@ -1,5 +1,6 @@
 import type { Stagehand } from '@browserbasehq/stagehand';
 import type { FormAuthField, FormAuthSubmit } from '../config.js';
+import { setInputRecordingPolicy } from '../worker/input-recording-policy.js';
 import { parseIndicator, waitForSuccess } from './success-indicator.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
@@ -44,6 +45,7 @@ export async function authenticateForm(
   await page.goto(fullLoginUrl);
 
   for (const field of fields) {
+    setInputRecordingPolicy(page as object, field.selector, field.secret ? 'secret' : 'safe');
     await fillSelector(page, field.selector, field.value);
   }
 

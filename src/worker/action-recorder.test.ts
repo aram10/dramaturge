@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { REDACTED_VALUE } from '../redaction.js';
 import { ActionRecorder } from './action-recorder.js';
+import { setInputRecordingPolicy } from './input-recording-policy.js';
 
 function createMockPage() {
   function createLocator(selector: string) {
@@ -8,6 +10,9 @@ function createMockPage() {
         return undefined;
       },
       async fill(_value: string) {
+        return undefined;
+      },
+      async type(_value: string) {
         return undefined;
       },
       async press(_key: string) {
@@ -49,6 +54,7 @@ function createMockPage() {
 describe('ActionRecorder', () => {
   it('records page navigation and common locator interactions', async () => {
     const page = createMockPage();
+    setInputRecordingPolicy(page as any, "input[name='email']", 'safe');
     const recorder = new ActionRecorder(page as any);
     recorder.start();
 
@@ -108,8 +114,30 @@ describe('ActionRecorder', () => {
       expect.objectContaining({
         kind: 'input',
         selector: "select[name='country']",
-        value: 'US',
+        value: REDACTED_VALUE,
         status: 'worked',
+      }),
+    ]);
+  });
+
+  it('redacts recorded input values by default', async () => {
+    const page = createMockPage();
+    const recorder = new ActionRecorder(page as any);
+    recorder.start();
+
+    await page.locator("input[name='password']").fill('super-secret');
+    await page.locator("input[name='otp']").type('123456');
+
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({
+        kind: 'input',
+        selector: "input[name='password']",
+        value: REDACTED_VALUE,
+      }),
+      expect.objectContaining({
+        kind: 'input',
+        selector: "input[name='otp']",
+        value: REDACTED_VALUE,
       }),
     ]);
   });
