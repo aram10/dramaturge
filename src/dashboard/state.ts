@@ -19,6 +19,7 @@ export type ActivityKind =
   | "error";
 
 export interface ActivityItem {
+  id: number;
   kind: ActivityKind;
   text: string;
   timestamp: number;
@@ -55,6 +56,8 @@ export interface DashboardState {
   activity: readonly ActivityItem[];
   /** Most recent error message, if any. */
   lastError: string | undefined;
+  /** Monotonic counter for generating stable activity item IDs. */
+  activitySeq: number;
 }
 
 /** Maximum number of activity items to keep. */
@@ -76,6 +79,7 @@ export function initialDashboardState(): DashboardState {
     durationMs: 0,
     activity: [],
     lastError: undefined,
+    activitySeq: 0,
   };
 }
 
@@ -84,11 +88,13 @@ export function initialDashboardState(): DashboardState {
 function pushActivity(
   state: DashboardState,
   kind: ActivityKind,
-  text: string
+  text: string,
+  timestamp: number
 ): DashboardState {
-  const item: ActivityItem = { kind, text, timestamp: Date.now() };
+  const id = state.activitySeq + 1;
+  const item: ActivityItem = { id, kind, text, timestamp };
   const activity = [item, ...state.activity].slice(0, MAX_ACTIVITY);
-  return { ...state, activity };
+  return { ...state, activity, activitySeq: id };
 }
 
 export function applyRunStart(
@@ -123,38 +129,42 @@ export function applyRunEnd(
 
 export function applyTaskStart(
   state: DashboardState,
-  evt: TaskStartEvent
+  evt: TaskStartEvent,
+  now: number = Date.now()
 ): DashboardState {
   const text = `[task ${evt.taskNumber}] ${evt.workerType}: ${evt.objective}`;
-  return pushActivity(state, "task-start", text);
+  return pushActivity(state, "task-start", text, now);
 }
 
 export function applyTaskComplete(
   state: DashboardState,
-  evt: TaskCompleteEvent
+  evt: TaskCompleteEvent,
+  now: number = Date.now()
 ): DashboardState {
   const coverage =
     evt.coverageExercised > 0
       ? ` | coverage: ${evt.coverageExercised}/${evt.coverageDiscovered}`
       : "";
   const text = `[task ${evt.taskNumber}] ${evt.outcome}: ${evt.findingsCount} finding(s)${coverage}`;
-  return pushActivity(state, "task-complete", text);
+  return pushActivity(state, "task-complete", text, now);
 }
 
 export function applyFinding(
   state: DashboardState,
-  evt: FindingEvent
+  evt: FindingEvent,
+  now: number = Date.now()
 ): DashboardState {
   const text = `⚠ [${evt.severity}] ${evt.title}`;
-  return pushActivity(state, "finding", text);
+  return pushActivity(state, "finding", text, now);
 }
 
 export function applyStateDiscovered(
   state: DashboardState,
-  evt: StateDiscoveredEvent
+  evt: StateDiscoveredEvent,
+  now: number = Date.now()
 ): DashboardState {
   const text = `↳ new state: ${evt.pageType} (${evt.totalStates} total)`;
-  return pushActivity(state, "state-discovered", text);
+  return pushActivity(state, "state-discovered", text, now);
 }
 
 export function applyProgress(
@@ -174,8 +184,9 @@ export function applyProgress(
 
 export function applyError(
   state: DashboardState,
-  evt: ErrorEvent
+  evt: ErrorEvent,
+  now: number = Date.now()
 ): DashboardState {
   const text = `Error [${evt.phase}]: ${evt.message}`;
-  return { ...pushActivity(state, "error", text), lastError: evt.message };
+  return { ...pushActivity(state, "error", text, now), lastError: evt.message };
 }
