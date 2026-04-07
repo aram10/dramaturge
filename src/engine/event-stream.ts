@@ -1,11 +1,11 @@
-import { EventEmitter } from "node:events";
+import { EventEmitter } from 'node:events';
 import type {
   RawFinding,
   WorkerResult,
   FrontierItem,
   FindingSeverity,
   WorkerType,
-} from "../types.js";
+} from '../types.js';
 
 // --- Event payload types ---
 
@@ -37,7 +37,7 @@ export interface TaskCompleteEvent {
   taskId: string;
   taskNumber: number;
   nodeId: string;
-  outcome: WorkerResult["outcome"];
+  outcome: WorkerResult['outcome'];
   findingsCount: number;
   coverageExercised: number;
   coverageDiscovered: number;
@@ -81,15 +81,15 @@ export interface ErrorEvent {
 // --- Event map ---
 
 export interface EngineEventMap {
-  "run:start": [RunStartEvent];
-  "run:end": [RunEndEvent];
-  "task:start": [TaskStartEvent];
-  "task:complete": [TaskCompleteEvent];
+  'run:start': [RunStartEvent];
+  'run:end': [RunEndEvent];
+  'task:start': [TaskStartEvent];
+  'task:complete': [TaskCompleteEvent];
   finding: [FindingEvent];
-  "state:discovered": [StateDiscoveredEvent];
+  'state:discovered': [StateDiscoveredEvent];
   progress: [ProgressEvent];
   checkpoint: [CheckpointEvent];
-  "run:error": [ErrorEvent];
+  'run:error': [ErrorEvent];
 }
 
 export type EngineEventName = keyof EngineEventMap;
@@ -115,8 +115,5 @@ export function emitEngineEvent<E extends EngineEventName>(
   payload: EngineEventMap[E][0]
 ): void {
   if (!emitter) return;
-  (emitter.emit as (event: E, payload: EngineEventMap[E][0]) => boolean)(
-    event,
-    payload
-  );
+  (emitter.emit as (event: E, payload: EngineEventMap[E][0]) => boolean)(event, payload);
 }

@@ -1,12 +1,12 @@
-import { createRequire } from "node:module";
-import type { ErrorObject, ValidateFunction } from "ajv";
-import type { JsonSchema } from "./types.js";
+import { createRequire } from 'node:module';
+import type { ErrorObject, ValidateFunction } from 'ajv';
+import type { JsonSchema } from './types.js';
 
 const require = createRequire(import.meta.url);
 type AjvConstructor = new (options?: Record<string, unknown>) => {
   compile: (schema: JsonSchema) => ValidateFunction;
 };
-const Ajv2020 = require("ajv/dist/2020").default as AjvConstructor;
+const Ajv2020 = require('ajv/dist/2020').default as AjvConstructor;
 
 const ajv = new Ajv2020({
   allErrors: true,
@@ -16,8 +16,8 @@ const ajv = new Ajv2020({
 const validatorCache = new Map<string, ValidateFunction>();
 
 function formatError(error: ErrorObject): string {
-  const instancePath = error.instancePath || "/";
-  return `${instancePath} ${error.message ?? "validation failed"}`.trim();
+  const instancePath = error.instancePath || '/';
+  return `${instancePath} ${error.message ?? 'validation failed'}`.trim();
 }
 
 export function validateJsonSchema(

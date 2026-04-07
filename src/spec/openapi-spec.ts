@@ -1,18 +1,22 @@
-import { addOperation, createEmptyNormalizedSpec } from "./normalized-spec.js";
+import { addOperation, createEmptyNormalizedSpec } from './normalized-spec.js';
 import type {
   JsonSchema,
   NormalizedOperationSpec,
   NormalizedResponseSpec,
   NormalizedSpecArtifact,
-} from "./types.js";
+} from './types.js';
 
-const HTTP_METHODS = ["get", "post", "put", "patch", "delete", "options", "head"] as const;
+const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
 
 function asObject(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+  return value !== null && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
-function firstContentSchema(container: Record<string, unknown> | undefined): JsonSchema | undefined {
+function firstContentSchema(
+  container: Record<string, unknown> | undefined
+): JsonSchema | undefined {
   const content = asObject(container?.content);
   if (!content) {
     return undefined;
@@ -29,7 +33,9 @@ function firstContentSchema(container: Record<string, unknown> | undefined): Jso
   return undefined;
 }
 
-function buildResponses(operation: Record<string, unknown>): Record<string, NormalizedResponseSpec> {
+function buildResponses(
+  operation: Record<string, unknown>
+): Record<string, NormalizedResponseSpec> {
   const responses = asObject(operation.responses) ?? {};
   return Object.fromEntries(
     Object.entries(responses).map(([status, response]) => {
@@ -39,7 +45,7 @@ function buildResponses(operation: Record<string, unknown>): Record<string, Norm
         {
           status,
           description:
-            typeof responseObject.description === "string" ? responseObject.description : undefined,
+            typeof responseObject.description === 'string' ? responseObject.description : undefined,
           schema: firstContentSchema(responseObject),
         },
       ];
@@ -58,12 +64,12 @@ function buildOperation(
 
   return {
     id:
-      typeof operation.operationId === "string"
+      typeof operation.operationId === 'string'
         ? operation.operationId
         : `${method.toUpperCase()} ${route}`,
     method: method.toUpperCase(),
     route,
-    source: "openapi",
+    source: 'openapi',
     authRequired: Array.isArray(security) ? security.length > 0 : undefined,
     requestBody: requestBody
       ? {

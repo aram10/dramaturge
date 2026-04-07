@@ -1,16 +1,16 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
-import type { OAuthRedirectStep } from "../config.js";
-import { parseIndicator, waitForSuccess } from "./success-indicator.js";
+import type { Stagehand } from '@browserbasehq/stagehand';
+import type { OAuthRedirectStep } from '../config.js';
+import { parseIndicator, waitForSuccess } from './success-indicator.js';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 async function fillSelector(page: StagehandPage, selector: string, value: string): Promise<void> {
   const playwrightPage = page as any;
-  if (typeof playwrightPage.fill === "function") {
+  if (typeof playwrightPage.fill === 'function') {
     await playwrightPage.fill(selector, value);
     return;
   }
-  if (typeof playwrightPage.locator === "function") {
+  if (typeof playwrightPage.locator === 'function') {
     await playwrightPage.locator(selector).fill(value);
     return;
   }
@@ -19,11 +19,11 @@ async function fillSelector(page: StagehandPage, selector: string, value: string
 
 async function clickSelector(page: StagehandPage, selector: string): Promise<void> {
   const playwrightPage = page as any;
-  if (typeof playwrightPage.click === "function") {
+  if (typeof playwrightPage.click === 'function') {
     await playwrightPage.click(selector);
     return;
   }
-  if (typeof playwrightPage.locator === "function") {
+  if (typeof playwrightPage.locator === 'function') {
     await playwrightPage.locator(selector).click();
     return;
   }
@@ -32,11 +32,11 @@ async function clickSelector(page: StagehandPage, selector: string): Promise<voi
 
 async function waitForSelector(page: StagehandPage, selector: string): Promise<void> {
   const playwrightPage = page as any;
-  if (typeof playwrightPage.waitForSelector === "function") {
+  if (typeof playwrightPage.waitForSelector === 'function') {
     await playwrightPage.waitForSelector(selector);
     return;
   }
-  if (typeof playwrightPage.locator === "function") {
+  if (typeof playwrightPage.locator === 'function') {
     await playwrightPage.locator(selector).waitFor();
     return;
   }
@@ -57,13 +57,13 @@ export async function authenticateOAuthRedirect(
 
   for (const step of steps) {
     switch (step.type) {
-      case "click":
+      case 'click':
         await clickSelector(page, step.selector);
         break;
-      case "fill":
+      case 'fill':
         await fillSelector(page, step.selector, step.value);
         break;
-      case "wait-for-selector":
+      case 'wait-for-selector':
         await waitForSelector(page, step.selector);
         break;
     }

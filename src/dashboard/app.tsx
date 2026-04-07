@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { Text, Box } from "ink";
-import type { EngineEventEmitter } from "../engine/event-stream.js";
-import type { Blackboard } from "../a2a/blackboard.js";
-import type { MessageBus } from "../a2a/message-bus.js";
+import React, { useState, useEffect } from 'react';
+import { Text, Box } from 'ink';
+import type { EngineEventEmitter } from '../engine/event-stream.js';
+import type { Blackboard } from '../a2a/blackboard.js';
+import type { MessageBus } from '../a2a/message-bus.js';
 import {
   type DashboardState,
   type AgentStatus,
@@ -18,7 +18,7 @@ import {
   applyA2ATask,
   applyA2AMessage,
   applyA2ABlackboard,
-} from "./state.js";
+} from './state.js';
 
 // --- Utility helpers ---
 
@@ -26,24 +26,20 @@ function formatElapsed(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
-  return `${m}m ${s.toString().padStart(2, "0")}s`;
+  return `${m}m ${s.toString().padStart(2, '0')}s`;
 }
 
 function progressBar(ratio: number, width: number = 20): string {
   const filled = Math.round(ratio * width);
   const empty = width - filled;
-  return "█".repeat(filled) + "░".repeat(empty);
+  return '█'.repeat(filled) + '░'.repeat(empty);
 }
 
 // --- Sub-components ---
 
 function Header({ state }: { state: DashboardState }): React.ReactElement {
   const pct = Math.round(state.estimatedProgress * 100);
-  const status = state.finished
-    ? "✓ Complete"
-    : state.running
-      ? "● Running"
-      : "○ Waiting";
+  const status = state.finished ? '✓ Complete' : state.running ? '● Running' : '○ Waiting';
   return (
     <Box flexDirection="column">
       <Box justifyContent="space-between">
@@ -52,7 +48,7 @@ function Header({ state }: { state: DashboardState }): React.ReactElement {
         </Text>
         <Text>
           {status}
-          {"  "}
+          {'  '}
           {progressBar(state.estimatedProgress)} {pct}%
         </Text>
       </Box>
@@ -61,9 +57,7 @@ function Header({ state }: { state: DashboardState }): React.ReactElement {
           <Text dimColor>Target: {state.targetUrl}</Text>
           <Text dimColor>
             Elapsed: {formatElapsed(state.elapsedMs)}
-            {state.timeLimitSeconds > 0
-              ? ` / ${formatElapsed(state.timeLimitSeconds * 1000)}`
-              : ""}
+            {state.timeLimitSeconds > 0 ? ` / ${formatElapsed(state.timeLimitSeconds * 1000)}` : ''}
           </Text>
         </Box>
       ) : null}
@@ -81,10 +75,8 @@ function Stats({ state }: { state: DashboardState }): React.ReactElement {
         <Text bold>States:</Text> {state.statesDiscovered}
       </Text>
       <Text>
-        <Text bold>Findings:</Text>{" "}
-        <Text color={state.totalFindings > 0 ? "yellow" : undefined}>
-          {state.totalFindings}
-        </Text>
+        <Text bold>Findings:</Text>{' '}
+        <Text color={state.totalFindings > 0 ? 'yellow' : undefined}>{state.totalFindings}</Text>
       </Text>
       <Text>
         <Text bold>Workers:</Text> {state.concurrency}
@@ -97,7 +89,7 @@ function ActivityFeed({
   activity,
   maxLines,
 }: {
-  activity: DashboardState["activity"];
+  activity: DashboardState['activity'];
   maxLines: number;
 }): React.ReactElement {
   const visible = activity.slice(0, maxLines);
@@ -111,12 +103,12 @@ function ActivityFeed({
       ) : (
         visible.map((item) => {
           let color: string | undefined;
-          if (item.kind === "finding") color = "yellow";
-          else if (item.kind === "error") color = "red";
-          else if (item.kind === "state-discovered") color = "green";
-          else if (item.kind === "a2a-task") color = "cyan";
-          else if (item.kind === "a2a-message") color = "blue";
-          else if (item.kind === "a2a-blackboard") color = "magenta";
+          if (item.kind === 'finding') color = 'yellow';
+          else if (item.kind === 'error') color = 'red';
+          else if (item.kind === 'state-discovered') color = 'green';
+          else if (item.kind === 'a2a-task') color = 'cyan';
+          else if (item.kind === 'a2a-message') color = 'blue';
+          else if (item.kind === 'a2a-blackboard') color = 'magenta';
           return (
             <Text key={item.id} color={color}>
               {item.text}
@@ -128,11 +120,7 @@ function ActivityFeed({
   );
 }
 
-function ErrorBanner({
-  message,
-}: {
-  message: string | undefined;
-}): React.ReactElement | null {
+function ErrorBanner({ message }: { message: string | undefined }): React.ReactElement | null {
   if (!message) return null;
   return (
     <Box marginTop={1}>
@@ -143,11 +131,7 @@ function ErrorBanner({
   );
 }
 
-function FinishedSummary({
-  state,
-}: {
-  state: DashboardState;
-}): React.ReactElement | null {
+function FinishedSummary({ state }: { state: DashboardState }): React.ReactElement | null {
   if (!state.finished) return null;
   return (
     <Box flexDirection="column" marginTop={1}>
@@ -155,22 +139,22 @@ function FinishedSummary({
         Run complete in {formatElapsed(state.durationMs)}
       </Text>
       <Text>
-        {state.tasksExecuted} tasks · {state.totalFindings} findings ·{" "}
-        {state.statesDiscovered} states
+        {state.tasksExecuted} tasks · {state.totalFindings} findings · {state.statesDiscovered}{' '}
+        states
         {state.a2aEnabled
           ? ` · ${state.a2aTasksTotal} A2A tasks · ${state.a2aMessagesTotal} messages`
-          : ""}
+          : ''}
       </Text>
     </Box>
   );
 }
 
 const ROLE_ICONS: Record<string, string> = {
-  scout: "🔭",
-  tester: "🧪",
-  security: "🛡️",
-  reviewer: "📝",
-  reporter: "📊",
+  scout: '🔭',
+  tester: '🧪',
+  security: '🛡️',
+  reviewer: '📝',
+  reporter: '📊',
 };
 
 function AgentPanel({
@@ -205,21 +189,19 @@ function AgentPanel({
         <Text dimColor>No agents active yet…</Text>
       ) : (
         agentList.map((agent) => {
-          const icon = ROLE_ICONS[agent.role] ?? "●";
+          const icon = ROLE_ICONS[agent.role] ?? '●';
           const statusColor =
-            agent.currentStatus === "working"
-              ? "cyan"
-              : agent.currentStatus === "completed"
-                ? "green"
+            agent.currentStatus === 'working'
+              ? 'cyan'
+              : agent.currentStatus === 'completed'
+                ? 'green'
                 : undefined;
           return (
             <Text key={agent.agentId}>
-              {icon}{" "}
-              <Text bold>{agent.role}</Text>{" "}
-              <Text dimColor>({agent.agentId})</Text>{" "}
+              {icon} <Text bold>{agent.role}</Text> <Text dimColor>({agent.agentId})</Text>{' '}
               <Text color={statusColor}>{agent.currentStatus}</Text>
-              {"  "}tasks: {agent.tasksAssigned}/{agent.tasksCompleted}
-              {"  "}posts: {agent.blackboardPosts}
+              {'  '}tasks: {agent.tasksAssigned}/{agent.tasksCompleted}
+              {'  '}posts: {agent.blackboardPosts}
             </Text>
           );
         })
@@ -256,32 +238,30 @@ export function Dashboard({
       setState((s) => applyTaskComplete(s, evt));
     const onFinding = (evt: Parameters<typeof applyFinding>[1]) =>
       setState((s) => applyFinding(s, evt));
-    const onStateDiscovered = (
-      evt: Parameters<typeof applyStateDiscovered>[1]
-    ) => setState((s) => applyStateDiscovered(s, evt));
+    const onStateDiscovered = (evt: Parameters<typeof applyStateDiscovered>[1]) =>
+      setState((s) => applyStateDiscovered(s, evt));
     const onProgress = (evt: Parameters<typeof applyProgress>[1]) =>
       setState((s) => applyProgress(s, evt));
-    const onError = (evt: Parameters<typeof applyError>[1]) =>
-      setState((s) => applyError(s, evt));
+    const onError = (evt: Parameters<typeof applyError>[1]) => setState((s) => applyError(s, evt));
 
-    eventStream.on("run:start", onRunStart);
-    eventStream.on("run:end", onRunEnd);
-    eventStream.on("task:start", onTaskStart);
-    eventStream.on("task:complete", onTaskComplete);
-    eventStream.on("finding", onFinding);
-    eventStream.on("state:discovered", onStateDiscovered);
-    eventStream.on("progress", onProgress);
-    eventStream.on("run:error", onError);
+    eventStream.on('run:start', onRunStart);
+    eventStream.on('run:end', onRunEnd);
+    eventStream.on('task:start', onTaskStart);
+    eventStream.on('task:complete', onTaskComplete);
+    eventStream.on('finding', onFinding);
+    eventStream.on('state:discovered', onStateDiscovered);
+    eventStream.on('progress', onProgress);
+    eventStream.on('run:error', onError);
 
     const cleanups: (() => void)[] = [];
 
     // Wire A2A blackboard subscription
     if (blackboard) {
-      const unsub = blackboard.subscribe("*", (entry) => {
+      const unsub = blackboard.subscribe('*', (entry) => {
         const summary =
-          typeof entry.data.summary === "string"
+          typeof entry.data.summary === 'string'
             ? entry.data.summary
-            : typeof entry.data.title === "string"
+            : typeof entry.data.title === 'string'
               ? entry.data.title
               : JSON.stringify(entry.data).slice(0, 60);
         setState((s) =>
@@ -300,9 +280,9 @@ export function Dashboard({
       const unsub = messageBus.onAny((msg) => {
         const text =
           msg.parts
-            .filter((p): p is { kind: "text"; text: string } => p.kind === "text")
+            .filter((p): p is { kind: 'text'; text: string } => p.kind === 'text')
             .map((p) => p.text)
-            .join(" ") || "(non-text message)";
+            .join(' ') || '(non-text message)';
         setState((s) =>
           applyA2AMessage(s, {
             fromAgent: msg.fromAgent,
@@ -315,14 +295,14 @@ export function Dashboard({
     }
 
     return () => {
-      eventStream.off("run:start", onRunStart);
-      eventStream.off("run:end", onRunEnd);
-      eventStream.off("task:start", onTaskStart);
-      eventStream.off("task:complete", onTaskComplete);
-      eventStream.off("finding", onFinding);
-      eventStream.off("state:discovered", onStateDiscovered);
-      eventStream.off("progress", onProgress);
-      eventStream.off("run:error", onError);
+      eventStream.off('run:start', onRunStart);
+      eventStream.off('run:end', onRunEnd);
+      eventStream.off('task:start', onTaskStart);
+      eventStream.off('task:complete', onTaskComplete);
+      eventStream.off('finding', onFinding);
+      eventStream.off('state:discovered', onStateDiscovered);
+      eventStream.off('progress', onProgress);
+      eventStream.off('run:error', onError);
       for (const cleanup of cleanups) cleanup();
     };
   }, [eventStream, blackboard, messageBus]);

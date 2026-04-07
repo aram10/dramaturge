@@ -1,5 +1,5 @@
 export function stripJsonComments(input: string): string {
-  let output = "";
+  let output = '';
   let inString = false;
   let isEscaped = false;
 
@@ -12,24 +12,24 @@ export function stripJsonComments(input: string): string {
 
       if (isEscaped) {
         isEscaped = false;
-      } else if (current === "\\") {
+      } else if (current === '\\') {
         isEscaped = true;
-      } else if (current === "\"") {
+      } else if (current === '"') {
         inString = false;
       }
 
       continue;
     }
 
-    if (current === "\"") {
+    if (current === '"') {
       inString = true;
       output += current;
       continue;
     }
 
-    if (current === "/" && next === "/") {
+    if (current === '/' && next === '/') {
       i += 2;
-      while (i < input.length && input[i] !== "\n") {
+      while (i < input.length && input[i] !== '\n') {
         i++;
       }
       if (i < input.length) {
@@ -38,10 +38,10 @@ export function stripJsonComments(input: string): string {
       continue;
     }
 
-    if (current === "/" && next === "*") {
+    if (current === '/' && next === '*') {
       i += 2;
       while (i < input.length - 1) {
-        if (input[i] === "*" && input[i + 1] === "/") {
+        if (input[i] === '*' && input[i + 1] === '/') {
           i++;
           break;
         }

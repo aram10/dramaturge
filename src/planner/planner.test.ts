@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { Planner } from "./planner.js";
-import { StateGraph } from "../graph/state-graph.js";
-import type { StateNode, MissionConfig, PageFingerprint } from "../types.js";
+import { describe, it, expect } from 'vitest';
+import { Planner } from './planner.js';
+import { StateGraph } from '../graph/state-graph.js';
+import type { StateNode, MissionConfig, PageFingerprint } from '../types.js';
 
 function makeFp(hash: string): PageFingerprint {
   return {
@@ -22,43 +22,43 @@ function makeGraph(): StateGraph {
   return new StateGraph();
 }
 
-describe("Planner", () => {
-  describe("proposeTasks", () => {
-    it("proposes a form worker for form pages", () => {
+describe('Planner', () => {
+  describe('proposeTasks', () => {
+    it('proposes a form worker for form pages', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("form1"),
-        pageType: "form",
+        fingerprint: makeFp('form1'),
+        pageType: 'form',
         depth: 1,
       });
 
       const tasks = planner.proposeTasks(node, graph);
       expect(tasks.length).toBeGreaterThanOrEqual(1);
       const workerTypes = tasks.map((t) => t.workerType);
-      expect(workerTypes).toContain("form");
+      expect(workerTypes).toContain('form');
     });
 
-    it("proposes navigation for dashboard pages", () => {
+    it('proposes navigation for dashboard pages', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("dash"),
-        pageType: "dashboard",
+        fingerprint: makeFp('dash'),
+        pageType: 'dashboard',
         depth: 0,
       });
 
       const tasks = planner.proposeTasks(node, graph);
       const workerTypes = tasks.map((t) => t.workerType);
-      expect(workerTypes).toContain("navigation");
+      expect(workerTypes).toContain('navigation');
     });
 
-    it("also proposes navigation for non-navigation pages (discovery)", () => {
+    it('also proposes navigation for non-navigation pages (discovery)', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("list1"),
-        pageType: "list",
+        fingerprint: makeFp('list1'),
+        pageType: 'list',
         depth: 1,
         // timesVisited defaults to 0
       });
@@ -66,38 +66,38 @@ describe("Planner", () => {
       const tasks = planner.proposeTasks(node, graph);
       const workerTypes = tasks.map((t) => t.workerType);
       // list → crud worker + navigation discovery
-      expect(workerTypes).toContain("crud");
-      expect(workerTypes).toContain("navigation");
+      expect(workerTypes).toContain('crud');
+      expect(workerTypes).toContain('navigation');
     });
 
-    it("respects focusModes from mission config", () => {
+    it('respects focusModes from mission config', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("settings1"),
-        pageType: "settings",
+        fingerprint: makeFp('settings1'),
+        pageType: 'settings',
         depth: 1,
       });
 
       const mission: MissionConfig = {
-        appDescription: "Test app",
+        appDescription: 'Test app',
         destructiveActionsAllowed: false,
-        focusModes: ["form"], // only form workers
+        focusModes: ['form'], // only form workers
       };
 
       const tasks = planner.proposeTasks(node, graph, mission);
       const workerTypes = tasks.map((t) => t.workerType);
       // settings → form worker, but navigation should be excluded
-      expect(workerTypes).toContain("form");
-      expect(workerTypes).not.toContain("navigation");
+      expect(workerTypes).toContain('form');
+      expect(workerTypes).not.toContain('navigation');
     });
 
-    it("generates tasks with valid frontier item structure", () => {
+    it('generates tasks with valid frontier item structure', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("detail1"),
-        pageType: "detail",
+        fingerprint: makeFp('detail1'),
+        pageType: 'detail',
         depth: 2,
       });
 
@@ -105,36 +105,36 @@ describe("Planner", () => {
       for (const task of tasks) {
         expect(task.id).toMatch(/^task-/);
         expect(task.nodeId).toBe(node.id);
-        expect(task.status).toBe("pending");
+        expect(task.status).toBe('pending');
         expect(task.retryCount).toBe(0);
-        expect(typeof task.priority).toBe("number");
+        expect(typeof task.priority).toBe('number');
         expect(task.priority).toBeGreaterThan(0);
       }
     });
 
-    it("adds a repo-aware navigation seed when routes and selectors are known", () => {
+    it('adds a repo-aware navigation seed when routes and selectors are known', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("root"),
-        pageType: "dashboard",
+        fingerprint: makeFp('root'),
+        pageType: 'dashboard',
         depth: 0,
       });
 
       const tasks = planner.proposeTasks(node, graph, undefined, {
-        routes: ["/login", "/manage/knowledge-bases"],
-        routeFamilies: ["/", "/login", "/manage"],
+        routes: ['/login', '/manage/knowledge-bases'],
+        routeFamilies: ['/', '/login', '/manage'],
         stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
         apiEndpoints: [
           {
-            route: "/api/manage/knowledge-bases",
-            methods: ["GET"],
+            route: '/api/manage/knowledge-bases',
+            methods: ['GET'],
             statuses: [401, 403],
           },
         ],
         authHints: {
-          loginRoutes: ["/login"],
-          callbackRoutes: ["/auth/callback"],
+          loginRoutes: ['/login'],
+          callbackRoutes: ['/auth/callback'],
         },
         expectedHttpNoise: [],
       });
@@ -142,21 +142,21 @@ describe("Planner", () => {
       expect(
         tasks.some(
           (task) =>
-            task.workerType === "navigation" &&
-            task.objective.includes("/manage/knowledge-bases") &&
-            task.objective.includes("#manage-kb-new-btn")
+            task.workerType === 'navigation' &&
+            task.objective.includes('/manage/knowledge-bases') &&
+            task.objective.includes('#manage-kb-new-btn')
         )
       ).toBe(true);
     });
 
-    it("adds an api worker when api exploration is enabled and api hints are present", () => {
+    it('adds an api worker when api exploration is enabled and api hints are present', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        url: "https://example.com/manage/knowledge-bases",
-        title: "Knowledge bases",
-        fingerprint: makeFp("knowledge-bases"),
-        pageType: "list",
+        url: 'https://example.com/manage/knowledge-bases',
+        title: 'Knowledge bases',
+        fingerprint: makeFp('knowledge-bases'),
+        pageType: 'list',
         depth: 1,
       });
 
@@ -164,18 +164,18 @@ describe("Planner", () => {
         node,
         graph,
         {
-          appDescription: "Test app",
+          appDescription: 'Test app',
           destructiveActionsAllowed: false,
-          focusModes: ["navigation", "crud", "api"],
+          focusModes: ['navigation', 'crud', 'api'],
         },
         {
-          routes: ["/manage/knowledge-bases"],
-          routeFamilies: ["/manage"],
+          routes: ['/manage/knowledge-bases'],
+          routeFamilies: ['/manage'],
           stableSelectors: [],
           apiEndpoints: [
             {
-              route: "/api/manage/knowledge-bases",
-              methods: ["GET"],
+              route: '/api/manage/knowledge-bases',
+              methods: ['GET'],
               statuses: [200, 401],
             },
           ],
@@ -187,109 +187,105 @@ describe("Planner", () => {
         }
       );
 
-      expect(tasks.some((task) => task.workerType === "api")).toBe(true);
+      expect(tasks.some((task) => task.workerType === 'api')).toBe(true);
     });
 
-    it("adds a lower-priority adversarial worker when adversarial exploration is enabled", () => {
+    it('adds a lower-priority adversarial worker when adversarial exploration is enabled', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        url: "https://example.com/settings/profile",
-        title: "Profile settings",
-        fingerprint: makeFp("settings-profile"),
-        pageType: "settings",
+        url: 'https://example.com/settings/profile',
+        title: 'Profile settings',
+        fingerprint: makeFp('settings-profile'),
+        pageType: 'settings',
         depth: 1,
       });
 
       const tasks = planner.proposeTasks(node, graph, {
-        appDescription: "Test app",
+        appDescription: 'Test app',
         destructiveActionsAllowed: false,
-        focusModes: ["form", "adversarial"],
+        focusModes: ['form', 'adversarial'],
       });
 
-      const formTask = tasks.find((task) => task.workerType === "form");
-      const adversarialTask = tasks.find((task) => task.workerType === "adversarial");
+      const formTask = tasks.find((task) => task.workerType === 'form');
+      const adversarialTask = tasks.find((task) => task.workerType === 'adversarial');
 
       expect(adversarialTask).toBeDefined();
       expect(adversarialTask?.priority).toBeLessThan(formTask?.priority ?? 1);
     });
 
-    it("suppresses tasks for excluded areas", () => {
+    it('suppresses tasks for excluded areas', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        url: "https://example.com/manage/billing",
-        title: "Billing settings",
-        fingerprint: makeFp("billing"),
-        pageType: "settings",
+        url: 'https://example.com/manage/billing',
+        title: 'Billing settings',
+        fingerprint: makeFp('billing'),
+        pageType: 'settings',
         depth: 1,
       });
 
       const mission: MissionConfig = {
-        appDescription: "Test app",
+        appDescription: 'Test app',
         destructiveActionsAllowed: false,
-        excludedAreas: ["billing"],
+        excludedAreas: ['billing'],
       };
 
       expect(planner.proposeTasks(node, graph, mission)).toEqual([]);
     });
 
-    it("boosts matching critical flows", () => {
+    it('boosts matching critical flows', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        url: "https://example.com/manage/knowledge-bases",
-        title: "Knowledge bases",
-        fingerprint: makeFp("knowledge-bases"),
-        pageType: "list",
+        url: 'https://example.com/manage/knowledge-bases',
+        title: 'Knowledge bases',
+        fingerprint: makeFp('knowledge-bases'),
+        pageType: 'list',
         depth: 1,
       });
 
       const baselineTasks = planner.proposeTasks(node, graph);
       const boostedTasks = planner.proposeTasks(node, graph, {
-        appDescription: "Test app",
+        appDescription: 'Test app',
         destructiveActionsAllowed: false,
-        criticalFlows: ["knowledge-bases"],
+        criticalFlows: ['knowledge-bases'],
       });
 
-      const baselineCrud = baselineTasks.find((task) => task.workerType === "crud");
-      const boostedCrud = boostedTasks.find((task) => task.workerType === "crud");
+      const baselineCrud = baselineTasks.find((task) => task.workerType === 'crud');
+      const boostedCrud = boostedTasks.find((task) => task.workerType === 'crud');
 
       expect(boostedCrud?.priority).toBeGreaterThan(baselineCrud?.priority ?? 0);
     });
   });
 
-  describe("recordDispatch", () => {
-    it("affects priority of subsequent proposals", () => {
+  describe('recordDispatch', () => {
+    it('affects priority of subsequent proposals', () => {
       const planner = new Planner();
       const graph = makeGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("page1"),
-        pageType: "form",
+        fingerprint: makeFp('page1'),
+        pageType: 'form',
         depth: 0,
       });
 
       const firstTasks = planner.proposeTasks(node, graph);
-      const firstFormPriority = firstTasks.find(
-        (t) => t.workerType === "form"
-      )?.priority;
+      const firstFormPriority = firstTasks.find((t) => t.workerType === 'form')?.priority;
 
       // Record that form worker was dispatched
-      planner.recordDispatch(node.id, "form");
+      planner.recordDispatch(node.id, 'form');
 
       const secondTasks = planner.proposeTasks(node, graph);
-      const secondFormPriority = secondTasks.find(
-        (t) => t.workerType === "form"
-      )?.priority;
+      const secondFormPriority = secondTasks.find((t) => t.workerType === 'form')?.priority;
 
       // Second proposal should have lower priority (coverage gap goes to 0)
       expect(secondFormPriority).toBeLessThan(firstFormPriority!);
     });
 
-    it("can snapshot and restore dispatched worker types", () => {
+    it('can snapshot and restore dispatched worker types', () => {
       const planner = new Planner();
-      planner.recordDispatch("node-1", "form");
-      planner.recordDispatch("node-1", "navigation");
+      planner.recordDispatch('node-1', 'form');
+      planner.recordDispatch('node-1', 'navigation');
 
       const snapshot = planner.snapshotDispatchState();
 
@@ -300,36 +296,36 @@ describe("Planner", () => {
     });
   });
 
-  describe("routeFollowup", () => {
-    it("creates a frontier item from a followup request", () => {
+  describe('routeFollowup', () => {
+    it('creates a frontier item from a followup request', () => {
       const planner = new Planner();
       const item = planner.routeFollowup(
         {
-          type: "form",
-          reason: "Need to test validation",
+          type: 'form',
+          reason: 'Need to test validation',
         },
-        "node-source"
+        'node-source'
       );
 
       expect(item.id).toMatch(/^task-/);
-      expect(item.nodeId).toBe("node-source");
-      expect(item.workerType).toBe("form");
-      expect(item.objective).toBe("Need to test validation");
-      expect(item.status).toBe("pending");
+      expect(item.nodeId).toBe('node-source');
+      expect(item.workerType).toBe('form');
+      expect(item.objective).toBe('Need to test validation');
+      expect(item.status).toBe('pending');
     });
 
-    it("uses targetNodeId when provided", () => {
+    it('uses targetNodeId when provided', () => {
       const planner = new Planner();
       const item = planner.routeFollowup(
         {
-          type: "crud",
-          reason: "Test CRUD on related page",
-          targetNodeId: "node-target",
+          type: 'crud',
+          reason: 'Test CRUD on related page',
+          targetNodeId: 'node-target',
         },
-        "node-source"
+        'node-source'
       );
 
-      expect(item.nodeId).toBe("node-target");
+      expect(item.nodeId).toBe('node-target');
     });
   });
 });

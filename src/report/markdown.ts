@@ -1,10 +1,13 @@
-import type { RunResult } from "../types.js";
-import { collectFindings } from "./collector.js";
-import { isNodeAffectedByDiff } from "../diff/diff-hints.js";
-import type { DiffContext } from "../diff/types.js";
+import type { RunResult } from '../types.js';
+import { collectFindings } from './collector.js';
+import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
+import type { DiffContext } from '../diff/types.js';
 
 function escapeTableCell(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/[\r\n]+/g, ' ');
 }
 
 function formatDuration(ms: number): string {
@@ -19,9 +22,7 @@ export function renderMarkdown(result: RunResult): string {
   const findings = collectFindings(result.areaResults);
   const duration = result.endTime.getTime() - result.startTime.getTime();
   const findingIdByRef = new Map<string, string>();
-  const exploredAreas = result.areaResults.filter(
-    (a) => a.status === "explored"
-  );
+  const exploredAreas = result.areaResults.filter((a) => a.status === 'explored');
   const totalSteps = result.areaResults.reduce((sum, a) => sum + a.steps, 0);
 
   for (const finding of findings) {
@@ -31,46 +32,39 @@ export function renderMarkdown(result: RunResult): string {
   }
 
   // Build diff-scope lookup: area name → "changed" | "unchanged"
-  const diffScope = result.diffSummary
-    ? buildDiffScopeMap(result)
-    : undefined;
+  const diffScope = result.diffSummary ? buildDiffScopeMap(result) : undefined;
 
-  const bugs = findings.filter((f) => f.category === "Bug");
-  const ux = findings.filter((f) => f.category === "UX Concern");
-  const a11y = findings.filter((f) => f.category === "Accessibility Issue");
-  const perf = findings.filter((f) => f.category === "Performance Issue");
-  const visual = findings.filter((f) => f.category === "Visual Glitch");
+  const bugs = findings.filter((f) => f.category === 'Bug');
+  const ux = findings.filter((f) => f.category === 'UX Concern');
+  const a11y = findings.filter((f) => f.category === 'Accessibility Issue');
+  const perf = findings.filter((f) => f.category === 'Performance Issue');
+  const visual = findings.filter((f) => f.category === 'Visual Glitch');
 
   const lines: string[] = [];
 
   // Header
-  const timestamp = result.startTime
-    .toISOString()
-    .replace(/[:.]/g, "-")
-    .slice(0, 19);
+  const timestamp = result.startTime.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   lines.push(`# Dramaturge Report — ${timestamp}`);
   if (result.partial) {
-    lines.push(
-      "> **Warning:** This run was incomplete. Some areas may not have been explored."
-    );
-    lines.push("");
+    lines.push('> **Warning:** This run was incomplete. Some areas may not have been explored.');
+    lines.push('');
   }
   lines.push(`**Target:** ${result.targetUrl}`);
   lines.push(
     `**Duration:** ${formatDuration(duration)} | **Areas explored:** ${exploredAreas.length} | **Total steps:** ${totalSteps}`
   );
-  lines.push("");
+  lines.push('');
 
   // Summary
-  lines.push("## Summary");
+  lines.push('## Summary');
   if (findings.length === 0) {
-    lines.push("- No issues found");
+    lines.push('- No issues found');
   } else {
     if (bugs.length > 0) {
       const severities = bugs.map((b) => b.severity.toLowerCase());
       const breakdown = [...new Set(severities)]
         .map((s) => `${severities.filter((x) => x === s).length} ${s}`)
-        .join(", ");
+        .join(', ');
       lines.push(`- ${bugs.length} bug(s) found (${breakdown})`);
     }
     if (ux.length > 0) lines.push(`- ${ux.length} UX concern(s)`);
@@ -78,18 +72,18 @@ export function renderMarkdown(result: RunResult): string {
     if (perf.length > 0) lines.push(`- ${perf.length} performance issue(s)`);
     if (visual.length > 0) lines.push(`- ${visual.length} visual glitch(es)`);
   }
-  lines.push("");
+  lines.push('');
 
   // Findings
   if (findings.length > 0) {
-    lines.push("## Findings");
-    lines.push("");
+    lines.push('## Findings');
+    lines.push('');
     for (const f of findings) {
-      const steps = f.stepsToReproduce.map((s, i) => `  ${i + 1}. ${s}`).join("\n");
+      const steps = f.stepsToReproduce.map((s, i) => `  ${i + 1}. ${s}`).join('\n');
       lines.push(`### [${f.id}] ${f.severity}: ${f.title}`);
       lines.push(`- **Area:** ${f.area}`);
       if (diffScope) {
-        const scope = diffScope.get(f.area) ?? "unchanged";
+        const scope = diffScope.get(f.area) ?? 'unchanged';
         lines.push(`- **Diff scope:** ${scope}`);
       }
       lines.push(`- **Category:** ${f.category}`);
@@ -102,26 +96,22 @@ export function renderMarkdown(result: RunResult): string {
         lines.push(`- **Hypothesis:** ${f.verdict.hypothesis}`);
         lines.push(`- **Observation:** ${f.verdict.observation}`);
         if (f.verdict.evidenceChain.length > 0) {
-          lines.push(`- **Evidence chain:** ${f.verdict.evidenceChain.join(" | ")}`);
+          lines.push(`- **Evidence chain:** ${f.verdict.evidenceChain.join(' | ')}`);
         }
         if (f.verdict.alternativesConsidered.length > 0) {
           lines.push(
-            `- **Alternative explanations:** ${f.verdict.alternativesConsidered.join(
-              " | "
-            )}`
+            `- **Alternative explanations:** ${f.verdict.alternativesConsidered.join(' | ')}`
           );
         }
         if (f.verdict.suggestedVerification.length > 0) {
           lines.push(
-            `- **Suggested verification:** ${f.verdict.suggestedVerification.join(
-              " | "
-            )}`
+            `- **Suggested verification:** ${f.verdict.suggestedVerification.join(' | ')}`
           );
         }
       }
       if (f.occurrenceCount > 1) {
         lines.push(`- **Occurrences:** ${f.occurrenceCount}`);
-        lines.push(`- **Impacted areas:** ${f.impactedAreas.join(", ")}`);
+        lines.push(`- **Impacted areas:** ${f.impactedAreas.join(', ')}`);
       }
       if (f.screenshot) {
         lines.push(`- **Screenshot:** ${f.screenshot}`);
@@ -139,71 +129,74 @@ export function renderMarkdown(result: RunResult): string {
           lines.push(`- **Repro objective:** ${f.meta.repro.objective}`);
         }
         if ((f.meta.repro?.breadcrumbs?.length ?? 0) > 0) {
-          lines.push(`- **Repro breadcrumbs:** ${f.meta.repro?.breadcrumbs.join(" | ")}`);
+          lines.push(`- **Repro breadcrumbs:** ${f.meta.repro?.breadcrumbs.join(' | ')}`);
         }
         if ((f.meta.repro?.actionIds?.length ?? 0) > 0) {
-          lines.push(`- **Repro action ids:** ${f.meta.repro?.actionIds?.join(", ")}`);
+          lines.push(`- **Repro action ids:** ${f.meta.repro?.actionIds?.join(', ')}`);
         }
         if ((f.meta.repro?.evidenceIds?.length ?? 0) > 0) {
-          lines.push(`- **Repro evidence:** ${f.meta.repro?.evidenceIds.join(", ")}`);
+          lines.push(`- **Repro evidence:** ${f.meta.repro?.evidenceIds.join(', ')}`);
         }
         if (
           (f.meta.repro?.actionIds?.length ?? 0) > 0 ||
           (f.meta.repro?.evidenceIds?.length ?? 0) > 0
         ) {
           lines.push(
-            `- **Trace bundle:** actions=${f.meta.repro?.actionIds?.join(", ") || "none"} | evidence=${f.meta.repro?.evidenceIds?.join(", ") || "none"}`
+            `- **Trace bundle:** actions=${f.meta.repro?.actionIds?.join(', ') || 'none'} | evidence=${f.meta.repro?.evidenceIds?.join(', ') || 'none'}`
           );
         }
       }
-      lines.push("");
+      lines.push('');
     }
   }
 
   // Coverage Map
-  lines.push("## Coverage Map");
-  lines.push("| Area | Page Type | Steps | Findings | Controls (exercised/discovered) | Status |");
-  lines.push("|------|-----------|-------|----------|-------------------------------|--------|");
+  lines.push('## Coverage Map');
+  lines.push('| Area | Page Type | Steps | Findings | Controls (exercised/discovered) | Status |');
+  lines.push('|------|-----------|-------|----------|-------------------------------|--------|');
   for (const area of result.areaResults) {
-    const coverageStr = area.coverage.controlsDiscovered > 0
-      ? `${area.coverage.controlsExercised}/${area.coverage.controlsDiscovered}`
-      : "—";
+    const coverageStr =
+      area.coverage.controlsDiscovered > 0
+        ? `${area.coverage.controlsExercised}/${area.coverage.controlsDiscovered}`
+        : '—';
     lines.push(
       `| ${escapeTableCell(area.name)} | ${escapeTableCell(area.pageType)} | ${area.steps} | ${area.findings.length} | ${coverageStr} | ${escapeTableCell(area.status)} |`
     );
   }
-  lines.push("");
+  lines.push('');
 
   // Coverage Summary
   const totalControlsDiscovered = result.areaResults.reduce(
-    (sum, a) => sum + a.coverage.controlsDiscovered, 0
+    (sum, a) => sum + a.coverage.controlsDiscovered,
+    0
   );
   const totalControlsExercised = result.areaResults.reduce(
-    (sum, a) => sum + a.coverage.controlsExercised, 0
+    (sum, a) => sum + a.coverage.controlsExercised,
+    0
   );
   if (totalControlsDiscovered > 0) {
     const pct = Math.round((totalControlsExercised / totalControlsDiscovered) * 100);
-    lines.push("## Coverage Summary");
+    lines.push('## Coverage Summary');
     lines.push(`- **Controls discovered:** ${totalControlsDiscovered}`);
     lines.push(`- **Controls exercised:** ${totalControlsExercised} (${pct}%)`);
-    lines.push("");
+    lines.push('');
   }
 
   // Evidence Index
   const allEvidence = result.areaResults.flatMap((a) => a.evidence);
   if (allEvidence.length > 0) {
-    lines.push("## Evidence Index");
-    lines.push("| ID | Type | Area | Summary | Path | Related findings |");
-    lines.push("|----|------|------|---------|------|------------------|");
+    lines.push('## Evidence Index');
+    lines.push('| ID | Type | Area | Summary | Path | Related findings |');
+    lines.push('|----|------|------|---------|------|------------------|');
     for (const ev of allEvidence) {
       const relatedFindings = Array.from(
         new Set(ev.relatedFindingIds.map((ref) => findingIdByRef.get(ref) ?? ref))
       );
       lines.push(
-        `| ${escapeTableCell(ev.id)} | ${escapeTableCell(ev.type)} | ${escapeTableCell(ev.areaName ?? "—")} | ${escapeTableCell(ev.summary)} | ${escapeTableCell(ev.path ?? "—")} | ${escapeTableCell(relatedFindings.join(", ") || "—")} |`
+        `| ${escapeTableCell(ev.id)} | ${escapeTableCell(ev.type)} | ${escapeTableCell(ev.areaName ?? '—')} | ${escapeTableCell(ev.summary)} | ${escapeTableCell(ev.path ?? '—')} | ${escapeTableCell(relatedFindings.join(', ') || '—')} |`
       );
     }
-    lines.push("");
+    lines.push('');
   }
 
   const allActions = result.areaResults.flatMap((area) =>
@@ -213,85 +206,89 @@ export function renderMarkdown(result: RunResult): string {
     }))
   );
   if (allActions.length > 0) {
-    lines.push("## Action Trace");
-    lines.push("| ID | Area | Kind | Source | Summary | Status |");
-    lines.push("|----|------|------|--------|---------|--------|");
+    lines.push('## Action Trace');
+    lines.push('| ID | Area | Kind | Source | Summary | Status |');
+    lines.push('|----|------|------|--------|---------|--------|');
     for (const action of allActions) {
       lines.push(
         `| ${escapeTableCell(action.id)} | ${escapeTableCell(action.areaName)} | ${escapeTableCell(action.kind)} | ${escapeTableCell(action.source)} | ${escapeTableCell(action.summary)} | ${escapeTableCell(action.status)} |`
       );
     }
-    lines.push("");
+    lines.push('');
   }
 
   // Unexplored Areas
   if (result.unexploredAreas.length > 0) {
-    lines.push("## Areas Not Explored");
+    lines.push('## Areas Not Explored');
     for (const area of result.unexploredAreas) {
       lines.push(`- ${area.name} (${area.reason})`);
     }
-    lines.push("");
+    lines.push('');
   }
 
   // Blind Spots
   if (result.blindSpots.length > 0) {
-    lines.push("## Blind Spots");
-    lines.push(
-      "Areas where testing coverage may be incomplete:"
-    );
-    lines.push("");
-    lines.push("| Severity | Reason | Summary |");
-    lines.push("|----------|--------|---------|");
+    lines.push('## Blind Spots');
+    lines.push('Areas where testing coverage may be incomplete:');
+    lines.push('');
+    lines.push('| Severity | Reason | Summary |');
+    lines.push('|----------|--------|---------|');
     for (const spot of result.blindSpots) {
-      lines.push(`| ${escapeTableCell(spot.severity)} | ${escapeTableCell(spot.reason)} | ${escapeTableCell(spot.summary)} |`);
+      lines.push(
+        `| ${escapeTableCell(spot.severity)} | ${escapeTableCell(spot.reason)} | ${escapeTableCell(spot.summary)} |`
+      );
     }
-    lines.push("");
+    lines.push('');
   }
 
   // State Graph
   if (result.stateGraphMermaid) {
-    lines.push("## State Graph");
-    lines.push("");
-    lines.push("```mermaid");
+    lines.push('## State Graph');
+    lines.push('');
+    lines.push('```mermaid');
     lines.push(result.stateGraphMermaid);
-    lines.push("```");
-    lines.push("");
+    lines.push('```');
+    lines.push('');
   }
 
   // Diff Summary
   if (result.diffSummary) {
     const ds = result.diffSummary;
-    lines.push("## Diff Summary");
+    lines.push('## Diff Summary');
     lines.push(`- **Base ref:** ${ds.baseRef}`);
     lines.push(`- **Changed files:** ${ds.changedFileCount}`);
-    lines.push(`- **Affected routes:** ${ds.affectedRoutes.length > 0 ? ds.affectedRoutes.join(", ") : "none detected"}`);
-    lines.push(`- **Affected API endpoints:** ${ds.affectedApiEndpoints.length > 0 ? ds.affectedApiEndpoints.join(", ") : "none detected"}`);
+    lines.push(
+      `- **Affected routes:** ${ds.affectedRoutes.length > 0 ? ds.affectedRoutes.join(', ') : 'none detected'}`
+    );
+    lines.push(
+      `- **Affected API endpoints:** ${ds.affectedApiEndpoints.length > 0 ? ds.affectedApiEndpoints.join(', ') : 'none detected'}`
+    );
     if (diffScope) {
-      const changedCount = [...diffScope.values()].filter((v) => v === "changed").length;
-      const unchangedCount = [...diffScope.values()].filter((v) => v === "unchanged").length;
+      const changedCount = [...diffScope.values()].filter((v) => v === 'changed').length;
+      const unchangedCount = [...diffScope.values()].filter((v) => v === 'unchanged').length;
       lines.push(`- **Areas in changed code paths:** ${changedCount}`);
       lines.push(`- **Areas in unchanged code paths:** ${unchangedCount}`);
     }
-    lines.push("");
+    lines.push('');
   }
 
   // Run Configuration
   if (result.runMemory) {
     const rm = result.runMemory;
     lines.push(`## Run Memory
-- **Enabled:** ${rm.enabled ? "yes" : "no"}
-- **Warm start applied:** ${rm.warmStartApplied ? "yes" : "no"}
+- **Enabled:** ${rm.enabled ? 'yes' : 'no'}
+- **Warm start applied:** ${rm.warmStartApplied ? 'yes' : 'no'}
 - **Restored states:** ${rm.restoredStateCount}
 - **Known findings tracked:** ${rm.knownFindingCount}
 - **Suppressed findings:** ${rm.suppressedFindingCount}
 - **Flaky pages noted:** ${rm.flakyPageCount}
 - **Visual baselines tracked:** ${rm.visualBaselineCount}`);
-    lines.push("");
+    lines.push('');
   }
 
   if (result.runConfig) {
     const rc = result.runConfig;
-    const ckpt = rc.checkpointInterval === 0 ? "disabled" : `every ${rc.checkpointInterval} tasks`;
+    const ckpt = rc.checkpointInterval === 0 ? 'disabled' : `every ${rc.checkpointInterval} tasks`;
     lines.push(`## Run Configuration
 - **App:** ${rc.appDescription}
 - **Planner model:** ${rc.models.planner}
@@ -299,23 +296,23 @@ export function renderMarkdown(result: RunResult): string {
 - **Concurrency:** ${rc.concurrency} worker(s)
 - **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states
 - **Checkpoint interval:** ${ckpt}
-- **Auto-capture:** ${rc.autoCaptureEnabled ? "enabled" : "disabled"}
-- **LLM planner:** ${rc.llmPlannerEnabled ? "enabled" : "disabled"}
-- **Memory:** ${rc.memoryEnabled ? "enabled" : "disabled"}
-- **Warm start:** ${rc.warmStartEnabled ? "enabled" : "disabled"}
-- **Visual regression:** ${rc.visualRegressionEnabled ? "enabled" : "disabled"}`);
-    lines.push("");
+- **Auto-capture:** ${rc.autoCaptureEnabled ? 'enabled' : 'disabled'}
+- **LLM planner:** ${rc.llmPlannerEnabled ? 'enabled' : 'disabled'}
+- **Memory:** ${rc.memoryEnabled ? 'enabled' : 'disabled'}
+- **Warm start:** ${rc.warmStartEnabled ? 'enabled' : 'disabled'}
+- **Visual regression:** ${rc.visualRegressionEnabled ? 'enabled' : 'disabled'}`);
+    lines.push('');
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 /**
  * Build a lookup of area name → "changed" | "unchanged" based on the
  * diff summary's affected routes.
  */
-function buildDiffScopeMap(result: RunResult): Map<string, "changed" | "unchanged"> {
-  const map = new Map<string, "changed" | "unchanged">();
+function buildDiffScopeMap(result: RunResult): Map<string, 'changed' | 'unchanged'> {
+  const map = new Map<string, 'changed' | 'unchanged'>();
   if (!result.diffSummary) return map;
 
   const diffContext: DiffContext = {
@@ -328,7 +325,7 @@ function buildDiffScopeMap(result: RunResult): Map<string, "changed" | "unchange
 
   for (const area of result.areaResults) {
     const affected = isNodeAffectedByDiff(area.url, diffContext);
-    map.set(area.name, affected ? "changed" : "unchanged");
+    map.set(area.name, affected ? 'changed' : 'unchanged');
   }
 
   return map;

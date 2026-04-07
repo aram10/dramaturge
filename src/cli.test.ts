@@ -1,77 +1,75 @@
-import { describe, expect, it, vi } from "vitest";
-import { resolve } from "node:path";
-import { buildHelpText, parseCliArgs, runCli, attachCliListeners } from "./cli.js";
-import { EngineEventEmitter } from "./engine/event-stream.js";
+import { describe, expect, it, vi } from 'vitest';
+import { resolve } from 'node:path';
+import { buildHelpText, parseCliArgs, runCli, attachCliListeners } from './cli.js';
+import { EngineEventEmitter } from './engine/event-stream.js';
 
-describe("parseCliArgs", () => {
-  it("parses config and resume arguments", () => {
-    expect(
-      parseCliArgs(["--config", "custom.json", "--resume", "./reports/run-1"])
-    ).toEqual({
-      configPath: "custom.json",
-      resumeDir: "./reports/run-1",
+describe('parseCliArgs', () => {
+  it('parses config and resume arguments', () => {
+    expect(parseCliArgs(['--config', 'custom.json', '--resume', './reports/run-1'])).toEqual({
+      configPath: 'custom.json',
+      resumeDir: './reports/run-1',
       diffRef: undefined,
       dashboard: false,
       showHelp: false,
     });
   });
 
-  it("detects help flags", () => {
-    expect(parseCliArgs(["-h"]).showHelp).toBe(true);
-    expect(parseCliArgs(["--help"]).showHelp).toBe(true);
+  it('detects help flags', () => {
+    expect(parseCliArgs(['-h']).showHelp).toBe(true);
+    expect(parseCliArgs(['--help']).showHelp).toBe(true);
   });
 
-  it("parses --diff flag", () => {
-    const result = parseCliArgs(["--diff", "origin/main"]);
-    expect(result.diffRef).toBe("origin/main");
+  it('parses --diff flag', () => {
+    const result = parseCliArgs(['--diff', 'origin/main']);
+    expect(result.diffRef).toBe('origin/main');
     expect(result.showHelp).toBe(false);
   });
 
-  it("parses --diff alongside other flags", () => {
-    const result = parseCliArgs(["--config", "c.json", "--diff", "origin/main"]);
-    expect(result.configPath).toBe("c.json");
-    expect(result.diffRef).toBe("origin/main");
+  it('parses --diff alongside other flags', () => {
+    const result = parseCliArgs(['--config', 'c.json', '--diff', 'origin/main']);
+    expect(result.configPath).toBe('c.json');
+    expect(result.diffRef).toBe('origin/main');
   });
 
-  it("throws when --diff has no value", () => {
-    expect(() => parseCliArgs(["--diff"])).toThrow("Missing value for --diff");
+  it('throws when --diff has no value', () => {
+    expect(() => parseCliArgs(['--diff'])).toThrow('Missing value for --diff');
   });
 
-  it("parses --dashboard flag", () => {
-    const result = parseCliArgs(["--dashboard"]);
+  it('parses --dashboard flag', () => {
+    const result = parseCliArgs(['--dashboard']);
     expect(result.dashboard).toBe(true);
     expect(result.showHelp).toBe(false);
   });
 
-  it("parses --dashboard alongside other flags", () => {
-    const result = parseCliArgs(["--config", "c.json", "--dashboard"]);
-    expect(result.configPath).toBe("c.json");
+  it('parses --dashboard alongside other flags', () => {
+    const result = parseCliArgs(['--config', 'c.json', '--dashboard']);
+    expect(result.configPath).toBe('c.json');
     expect(result.dashboard).toBe(true);
   });
 
-  it("defaults dashboard to false", () => {
+  it('defaults dashboard to false', () => {
     const result = parseCliArgs([]);
     expect(result.dashboard).toBe(false);
   });
 });
 
-describe("buildHelpText", () => {
-  it("mentions config and resume usage", () => {
+describe('buildHelpText', () => {
+  it('mentions config and resume usage', () => {
     const helpText = buildHelpText();
 
-    expect(helpText).toContain("Usage: dramaturge");
-    expect(helpText).toContain("--config <path>");
-    expect(helpText).toContain("--resume <run-dir>");
-    expect(helpText).toContain("--dashboard");
+    expect(helpText).toContain('Usage: dramaturge');
+    expect(helpText).toContain('--config <path>');
+    expect(helpText).toContain('--resume <run-dir>');
+    expect(helpText).toContain('--dashboard');
   });
 });
 
-describe("runCli", () => {
-  it("prints help without loading config", async () => {
+describe('runCli', () => {
+  it('prints help without loading config', async () => {
     const output: string[] = [];
     const loadConfig = vi.fn();
 
-    const exitCode = await runCli(["--help"], {
+    const exitCode = await runCli(['--help'], {
       loadConfig,
       runEngine: vi.fn(),
       log: (message) => {
@@ -82,20 +80,20 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(0);
     expect(loadConfig).not.toHaveBeenCalled();
-    expect(output.join("\n")).toContain("Usage: dramaturge");
+    expect(output.join('\n')).toContain('Usage: dramaturge');
   });
 
-  it("loads config and runs the engine", async () => {
+  it('loads config and runs the engine', async () => {
     const config = {
-      targetUrl: "https://example.com",
+      targetUrl: 'https://example.com',
       _meta: {
-        configDir: resolve("C:/tmp/dramaturge/configs"),
+        configDir: resolve('C:/tmp/dramaturge/configs'),
       },
     } as never;
     const loadConfig = vi.fn().mockReturnValue(config);
     const runEngineMock = vi.fn().mockResolvedValue(undefined);
 
-    const exitCode = await runCli(["--config", "custom.json", "--resume", "./run"], {
+    const exitCode = await runCli(['--config', 'custom.json', '--resume', './run'], {
       loadConfig,
       runEngine: runEngineMock,
       log: vi.fn(),
@@ -103,21 +101,24 @@ describe("runCli", () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(loadConfig).toHaveBeenCalledWith("custom.json");
-    expect(runEngineMock).toHaveBeenCalledWith(config, expect.objectContaining({
-      resumeDir: resolve("C:/tmp/dramaturge/configs/run"),
-    }));
+    expect(loadConfig).toHaveBeenCalledWith('custom.json');
+    expect(runEngineMock).toHaveBeenCalledWith(
+      config,
+      expect.objectContaining({
+        resumeDir: resolve('C:/tmp/dramaturge/configs/run'),
+      })
+    );
     // Event stream should be wired up
     const passedOptions = runEngineMock.mock.calls[0][1];
     expect(passedOptions.eventStream).toBeDefined();
   });
 
-  it("reports errors and returns a failing exit code", async () => {
+  it('reports errors and returns a failing exit code', async () => {
     const errors: string[] = [];
 
     const exitCode = await runCli([], {
       loadConfig: vi.fn(() => {
-        throw new Error("missing config");
+        throw new Error('missing config');
       }),
       runEngine: vi.fn(),
       log: vi.fn(),
@@ -127,94 +128,94 @@ describe("runCli", () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(errors).toEqual(["Error: missing config"]);
+    expect(errors).toEqual(['Error: missing config']);
   });
 });
 
-describe("attachCliListeners", () => {
-  it("logs task:start events", () => {
+describe('attachCliListeners', () => {
+  it('logs task:start events', () => {
     const emitter = new EngineEventEmitter();
     const messages: string[] = [];
     attachCliListeners(emitter, (msg) => messages.push(msg));
 
-    emitter.emit("task:start", {
-      taskId: "t1",
+    emitter.emit('task:start', {
+      taskId: 't1',
       taskNumber: 1,
-      nodeId: "n1",
-      workerType: "navigation",
-      objective: "Explore home page",
+      nodeId: 'n1',
+      workerType: 'navigation',
+      objective: 'Explore home page',
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("[task 1]");
-    expect(messages[0]).toContain("navigation");
-    expect(messages[0]).toContain("Explore home page");
+    expect(messages[0]).toContain('[task 1]');
+    expect(messages[0]).toContain('navigation');
+    expect(messages[0]).toContain('Explore home page');
   });
 
-  it("logs task:complete events", () => {
+  it('logs task:complete events', () => {
     const emitter = new EngineEventEmitter();
     const messages: string[] = [];
     attachCliListeners(emitter, (msg) => messages.push(msg));
 
-    emitter.emit("task:complete", {
-      taskId: "t1",
+    emitter.emit('task:complete', {
+      taskId: 't1',
       taskNumber: 1,
-      nodeId: "n1",
-      outcome: "completed",
+      nodeId: 'n1',
+      outcome: 'completed',
       findingsCount: 2,
       coverageExercised: 5,
       coverageDiscovered: 10,
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("completed");
-    expect(messages[0]).toContain("2 finding(s)");
-    expect(messages[0]).toContain("coverage: 5/10");
+    expect(messages[0]).toContain('completed');
+    expect(messages[0]).toContain('2 finding(s)');
+    expect(messages[0]).toContain('coverage: 5/10');
   });
 
-  it("logs finding events with severity marker", () => {
+  it('logs finding events with severity marker', () => {
     const emitter = new EngineEventEmitter();
     const messages: string[] = [];
     attachCliListeners(emitter, (msg) => messages.push(msg));
 
-    emitter.emit("finding", {
-      taskId: "t1",
-      title: "Broken link",
-      severity: "Critical",
-      category: "Bug",
+    emitter.emit('finding', {
+      taskId: 't1',
+      title: 'Broken link',
+      severity: 'Critical',
+      category: 'Bug',
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("⚠");
-    expect(messages[0]).toContain("[Critical]");
-    expect(messages[0]).toContain("Broken link");
+    expect(messages[0]).toContain('⚠');
+    expect(messages[0]).toContain('[Critical]');
+    expect(messages[0]).toContain('Broken link');
   });
 
-  it("logs state:discovered events", () => {
+  it('logs state:discovered events', () => {
     const emitter = new EngineEventEmitter();
     const messages: string[] = [];
     attachCliListeners(emitter, (msg) => messages.push(msg));
 
-    emitter.emit("state:discovered", {
-      nodeId: "n2",
-      url: "https://example.com/about",
-      pageType: "detail",
+    emitter.emit('state:discovered', {
+      nodeId: 'n2',
+      url: 'https://example.com/about',
+      pageType: 'detail',
       depth: 1,
       totalStates: 3,
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("new state");
-    expect(messages[0]).toContain("detail");
-    expect(messages[0]).toContain("3 total");
+    expect(messages[0]).toContain('new state');
+    expect(messages[0]).toContain('detail');
+    expect(messages[0]).toContain('3 total');
   });
 
-  it("logs progress events with percentage", () => {
+  it('logs progress events with percentage', () => {
     const emitter = new EngineEventEmitter();
     const messages: string[] = [];
     attachCliListeners(emitter, (msg) => messages.push(msg));
 
-    emitter.emit("progress", {
+    emitter.emit('progress', {
       tasksExecuted: 5,
       tasksRemaining: 10,
       totalFindings: 2,
@@ -224,42 +225,42 @@ describe("attachCliListeners", () => {
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("33%");
-    expect(messages[0]).toContain("5 done");
-    expect(messages[0]).toContain("10 queued");
+    expect(messages[0]).toContain('33%');
+    expect(messages[0]).toContain('5 done');
+    expect(messages[0]).toContain('10 queued');
   });
 
-  it("omits coverage from task:complete when zero", () => {
+  it('omits coverage from task:complete when zero', () => {
     const emitter = new EngineEventEmitter();
     const messages: string[] = [];
     attachCliListeners(emitter, (msg) => messages.push(msg));
 
-    emitter.emit("task:complete", {
-      taskId: "t1",
+    emitter.emit('task:complete', {
+      taskId: 't1',
       taskNumber: 1,
-      nodeId: "n1",
-      outcome: "blocked",
+      nodeId: 'n1',
+      outcome: 'blocked',
       findingsCount: 0,
       coverageExercised: 0,
       coverageDiscovered: 0,
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).not.toContain("coverage");
+    expect(messages[0]).not.toContain('coverage');
   });
 
-  it("logs run:error events", () => {
+  it('logs run:error events', () => {
     const emitter = new EngineEventEmitter();
     const messages: string[] = [];
     attachCliListeners(emitter, (msg) => messages.push(msg));
 
-    emitter.emit("run:error", {
-      message: "Browser crashed",
-      phase: "engine",
+    emitter.emit('run:error', {
+      message: 'Browser crashed',
+      phase: 'engine',
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]).toContain("Error:");
-    expect(messages[0]).toContain("Browser crashed");
+    expect(messages[0]).toContain('Error:');
+    expect(messages[0]).toContain('Browser crashed');
   });
 });

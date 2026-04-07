@@ -2,7 +2,7 @@ export interface DiffFileEntry {
   /** Relative file path from repo root. */
   path: string;
   /** Change kind. */
-  status: "added" | "modified" | "deleted" | "renamed";
+  status: 'added' | 'modified' | 'deleted' | 'renamed';
 }
 
 /**

@@ -1,14 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { loadConfig } from "./config.js";
-import { parseJsoncObject } from "./utils/jsonc.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import { loadConfig } from './config.js';
+import { parseJsoncObject } from './utils/jsonc.js';
 
 const tempDirs: string[] = [];
 
 function createTempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "dramaturge-config-test-"));
+  const dir = mkdtempSync(join(tmpdir(), 'dramaturge-config-test-'));
   tempDirs.push(dir);
   return dir;
 }
@@ -22,8 +22,8 @@ afterEach(() => {
   }
 });
 
-describe("parseJsoncObject", () => {
-  it("preserves https URLs while stripping comments", () => {
+describe('parseJsoncObject', () => {
+  it('preserves https URLs while stripping comments', () => {
     const parsed = parseJsoncObject(`{
       // comment
       "targetUrl": "https://example.com/app",
@@ -31,12 +31,12 @@ describe("parseJsoncObject", () => {
     }`);
 
     expect(parsed).toMatchObject({
-      targetUrl: "https://example.com/app",
-      auth: { loginUrl: "/login" },
+      targetUrl: 'https://example.com/app',
+      auth: { loginUrl: '/login' },
     });
   });
 
-  it("supports line and block comments without touching quoted strings", () => {
+  it('supports line and block comments without touching quoted strings', () => {
     const parsed = parseJsoncObject(`{
       "note": "keep // inside string",
       /* block comment */
@@ -44,16 +44,16 @@ describe("parseJsoncObject", () => {
     }`);
 
     expect(parsed).toMatchObject({
-      note: "keep // inside string",
-      value: "ok",
+      note: 'keep // inside string',
+      value: 'ok',
     });
   });
 });
 
-describe("loadConfig", () => {
-  it("loads JSONC config files without corrupting https URLs", () => {
+describe('loadConfig', () => {
+  it('loads JSONC config files without corrupting https URLs', () => {
     const dir = createTempDir();
-    const configPath = join(dir, "dramaturge.config.json");
+    const configPath = join(dir, 'dramaturge.config.json');
     writeFileSync(
       configPath,
       `{
@@ -64,19 +64,19 @@ describe("loadConfig", () => {
           "type": "none"
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
     const config = loadConfig(configPath);
 
-    expect(config.targetUrl).toBe("https://example.com/app");
-    expect(config.appDescription).toBe("Test app");
-    expect(config.auth).toMatchObject({ type: "none" });
+    expect(config.targetUrl).toBe('https://example.com/app');
+    expect(config.appDescription).toBe('Test app');
+    expect(config.auth).toMatchObject({ type: 'none' });
   });
 
-  it("accepts repo-aware mode and bootstrap settings", () => {
+  it('accepts repo-aware mode and bootstrap settings', () => {
     const dir = createTempDir();
-    const configPath = join(dir, "dramaturge.config.json");
+    const configPath = join(dir, 'dramaturge.config.json');
     writeFileSync(
       configPath,
       `{
@@ -99,29 +99,29 @@ describe("loadConfig", () => {
           "timeoutSeconds": 90
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
     const config = loadConfig(configPath);
 
     expect(config.repoContext).toMatchObject({
-      root: resolve(dir, "../.."),
-      framework: "nextjs",
-      hintsFile: resolve(dir, "../..", "dramaturge.hints.jsonc"),
-      specFile: resolve(dir, "../..", "dramaturge.openapi.json"),
+      root: resolve(dir, '../..'),
+      framework: 'nextjs',
+      hintsFile: resolve(dir, '../..', 'dramaturge.hints.jsonc'),
+      specFile: resolve(dir, '../..', 'dramaturge.openapi.json'),
     });
     expect(config.bootstrap).toMatchObject({
-      command: "pnpm dev",
-      cwd: resolve(dir, ".."),
-      readyUrl: "https://example.com/health",
+      command: 'pnpm dev',
+      cwd: resolve(dir, '..'),
+      readyUrl: 'https://example.com/health',
       readyIndicator: "[data-testid='app-shell']",
       timeoutSeconds: 90,
     });
   });
 
-  it("accepts explicit policy controls", () => {
+  it('accepts explicit policy controls', () => {
     const dir = createTempDir();
-    const configPath = join(dir, "dramaturge.config.json");
+    const configPath = join(dir, 'dramaturge.config.json');
     writeFileSync(
       configPath,
       `{
@@ -139,7 +139,7 @@ describe("loadConfig", () => {
           "ignoredConsolePatterns": ["ResizeObserver loop"]
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
     const config = loadConfig(configPath);
@@ -147,12 +147,12 @@ describe("loadConfig", () => {
     expect(config.policy).toMatchObject({
       expectedResponses: [
         {
-          method: "GET",
-          pathPrefix: "/api/manage/knowledge-bases",
+          method: 'GET',
+          pathPrefix: '/api/manage/knowledge-bases',
           statuses: [401, 403],
         },
       ],
-      ignoredConsolePatterns: ["ResizeObserver loop"],
+      ignoredConsolePatterns: ['ResizeObserver loop'],
     });
     expect(config.apiTesting).toMatchObject({
       enabled: false,
@@ -180,9 +180,9 @@ describe("loadConfig", () => {
     });
   });
 
-  it("accepts deterministic form auth config", () => {
+  it('accepts deterministic form auth config', () => {
     const dir = createTempDir();
-    const configPath = join(dir, "dramaturge.config.json");
+    const configPath = join(dir, 'dramaturge.config.json');
     writeFileSync(
       configPath,
       `{
@@ -199,27 +199,27 @@ describe("loadConfig", () => {
           "successIndicator": "selector:[data-testid='user-nav-button']"
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
-    process.env.TEST_PASSWORD = "super-secret";
+    process.env.TEST_PASSWORD = 'super-secret';
     const config = loadConfig(configPath);
 
     expect(config.auth).toMatchObject({
-      type: "form",
-      loginUrl: "/login",
+      type: 'form',
+      loginUrl: '/login',
       fields: [
-        { selector: "input[name='email']", value: "user@example.com", secret: false },
-        { selector: "input[name='password']", value: "super-secret", secret: true },
+        { selector: "input[name='email']", value: 'user@example.com', secret: false },
+        { selector: "input[name='password']", value: 'super-secret', secret: true },
       ],
       submit: { selector: "button[type='submit']" },
       successIndicator: "selector:[data-testid='user-nav-button']",
     });
   });
 
-  it("accepts scripted oauth redirect auth config", () => {
+  it('accepts scripted oauth redirect auth config', () => {
     const dir = createTempDir();
-    const configPath = join(dir, "dramaturge.config.json");
+    const configPath = join(dir, 'dramaturge.config.json');
     writeFileSync(
       configPath,
       `{
@@ -236,26 +236,26 @@ describe("loadConfig", () => {
           "successIndicator": "selector:[data-testid='user-nav-button']"
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
     const config = loadConfig(configPath);
 
     expect(config.auth).toMatchObject({
-      type: "oauth-redirect",
-      loginUrl: "/login",
+      type: 'oauth-redirect',
+      loginUrl: '/login',
       steps: [
-        { type: "click", selector: "button[data-provider='microsoft']" },
-        { type: "fill", selector: "input[type='email']", value: "user@example.com", secret: false },
-        { type: "wait-for-selector", selector: "input[type='password']" },
+        { type: 'click', selector: "button[data-provider='microsoft']" },
+        { type: 'fill', selector: "input[type='email']", value: 'user@example.com', secret: false },
+        { type: 'wait-for-selector', selector: "input[type='password']" },
       ],
       successIndicator: "selector:[data-testid='user-nav-button']",
     });
   });
 
-  it("rejects legacy form auth configs that pass credentials by field name", () => {
+  it('rejects legacy form auth configs that pass credentials by field name', () => {
     const dir = createTempDir();
-    const configPath = join(dir, "dramaturge.config.json");
+    const configPath = join(dir, 'dramaturge.config.json');
     writeFileSync(
       configPath,
       `{
@@ -271,15 +271,15 @@ describe("loadConfig", () => {
           "successIndicator": "selector:[data-testid='user-nav-button']"
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
     expect(() => loadConfig(configPath)).toThrow();
   });
 
-  it("rejects legacy oauth redirect configs that pass raw credentials", () => {
+  it('rejects legacy oauth redirect configs that pass raw credentials', () => {
     const dir = createTempDir();
-    const configPath = join(dir, "dramaturge.config.json");
+    const configPath = join(dir, 'dramaturge.config.json');
     writeFileSync(
       configPath,
       `{
@@ -295,16 +295,16 @@ describe("loadConfig", () => {
           "successIndicator": "selector:[data-testid='user-nav-button']"
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
     expect(() => loadConfig(configPath)).toThrow();
   });
 
-  it("resolves filesystem paths relative to the config file", () => {
+  it('resolves filesystem paths relative to the config file', () => {
     const dir = createTempDir();
-    const configsDir = join(dir, "configs");
-    const configPath = join(configsDir, "dramaturge.config.json");
+    const configsDir = join(dir, 'configs');
+    const configPath = join(configsDir, 'dramaturge.config.json');
     mkdirSync(configsDir, { recursive: true });
     writeFileSync(
       configPath,
@@ -341,38 +341,37 @@ describe("loadConfig", () => {
           "cwd": "../host"
         }
       }`,
-      "utf-8"
+      'utf-8'
     );
 
     const config = loadConfig(configPath);
 
     expect(config.auth).toMatchObject({
-      type: "interactive",
-      stateFile: resolve(configsDir, "state/user.json"),
+      type: 'interactive',
+      stateFile: resolve(configsDir, 'state/user.json'),
     });
-    expect(config.output.dir).toBe(resolve(configsDir, "reports"));
+    expect(config.output.dir).toBe(resolve(configsDir, 'reports'));
     expect(config.memory).toMatchObject({
       enabled: true,
-      dir: resolve(configsDir, ".dramaturge"),
+      dir: resolve(configsDir, '.dramaturge'),
       warmStart: true,
     });
     expect(config.visualRegression).toMatchObject({
       enabled: true,
-      baselineDir: resolve(configsDir, ".dramaturge/visual-baselines"),
+      baselineDir: resolve(configsDir, '.dramaturge/visual-baselines'),
       maskSelectors: ["[data-testid='clock']"],
     });
     expect(config.repoContext).toMatchObject({
-      root: resolve(configsDir, "../host"),
-      hintsFile: resolve(configsDir, "../host", "hints/dramaturge.hints.jsonc"),
-      specFile: resolve(configsDir, "../host", "specs/dramaturge.openapi.json"),
+      root: resolve(configsDir, '../host'),
+      hintsFile: resolve(configsDir, '../host', 'hints/dramaturge.hints.jsonc'),
+      specFile: resolve(configsDir, '../host', 'specs/dramaturge.openapi.json'),
     });
     expect(config.bootstrap).toMatchObject({
-      cwd: resolve(configsDir, "../host"),
+      cwd: resolve(configsDir, '../host'),
     });
     expect(config._meta).toEqual({
       configPath: resolve(configPath),
       configDir: resolve(configsDir),
     });
   });
-
 });

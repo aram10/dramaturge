@@ -1,14 +1,10 @@
-import { shortId } from "../constants.js";
-import { buildAgentFindingMeta } from "../repro/repro.js";
-import type { RawFinding } from "../types.js";
-import { buildTraceBundle } from "./bundle.js";
-import { runDeterministicGraders } from "./deterministic-graders.js";
-import { buildJudgePrompt } from "./prompt.js";
-import type {
-  JudgeDecision,
-  JudgeWorkerObservationsInput,
-  Observation,
-} from "./types.js";
+import { shortId } from '../constants.js';
+import { buildAgentFindingMeta } from '../repro/repro.js';
+import type { RawFinding } from '../types.js';
+import { buildTraceBundle } from './bundle.js';
+import { runDeterministicGraders } from './deterministic-graders.js';
+import { buildJudgePrompt } from './prompt.js';
+import type { JudgeDecision, JudgeWorkerObservationsInput, Observation } from './types.js';
 
 function ensureShouldHypothesis(text: string): string {
   const trimmed = text.trim();
@@ -16,22 +12,18 @@ function ensureShouldHypothesis(text: string): string {
     return trimmed;
   }
 
-  return `The expected behavior should be: ${trimmed.replace(/\.*$/, "")}.`;
+  return `The expected behavior should be: ${trimmed.replace(/\.*$/, '')}.`;
 }
 
 function buildDeterministicDecision(observation: Observation): JudgeDecision {
   return {
-    hypothesis: ensureShouldHypothesis(
-      observation.verdictHint?.hypothesis ?? observation.expected
-    ),
+    hypothesis: ensureShouldHypothesis(observation.verdictHint?.hypothesis ?? observation.expected),
     observation: observation.verdictHint?.observation ?? observation.actual,
-    alternativesConsidered:
-      observation.verdictHint?.alternativesConsidered ?? [],
-    suggestedVerification:
-      observation.verdictHint?.suggestedVerification ?? [
-        `Repeat the flow for "${observation.title}" on a fresh page load.`,
-      ],
-    confidence: "medium",
+    alternativesConsidered: observation.verdictHint?.alternativesConsidered ?? [],
+    suggestedVerification: observation.verdictHint?.suggestedVerification ?? [
+      `Repeat the flow for "${observation.title}" on a fresh page load.`,
+    ],
+    confidence: 'medium',
   };
 }
 
@@ -64,7 +56,7 @@ function materializeFinding(
       breadcrumbs: observation.breadcrumbs,
       actionIds: traceBundle.actionIds,
       evidenceIds: traceBundle.evidenceIds,
-      confidence: decision.confidence ?? "medium",
+      confidence: decision.confidence ?? 'medium',
     }),
   };
 }
@@ -87,7 +79,7 @@ export async function judgeWorkerObservations(
       .map((r) => `Deterministic grader "${r.grader}": ${r.reason}`);
 
     const deterministicFullyConfident =
-      graderResult.combinedConfidence === "high" && graderResult.allConfirmed;
+      graderResult.combinedConfidence === 'high' && graderResult.allConfirmed;
 
     if (!deterministicFullyConfident && input.config?.enabled !== false && input.judgeText) {
       try {
@@ -100,7 +92,7 @@ export async function judgeWorkerObservations(
           ...decision,
           alternativesConsidered: [
             ...decision.alternativesConsidered,
-            "Judge fallback used because the preferred judgment path failed.",
+            'Judge fallback used because the preferred judgment path failed.',
           ],
         };
       }
@@ -108,10 +100,7 @@ export async function judgeWorkerObservations(
 
     // Append deterministic grader notes to final decision
     if (graderNotes.length > 0) {
-      decision.alternativesConsidered = [
-        ...decision.alternativesConsidered,
-        ...graderNotes,
-      ];
+      decision.alternativesConsidered = [...decision.alternativesConsidered, ...graderNotes];
     }
 
     const finding = materializeFinding(observation, decision, traceBundle);
@@ -119,7 +108,7 @@ export async function judgeWorkerObservations(
 
     for (const item of input.evidence) {
       item.relatedFindingIds = item.relatedFindingIds.map((relatedId) =>
-        relatedId === observation.id ? finding.ref ?? relatedId : relatedId
+        relatedId === observation.id ? (finding.ref ?? relatedId) : relatedId
       );
     }
   }

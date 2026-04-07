@@ -1,7 +1,7 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
-import type { AdversarialConfig, JudgeConfig } from "../config.js";
-import { createWorkerTools } from "./tools.js";
-import { buildWorkerSystemPrompt } from "./prompts.js";
+import type { Stagehand } from '@browserbasehq/stagehand';
+import type { AdversarialConfig, JudgeConfig } from '../config.js';
+import { createWorkerTools } from './tools.js';
+import { buildWorkerSystemPrompt } from './prompts.js';
 import type {
   Area,
   AreaResult,
@@ -12,18 +12,18 @@ import type {
   FollowupRequest,
   DiscoveredEdge,
   MissionConfig,
-} from "../types.js";
-import { CoverageTracker } from "../coverage/tracker.js";
-import { StagnationTracker } from "./stagnation.js";
-import { captureFingerprint } from "../graph/fingerprint.js";
-import { classifyPage } from "../planner/page-classifier.js";
-import type { RepoHints } from "../adaptation/types.js";
-import { ActionRecorder } from "./action-recorder.js";
-import type { WorkerHistoryContext } from "../memory/types.js";
-import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
-import type { Observation } from "../judge/types.js";
-import { judgeWorkerObservations } from "../judge/judge.js";
-import { hasLLMApiKey, judgeObservationWithLLM } from "../llm.js";
+} from '../types.js';
+import { CoverageTracker } from '../coverage/tracker.js';
+import { StagnationTracker } from './stagnation.js';
+import { captureFingerprint } from '../graph/fingerprint.js';
+import { classifyPage } from '../planner/page-classifier.js';
+import type { RepoHints } from '../adaptation/types.js';
+import { ActionRecorder } from './action-recorder.js';
+import type { WorkerHistoryContext } from '../memory/types.js';
+import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
+import type { Observation } from '../judge/types.js';
+import { judgeWorkerObservations } from '../judge/judge.js';
+import { hasLLMApiKey, judgeObservationWithLLM } from '../llm.js';
 
 interface WorkerSetup {
   observations: Observation[];
@@ -33,7 +33,7 @@ interface WorkerSetup {
   followupRequests: FollowupRequest[];
   discoveredEdges: DiscoveredEdge[];
   actionRecorder: ActionRecorder;
-  agent: ReturnType<Stagehand["agent"]>;
+  agent: ReturnType<Stagehand['agent']>;
 }
 
 function initWorker(
@@ -45,7 +45,7 @@ function initWorker(
     objectiveLabel: string;
     objectiveDescription?: string;
     pageType: PageType;
-    agentMode: "cua" | "dom";
+    agentMode: 'cua' | 'dom';
     model: string;
     screenshotsEnabled: boolean;
     stagnationThreshold: number;
@@ -56,7 +56,7 @@ function initWorker(
     mission?: MissionConfig;
     history?: WorkerHistoryContext;
     stateId?: string;
-    workerType?: WorkerTask["workerType"];
+    workerType?: WorkerTask['workerType'];
     adversarialConfig?: AdversarialConfig;
     judgeConfig?: JudgeConfig;
     visionContext?: string;
@@ -72,14 +72,19 @@ function initWorker(
   const actionRecorder = new ActionRecorder(page as any);
   actionRecorder.start();
 
-  const stagnationTracker = opts.stagnationThreshold > 0
-    ? new StagnationTracker(opts.stagnationThreshold)
-    : undefined;
+  const stagnationTracker =
+    opts.stagnationThreshold > 0 ? new StagnationTracker(opts.stagnationThreshold) : undefined;
 
   const tools = createWorkerTools(
-    observations, screenshots, evidence, coverageTracker, page,
-    opts.screenshotDir, opts.areaName,
-    followupRequests, discoveredEdges,
+    observations,
+    screenshots,
+    evidence,
+    coverageTracker,
+    page,
+    opts.screenshotDir,
+    opts.areaName,
+    followupRequests,
+    discoveredEdges,
     opts.screenshotsEnabled,
     {
       stagnationTracker,
@@ -141,15 +146,9 @@ async function materializeObservedFindings(input: {
     actions: input.actionRecorder.getActions(),
     config: input.judgeConfig,
     judgeText:
-      input.judgeConfig?.enabled !== false &&
-      input.judgeModel &&
-      hasLLMApiKey(input.judgeModel)
+      input.judgeConfig?.enabled !== false && input.judgeModel && hasLLMApiKey(input.judgeModel)
         ? (prompt, timeoutMs) =>
-            judgeObservationWithLLM(
-              input.judgeModel as string,
-              prompt,
-              timeoutMs
-            )
+            judgeObservationWithLLM(input.judgeModel as string, prompt, timeoutMs)
         : undefined,
   });
 }
@@ -161,7 +160,7 @@ export async function exploreArea(
   model: string,
   stepsPerArea: number,
   screenshotDir: string,
-  agentMode: "cua" | "dom" = "cua",
+  agentMode: 'cua' | 'dom' = 'cua',
   screenshotsEnabled = true,
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
@@ -174,44 +173,35 @@ export async function exploreArea(
 ): Promise<AreaResult> {
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
-  let pageType: PageType = "unknown";
+  let pageType: PageType = 'unknown';
   let fingerprint;
   try {
-    [pageType, fingerprint] = await Promise.all([
-      classifyPage(page),
-      captureFingerprint(page),
-    ]);
+    [pageType, fingerprint] = await Promise.all([classifyPage(page), captureFingerprint(page)]);
     console.log(`  Page type: ${pageType}, fingerprint: ${fingerprint.hash}`);
   } catch {
     console.warn(`  Could not classify page for "${area.name}"`);
   }
 
-  const {
-    observations,
-    screenshots,
-    evidence,
-    coverageTracker,
-    actionRecorder,
-    agent,
-  } = initWorker(stagehand, {
-    screenshotDir,
-    areaName: area.name,
-    appDescription,
-    objectiveLabel: area.name,
-    objectiveDescription: area.description,
-    pageType,
-    agentMode,
-    model,
-    screenshotsEnabled,
-    stagnationThreshold,
-    appContext,
-    repoHints,
-    contractSummary,
-    observedApiEndpoints,
-    mission,
-    history,
-    judgeConfig,
-  });
+  const { observations, screenshots, evidence, coverageTracker, actionRecorder, agent } =
+    initWorker(stagehand, {
+      screenshotDir,
+      areaName: area.name,
+      appDescription,
+      objectiveLabel: area.name,
+      objectiveDescription: area.description,
+      pageType,
+      agentMode,
+      model,
+      screenshotsEnabled,
+      stagnationThreshold,
+      appContext,
+      repoHints,
+      contractSummary,
+      observedApiEndpoints,
+      mission,
+      history,
+      judgeConfig,
+    });
 
   try {
     const result = await agent.execute({
@@ -220,9 +210,7 @@ export async function exploreArea(
     });
 
     const stepCount =
-      "actions" in result && Array.isArray(result.actions)
-        ? result.actions.length
-        : 0;
+      'actions' in result && Array.isArray(result.actions) ? result.actions.length : 0;
 
     return {
       name: area.name,
@@ -241,7 +229,7 @@ export async function exploreArea(
       coverage: coverageTracker.snapshot(),
       pageType,
       fingerprint,
-      status: "explored" as const,
+      status: 'explored' as const,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -273,7 +261,7 @@ export async function exploreArea(
       coverage: coverageTracker.snapshot(),
       pageType,
       fingerprint,
-      status: "failed",
+      status: 'failed',
       failureReason: message,
     };
   } finally {
@@ -286,7 +274,7 @@ export async function executeWorkerTask(
   task: WorkerTask,
   model: string,
   screenshotDir: string,
-  agentMode: "cua" | "dom" = "cua",
+  agentMode: 'cua' | 'dom' = 'cua',
   screenshotsEnabled = true,
   stagnationThreshold = 0,
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
@@ -310,7 +298,7 @@ export async function executeWorkerTask(
   } = initWorker(stagehand, {
     screenshotDir,
     areaName: task.nodeId,
-    appDescription: task.missionContext ?? "",
+    appDescription: task.missionContext ?? '',
     objectiveLabel: task.objective,
     pageType: task.pageType,
     agentMode,
@@ -333,7 +321,7 @@ export async function executeWorkerTask(
   try {
     await agent.execute({
       instruction:
-        task.workerType === "adversarial"
+        task.workerType === 'adversarial'
           ? `${task.objective}\nPrioritize stale-state, replay, idempotency, and boundary-value probes. Stay read-only unless the run explicitly allows mutation-dependent adversarial sequences.`
           : task.objective,
       maxSteps: task.maxSteps,
@@ -353,7 +341,7 @@ export async function executeWorkerTask(
       coverageSnapshot: coverageTracker.snapshot(),
       followupRequests,
       discoveredEdges,
-      outcome: "completed",
+      outcome: 'completed',
       summary: `Completed ${task.workerType} task: ${task.objective}`,
     };
   } catch (error) {
@@ -380,7 +368,7 @@ export async function executeWorkerTask(
       coverageSnapshot: coverageTracker.snapshot(),
       followupRequests,
       discoveredEdges,
-      outcome: "failed",
+      outcome: 'failed',
       summary: error instanceof Error ? error.message : String(error),
     };
   } finally {

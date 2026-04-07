@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
-import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from "./types.js";
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
+import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 
 const PAGE_FILE_RE = /(?:^|\/)src\/routes(?:\/.*)?\/\+page\.(?:svelte|ts|js)$/;
 const SERVER_FILE_RE = /(?:^|\/)src\/routes(?:\/.*)?\/\+server\.(?:ts|js)$/;
@@ -17,12 +17,21 @@ const AUTH_RE =
 const VALIDATION_SCHEMA_RE = /\b([A-Z][A-Za-z0-9]+Schema)\b/g;
 
 const IGNORED_DIRS = new Set([
-  "node_modules", ".git", ".svelte-kit", "dist", "build", "out", "coverage",
-  ".next", ".nuxt", ".turbo", ".cache",
+  'node_modules',
+  '.git',
+  '.svelte-kit',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
 ]);
 
 function toPosix(value: string): string {
-  return value.split(sep).join("/");
+  return value.split(sep).join('/');
 }
 
 function walkFiles(root: string): string[] {
@@ -49,36 +58,34 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function normalizeRoute(routePath: string): string {
-  const normalized = routePath.replace(/\/+$/g, "");
-  return normalized || "/";
+  const normalized = routePath.replace(/\/+$/g, '');
+  return normalized || '/';
 }
 
 function routeFamily(routePath: string): string {
-  const [pathname] = routePath.split("?");
-  if (!pathname || pathname === "/") {
-    return "/";
+  const [pathname] = routePath.split('?');
+  if (!pathname || pathname === '/') {
+    return '/';
   }
 
-  const segments = pathname.split("/").filter(Boolean);
-  return segments.length > 0 ? `/${segments[0]}` : "/";
+  const segments = pathname.split('/').filter(Boolean);
+  return segments.length > 0 ? `/${segments[0]}` : '/';
 }
 
 function stripRouteGroups(segments: string[]): string[] {
   return segments.filter(
-    (segment) =>
-      segment &&
-      !(segment.startsWith("(") && segment.endsWith(")"))
+    (segment) => segment && !(segment.startsWith('(') && segment.endsWith(')'))
   );
 }
 
 function convertParam(segment: string): string {
-  if (segment.startsWith("[[") && segment.endsWith("]]")) {
+  if (segment.startsWith('[[') && segment.endsWith(']]')) {
     return `:${segment.slice(2, -2)}?`;
   }
-  if (segment.startsWith("[...") && segment.endsWith("]")) {
+  if (segment.startsWith('[...') && segment.endsWith(']')) {
     return `*${segment.slice(4, -1)}`;
   }
-  if (segment.startsWith("[") && segment.endsWith("]")) {
+  if (segment.startsWith('[') && segment.endsWith(']')) {
     return `:${segment.slice(1, -1)}`;
   }
   return segment;
@@ -86,13 +93,10 @@ function convertParam(segment: string): string {
 
 function routeFromFile(root: string, filePath: string): string {
   const rel = toPosix(relative(root, filePath));
-  const withoutPrefix = rel.replace(/^src\/routes\//, "");
-  const withoutFile = withoutPrefix.replace(
-    /\/?\+(?:page|server|layout)\.(?:svelte|ts|js)$/,
-    ""
-  );
-  const segments = stripRouteGroups(withoutFile.split("/")).map(convertParam);
-  return normalizeRoute(`/${segments.join("/")}`);
+  const withoutPrefix = rel.replace(/^src\/routes\//, '');
+  const withoutFile = withoutPrefix.replace(/\/?\+(?:page|server|layout)\.(?:svelte|ts|js)$/, '');
+  const segments = stripRouteGroups(withoutFile.split('/')).map(convertParam);
+  return normalizeRoute(`/${segments.join('/')}`);
 }
 
 function extractQueryRoutes(content: string): string[] {
@@ -108,7 +112,7 @@ function extractStableSelectors(content: string): string[] {
 
   for (const match of content.matchAll(SELECTOR_RE)) {
     const [, attr, value] = match;
-    if (attr === "id") {
+    if (attr === 'id') {
       selectors.push(`#${value}`);
     } else {
       selectors.push(`[data-testid="${value}"]`);
@@ -139,7 +143,7 @@ function extractRouteMethods(content: string): string[] {
 function extractApiEndpoints(root: string, serverFiles: string[]): ApiEndpointHint[] {
   return serverFiles
     .map((filePath) => {
-      const content = readFileSync(filePath, "utf-8");
+      const content = readFileSync(filePath, 'utf-8');
       return {
         route: routeFromFile(root, filePath),
         methods: extractRouteMethods(content),
@@ -153,14 +157,11 @@ function extractApiEndpoints(root: string, serverFiles: string[]): ApiEndpointHi
     .sort((left, right) => left.route.localeCompare(right.route));
 }
 
-function extractExpectedHttpNoise(
-  root: string,
-  serverFiles: string[]
-): ExpectedHttpNoise[] {
+function extractExpectedHttpNoise(root: string, serverFiles: string[]): ExpectedHttpNoise[] {
   const noise: ExpectedHttpNoise[] = [];
 
   for (const filePath of serverFiles) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
     const statuses = extractStatusCodes(content).filter(
       (status) => status === 401 || status === 403
     );
@@ -179,14 +180,14 @@ function extractExpectedHttpNoise(
 export function canScanSvelteKitRepo(root: string): boolean {
   const resolvedRoot = resolve(root);
   if (
-    existsSync(join(resolvedRoot, "svelte.config.js")) ||
-    existsSync(join(resolvedRoot, "svelte.config.ts"))
+    existsSync(join(resolvedRoot, 'svelte.config.js')) ||
+    existsSync(join(resolvedRoot, 'svelte.config.ts'))
   ) {
     return true;
   }
   try {
-    const pkg = readFileSync(join(resolvedRoot, "package.json"), "utf-8");
-    return pkg.includes("@sveltejs/kit");
+    const pkg = readFileSync(join(resolvedRoot, 'package.json'), 'utf-8');
+    return pkg.includes('@sveltejs/kit');
   } catch {
     return false;
   }
@@ -213,18 +214,12 @@ export function scanSvelteKitRepo(root: string): RepoHints {
   const routes = uniqueSorted([
     ...pageFiles.map((filePath) => routeFromFile(resolvedRoot, filePath)),
     ...serverFiles.map((filePath) => routeFromFile(resolvedRoot, filePath)),
-    ...pageFiles.flatMap((filePath) =>
-      extractQueryRoutes(readFileSync(filePath, "utf-8"))
-    ),
-    ...svelteFiles.flatMap((filePath) =>
-      extractQueryRoutes(readFileSync(filePath, "utf-8"))
-    ),
+    ...pageFiles.flatMap((filePath) => extractQueryRoutes(readFileSync(filePath, 'utf-8'))),
+    ...svelteFiles.flatMap((filePath) => extractQueryRoutes(readFileSync(filePath, 'utf-8'))),
   ]);
 
   const stableSelectors = uniqueSorted(
-    svelteFiles.flatMap((filePath) =>
-      extractStableSelectors(readFileSync(filePath, "utf-8"))
-    )
+    svelteFiles.flatMap((filePath) => extractStableSelectors(readFileSync(filePath, 'utf-8')))
   );
   const routeFamilies = uniqueSorted(routes.map(routeFamily));
   const apiEndpoints = extractApiEndpoints(resolvedRoot, serverFiles);
@@ -235,12 +230,8 @@ export function scanSvelteKitRepo(root: string): RepoHints {
     stableSelectors,
     apiEndpoints,
     authHints: {
-      loginRoutes: routes.filter((route) =>
-        /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)
-      ),
-      callbackRoutes: routes.filter((route) =>
-        /(^|\/)(callback|oauth|sso)(\/|$)/i.test(route)
-      ),
+      loginRoutes: routes.filter((route) => /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)),
+      callbackRoutes: routes.filter((route) => /(^|\/)(callback|oauth|sso)(\/|$)/i.test(route)),
     },
     expectedHttpNoise: extractExpectedHttpNoise(resolvedRoot, serverFiles),
   };

@@ -1,35 +1,28 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import type { ApiEndpointHint, RepoHints } from "./types.js";
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import type { ApiEndpointHint, RepoHints } from './types.js';
 
-const SOURCE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-]);
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const IGNORED_DIRECTORY_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  "coverage",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  "tests",
-  "test",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "mocks",
-  "__mocks__",
-  "generated",
-  "__generated__",
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  'tests',
+  'test',
+  '__tests__',
+  'fixtures',
+  '__fixtures__',
+  'mocks',
+  '__mocks__',
+  'generated',
+  '__generated__',
 ]);
 const IGNORED_FILE_NAME_PATTERNS = [
   /\.test\./i,
@@ -43,10 +36,8 @@ const REACT_ROUTER_IMPORT_RE =
   /(?:from|require\()\s*["'](?:react-router-dom|react-router|@remix-run\/router)["']/;
 
 // Route extraction patterns
-const ROUTE_JSX_PATH_RE =
-  /<Route\s[^>]*?path\s*=\s*["'`]([^"'`]+)["'`]/g;
-const ROUTE_CONFIG_PATH_RE =
-  /\bpath\s*:\s*["'`](\/[^"'`]*)["'`]/g;
+const ROUTE_JSX_PATH_RE = /<Route\s[^>]*?path\s*=\s*["'`]([^"'`]+)["'`]/g;
+const ROUTE_CONFIG_PATH_RE = /\bpath\s*:\s*["'`](\/[^"'`]*)["'`]/g;
 
 // Selector patterns
 const SELECTOR_RE = /data-testid=["']([^"']+)["']/g;
@@ -68,7 +59,7 @@ function shouldIgnoreEntry(name: string, isDirectory: boolean): boolean {
   if (isDirectory) {
     return false;
   }
-  if (name.endsWith(".d.ts")) {
+  if (name.endsWith('.d.ts')) {
     return true;
   }
   return IGNORED_FILE_NAME_PATTERNS.some((pattern) => pattern.test(name));
@@ -88,11 +79,7 @@ function walkFiles(root: string): string[] {
       continue;
     }
 
-    if (
-      entry.isFile() &&
-      isSourceFile(fullPath) &&
-      !shouldIgnoreEntry(basename(fullPath), false)
-    ) {
+    if (entry.isFile() && isSourceFile(fullPath) && !shouldIgnoreEntry(basename(fullPath), false)) {
       results.push(fullPath);
     }
   }
@@ -109,25 +96,21 @@ function uniqueNumbers(values: number[]): number[] {
 }
 
 function routeFamily(route: string): string {
-  const parts = route.split("?")[0]?.split("/").filter(Boolean) ?? [];
-  return parts.length === 0 ? "/" : `/${parts[0]}`;
+  const parts = route.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  return parts.length === 0 ? '/' : `/${parts[0]}`;
 }
 
 function normalizeRoute(raw: string): string {
-  const trimmed = raw.replace(/\/+$/, "");
-  return trimmed || "/";
+  const trimmed = raw.replace(/\/+$/, '');
+  return trimmed || '/';
 }
 
 function extractRouteJsxPaths(content: string): string[] {
-  return [...content.matchAll(ROUTE_JSX_PATH_RE)].map((m) =>
-    normalizeRoute(m[1]),
-  );
+  return [...content.matchAll(ROUTE_JSX_PATH_RE)].map((m) => normalizeRoute(m[1]));
 }
 
 function extractRouteConfigPaths(content: string): string[] {
-  return [...content.matchAll(ROUTE_CONFIG_PATH_RE)].map((m) =>
-    normalizeRoute(m[1]),
-  );
+  return [...content.matchAll(ROUTE_CONFIG_PATH_RE)].map((m) => normalizeRoute(m[1]));
 }
 
 function extractSelectors(content: string): string[] {
@@ -148,11 +131,14 @@ function extractSelectors(content: string): string[] {
 
 function extractFetchEndpoints(
   content: string,
-  endpoints: Map<string, { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }>,
+  endpoints: Map<
+    string,
+    { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }
+  >
 ): void {
   for (const match of content.matchAll(FETCH_RE)) {
-    const route = match[1] ?? "";
-    const method = (match[2] ?? "GET").toUpperCase();
+    const route = match[1] ?? '';
+    const method = (match[2] ?? 'GET').toUpperCase();
     const existing = endpoints.get(route) ?? {
       route,
       methods: [],
@@ -168,7 +154,7 @@ export function canScanReactRouterRepo(root: string): boolean {
   for (const filePath of walkFiles(root)) {
     if (!isSourceFile(filePath)) continue;
 
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
     if (REACT_ROUTER_IMPORT_RE.test(content)) {
       return true;
     }
@@ -187,7 +173,7 @@ export function scanReactRouterRepo(root: string): RepoHints {
   const callbackRoutes: string[] = [];
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
 
     // Extract routes from JSX <Route path="..." /> elements
     routes.push(...extractRouteJsxPaths(content));

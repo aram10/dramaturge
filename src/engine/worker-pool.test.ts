@@ -1,30 +1,26 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  stagehandCtor,
-  authenticateMock,
-  applyStorageStateMock,
-} = vi.hoisted(() => ({
+const { stagehandCtor, authenticateMock, applyStorageStateMock } = vi.hoisted(() => ({
   stagehandCtor: vi.fn(),
   authenticateMock: vi.fn(),
   applyStorageStateMock: vi.fn(),
 }));
 
-vi.mock("@browserbasehq/stagehand", () => ({
+vi.mock('@browserbasehq/stagehand', () => ({
   Stagehand: stagehandCtor,
 }));
 
-vi.mock("../auth/authenticator.js", () => ({
+vi.mock('../auth/authenticator.js', () => ({
   authenticate: authenticateMock,
 }));
 
-vi.mock("../auth/storage-state.js", () => ({
+vi.mock('../auth/storage-state.js', () => ({
   applyStorageState: applyStorageStateMock,
 }));
 
-import { createStagehand, initWorkerPool } from "./worker-pool.js";
+import { createStagehand, initWorkerPool } from './worker-pool.js';
 
-describe("worker-pool", () => {
+describe('worker-pool', () => {
   beforeEach(() => {
     stagehandCtor.mockReset();
     authenticateMock.mockReset();
@@ -34,7 +30,7 @@ describe("worker-pool", () => {
       this.options = options;
       this.init = vi.fn().mockResolvedValue(undefined);
       this.context = {
-        pages: () => [{ name: "page" }],
+        pages: () => [{ name: 'page' }],
         close: vi.fn().mockResolvedValue(undefined),
       };
     } as any);
@@ -42,9 +38,9 @@ describe("worker-pool", () => {
     applyStorageStateMock.mockResolvedValue(undefined);
   });
 
-  it("uses the configured headless mode when creating Stagehand", () => {
+  it('uses the configured headless mode when creating Stagehand', () => {
     createStagehand({
-      models: { planner: "anthropic/claude-sonnet-4-6" },
+      models: { planner: 'anthropic/claude-sonnet-4-6' },
       browser: { headless: true },
     } as any);
 
@@ -55,30 +51,30 @@ describe("worker-pool", () => {
     );
   });
 
-  it("uses the browser-ops model for base Stagehand instances when configured", () => {
+  it('uses the browser-ops model for base Stagehand instances when configured', () => {
     createStagehand({
       models: {
-        planner: "anthropic/claude-sonnet-4-6",
-        browserOps: "openai/gpt-4.1-mini",
+        planner: 'anthropic/claude-sonnet-4-6',
+        browserOps: 'openai/gpt-4.1-mini',
       },
       browser: { headless: false },
     } as any);
 
     expect(stagehandCtor).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "openai/gpt-4.1-mini",
+        model: 'openai/gpt-4.1-mini',
       })
     );
   });
 
-  it("reuses shared storage state for worker browsers instead of reauthenticating", async () => {
+  it('reuses shared storage state for worker browsers instead of reauthenticating', async () => {
     const errorCollector = { attach: vi.fn() };
     const trafficObserver = { attach: vi.fn() };
 
     const pool = await initWorkerPool(
       {
-        targetUrl: "https://example.com/app",
-        models: { planner: "anthropic/claude-sonnet-4-6" },
+        targetUrl: 'https://example.com/app',
+        models: { planner: 'anthropic/claude-sonnet-4-6' },
         browser: { headless: false },
       } as any,
       2,
@@ -94,13 +90,13 @@ describe("worker-pool", () => {
     expect(trafficObserver.attach).toHaveBeenCalledTimes(2);
   });
 
-  it("falls back to full authenticate when no shared state is supplied", async () => {
+  it('falls back to full authenticate when no shared state is supplied', async () => {
     const errorCollector = { attach: vi.fn() };
 
     await initWorkerPool(
       {
-        targetUrl: "https://example.com/app",
-        models: { planner: "anthropic/claude-sonnet-4-6" },
+        targetUrl: 'https://example.com/app',
+        models: { planner: 'anthropic/claude-sonnet-4-6' },
         browser: { headless: false },
       } as any,
       1,

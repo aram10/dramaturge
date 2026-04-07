@@ -1,43 +1,38 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
-import { z } from "zod";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
-import type { Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from "../types.js";
-import { shortId } from "../constants.js";
-import type { CoverageTracker } from "../coverage/tracker.js";
-import type { StagnationTracker } from "./stagnation.js";
-import type { ActionRecorder } from "./action-recorder.js";
-import type { Observation } from "../judge/types.js";
-import type { Blackboard } from "../a2a/blackboard.js";
-import type { BlackboardEntryKind } from "../a2a/types.js";
+import type { Stagehand } from '@browserbasehq/stagehand';
+import { z } from 'zod';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from '../types.js';
+import { shortId, MAX_BREADCRUMBS } from '../constants.js';
+import type { CoverageTracker } from '../coverage/tracker.js';
+import type { StagnationTracker } from './stagnation.js';
+import type { ActionRecorder } from './action-recorder.js';
+import type { Observation } from '../judge/types.js';
+import type { Blackboard } from '../a2a/blackboard.js';
+import type { BlackboardEntryKind } from '../a2a/types.js';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 const FindingCategorySchema = z.enum([
-  "Bug",
-  "UX Concern",
-  "Accessibility Issue",
-  "Performance Issue",
-  "Visual Glitch",
+  'Bug',
+  'UX Concern',
+  'Accessibility Issue',
+  'Performance Issue',
+  'Visual Glitch',
 ]);
 
-const FindingSeveritySchema = z.enum([
-  "Critical",
-  "Major",
-  "Minor",
-  "Trivial",
-]);
+const FindingSeveritySchema = z.enum(['Critical', 'Major', 'Minor', 'Trivial']);
 
 const LogFindingSchema = z.object({
   category: FindingCategorySchema,
   severity: FindingSeveritySchema.describe(
-    "Critical = crash/data loss, Major = broken feature, Minor = cosmetic/inconvenience, Trivial = nitpick"
+    'Critical = crash/data loss, Major = broken feature, Minor = cosmetic/inconvenience, Trivial = nitpick'
   ),
-  title: z.string().describe("One-line summary of the issue"),
-  stepsToReproduce: z.array(z.string()).describe("Ordered actions to encounter this issue"),
+  title: z.string().describe('One-line summary of the issue'),
+  stepsToReproduce: z.array(z.string()).describe('Ordered actions to encounter this issue'),
   expected: z.string(),
   actual: z.string(),
-  evidenceIds: z.array(z.string()).optional().describe("Evidence IDs from take_screenshot"),
+  evidenceIds: z.array(z.string()).optional().describe('Evidence IDs from take_screenshot'),
   verdict: z
     .object({
       hypothesis: z.string(),
@@ -50,34 +45,37 @@ const LogFindingSchema = z.object({
 });
 
 const TakeScreenshotSchema = z.object({
-  annotation: z.string().optional().describe("What the screenshot shows"),
+  annotation: z.string().optional().describe('What the screenshot shows'),
   ref: z.string().describe("Reference ID to correlate with a finding (e.g., 'bug-empty-form')"),
 });
 
 const MarkControlExercisedSchema = z.object({
   controlId: z.string().describe("Control identifier (e.g., 'save-button', 'name-input')"),
-  action: z.enum(["click", "input", "submit", "toggle", "open", "close"]),
-  outcome: z.enum(["worked", "blocked", "error", "unclear"]),
+  action: z.enum(['click', 'input', 'submit', 'toggle', 'open', 'close']),
+  outcome: z.enum(['worked', 'blocked', 'error', 'unclear']),
 });
 
 const RequestFollowupSchema = z.object({
-  type: z.enum(["navigation", "form", "crud", "api", "adversarial"]),
+  type: z.enum(['navigation', 'form', 'crud', 'api', 'adversarial']),
   reason: z.string(),
   relatedFindingId: z.string().optional(),
 });
 
 const ReportDiscoveredEdgeSchema = z.object({
-  actionLabel: z.string().describe("Action leading to new state (e.g., 'Click Create User button')"),
-  url: z.string().optional().describe("Direct URL of the discovered page, if known"),
+  actionLabel: z
+    .string()
+    .describe("Action leading to new state (e.g., 'Click Create User button')"),
+  url: z.string().optional().describe('Direct URL of the discovered page, if known'),
   selector: z.string().optional(),
-  actionDescription: z.string().optional().describe("Natural language action description"),
+  actionDescription: z.string().optional().describe('Natural language action description'),
 });
 
 const PostToBlackboardSchema = z.object({
-  kind: z.enum(["finding", "coverage", "navigation", "message", "directive"])
-    .describe("Category of the blackboard entry"),
-  summary: z.string().describe("Short summary of what you are sharing with other agents"),
-  tags: z.array(z.string()).optional().describe("Tags for other agents to filter on"),
+  kind: z
+    .enum(['finding', 'coverage', 'navigation', 'message', 'directive'])
+    .describe('Category of the blackboard entry'),
+  summary: z.string().describe('Short summary of what you are sharing with other agents'),
+  tags: z.array(z.string()).optional().describe('Tags for other agents to filter on'),
 });
 
 export interface WorkerToolOptions {
@@ -110,7 +108,7 @@ export function createWorkerTools(
 
   const rememberBreadcrumb = (value: string) => {
     breadcrumbs.push(value);
-    if (breadcrumbs.length > 8) {
+    if (breadcrumbs.length > MAX_BREADCRUMBS) {
       breadcrumbs.shift();
     }
   };
@@ -118,7 +116,7 @@ export function createWorkerTools(
   return {
     log_finding: {
       description:
-        "Report a bug, UX concern, accessibility, performance, or visual issue. Attach evidence IDs from take_screenshot calls.",
+        'Report a bug, UX concern, accessibility, performance, or visual issue. Attach evidence IDs from take_screenshot calls.',
       inputSchema: LogFindingSchema,
       execute: async (input: z.infer<typeof LogFindingSchema>) => {
         const evidenceIds = input.evidenceIds ?? [];
@@ -128,7 +126,7 @@ export function createWorkerTools(
           ...input,
           evidenceIds,
           route: page.url(),
-          objective: findingContext?.objective ?? "Investigate the current page",
+          objective: findingContext?.objective ?? 'Investigate the current page',
           breadcrumbs: actionRecorder?.getRecentSummaries() ?? [...breadcrumbs],
           actionIds: actionRecorder?.getRecentActionIds() ?? [],
           verdictHint: input.verdict,
@@ -153,21 +151,21 @@ export function createWorkerTools(
     },
 
     take_screenshot: {
-      description:
-        "Capture a screenshot. Returns an evidenceId to pass to log_finding.",
+      description: 'Capture a screenshot. Returns an evidenceId to pass to log_finding.',
       inputSchema: TakeScreenshotSchema,
       execute: async (input: z.infer<typeof TakeScreenshotSchema>) => {
         if (!screenshotsEnabled) {
-          return { captured: false, ref: input.ref, message: "Screenshots disabled in config" };
+          return { captured: false, ref: input.ref, message: 'Screenshots disabled in config' };
         }
         let buffer: Buffer;
         try {
           buffer = await page.screenshot({
             fullPage: false,
-            type: "png",
+            type: 'png',
           });
         } catch (screenshotError) {
-          const msg = screenshotError instanceof Error ? screenshotError.message : String(screenshotError);
+          const msg =
+            screenshotError instanceof Error ? screenshotError.message : String(screenshotError);
           return { captured: false, ref: input.ref, message: `Screenshot failed: ${msg}` };
         }
         const screenshotId = `ss-${shortId()}`;
@@ -188,7 +186,7 @@ export function createWorkerTools(
         const evidenceId = `ev-${shortId()}`;
         const ev: Evidence = {
           id: evidenceId,
-          type: "screenshot",
+          type: 'screenshot',
           summary: input.annotation ?? `Screenshot: ${input.ref}`,
           path: `screenshots/${filename}`,
           timestamp: new Date().toISOString(),
@@ -198,10 +196,10 @@ export function createWorkerTools(
         evidence.push(ev);
         rememberBreadcrumb(`capture screenshot ${input.ref}`);
         actionRecorder?.recordToolAction({
-          kind: "screenshot",
+          kind: 'screenshot',
           summary: `capture screenshot ${input.ref}`,
-          source: "worker-tool",
-          status: "recorded",
+          source: 'worker-tool',
+          status: 'recorded',
         });
 
         return { captured: true, ref: input.ref, filename, evidenceId };
@@ -209,8 +207,7 @@ export function createWorkerTools(
     },
 
     mark_control_exercised: {
-      description:
-        "Report interaction with a UI control for coverage tracking.",
+      description: 'Report interaction with a UI control for coverage tracking.',
       inputSchema: MarkControlExercisedSchema,
       execute: async (input: z.infer<typeof MarkControlExercisedSchema>) => {
         const event: CoverageEvent = {
@@ -221,11 +218,7 @@ export function createWorkerTools(
         };
         coverageTracker.recordEvent(event);
         rememberBreadcrumb(`${input.action} ${input.controlId} -> ${input.outcome}`);
-        actionRecorder?.recordControlAction(
-          input.controlId,
-          input.action,
-          input.outcome
-        );
+        actionRecorder?.recordControlAction(input.controlId, input.action, input.outcome);
         stagnationTracker?.recordStep({ findings: 0, newControls: 1, edges: 0 });
         return {
           recorded: true,
@@ -236,8 +229,7 @@ export function createWorkerTools(
     },
 
     request_followup: {
-      description:
-        "Request additional investigation on the current page or a related area.",
+      description: 'Request additional investigation on the current page or a related area.',
       inputSchema: RequestFollowupSchema,
       execute: async (input: z.infer<typeof RequestFollowupSchema>) => {
         followupRequests.push({
@@ -254,11 +246,9 @@ export function createWorkerTools(
 
     report_discovered_edge: {
       description:
-        "Report a navigation target (link, button, action) leading to a different page/state.",
+        'Report a navigation target (link, button, action) leading to a different page/state.',
       inputSchema: ReportDiscoveredEdgeSchema,
-      execute: async (
-        input: z.infer<typeof ReportDiscoveredEdgeSchema>
-      ) => {
+      execute: async (input: z.infer<typeof ReportDiscoveredEdgeSchema>) => {
         discoveredEdges.push({
           actionLabel: input.actionLabel,
           navigationHint: {
@@ -268,27 +258,27 @@ export function createWorkerTools(
           },
           // Placeholder — engine fills these when it actually navigates
           targetFingerprint: {
-            normalizedPath: "",
+            normalizedPath: '',
             signature: {
-              pathname: "",
+              pathname: '',
               query: [],
               uiMarkers: [],
             },
-            title: "",
-            heading: "",
+            title: '',
+            heading: '',
             dialogTitles: [],
-            hash: "",
+            hash: '',
           },
-          targetPageType: "unknown",
+          targetPageType: 'unknown',
         });
         rememberBreadcrumb(`discover edge ${input.actionLabel}`);
         actionRecorder?.recordToolAction({
-          kind: "discover-edge",
+          kind: 'discover-edge',
           selector: input.selector,
           url: input.url,
           summary: `discover edge ${input.actionLabel}`,
-          source: "worker-tool",
-          status: "recorded",
+          source: 'worker-tool',
+          status: 'recorded',
         });
         stagnationTracker?.recordStep({ findings: 0, newControls: 0, edges: 1 });
         return {
@@ -302,7 +292,7 @@ export function createWorkerTools(
       ? {
           post_to_blackboard: {
             description:
-              "Share a signal with other agents on the team blackboard. Use this to flag suspicious behaviors, coverage gaps, or interesting patterns.",
+              'Share a signal with other agents on the team blackboard. Use this to flag suspicious behaviors, coverage gaps, or interesting patterns.',
             inputSchema: PostToBlackboardSchema,
             execute: async (input: z.infer<typeof PostToBlackboardSchema>) => {
               const entry = blackboard.post(

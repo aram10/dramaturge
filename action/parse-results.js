@@ -13,22 +13,22 @@
  *   summary-path       – path to the generated PR comment markdown
  */
 
-import { readFileSync, readdirSync, writeFileSync, existsSync, appendFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync, readdirSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Severity levels ordered from most to least severe. */
-const SEVERITY_ORDER = ["Critical", "Major", "Minor", "Trivial"];
+const SEVERITY_ORDER = ['Critical', 'Major', 'Minor', 'Trivial'];
 
 /** Numeric rank for each severity (lower = more severe). */
 const SEVERITY_RANK = { Critical: 0, Major: 1, Minor: 2, Trivial: 3 };
 
 /** Emoji icons for each severity level. */
 const SEVERITY_ICON = {
-  Critical: "\u{1F534}",
-  Major: "\u{1F7E0}",
-  Minor: "\u{1F7E1}",
-  Trivial: "\u26AA",
+  Critical: '\u{1F534}',
+  Major: '\u{1F7E0}',
+  Minor: '\u{1F7E1}',
+  Trivial: '\u26AA',
 };
 
 /**
@@ -43,7 +43,7 @@ export function findLatestReportDir(baseDir) {
     .sort()
     .reverse();
   for (const entry of entries) {
-    const reportPath = join(baseDir, entry, "report.json");
+    const reportPath = join(baseDir, entry, 'report.json');
     if (existsSync(reportPath)) return join(baseDir, entry);
   }
   return null;
@@ -51,7 +51,7 @@ export function findLatestReportDir(baseDir) {
 
 /** Reads and parses a JSON report file. */
 export function parseReport(reportPath) {
-  const raw = readFileSync(reportPath, "utf-8");
+  const raw = readFileSync(reportPath, 'utf-8');
   return JSON.parse(raw);
 }
 
@@ -88,7 +88,7 @@ export function buildSummary(report) {
   const totalFindings = summary.totalFindings ?? findings.length;
 
   // Determine highest severity present
-  let maxSeverity = "none";
+  let maxSeverity = 'none';
   for (const sev of SEVERITY_ORDER) {
     if ((bySeverity[sev] || 0) > 0) {
       maxSeverity = sev;
@@ -98,16 +98,16 @@ export function buildSummary(report) {
 
   const topFindings = findings.slice(0, 10);
 
-  const duration = meta.durationMs ? formatDuration(meta.durationMs) : "unknown";
+  const duration = meta.durationMs ? formatDuration(meta.durationMs) : 'unknown';
 
   let md = `## \u{1F3AD} Dramaturge QA Report\n\n`;
-  md += `**Target:** ${meta.targetUrl || "unknown"}  \n`;
+  md += `**Target:** ${meta.targetUrl || 'unknown'}  \n`;
   md += `**Duration:** ${duration}  \n`;
 
   if (totalFindings === 0) {
     md += `**Status:** \u2705 No findings\n`;
   } else {
-    md += `**Status:** \u26A0\uFE0F ${totalFindings} finding${totalFindings !== 1 ? "s" : ""}\n`;
+    md += `**Status:** \u26A0\uFE0F ${totalFindings} finding${totalFindings !== 1 ? 's' : ''}\n`;
   }
 
   md += `\n### Summary\n\n`;
@@ -139,9 +139,8 @@ export function buildSummary(report) {
  * @returns {boolean} true when findings meet or exceed the threshold
  */
 export function checkSeverityThreshold(maxSeverity, threshold) {
-  if (!threshold || maxSeverity === "none") return false;
-  const normalized =
-    threshold.charAt(0).toUpperCase() + threshold.slice(1).toLowerCase();
+  if (!threshold || maxSeverity === 'none') return false;
+  const normalized = threshold.charAt(0).toUpperCase() + threshold.slice(1).toLowerCase();
   const maxRank = SEVERITY_RANK[maxSeverity];
   const thresholdRank = SEVERITY_RANK[normalized];
   if (maxRank === undefined || thresholdRank === undefined) return false;
@@ -162,48 +161,46 @@ function setOutput(name, value) {
 
 function main() {
   const reportBaseDir = process.argv[2];
-  const failOnSeverity = process.argv[3] || "";
+  const failOnSeverity = process.argv[3] || '';
 
   if (!reportBaseDir) {
-    console.error("Usage: parse-results.js <report-base-dir> [fail-on-severity]");
+    console.error('Usage: parse-results.js <report-base-dir> [fail-on-severity]');
     process.exit(1);
   }
 
   const reportDir = findLatestReportDir(reportBaseDir);
   if (!reportDir) {
-    console.log("No Dramaturge report found in " + reportBaseDir);
-    setOutput("report-path", reportBaseDir);
-    setOutput("finding-count", "0");
-    setOutput("max-severity", "none");
-    setOutput("threshold-exceeded", "false");
-    setOutput("summary-path", "");
+    console.log('No Dramaturge report found in ' + reportBaseDir);
+    setOutput('report-path', reportBaseDir);
+    setOutput('finding-count', '0');
+    setOutput('max-severity', 'none');
+    setOutput('threshold-exceeded', 'false');
+    setOutput('summary-path', '');
     return;
   }
 
-  const reportPath = join(reportDir, "report.json");
+  const reportPath = join(reportDir, 'report.json');
   const report = parseReport(reportPath);
   const { markdown, totalFindings, maxSeverity } = buildSummary(report);
 
   // Write the PR-comment markdown next to the report
-  const summaryPath = join(reportDir, "pr-comment.md");
-  writeFileSync(summaryPath, markdown, "utf-8");
+  const summaryPath = join(reportDir, 'pr-comment.md');
+  writeFileSync(summaryPath, markdown, 'utf-8');
 
   // Check severity threshold
   const exceeded = checkSeverityThreshold(maxSeverity, failOnSeverity);
 
   // Set GitHub Actions outputs
-  setOutput("report-path", reportDir);
-  setOutput("finding-count", String(totalFindings));
-  setOutput("max-severity", maxSeverity);
-  setOutput("threshold-exceeded", String(exceeded));
-  setOutput("summary-path", summaryPath);
+  setOutput('report-path', reportDir);
+  setOutput('finding-count', String(totalFindings));
+  setOutput('max-severity', maxSeverity);
+  setOutput('threshold-exceeded', String(exceeded));
+  setOutput('summary-path', summaryPath);
 
   console.log(`Report: ${reportDir}`);
   console.log(`Findings: ${totalFindings} (max severity: ${maxSeverity})`);
   if (exceeded) {
-    console.log(
-      `\u26A0\uFE0F  Severity threshold '${failOnSeverity}' exceeded`,
-    );
+    console.log(`\u26A0\uFE0F  Severity threshold '${failOnSeverity}' exceeded`);
   }
 }
 

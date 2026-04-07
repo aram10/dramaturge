@@ -1,35 +1,35 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from "./types.js";
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 
-const SOURCE_EXTENSIONS = new Set([".py", ".html"]);
+const SOURCE_EXTENSIONS = new Set(['.py', '.html']);
 const IGNORED_DIRECTORY_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  "coverage",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  "tests",
-  "test",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "mocks",
-  "__mocks__",
-  "generated",
-  "__generated__",
-  "__pycache__",
-  ".venv",
-  "venv",
-  "env",
-  "migrations",
-  "static",
-  "media",
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  'tests',
+  'test',
+  '__tests__',
+  'fixtures',
+  '__fixtures__',
+  'mocks',
+  '__mocks__',
+  'generated',
+  '__generated__',
+  '__pycache__',
+  '.venv',
+  'venv',
+  'env',
+  'migrations',
+  'static',
+  'media',
 ]);
 const IGNORED_FILE_NAME_PATTERNS = [
   /\.test\./i,
@@ -40,19 +40,16 @@ const IGNORED_FILE_NAME_PATTERNS = [
 ];
 
 // Route extraction from urls.py
-const DJANGO_URL_PATTERN_RE =
-  /(?:path|re_path|url)\s*\(\s*["']([^"']*)["']/g;
+const DJANGO_URL_PATTERN_RE = /(?:path|re_path|url)\s*\(\s*["']([^"']*)["']/g;
 
 // DRF api_view decorator with methods
-const API_VIEW_DECORATOR_RE =
-  /@api_view\s*\(\s*\[([^\]]*)\]\s*\)/g;
+const API_VIEW_DECORATOR_RE = /@api_view\s*\(\s*\[([^\]]*)\]\s*\)/g;
 
 // ViewSet class definitions
 const VIEWSET_CLASS_RE = /class\s+(\w+)\s*\([^)]*ViewSet[^)]*\)/g;
 
 // @action decorator
-const ACTION_DECORATOR_RE =
-  /@action\s*\(\s*[^)]*methods\s*=\s*\[([^\]]*)\][^)]*\)/g;
+const ACTION_DECORATOR_RE = /@action\s*\(\s*[^)]*methods\s*=\s*\[([^\]]*)\][^)]*\)/g;
 
 // Selector patterns in templates
 const SELECTOR_RE = /data-testid=["']([^"']+)["']/g;
@@ -89,11 +86,7 @@ function walkFiles(root: string): string[] {
       continue;
     }
 
-    if (
-      entry.isFile() &&
-      isSourceFile(fullPath) &&
-      !shouldIgnoreEntry(basename(fullPath), false)
-    ) {
+    if (entry.isFile() && isSourceFile(fullPath) && !shouldIgnoreEntry(basename(fullPath), false)) {
       results.push(fullPath);
     }
   }
@@ -110,45 +103,43 @@ function uniqueNumbers(values: number[]): number[] {
 }
 
 function routeFamily(route: string): string {
-  const parts = route.split("?")[0]?.split("/").filter(Boolean) ?? [];
-  return parts.length === 0 ? "/" : `/${parts[0]}`;
+  const parts = route.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  return parts.length === 0 ? '/' : `/${parts[0]}`;
 }
 
 function normalizeRoute(raw: string): string {
   // Strip leading regex anchors (^) from re_path / url patterns
-  let cleaned = raw.replace(/^\^/, "");
+  let cleaned = raw.replace(/^\^/, '');
   // Strip trailing regex anchors ($)
-  cleaned = cleaned.replace(/\$$/, "");
+  cleaned = cleaned.replace(/\$$/, '');
   // Ensure leading slash
-  if (cleaned && !cleaned.startsWith("/")) {
+  if (cleaned && !cleaned.startsWith('/')) {
     cleaned = `/${cleaned}`;
   }
-  const trimmed = cleaned.replace(/\/+$/, "");
-  return trimmed || "/";
+  const trimmed = cleaned.replace(/\/+$/, '');
+  return trimmed || '/';
 }
 
 function extractDjangoRoutes(content: string): string[] {
-  return [...content.matchAll(DJANGO_URL_PATTERN_RE)].map((m) =>
-    normalizeRoute(m[1] ?? ""),
-  );
+  return [...content.matchAll(DJANGO_URL_PATTERN_RE)].map((m) => normalizeRoute(m[1] ?? ''));
 }
 
 function extractApiViewMethods(content: string): string[][] {
   return [...content.matchAll(API_VIEW_DECORATOR_RE)].map((m) => {
-    const raw = m[1] ?? "";
+    const raw = m[1] ?? '';
     return raw
-      .split(",")
-      .map((s) => s.trim().replace(/["']/g, "").toUpperCase())
+      .split(',')
+      .map((s) => s.trim().replace(/["']/g, '').toUpperCase())
       .filter(Boolean);
   });
 }
 
 function extractActionMethods(content: string): string[][] {
   return [...content.matchAll(ACTION_DECORATOR_RE)].map((m) => {
-    const raw = m[1] ?? "";
+    const raw = m[1] ?? '';
     return raw
-      .split(",")
-      .map((s) => s.trim().replace(/["']/g, "").toUpperCase())
+      .split(',')
+      .map((s) => s.trim().replace(/["']/g, '').toUpperCase())
       .filter(Boolean);
   });
 }
@@ -168,7 +159,7 @@ function extractSelectors(content: string): string[] {
 
 export function canScanDjangoRepo(root: string): boolean {
   // Check for manage.py in root
-  if (existsSync(join(root, "manage.py"))) {
+  if (existsSync(join(root, 'manage.py'))) {
     return true;
   }
 
@@ -176,13 +167,13 @@ export function canScanDjangoRepo(root: string): boolean {
     const name = basename(filePath);
 
     // Check for urls.py anywhere
-    if (name === "urls.py") {
+    if (name === 'urls.py') {
       return true;
     }
 
     // Check for settings.py containing Django markers
-    if (name === "settings.py") {
-      const content = readFileSync(filePath, "utf-8");
+    if (name === 'settings.py') {
+      const content = readFileSync(filePath, 'utf-8');
       if (DJANGO_SETTINGS_RE.test(content)) {
         return true;
       }
@@ -197,18 +188,24 @@ export function scanDjangoRepo(root: string): RepoHints {
   const selectors: string[] = [];
   const apiEndpoints = new Map<
     string,
-    { route: string; methods: string[]; statuses: number[]; authRequired: boolean; validationSchemas: string[] }
+    {
+      route: string;
+      methods: string[];
+      statuses: number[];
+      authRequired: boolean;
+      validationSchemas: string[];
+    }
   >();
   const loginRoutes: string[] = [];
   const callbackRoutes: string[] = [];
   const noiseMap = new Map<string, { method?: string; pathPrefix: string; statuses: number[] }>();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
     const name = basename(filePath);
 
     // Extract routes from urls.py files
-    if (name === "urls.py") {
+    if (name === 'urls.py') {
       const fileRoutes = extractDjangoRoutes(content);
       routes.push(...fileRoutes);
 
@@ -224,7 +221,7 @@ export function scanDjangoRepo(root: string): RepoHints {
           };
           // Default methods for url-only detection
           if (existing.methods.length === 0) {
-            existing.methods = ["GET"];
+            existing.methods = ['GET'];
           }
           apiEndpoints.set(route, existing);
         }
@@ -240,7 +237,7 @@ export function scanDjangoRepo(root: string): RepoHints {
     }
 
     // Extract DRF @api_view endpoints from Python files
-    if (filePath.endsWith(".py")) {
+    if (filePath.endsWith('.py')) {
       const apiViewMethodSets = extractApiViewMethods(content);
       const actionMethodSets = extractActionMethods(content);
 
@@ -254,14 +251,14 @@ export function scanDjangoRepo(root: string): RepoHints {
       const viewSetMatches = [...content.matchAll(VIEWSET_CLASS_RE)];
       if (viewSetMatches.length > 0) {
         // ViewSets typically support standard CRUD methods
-        allMethods.push("GET", "POST", "PUT", "PATCH", "DELETE");
+        allMethods.push('GET', 'POST', 'PUT', 'PATCH', 'DELETE');
       }
 
       // Associate methods with API routes from the same app's urls.py
-      if (allMethods.length > 0 && name === "views.py") {
-        const siblingUrls = join(dirname(filePath), "urls.py");
+      if (allMethods.length > 0 && name === 'views.py') {
+        const siblingUrls = join(dirname(filePath), 'urls.py');
         if (existsSync(siblingUrls)) {
-          const urlsContent = readFileSync(siblingUrls, "utf-8");
+          const urlsContent = readFileSync(siblingUrls, 'utf-8');
           const fileRoutes = extractDjangoRoutes(urlsContent);
           for (const route of fileRoutes) {
             if (!/^\/api\//i.test(route)) continue;
@@ -279,13 +276,13 @@ export function scanDjangoRepo(root: string): RepoHints {
       }
 
       // Detect auth-related patterns and scope them to API routes in the same app
-      if (name === "views.py") {
+      if (name === 'views.py') {
         const hasAuthMiddleware =
           /(?:login_required|permission_required|IsAuthenticated|IsAdminUser)\b/.test(content);
         if (hasAuthMiddleware) {
-          const siblingUrls = join(dirname(filePath), "urls.py");
+          const siblingUrls = join(dirname(filePath), 'urls.py');
           if (existsSync(siblingUrls)) {
-            const urlsContent = readFileSync(siblingUrls, "utf-8");
+            const urlsContent = readFileSync(siblingUrls, 'utf-8');
             const appRoutes = extractDjangoRoutes(urlsContent).map(normalizeRoute);
             for (const route of appRoutes) {
               if (!/^\/api\//i.test(route)) continue;
@@ -300,11 +297,7 @@ export function scanDjangoRepo(root: string): RepoHints {
                 pathPrefix: route,
                 statuses: [],
               };
-              existingNoise.statuses = uniqueNumbers([
-                ...existingNoise.statuses,
-                401,
-                403,
-              ]);
+              existingNoise.statuses = uniqueNumbers([...existingNoise.statuses, 401, 403]);
               noiseMap.set(key, existingNoise);
             }
           }
@@ -313,7 +306,7 @@ export function scanDjangoRepo(root: string): RepoHints {
     }
 
     // Extract stable selectors from template files
-    if (filePath.endsWith(".html")) {
+    if (filePath.endsWith('.html')) {
       selectors.push(...extractSelectors(content));
     }
   }

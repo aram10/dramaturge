@@ -1,4 +1,4 @@
-import { redactSensitiveValue, sanitizeHeaders, truncateString } from "../redaction.js";
+import { redactSensitiveValue, sanitizeHeaders, truncateString } from '../redaction.js';
 
 export interface ObservedApiRequestSample {
   method: string;
@@ -48,7 +48,7 @@ export class NetworkTrafficObserver {
   private pageEndpoints = new Map<string, Map<string, ObservedApiEndpoint>>();
   private teardownFns = new Map<string, Array<() => void>>();
 
-  attach(page: any, pageKey = "default"): void {
+  attach(page: any, pageKey = 'default'): void {
     if (this.teardownFns.has(pageKey)) {
       this.detach(pageKey);
     }
@@ -60,11 +60,11 @@ export class NetworkTrafficObserver {
         /* best-effort: recording failures should not crash the observer */
       });
     };
-    page.on("response", onResponse);
-    teardowns.push(() => page.off("response", onResponse));
+    page.on('response', onResponse);
+    teardowns.push(() => page.off('response', onResponse));
 
     const onRequestFailed = (request: RequestLike) => {
-      const route = normalizeRoute(request.url?.() ?? "");
+      const route = normalizeRoute(request.url?.() ?? '');
       if (!shouldRecordRoute(route, request.resourceType?.())) return;
 
       const headers = sanitizeHeaders(readHeadersSync(request));
@@ -84,8 +84,8 @@ export class NetworkTrafficObserver {
         },
       });
     };
-    page.on("requestfailed", onRequestFailed);
-    teardowns.push(() => page.off("requestfailed", onRequestFailed));
+    page.on('requestfailed', onRequestFailed);
+    teardowns.push(() => page.off('requestfailed', onRequestFailed));
 
     this.teardownFns.set(pageKey, teardowns);
   }
@@ -110,7 +110,7 @@ export class NetworkTrafficObserver {
 
   snapshot(pageKey?: string): ObservedApiEndpoint[] {
     const source = pageKey
-      ? this.pageEndpoints.get(pageKey) ?? new Map<string, ObservedApiEndpoint>()
+      ? (this.pageEndpoints.get(pageKey) ?? new Map<string, ObservedApiEndpoint>())
       : this.endpoints;
 
     return [...source.values()].map((endpoint) => ({
@@ -126,9 +126,7 @@ export class NetworkTrafficObserver {
               url: sample.url,
               ...(sample.headers ? { headers: { ...sample.headers } } : {}),
               ...(sample.data !== undefined ? { data: sample.data } : {}),
-              ...(sample.responseBody !== undefined
-                ? { responseBody: sample.responseBody }
-                : {}),
+              ...(sample.responseBody !== undefined ? { responseBody: sample.responseBody } : {}),
               ...(sample.failure ? { failure: sample.failure } : {}),
             })),
           }
@@ -159,10 +157,7 @@ export class NetworkTrafficObserver {
     if (Object.keys(syncRequestHeaders).length > 0) {
       sample.headers = syncRequestHeaders;
     }
-    const requestData = parseRequestData(
-      request.postData?.(),
-      syncRequestHeaders["content-type"]
-    );
+    const requestData = parseRequestData(request.postData?.(), syncRequestHeaders['content-type']);
     if (requestData !== undefined) {
       sample.data = requestData;
     }
@@ -182,7 +177,7 @@ export class NetworkTrafficObserver {
 
     const responseHeaders = await readHeaders(response);
     const responseBody = parseResponseBody(
-      responseHeaders["content-type"],
+      responseHeaders['content-type'],
       await readResponseText(response)
     );
     if (responseBody !== undefined) {
@@ -199,8 +194,7 @@ export class NetworkTrafficObserver {
     sample?: ObservedApiRequestSample;
   }): void {
     this.recordInto(this.endpoints, input);
-    const pageMap =
-      this.pageEndpoints.get(input.pageKey) ?? new Map<string, ObservedApiEndpoint>();
+    const pageMap = this.pageEndpoints.get(input.pageKey) ?? new Map<string, ObservedApiEndpoint>();
     this.recordInto(pageMap, input);
     this.pageEndpoints.set(input.pageKey, pageMap);
   }
@@ -239,7 +233,7 @@ export class NetworkTrafficObserver {
 
 function normalizeRoute(url: string): string {
   try {
-    return new URL(url).pathname || "/";
+    return new URL(url).pathname || '/';
   } catch {
     return url;
   }
@@ -248,18 +242,18 @@ function normalizeRoute(url: string): string {
 function normalizeRequestUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    return `${parsed.pathname || "/"}${parsed.search}`;
+    return `${parsed.pathname || '/'}${parsed.search}`;
   } catch {
     return url;
   }
 }
 
 function shouldRecordRoute(route: string, resourceType?: string): boolean {
-  if (resourceType === "fetch" || resourceType === "xhr") {
+  if (resourceType === 'fetch' || resourceType === 'xhr') {
     return true;
   }
 
-  return route.startsWith("/api/");
+  return route.startsWith('/api/');
 }
 
 async function readHeaders(
@@ -274,10 +268,10 @@ async function readHeaders(
     return {};
   }
 
-  if (typeof value.allHeaders === "function") {
+  if (typeof value.allHeaders === 'function') {
     return normalizeHeaderNames(await value.allHeaders());
   }
-  if (typeof value.headers === "function") {
+  if (typeof value.headers === 'function') {
     return normalizeHeaderNames(await Promise.resolve(value.headers()));
   }
 
@@ -291,12 +285,12 @@ function readHeadersSync(
       }
     | undefined
 ): Record<string, string> {
-  if (!value || typeof value.headers !== "function") {
+  if (!value || typeof value.headers !== 'function') {
     return {};
   }
 
   const result = value.headers();
-  if (result && typeof (result as PromiseLike<Record<string, string>>).then === "function") {
+  if (result && typeof (result as PromiseLike<Record<string, string>>).then === 'function') {
     return {};
   }
 
@@ -304,14 +298,14 @@ function readHeadersSync(
 }
 
 async function readResponseText(response: { text?: () => Promise<string> }): Promise<string> {
-  if (typeof response.text !== "function") {
-    return "";
+  if (typeof response.text !== 'function') {
+    return '';
   }
 
   try {
     return await response.text();
   } catch {
-    return "";
+    return '';
   }
 }
 
@@ -338,7 +332,7 @@ function parseResponseBody(contentType: string | undefined, text: string): unkno
 }
 
 function parseBody(contentType: string | undefined, text: string): unknown {
-  if (contentType?.includes("json")) {
+  if (contentType?.includes('json')) {
     try {
       return redactSensitiveValue(JSON.parse(text));
     } catch {

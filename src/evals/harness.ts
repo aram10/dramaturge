@@ -1,4 +1,4 @@
-import type { EvalCaseResult, EvalSummary } from "./types.js";
+import type { EvalCaseResult, EvalSummary } from './types.js';
 
 export function summarizeEvalResults(results: EvalCaseResult[]): EvalSummary {
   const passed = results.filter((result) => result.passed).length;
@@ -6,7 +6,7 @@ export function summarizeEvalResults(results: EvalCaseResult[]): EvalSummary {
     .filter((result) => !result.passed)
     .map((result) => ({
       id: result.id,
-      reason: result.failureReason ?? "Unknown failure",
+      reason: result.failureReason ?? 'Unknown failure',
     }));
 
   const tagBreakdown = results.reduce<Record<string, { total: number; passed: number }>>(
