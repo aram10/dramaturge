@@ -1,6 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadConfig } from './config.js';
 import { parseJsoncObject } from './utils/jsonc.js';
@@ -373,5 +375,63 @@ describe('loadConfig', () => {
       configPath: resolve(configPath),
       configDir: resolve(configsDir),
     });
+  });
+
+  it('prepares action configs with the shared JSONC parser', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    const githubOutputPath = join(dir, 'github-output.txt');
+    writeFileSync(
+      configPath,
+      `{
+        // URL comments should not break strings
+        "targetUrl": "https://example.com/app",
+        "output": {
+          "format": "markdown"
+        },
+        "browser": {
+          "headless": false
+        }
+      }`,
+      'utf-8'
+    );
+
+    execFileSync(
+      process.execPath,
+      [fileURLToPath(new URL('../action/prepare-config.js', import.meta.url))],
+      {
+        cwd: dir,
+        env: {
+          ...process.env,
+          INPUT_CONFIG: configPath,
+          INPUT_REPORT_DIR: './ci-reports',
+          RUNNER_TEMP: dir,
+          GITHUB_OUTPUT: githubOutputPath,
+        },
+        stdio: 'pipe',
+      }
+    );
+
+    const githubOutput = readFileSync(githubOutputPath, 'utf-8');
+    const preparedConfigPath = githubOutput
+      .split('\n')
+      .find((line) => line.startsWith('config-path='))
+      ?.slice('config-path='.length);
+
+    expect(preparedConfigPath).toBeTruthy();
+
+    const preparedConfig = JSON.parse(readFileSync(preparedConfigPath ?? '', 'utf-8'));
+
+    expect(preparedConfig).toMatchObject({
+      targetUrl: 'https://example.com/app',
+      output: {
+        format: 'both',
+        dir: './ci-reports',
+      },
+      browser: {
+        headless: true,
+      },
+    });
+    expect(githubOutput).toContain('report-dir=./ci-reports');
   });
 });
