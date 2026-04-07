@@ -419,8 +419,11 @@ describe('loadConfig', () => {
       ?.slice('config-path='.length);
 
     expect(preparedConfigPath).toBeTruthy();
+    if (!preparedConfigPath) {
+      throw new Error('prepare-config did not write config-path to GITHUB_OUTPUT');
+    }
 
-    const preparedConfig = JSON.parse(readFileSync(preparedConfigPath ?? '', 'utf-8'));
+    const preparedConfig = JSON.parse(readFileSync(preparedConfigPath, 'utf-8'));
 
     expect(preparedConfig).toMatchObject({
       targetUrl: 'https://example.com/app',
