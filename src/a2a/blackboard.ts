@@ -37,7 +37,7 @@ export class Blackboard {
       id: `bb-${shortId()}`,
       kind,
       agentId,
-      data: { ...data },
+      data: structuredClone(data),
       timestamp: new Date().toISOString(),
       tags: [...tags],
     };
