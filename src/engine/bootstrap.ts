@@ -184,7 +184,7 @@ export async function waitForBootstrapReady(
       : undefined;
 
   if (readyIndicator && !checkReadyIndicator) {
-    throw new Error('Bootstrap readyIndicator checks require an isolated page factory.');
+    throw new Error('Bootstrap readyIndicator checks require a newPage factory in dependencies.');
   }
 
   const deadline = now() + config.bootstrap.timeoutSeconds * 1000;
