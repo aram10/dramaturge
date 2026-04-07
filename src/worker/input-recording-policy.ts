@@ -19,6 +19,8 @@ function getPolicyStore(
     Object.defineProperty(host, INPUT_RECORDING_POLICY, {
       value: new Map<string, InputRecordingPolicy>(),
       configurable: true,
+      enumerable: false,
+      writable: false,
     });
   }
 

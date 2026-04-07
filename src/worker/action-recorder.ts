@@ -260,7 +260,12 @@ export class ActionRecorder {
       return undefined;
     }
 
-    return getInputRecordingPolicy(this.page, selector) === 'safe' ? normalized : REDACTED_VALUE;
+    const policy = getInputRecordingPolicy(this.page, selector);
+    if (policy === 'safe') {
+      return normalized;
+    }
+
+    return REDACTED_VALUE;
   }
 
   private patchPageNavigation(method: 'goto' | 'goBack' | 'goForward' | 'reload'): void {
