@@ -1,13 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import type { Stagehand } from '@browserbasehq/stagehand';
 import type { DramaturgeConfig } from '../config.js';
 
 const BOOTSTRAP_LOG_LIMIT = 20;
 const DEFAULT_READY_REQUEST_TIMEOUT_MS = 5_000;
 
-type StagehandPage = {
-  goto(url: string): Promise<unknown>;
-  evaluate(script: string): Promise<unknown>;
-};
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 type SpawnLike = typeof spawn;
 
@@ -138,14 +136,19 @@ async function hasReadyIndicator(
   pageUrl: string,
   selector: string
 ): Promise<boolean> {
+  let readinessPage: StagehandPage | undefined;
+
   try {
-    await page.goto(pageUrl);
-    const found = await page.evaluate(
+    readinessPage = await page.context().newPage();
+    await readinessPage.goto(pageUrl);
+    const found = await readinessPage.evaluate(
       `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
     );
     return found === true;
   } catch {
     return false;
+  } finally {
+    await readinessPage?.close().catch(() => undefined);
   }
 }
 
