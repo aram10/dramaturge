@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { chromium } from "playwright";
-import { pathToFileURL } from "node:url";
+import { existsSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { chromium } from 'playwright';
+import { pathToFileURL } from 'node:url';
 
 export interface ExportAuthStateArgs {
   url?: string;
@@ -26,9 +26,7 @@ export function buildExportAuthStateHelpText(): string {
   return HELP_TEXT;
 }
 
-export function parseExportAuthStateArgs(
-  args: readonly string[]
-): ExportAuthStateArgs {
+export function parseExportAuthStateArgs(args: readonly string[]): ExportAuthStateArgs {
   let url: string | undefined;
   let output: string | undefined;
   let successUrl: string | undefined;
@@ -37,37 +35,37 @@ export function parseExportAuthStateArgs(
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg === "--help" || arg === "-h") {
+    if (arg === '--help' || arg === '-h') {
       return { url, output, successUrl, timeoutSeconds, showHelp: true };
     }
 
-    if (arg === "--url") {
+    if (arg === '--url') {
       const value = args[i + 1];
-      if (!value) throw new Error("Missing required --url value");
+      if (!value) throw new Error('Missing required --url value');
       url = value;
       i++;
       continue;
     }
 
-    if (arg === "--output") {
+    if (arg === '--output') {
       const value = args[i + 1];
-      if (!value) throw new Error("Missing required --output value");
+      if (!value) throw new Error('Missing required --output value');
       output = value;
       i++;
       continue;
     }
 
-    if (arg === "--success-url") {
+    if (arg === '--success-url') {
       const value = args[i + 1];
-      if (!value) throw new Error("Missing required --success-url value");
+      if (!value) throw new Error('Missing required --success-url value');
       successUrl = value;
       i++;
       continue;
     }
 
-    if (arg === "--timeout-seconds") {
+    if (arg === '--timeout-seconds') {
       const value = args[i + 1];
-      if (!value) throw new Error("Missing required --timeout-seconds value");
+      if (!value) throw new Error('Missing required --timeout-seconds value');
       timeoutSeconds = Number.parseInt(value, 10);
       if (!Number.isFinite(timeoutSeconds) || timeoutSeconds < 1) {
         throw new Error(`Invalid --timeout-seconds value: ${value}`);
@@ -79,13 +77,13 @@ export function parseExportAuthStateArgs(
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  if (!url) throw new Error("Missing required --url");
-  if (!output) throw new Error("Missing required --output");
+  if (!url) throw new Error('Missing required --url');
+  if (!output) throw new Error('Missing required --output');
 
   return {
     url,
     output,
-    successUrl: successUrl ?? new URL("/", url).href,
+    successUrl: successUrl ?? new URL('/', url).href,
     timeoutSeconds,
     showHelp: false,
   };
@@ -93,7 +91,7 @@ export function parseExportAuthStateArgs(
 
 export async function runExportAuthStateCli(
   args: readonly string[] = process.argv.slice(2),
-  io: Pick<typeof console, "log" | "error"> = console
+  io: Pick<typeof console, 'log' | 'error'> = console
 ): Promise<number> {
   try {
     const parsed = parseExportAuthStateArgs(args);
@@ -116,11 +114,9 @@ export async function runExportAuthStateCli(
         timeout: parsed.timeoutSeconds * 1000,
       });
       await page.waitForTimeout(5000);
-      io.log("Login detected. Saving browser state...");
+      io.log('Login detected. Saving browser state...');
     } catch {
-      io.log(
-        "Timed out waiting for the success URL. Saving the current browser state anyway."
-      );
+      io.log('Timed out waiting for the success URL. Saving the current browser state anyway.');
     }
 
     const outputDir = dirname(outputPath);
@@ -140,8 +136,7 @@ export async function runExportAuthStateCli(
 }
 
 const executedDirectly =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === pathToFileURL(process.argv[1]).href;
+  typeof process.argv[1] === 'string' && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (executedDirectly) {
   const exitCode = await runExportAuthStateCli();

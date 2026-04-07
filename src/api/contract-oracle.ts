@@ -1,16 +1,13 @@
-import { shortId } from "../constants.js";
-import { buildAutoCaptureFindingMeta } from "../repro/repro.js";
-import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
-import type {
-  ObservedApiEndpoint,
-  ObservedApiRequestSample,
-} from "../network/traffic-observer.js";
+import { shortId } from '../constants.js';
+import { buildAutoCaptureFindingMeta } from '../repro/repro.js';
+import type { Evidence, FindingSeverity, RawFinding } from '../types.js';
+import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/traffic-observer.js';
 import {
   matchContractOperation,
   matchContractOperationsForRoute,
   type ContractIndex,
   validateOperationResponse,
-} from "../spec/contract-index.js";
+} from '../spec/contract-index.js';
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort();
@@ -101,14 +98,14 @@ function severityForDeviation(input: {
     input.failures.length > 0 ||
     input.unexpectedStatuses.some((status) => status === 0 || status >= 500)
   ) {
-    return "Major";
+    return 'Major';
   }
 
   if (input.unexpectedMethods.length > 0 || input.unexpectedStatuses.length > 0) {
-    return "Minor";
+    return 'Minor';
   }
 
-  return "Trivial";
+  return 'Trivial';
 }
 
 export function buildApiContractArtifacts(input: {
@@ -161,9 +158,9 @@ export function buildApiContractArtifacts(input: {
             return [];
           }
 
-            return validation.errors.map(
-              (error) => `Schema validation failed for ${response.status}: ${error}`
-            );
+          return validation.errors.map(
+            (error) => `Schema validation failed for ${response.status}: ${error}`
+          );
         });
       });
       if (
@@ -177,25 +174,23 @@ export function buildApiContractArtifacts(input: {
 
       const evidenceId = `ev-${shortId()}`;
       const findingRef = `fid-${shortId()}`;
-      const methods = slice.method || "ANY";
+      const methods = slice.method || 'ANY';
       const expectedContract = [
-        `methods=${uniqueSorted(expectedOperations.map((operation) => operation.method)).join("/") || "ANY"}`,
-        `statuses=${expectedStatuses.join(", ") || "none"}`,
-      ].join("; ");
+        `methods=${uniqueSorted(expectedOperations.map((operation) => operation.method)).join('/') || 'ANY'}`,
+        `statuses=${expectedStatuses.join(', ') || 'none'}`,
+      ].join('; ');
       const observedContract = [
         `methods=${methods}`,
-        `statuses=${slice.statuses.join(", ") || "none"}`,
-        slice.failures.length > 0
-          ? `failures=${slice.failures.join(" | ")}`
-          : undefined,
-        schemaErrors.length > 0 ? `schemaErrors=${schemaErrors.join(" | ")}` : undefined,
+        `statuses=${slice.statuses.join(', ') || 'none'}`,
+        slice.failures.length > 0 ? `failures=${slice.failures.join(' | ')}` : undefined,
+        schemaErrors.length > 0 ? `schemaErrors=${schemaErrors.join(' | ')}` : undefined,
       ]
         .filter(Boolean)
-        .join("; ");
+        .join('; ');
 
       evidence.push({
         id: evidenceId,
-        type: "api-contract",
+        type: 'api-contract',
         summary: `${methods} ${observed.route} deviated from repo expectations`,
         timestamp: new Date().toISOString(),
         areaName: input.areaName,
@@ -204,7 +199,7 @@ export function buildApiContractArtifacts(input: {
 
       findings.push({
         ref: findingRef,
-        category: "Bug",
+        category: 'Bug',
         severity: severityForDeviation({
           unexpectedStatuses,
           unexpectedMethods,
@@ -227,22 +222,22 @@ export function buildApiContractArtifacts(input: {
           alternativesConsidered:
             unexpectedStatuses.length === 0 && unexpectedMethods.length === 0
               ? [
-                  "The deviation may be caused by transient upstream failures rather than a code-level contract mismatch.",
+                  'The deviation may be caused by transient upstream failures rather than a code-level contract mismatch.',
                 ]
               : [],
           suggestedVerification: [
-            `Replay ${methods} ${observed.route} and verify the response stays within statuses ${expectedStatuses.join(", ")}.`,
+            `Replay ${methods} ${observed.route} and verify the response stays within statuses ${expectedStatuses.join(', ')}.`,
           ],
         },
         meta: buildAutoCaptureFindingMeta({
           route: input.route,
-          objective: "Compare observed API behavior against normalized contract expectations",
+          objective: 'Compare observed API behavior against normalized contract expectations',
           confidence:
             slice.failures.length > 0 ||
             schemaErrors.length > 0 ||
             unexpectedStatuses.some((status) => status >= 500)
-              ? "high"
-              : "medium",
+              ? 'high'
+              : 'medium',
           breadcrumbs: [`api contract check ${methods} ${observed.route}`],
           evidenceIds: [evidenceId],
         }),

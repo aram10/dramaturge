@@ -1,6 +1,6 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
+import type { Stagehand } from '@browserbasehq/stagehand';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 /** Builds a browser-eval script that resolves once DOM mutations quiet for 300ms (or timeout). */
 export function buildStabilityChecker(timeoutMs = 5000): string {
@@ -42,17 +42,15 @@ export function buildStabilityChecker(timeoutMs = 5000): string {
 /** Wait for the page DOM to settle; returns "stable" or "timeout". */
 export async function waitForPageStable(
   page: StagehandPage,
-  timeoutMs = 5000,
-): Promise<"stable" | "timeout"> {
+  timeoutMs = 5000
+): Promise<'stable' | 'timeout'> {
   try {
     const result = await Promise.race([
       page.evaluate(buildStabilityChecker(timeoutMs)) as Promise<string>,
-      new Promise<string>((resolve) =>
-        setTimeout(() => resolve("timeout"), timeoutMs + 1000),
-      ),
+      new Promise<string>((resolve) => setTimeout(() => resolve('timeout'), timeoutMs + 1000)),
     ]);
-    return result === "stable" ? "stable" : "timeout";
+    return result === 'stable' ? 'stable' : 'timeout';
   } catch {
-    return "timeout";
+    return 'timeout';
   }
 }

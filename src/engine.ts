@@ -1,26 +1,32 @@
-import { mkdirSync } from "node:fs";
-import { join } from "node:path";
-import type { Stagehand } from "@browserbasehq/stagehand";
-import { request as playwrightRequest } from "playwright";
-import type { LoadedDramaturgeConfig, DramaturgeConfig } from "./config.js";
-import { resolveResumeDir } from "./config-paths.js";
-import type { FrontierItem, WorkerResult, BudgetConfig, MissionConfig, WorkerType } from "./types.js";
-import { authenticate } from "./auth/authenticator.js";
-import { captureStorageState } from "./auth/storage-state.js";
-import { captureFingerprint } from "./graph/fingerprint.js";
-import { classifyPage } from "./planner/page-classifier.js";
-import { StateGraph } from "./graph/state-graph.js";
-import { FrontierQueue } from "./graph/frontier.js";
-import { Planner } from "./planner/planner.js";
-import { Navigator } from "./planner/navigator.js";
-import { CoverageTracker } from "./coverage/tracker.js";
-import { CostTracker } from "./coverage/cost-tracker.js";
-import { BrowserErrorCollector } from "./browser-errors.js";
-import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from "./checkpoint.js";
-import { hasLLMApiKey } from "./llm.js";
-import { MAX_NAV_RETRIES } from "./constants.js";
-import type { EngineContext } from "./engine/context.js";
-import { initWorkerPool, closeWorkerPool, createStagehand } from "./engine/worker-pool.js";
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import type { Stagehand } from '@browserbasehq/stagehand';
+import { request as playwrightRequest } from 'playwright';
+import type { LoadedDramaturgeConfig, DramaturgeConfig } from './config.js';
+import { resolveResumeDir } from './config-paths.js';
+import type {
+  FrontierItem,
+  WorkerResult,
+  BudgetConfig,
+  MissionConfig,
+  WorkerType,
+} from './types.js';
+import { authenticate } from './auth/authenticator.js';
+import { captureStorageState } from './auth/storage-state.js';
+import { captureFingerprint } from './graph/fingerprint.js';
+import { classifyPage } from './planner/page-classifier.js';
+import { StateGraph } from './graph/state-graph.js';
+import { FrontierQueue } from './graph/frontier.js';
+import { Planner } from './planner/planner.js';
+import { Navigator } from './planner/navigator.js';
+import { CoverageTracker } from './coverage/tracker.js';
+import { CostTracker } from './coverage/cost-tracker.js';
+import { BrowserErrorCollector } from './browser-errors.js';
+import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from './checkpoint.js';
+import { hasLLMApiKey } from './llm.js';
+import { MAX_NAV_RETRIES } from './constants.js';
+import type { EngineContext } from './engine/context.js';
+import { initWorkerPool, closeWorkerPool, createStagehand } from './engine/worker-pool.js';
 import {
   collectResults,
   expandGraph,
@@ -28,36 +34,33 @@ import {
   maintainFrontier,
   assignPageNodeOwner,
   flushOwnedBrowserErrors,
-} from "./engine/graph-ops.js";
-import { buildAreaResults, writeReports } from "./engine/reports.js";
-import { executeFrontierItem } from "./engine/execute-frontier-item.js";
-import type { WorkerSession } from "./engine/worker-pool.js";
-import { scanRepository } from "./adaptation/repo-scan.js";
-import type { RepoHints } from "./adaptation/types.js";
-import { buildDiffContext } from "./diff/diff-hints.js";
-import type { DiffContext } from "./diff/types.js";
-import { resolvePolicy } from "./policy/policy.js";
-import { MemoryStore } from "./memory/store.js";
-import { seedGraphFromNavigationMemory } from "./memory/navigation-cache.js";
-import { NetworkTrafficObserver } from "./network/traffic-observer.js";
-import { createContractIndex, type ContractIndex } from "./spec/contract-index.js";
-import { loadOpenApiSpec } from "./spec/openapi-loader.js";
-import { buildRepoSpec } from "./spec/repo-spec.js";
+} from './engine/graph-ops.js';
+import { buildAreaResults, writeReports } from './engine/reports.js';
+import { executeFrontierItem } from './engine/execute-frontier-item.js';
+import type { WorkerSession } from './engine/worker-pool.js';
+import { scanRepository } from './adaptation/repo-scan.js';
+import type { RepoHints } from './adaptation/types.js';
+import { buildDiffContext } from './diff/diff-hints.js';
+import type { DiffContext } from './diff/types.js';
+import { resolvePolicy } from './policy/policy.js';
+import { MemoryStore } from './memory/store.js';
+import { seedGraphFromNavigationMemory } from './memory/navigation-cache.js';
+import { NetworkTrafficObserver } from './network/traffic-observer.js';
+import { createContractIndex, type ContractIndex } from './spec/contract-index.js';
+import { loadOpenApiSpec } from './spec/openapi-loader.js';
+import { buildRepoSpec } from './spec/repo-spec.js';
 import {
   startBootstrapProcess,
   stopBootstrapProcess,
   waitForBootstrapReady,
   type BootstrapStatus,
-} from "./engine/bootstrap.js";
-import { emitEngineEvent, type EngineEventEmitter } from "./engine/event-stream.js";
+} from './engine/bootstrap.js';
+import { emitEngineEvent, type EngineEventEmitter } from './engine/event-stream.js';
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
-    globalTimeLimitSeconds:
-      config.budget.globalTimeLimitSeconds ??
-      config.exploration.totalTimeout,
-    maxStepsPerTask:
-      config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
+    globalTimeLimitSeconds: config.budget.globalTimeLimitSeconds ?? config.exploration.totalTimeout,
+    maxStepsPerTask: config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
     maxFrontierSize: config.budget.maxFrontierSize ?? 200,
     maxStateNodes: config.budget.maxStateNodes ?? 50,
     costLimitUsd: config.budget.costLimitUsd,
@@ -65,41 +68,35 @@ function resolveBudget(config: DramaturgeConfig): BudgetConfig {
 }
 
 function buildMission(config: DramaturgeConfig): MissionConfig | undefined {
-  const enabledFocusModes: WorkerType[] = ["navigation", "form", "crud"];
+  const enabledFocusModes: WorkerType[] = ['navigation', 'form', 'crud'];
   if (config.apiTesting.enabled) {
-    enabledFocusModes.push("api");
+    enabledFocusModes.push('api');
   }
   if (config.adversarial.enabled) {
-    enabledFocusModes.push("adversarial");
+    enabledFocusModes.push('adversarial');
   }
 
   const focusModes =
-    config.mission?.focusModes ??
-    (enabledFocusModes.length > 3 ? enabledFocusModes : undefined);
+    config.mission?.focusModes ?? (enabledFocusModes.length > 3 ? enabledFocusModes : undefined);
 
   if (!config.mission && !focusModes) return undefined;
   return {
     ...config.mission,
     appDescription: config.appDescription,
-    destructiveActionsAllowed:
-      config.mission?.destructiveActionsAllowed ?? false,
+    destructiveActionsAllowed: config.mission?.destructiveActionsAllowed ?? false,
     focusModes,
   };
 }
 
-function handleNavFailure(
-  ctx: EngineContext,
-  item: FrontierItem,
-  logPrefix = ""
-): void {
+function handleNavFailure(ctx: EngineContext, item: FrontierItem, logPrefix = ''): void {
   console.log(`${logPrefix}  Navigation failed`);
   item.retryCount++;
   if (item.retryCount >= MAX_NAV_RETRIES) {
     ctx.globalCoverage.addBlindSpot({
       nodeId: item.nodeId,
       summary: `Unreachable: ${item.objective}`,
-      reason: "state-unreachable",
-      severity: "medium",
+      reason: 'state-unreachable',
+      severity: 'medium',
     });
   } else {
     ctx.frontier.requeue(item);
@@ -153,7 +150,7 @@ function loadContractIndex(
 function loadDiffContext(
   config: DramaturgeConfig,
   repoHints: RepoHints | undefined,
-  cliDiffRef?: string,
+  cliDiffRef?: string
 ): DiffContext | undefined {
   const baseRef = cliDiffRef ?? config.diffAware.baseRef;
   const enabled = cliDiffRef ? true : config.diffAware.enabled;
@@ -174,7 +171,7 @@ async function processTaskBatch(
   taskNumberStart: number
 ): Promise<BatchTaskResult[]> {
   const primaryWorker: WorkerSession = {
-    key: "primary",
+    key: 'primary',
     stagehand: ctx.stagehand,
     page: ctx.page,
   };
@@ -185,7 +182,7 @@ async function processTaskBatch(
     const taskNumber = taskNumberStart + i;
     assignPageNodeOwner(ctx, worker.key, item.nodeId);
 
-    emitEngineEvent(ctx.eventStream, "task:start", {
+    emitEngineEvent(ctx.eventStream, 'task:start', {
       taskId: item.id,
       taskNumber,
       nodeId: item.nodeId,
@@ -203,11 +200,7 @@ async function processTaskBatch(
     });
 
     if (!result.result) {
-      handleNavFailure(
-        ctx,
-        item,
-        workers.length > 1 ? `  [${taskNumber}]` : ""
-      );
+      handleNavFailure(ctx, item, workers.length > 1 ? `  [${taskNumber}]` : '');
     }
 
     return {
@@ -232,14 +225,11 @@ export async function runEngine(
   options: RunEngineOptions = {}
 ): Promise<void> {
   const startTime = new Date();
-  const timestamp = startTime
-    .toISOString()
-    .replace(/[:.]/g, "-")
-    .slice(0, 19);
+  const timestamp = startTime.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const outputDir =
     resolveResumeDir(options.resumeDir, config as Partial<LoadedDramaturgeConfig>) ??
     join(config.output.dir, timestamp);
-  const screenshotDir = join(outputDir, "screenshots");
+  const screenshotDir = join(outputDir, 'screenshots');
   mkdirSync(screenshotDir, { recursive: true });
 
   console.log(`Dramaturge v2 starting — target: ${config.targetUrl}`);
@@ -284,8 +274,8 @@ export async function runEngine(
   // Initialize primary Stagehand
   const stagehand = createStagehand(config);
   await stagehand.init();
-  errorCollector.attach(stagehand.context.pages()[0], "primary");
-  trafficObserver.attach(stagehand.context.pages()[0], "primary");
+  errorCollector.attach(stagehand.context.pages()[0], 'primary');
+  trafficObserver.attach(stagehand.context.pages()[0], 'primary');
 
   bootstrapProcess = startBootstrapProcess(config);
   await waitForBootstrapReady(config, stagehand.context.pages()[0]);
@@ -334,7 +324,7 @@ export async function runEngine(
       }),
   };
 
-  emitEngineEvent(eventStream, "run:start", {
+  emitEngineEvent(eventStream, 'run:start', {
     targetUrl: config.targetUrl,
     timestamp: startTime.toISOString(),
     budget: {
@@ -348,7 +338,7 @@ export async function runEngine(
     // Authenticate primary browser
     console.log(`\nAuthenticating (strategy: ${config.auth.type})...`);
     await authenticate(stagehand, config);
-    console.log("Authentication successful.");
+    console.log('Authentication successful.');
     memoryStore?.rememberAuthFromConfig(config);
 
     if (concurrency > 1) {
@@ -387,7 +377,12 @@ export async function runEngine(
       }
     }
 
-    if (!options.resumeDir && ctx.graph.nodeCount() === 0 && memoryStore && config.memory.warmStart) {
+    if (
+      !options.resumeDir &&
+      ctx.graph.nodeCount() === 0 &&
+      memoryStore &&
+      config.memory.warmStart
+    ) {
       const navigationSnapshot = memoryStore.getNavigationSnapshot(config.targetUrl);
       if (navigationSnapshot) {
         const warmStart = seedGraphFromNavigationMemory({
@@ -419,10 +414,8 @@ export async function runEngine(
         pageType: rootPageType,
         depth: 0,
       });
-      console.log(
-        `Root state: ${rootPageType} (fingerprint: ${rootFingerprint.hash})`
-      );
-      assignPageNodeOwner(ctx, "primary", rootNode.id);
+      console.log(`Root state: ${rootPageType} (fingerprint: ${rootFingerprint.hash})`);
+      assignPageNodeOwner(ctx, 'primary', rootNode.id);
 
       // Seed initial tasks — use LLM planner if available
       let seedTasks: FrontierItem[];
@@ -435,7 +428,7 @@ export async function runEngine(
           ctx.repoHints,
           config.llm.requestTimeoutMs,
           ctx.memoryStore?.getPlannerSignals(rootNode),
-          ctx.diffContext,
+          ctx.diffContext
         );
       } else {
         seedTasks = ctx.planner.proposeTasks(
@@ -444,17 +437,16 @@ export async function runEngine(
           mission,
           ctx.repoHints,
           ctx.memoryStore?.getPlannerSignals(rootNode),
-          ctx.diffContext,
+          ctx.diffContext
         );
       }
       ctx.frontier.enqueueMany(seedTasks);
       console.log(`Seeded frontier with ${seedTasks.length} tasks\n`);
     } else if (ctx.frontier.size() === 0) {
       const rootNode =
-        ctx.graph.getAllNodes().find((node) => node.depth === 0) ??
-        ctx.graph.getAllNodes()[0];
+        ctx.graph.getAllNodes().find((node) => node.depth === 0) ?? ctx.graph.getAllNodes()[0];
       if (rootNode) {
-        assignPageNodeOwner(ctx, "primary", rootNode.id);
+        assignPageNodeOwner(ctx, 'primary', rootNode.id);
         const seedTasks = useLLMPlanner
           ? await ctx.planner.proposeTasksWithLLM(
               rootNode,
@@ -464,7 +456,7 @@ export async function runEngine(
               ctx.repoHints,
               config.llm.requestTimeoutMs,
               ctx.memoryStore?.getPlannerSignals(rootNode),
-              ctx.diffContext,
+              ctx.diffContext
             )
           : ctx.planner.proposeTasks(
               rootNode,
@@ -472,7 +464,7 @@ export async function runEngine(
               mission,
               ctx.repoHints,
               ctx.memoryStore?.getPlannerSignals(rootNode),
-              ctx.diffContext,
+              ctx.diffContext
             );
         ctx.frontier.enqueueMany(seedTasks);
         console.log(`Seeded frontier with ${seedTasks.length} warm-start task(s)\n`);
@@ -480,10 +472,9 @@ export async function runEngine(
     }
 
     const existingRootNode =
-      ctx.graph.getAllNodes().find((node) => node.depth === 0) ??
-      ctx.graph.getAllNodes()[0];
+      ctx.graph.getAllNodes().find((node) => node.depth === 0) ?? ctx.graph.getAllNodes()[0];
     if (existingRootNode) {
-      assignPageNodeOwner(ctx, "primary", existingRootNode.id);
+      assignPageNodeOwner(ctx, 'primary', existingRootNode.id);
     }
 
     // === Main planner loop ===
@@ -495,7 +486,7 @@ export async function runEngine(
     while (ctx.frontier.hasItems()) {
       const elapsedMs = Date.now() - startMs;
       if (elapsedMs > budget.globalTimeLimitSeconds * 1000) {
-        console.log("Time budget exhausted.");
+        console.log('Time budget exhausted.');
         break;
       }
 
@@ -507,7 +498,7 @@ export async function runEngine(
         // Skip already-completed tasks (from resume).
         // Setting status to "completed" removes them from hasItems() naturally.
         if (ctx.completedTaskIds.has(item.id)) {
-          item.status = "completed";
+          item.status = 'completed';
           i--; // don't count this toward batch size
           continue;
         }
@@ -516,11 +507,7 @@ export async function runEngine(
 
       if (batchItems.length === 0) break;
 
-      const batchResults = await processTaskBatch(
-        ctx,
-        batchItems,
-        tasksExecuted + 1
-      );
+      const batchResults = await processTaskBatch(ctx, batchItems, tasksExecuted + 1);
 
       // Collect results and expand graph
       for (const { item, result, pageKey } of batchResults) {
@@ -532,12 +519,10 @@ export async function runEngine(
         const coverageInfo =
           result.coverageSnapshot.controlsExercised > 0
             ? `, coverage: ${result.coverageSnapshot.controlsExercised}/${result.coverageSnapshot.controlsDiscovered}`
-            : "";
-        console.log(
-          `  ${result.outcome}: ${result.findings.length} findings${coverageInfo}`
-        );
+            : '';
+        console.log(`  ${result.outcome}: ${result.findings.length} findings${coverageInfo}`);
 
-        emitEngineEvent(eventStream, "task:complete", {
+        emitEngineEvent(eventStream, 'task:complete', {
           taskId: item.id,
           taskNumber: tasksExecuted + 1,
           nodeId: item.nodeId,
@@ -548,7 +533,7 @@ export async function runEngine(
         });
 
         for (const finding of result.findings) {
-          emitEngineEvent(eventStream, "finding", {
+          emitEngineEvent(eventStream, 'finding', {
             taskId: item.id,
             title: finding.title,
             severity: finding.severity,
@@ -561,7 +546,7 @@ export async function runEngine(
         await expandGraph(ctx, item.nodeId, result, useLLMPlanner);
         routeFollowups(ctx, item.nodeId, result);
 
-        item.status = "completed";
+        item.status = 'completed';
         ctx.completedTaskIds.add(item.id);
         tasksExecuted++;
         tasksSinceCheckpoint++;
@@ -572,7 +557,7 @@ export async function runEngine(
       // Emit progress event after each batch
       const elapsedSinceStart = Date.now() - startMs;
       const timeBudgetMs = budget.globalTimeLimitSeconds * 1000;
-      emitEngineEvent(eventStream, "progress", {
+      emitEngineEvent(eventStream, 'progress', {
         tasksExecuted,
         tasksRemaining: ctx.frontier.size(),
         totalFindings: totalFindingsCount,
@@ -582,10 +567,7 @@ export async function runEngine(
       });
 
       // Periodic checkpoint
-      if (
-        checkpointInterval > 0 &&
-        tasksSinceCheckpoint >= checkpointInterval
-      ) {
+      if (checkpointInterval > 0 && tasksSinceCheckpoint >= checkpointInterval) {
         saveCheckpoint(
           outputDir,
           ctx.graph,
@@ -600,7 +582,7 @@ export async function runEngine(
         );
         tasksSinceCheckpoint = 0;
         console.log(`  Checkpoint saved (${tasksExecuted} tasks completed)`);
-        emitEngineEvent(eventStream, "checkpoint", {
+        emitEngineEvent(eventStream, 'checkpoint', {
           tasksExecuted,
           outputDir,
         });
@@ -610,24 +592,23 @@ export async function runEngine(
       try {
         const rootNode = ctx.graph.getAllNodes().find((node) => node.depth === 0);
         if (rootNode) {
-          assignPageNodeOwner(ctx, "primary", rootNode.id);
+          assignPageNodeOwner(ctx, 'primary', rootNode.id);
         }
         await ctx.page.goto(config.targetUrl);
       } catch {
-        console.warn("  Failed to navigate back to root URL.");
+        console.warn('  Failed to navigate back to root URL.');
       }
     }
 
     // Flush any remaining browser errors
     if (ctx.graph.nodeCount() > 0) {
-      flushOwnedBrowserErrors(ctx, "primary");
+      flushOwnedBrowserErrors(ctx, 'primary');
       for (const worker of ctx.workerPool) {
         flushOwnedBrowserErrors(ctx, worker.key);
       }
     }
 
-    const finalFrontierSnapshot =
-      checkpointInterval > 0 ? ctx.frontier.snapshot() : undefined;
+    const finalFrontierSnapshot = checkpointInterval > 0 ? ctx.frontier.snapshot() : undefined;
 
     // Record remaining frontier as blind spots
     const remaining = ctx.frontier.drain();
@@ -635,8 +616,8 @@ export async function runEngine(
       ctx.globalCoverage.addBlindSpot({
         nodeId: r.nodeId,
         summary: `Not reached: ${r.objective}`,
-        reason: "time-budget",
-        severity: r.priority > 0.7 ? "high" : "low",
+        reason: 'time-budget',
+        severity: r.priority > 0.7 ? 'high' : 'low',
       });
     }
 
@@ -663,29 +644,20 @@ export async function runEngine(
     const areaResults = buildAreaResults(ctx);
     if (memoryStore) {
       memoryStore.recordRunFindings(startTime.toISOString(), areaResults);
-      memoryStore.recordObservedApiTraffic(
-        startTime.toISOString(),
-        trafficObserver.snapshot()
-      );
+      memoryStore.recordObservedApiTraffic(startTime.toISOString(), trafficObserver.snapshot());
       memoryStore.recordNavigationSnapshot(config.targetUrl, ctx.graph);
-      ctx.runMemory = memoryStore.getSummary(
-        warmStartApplied,
-        warmStartRestoredStateCount
-      );
+      ctx.runMemory = memoryStore.getSummary(warmStartApplied, warmStartRestoredStateCount);
     }
     writeReports(ctx, startTime, areaResults, remaining);
 
     // Summary
     const blindSpots = ctx.globalCoverage.getBlindSpots();
-    const totalFindings = [...ctx.findingsByNode.values()].reduce(
-      (sum, f) => sum + f.length,
-      0
-    );
+    const totalFindings = [...ctx.findingsByNode.values()].reduce((sum, f) => sum + f.length, 0);
     console.log(
       `\nDone. ${tasksExecuted} tasks executed, ${totalFindings} finding(s), ${ctx.graph.nodeCount()} states discovered, ${blindSpots.length} blind spot(s).`
     );
 
-    emitEngineEvent(eventStream, "run:end", {
+    emitEngineEvent(eventStream, 'run:end', {
       timestamp: new Date().toISOString(),
       tasksExecuted,
       totalFindings,
@@ -695,7 +667,7 @@ export async function runEngine(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    emitEngineEvent(eventStream, "run:error", { message, phase: "engine" });
+    emitEngineEvent(eventStream, 'run:error', { message, phase: 'engine' });
     console.error(`\nFatal error: ${message}`);
     throw error;
   } finally {

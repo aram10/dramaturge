@@ -1,14 +1,11 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
-import type { NavigationHint, StateNode } from "../types.js";
-import type { StateGraph } from "../graph/state-graph.js";
-import { captureFingerprint } from "../graph/fingerprint.js";
-import {
-  hasPathOnlyStateSignature,
-  signaturesEqual,
-} from "../graph/state-signature.js";
-import { waitForPageStable } from "../worker/page-stability.js";
+import type { Stagehand } from '@browserbasehq/stagehand';
+import type { NavigationHint, StateNode } from '../types.js';
+import type { StateGraph } from '../graph/state-graph.js';
+import { captureFingerprint } from '../graph/fingerprint.js';
+import { hasPathOnlyStateSignature, signaturesEqual } from '../graph/state-signature.js';
+import { waitForPageStable } from '../worker/page-stability.js';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 export interface NavigationResult {
   success: boolean;
@@ -37,7 +34,7 @@ export class Navigator {
     if (path.length === 0 && node.depth > 0) {
       return {
         success: false,
-        reason: "No path from root to target node",
+        reason: 'No path from root to target node',
       };
     }
 
@@ -49,8 +46,7 @@ export class Navigator {
       try {
         await this.followHint(edge.navigationHint, page, stagehand, rootUrl);
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         return {
           success: false,
           reason: `Navigation step failed: ${message}`,
@@ -69,13 +65,7 @@ export class Navigator {
     stagehand: Stagehand,
     rootUrl: string
   ): Promise<NavigationResult> {
-    const restored = await this.navigateTo(
-      fromNodeId,
-      graph,
-      page,
-      stagehand,
-      rootUrl
-    );
+    const restored = await this.navigateTo(fromNodeId, graph, page, stagehand, rootUrl);
     if (!restored.success) {
       return restored;
     }
@@ -92,10 +82,7 @@ export class Navigator {
     }
   }
 
-  private async verifyArrival(
-    node: StateNode,
-    page: StagehandPage
-  ): Promise<NavigationResult> {
+  private async verifyArrival(node: StateNode, page: StagehandPage): Promise<NavigationResult> {
     try {
       const currentFp = await captureFingerprint(page);
       if (currentFp.hash === node.fingerprint.hash) {
@@ -139,7 +126,7 @@ export class Navigator {
     } else if (hint.actionDescription) {
       await stagehand.act(hint.actionDescription);
     } else {
-      throw new Error("No navigation hint available");
+      throw new Error('No navigation hint available');
     }
     await waitForPageStable(page);
   }

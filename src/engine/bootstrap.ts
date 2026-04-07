@@ -1,5 +1,5 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import type { DramaturgeConfig } from "../config.js";
+import { spawn, type ChildProcess } from 'node:child_process';
+import type { DramaturgeConfig } from '../config.js';
 
 const BOOTSTRAP_LOG_LIMIT = 20;
 const DEFAULT_READY_REQUEST_TIMEOUT_MS = 5_000;
@@ -55,41 +55,33 @@ function appendLogLines(target: string[], chunk: string): void {
   }
 }
 
-function attachLogStream(
-  stream: NodeJS.ReadableStream | null | undefined,
-  target: string[]
-): void {
+function attachLogStream(stream: NodeJS.ReadableStream | null | undefined, target: string[]): void {
   if (!stream) {
     return;
   }
 
-  stream.on("data", (chunk: Buffer | string) => {
+  stream.on('data', (chunk: Buffer | string) => {
     appendLogLines(target, chunk.toString());
   });
 }
 
-function formatBootstrapFailure(
-  summary: string,
-  status?: BootstrapStatus
-): string {
+function formatBootstrapFailure(summary: string, status?: BootstrapStatus): string {
   const details: string[] = [summary];
 
   if (status?.command) {
     details.push(`command: ${status.command}`);
   }
   if (status?.exited) {
-    details.push(
-      `exit: code=${status.exitCode ?? "null"} signal=${status.exitSignal ?? "null"}`
-    );
+    details.push(`exit: code=${status.exitCode ?? 'null'} signal=${status.exitSignal ?? 'null'}`);
   }
   if ((status?.recentStdout.length ?? 0) > 0) {
-    details.push(`stdout: ${status?.recentStdout.join(" | ")}`);
+    details.push(`stdout: ${status?.recentStdout.join(' | ')}`);
   }
   if ((status?.recentStderr.length ?? 0) > 0) {
-    details.push(`stderr: ${status?.recentStderr.join(" | ")}`);
+    details.push(`stderr: ${status?.recentStderr.join(' | ')}`);
   }
 
-  return details.join(" | ");
+  return details.join(' | ');
 }
 
 export function startBootstrapProcess(
@@ -105,13 +97,13 @@ export function startBootstrapProcess(
   const processRef = spawnImpl(command, {
     cwd: config.bootstrap?.cwd,
     shell: true,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
   const status = createBootstrapStatus(processRef, command);
 
   attachLogStream(processRef.stdout, status.recentStdout);
   attachLogStream(processRef.stderr, status.recentStderr);
-  processRef.on("exit", (code, signal) => {
+  processRef.on('exit', (code, signal) => {
     status.exited = true;
     status.exitCode = code;
     status.exitSignal = signal;
@@ -130,7 +122,7 @@ async function isReadyUrlReachable(
 
   try {
     const response = await fetchImpl(url, {
-      redirect: "manual",
+      redirect: 'manual',
       signal: controller.signal,
     });
     return response.ok || (response.status >= 300 && response.status < 400);
@@ -180,26 +172,22 @@ export async function waitForBootstrapReady(
   const fetchImpl = deps.fetchImpl ?? fetch;
   const sleep = deps.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const now = deps.now ?? (() => Date.now());
-  const requestTimeoutMs =
-    deps.requestTimeoutMs ?? DEFAULT_READY_REQUEST_TIMEOUT_MS;
+  const requestTimeoutMs = deps.requestTimeoutMs ?? DEFAULT_READY_REQUEST_TIMEOUT_MS;
 
   const deadline = now() + config.bootstrap.timeoutSeconds * 1000;
   while (now() < deadline) {
     if (status?.exited) {
-      throw new Error(
-        formatBootstrapFailure("Bootstrap process exited before ready", status)
-      );
+      throw new Error(formatBootstrapFailure('Bootstrap process exited before ready', status));
     }
 
     const urlReady =
       !config.bootstrap.readyUrl ||
       (await isReadyUrlReachable(readyUrl, fetchImpl, requestTimeoutMs));
     const indicatorReady =
-      !readyIndicator ||
-      (await hasReadyIndicator(page, readyIndicatorUrl, readyIndicator));
+      !readyIndicator || (await hasReadyIndicator(page, readyIndicatorUrl, readyIndicator));
 
     if (urlReady && indicatorReady) {
-      console.log("Bootstrap target is ready.");
+      console.log('Bootstrap target is ready.');
       return;
     }
 
@@ -224,12 +212,12 @@ export function stopBootstrapProcess(
     return;
   }
 
-  if (platform === "win32") {
-    spawnImpl("taskkill", ["/pid", String(processRef.pid), "/t", "/f"], {
-      stdio: "ignore",
+  if (platform === 'win32') {
+    spawnImpl('taskkill', ['/pid', String(processRef.pid), '/t', '/f'], {
+      stdio: 'ignore',
     });
     return;
   }
 
-  processRef.kill?.("SIGTERM");
+  processRef.kill?.('SIGTERM');
 }

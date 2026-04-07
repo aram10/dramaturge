@@ -1,5 +1,5 @@
-import { shortId } from "../constants.js";
-import type { Evidence } from "../types.js";
+import { shortId } from '../constants.js';
+import type { Evidence } from '../types.js';
 
 const MAX_RECENT_FAILURES = 5;
 
@@ -23,10 +23,7 @@ export function recordApiProbeSuccess(diagnostics: ApiProbeDiagnostics): void {
   diagnostics.succeeded += 1;
 }
 
-export function recordApiProbeFailure(
-  diagnostics: ApiProbeDiagnostics,
-  message: string
-): void {
+export function recordApiProbeFailure(diagnostics: ApiProbeDiagnostics, message: string): void {
   diagnostics.failed += 1;
   diagnostics.recentFailures.push(message);
   if (diagnostics.recentFailures.length > MAX_RECENT_FAILURES) {
@@ -51,14 +48,12 @@ export function buildApiProbeDiagnosticsEvidence(
     return undefined;
   }
 
-  const failureTail = diagnostics.recentFailures
-    .slice(-3)
-    .join(" | ");
+  const failureTail = diagnostics.recentFailures.slice(-3).join(' | ');
 
   return {
     id: `ev-${shortId()}`,
-    type: "api-contract",
-    summary: `API probe diagnostics: attempted ${diagnostics.attempted}, succeeded ${diagnostics.succeeded}, failed ${diagnostics.failed}${failureTail ? ` (${failureTail})` : ""}`,
+    type: 'api-contract',
+    summary: `API probe diagnostics: attempted ${diagnostics.attempted}, succeeded ${diagnostics.succeeded}, failed ${diagnostics.failed}${failureTail ? ` (${failureTail})` : ''}`,
     timestamp: new Date().toISOString(),
     areaName,
     relatedFindingIds: [],

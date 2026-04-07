@@ -1,18 +1,18 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
-import type { PageType } from "../types.js";
+import type { Stagehand } from '@browserbasehq/stagehand';
+import type { PageType } from '../types.js';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 // Keyword lists for deterministic page classification
-const AUTH_PATH_KEYWORDS = ["login", "signin", "auth"];
-const AUTH_TITLE_KEYWORDS = ["sign in", "log in"];
-const WIZARD_BUTTON_LABELS = ["next", "previous", "back", "step"];
-const WIZARD_PATH_KEYWORDS = ["wizard", "step"];
-const SETTINGS_PATH_KEYWORDS = ["settings", "preferences", "config"];
-const SETTINGS_HEADING_KEYWORDS = ["settings", "preferences"];
-const LIST_BUTTON_LABELS = ["filter", "search", "sort", "delete", "edit", "create", "add", "new"];
-const DASHBOARD_PATH_KEYWORDS = ["dashboard", "home"];
-const DASHBOARD_HEADING_KEYWORDS = ["dashboard", "overview"];
+const AUTH_PATH_KEYWORDS = ['login', 'signin', 'auth'];
+const AUTH_TITLE_KEYWORDS = ['sign in', 'log in'];
+const WIZARD_BUTTON_LABELS = ['next', 'previous', 'back', 'step'];
+const WIZARD_PATH_KEYWORDS = ['wizard', 'step'];
+const SETTINGS_PATH_KEYWORDS = ['settings', 'preferences', 'config'];
+const SETTINGS_HEADING_KEYWORDS = ['settings', 'preferences'];
+const LIST_BUTTON_LABELS = ['filter', 'search', 'sort', 'delete', 'edit', 'create', 'add', 'new'];
+const DASHBOARD_PATH_KEYWORDS = ['dashboard', 'home'];
+const DASHBOARD_HEADING_KEYWORDS = ['dashboard', 'overview'];
 
 interface ClassificationSignals {
   pathname: string;
@@ -29,9 +29,7 @@ interface ClassificationSignals {
  * Classify the current page using deterministic heuristics.
  * No LLM call — uses DOM signals only.
  */
-export async function classifyPage(
-  page: StagehandPage
-): Promise<PageType> {
+export async function classifyPage(page: StagehandPage): Promise<PageType> {
   const url = page.url();
   let pathname: string;
   try {
@@ -41,17 +39,17 @@ export async function classifyPage(
   }
 
   const signals: ClassificationSignals = await page.evaluate(() => {
-    const forms = document.querySelectorAll("form");
+    const forms = document.querySelectorAll('form');
     const tables = document.querySelectorAll("table, [role='grid'], [role='table']");
-    const modals = document.querySelectorAll(
-      'dialog[open], [role="dialog"], [role="alertdialog"]'
+    const modals = document.querySelectorAll('dialog[open], [role="dialog"], [role="alertdialog"]');
+    const buttons = Array.from(
+      document.querySelectorAll("button, [role='button'], input[type='submit']")
     );
-    const buttons = Array.from(document.querySelectorAll("button, [role='button'], input[type='submit']"));
     const buttonLabels = buttons
-      .map((b) => (b.textContent ?? "").trim().toLowerCase())
+      .map((b) => (b.textContent ?? '').trim().toLowerCase())
       .filter(Boolean);
-    const h1 = document.querySelector("h1, h2");
-    const headingText = (h1?.textContent ?? "").trim().toLowerCase();
+    const h1 = document.querySelector('h1, h2');
+    const headingText = (h1?.textContent ?? '').trim().toLowerCase();
     const inputs = document.querySelectorAll(
       "input:not([type='hidden']):not([type='submit']), textarea, select"
     );
@@ -80,12 +78,12 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
     AUTH_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
     AUTH_TITLE_KEYWORDS.some((k) => s.title.includes(k))
   ) {
-    return "auth";
+    return 'auth';
   }
 
   // Modal overlay
   if (s.hasModal) {
-    return "modal";
+    return 'modal';
   }
 
   // Wizard / multi-step
@@ -94,7 +92,7 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
     WIZARD_BUTTON_LABELS.some((w) => s.buttonLabels.some((b) => b.includes(w)))
   ) {
     if (s.inputCount > 0) {
-      return "wizard";
+      return 'wizard';
     }
   }
 
@@ -103,35 +101,36 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
     SETTINGS_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
     SETTINGS_HEADING_KEYWORDS.some((k) => s.headingText.includes(k))
   ) {
-    return "settings";
+    return 'settings';
   }
 
   // Form pages (many inputs, few or no tables)
   if (s.formCount > 0 && s.inputCount >= 3 && s.tableCount === 0) {
-    return "form";
+    return 'form';
   }
 
   // List pages (tables or grids with action buttons)
   if (
     s.tableCount > 0 ||
-    (s.pathname.includes("list") && LIST_BUTTON_LABELS.some((l) => s.buttonLabels.some((b) => b.includes(l))))
+    (s.pathname.includes('list') &&
+      LIST_BUTTON_LABELS.some((l) => s.buttonLabels.some((b) => b.includes(l))))
   ) {
-    return "list";
+    return 'list';
   }
 
   // Detail pages (specific ID-like patterns in path)
   if (/\/[a-f0-9-]{8,}|\/\d+$/.test(s.pathname)) {
-    return "detail";
+    return 'detail';
   }
 
   // Landing page (root with minimal interactive elements)
   if (
-    s.pathname === "/" &&
+    s.pathname === '/' &&
     s.formCount === 0 &&
     s.tableCount === 0 &&
     !DASHBOARD_HEADING_KEYWORDS.some((k) => s.headingText.includes(k))
   ) {
-    return "landing";
+    return 'landing';
   }
 
   // Dashboard pages
@@ -139,8 +138,8 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
     DASHBOARD_PATH_KEYWORDS.some((k) => s.pathname.includes(k)) ||
     DASHBOARD_HEADING_KEYWORDS.some((k) => s.headingText.includes(k))
   ) {
-    return "dashboard";
+    return 'dashboard';
   }
 
-  return "unknown";
+  return 'unknown';
 }

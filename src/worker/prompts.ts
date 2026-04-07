@@ -11,6 +11,7 @@ import {
   MAX_STABLE_SELECTORS_IN_WORKER,
   MAX_API_ENDPOINTS_IN_WORKER,
   MAX_LOGIN_ROUTES_IN_WORKER,
+  MAX_CALLBACK_ROUTES_IN_WORKER,
 } from '../constants.js';
 
 interface AppContext {
@@ -109,7 +110,9 @@ function buildRepoHintsSection(repoHints?: RepoHints): string {
   }
 
   if (repoHints.authHints.callbackRoutes.length > 0) {
-    parts.push(`Callback routes: ${repoHints.authHints.callbackRoutes.slice(0, 3).join(', ')}`);
+    parts.push(
+      `Callback routes: ${repoHints.authHints.callbackRoutes.slice(0, MAX_CALLBACK_ROUTES_IN_WORKER).join(', ')}`
+    );
   }
 
   return parts.length > 0 ? `\n\n${parts.join('\n')}` : '';

@@ -1,4 +1,4 @@
-import type { NormalizedOperationSpec, NormalizedSpecArtifact } from "./types.js";
+import type { NormalizedOperationSpec, NormalizedSpecArtifact } from './types.js';
 
 export function buildOperationKey(method: string, route: string): string {
   return `${method.toUpperCase()} ${route}`;

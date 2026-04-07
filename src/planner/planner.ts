@@ -14,10 +14,10 @@ import {
   MAX_STABLE_SELECTORS_IN_PLANNER,
   MAX_API_ENDPOINTS_IN_PLANNER,
   MAX_LOGIN_ROUTES_IN_PLANNER,
+  shortId,
 } from '../constants.js';
 import { computePriority, type PriorityContext } from './priority.js';
 import { proposeLLMTasks } from '../llm.js';
-import { shortId } from '../constants.js';
 import type { PlannerMemorySignals } from '../memory/types.js';
 import type { DiffContext } from '../diff/types.js';
 

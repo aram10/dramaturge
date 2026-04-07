@@ -1,11 +1,7 @@
-import { PassThrough } from "node:stream";
-import { EventEmitter } from "node:events";
-import { describe, expect, it, vi } from "vitest";
-import {
-  startBootstrapProcess,
-  stopBootstrapProcess,
-  waitForBootstrapReady,
-} from "./bootstrap.js";
+import { PassThrough } from 'node:stream';
+import { EventEmitter } from 'node:events';
+import { describe, expect, it, vi } from 'vitest';
+import { startBootstrapProcess, stopBootstrapProcess, waitForBootstrapReady } from './bootstrap.js';
 
 function createMockProcess() {
   const processRef = new EventEmitter() as any;
@@ -23,31 +19,31 @@ function createResponse(status: number, ok = status >= 200 && status < 300) {
   };
 }
 
-describe("bootstrap supervision", () => {
-  it("fails fast when the bootstrap process exits before the app is ready", async () => {
+describe('bootstrap supervision', () => {
+  it('fails fast when the bootstrap process exits before the app is ready', async () => {
     const processRef = createMockProcess();
     const spawnImpl = vi.fn().mockReturnValue(processRef);
 
     const status = startBootstrapProcess(
       {
         bootstrap: {
-          command: "pnpm dev",
-          cwd: "C:/tmp/app",
+          command: 'pnpm dev',
+          cwd: 'C:/tmp/app',
         },
       } as any,
       spawnImpl as any
     )!;
 
-    processRef.stderr.write("server crashed\n");
-    processRef.emit("exit", 1, null);
+    processRef.stderr.write('server crashed\n');
+    processRef.emit('exit', 1, null);
 
     await expect(
       waitForBootstrapReady(
         {
-          targetUrl: "https://example.com",
+          targetUrl: 'https://example.com',
           bootstrap: {
-            command: "pnpm dev",
-            readyUrl: "/health",
+            command: 'pnpm dev',
+            readyUrl: '/health',
             timeoutSeconds: 5,
           },
         } as any,
@@ -67,10 +63,10 @@ describe("bootstrap supervision", () => {
     await expect(
       waitForBootstrapReady(
         {
-          targetUrl: "https://example.com",
+          targetUrl: 'https://example.com',
           bootstrap: {
-            command: "pnpm dev",
-            readyUrl: "/health",
+            command: 'pnpm dev',
+            readyUrl: '/health',
             timeoutSeconds: 5,
           },
         } as any,
@@ -88,15 +84,15 @@ describe("bootstrap supervision", () => {
     ).rejects.toThrow(/server crashed/);
   });
 
-  it("times out a hanging ready-url fetch instead of waiting forever", async () => {
+  it('times out a hanging ready-url fetch instead of waiting forever', async () => {
     let nowMs = 0;
 
     await expect(
       waitForBootstrapReady(
         {
-          targetUrl: "https://example.com",
+          targetUrl: 'https://example.com',
           bootstrap: {
-            readyUrl: "/health",
+            readyUrl: '/health',
             timeoutSeconds: 1,
           },
         } as any,
@@ -107,12 +103,13 @@ describe("bootstrap supervision", () => {
         undefined,
         {
           requestTimeoutMs: 5,
-          fetchImpl: vi.fn((_url: string, init?: RequestInit) =>
-            new Promise((_resolve, reject) => {
-              init?.signal?.addEventListener("abort", () => {
-                reject(new Error("aborted"));
-              });
-            })
+          fetchImpl: vi.fn(
+            (_url: string, init?: RequestInit) =>
+              new Promise((_resolve, reject) => {
+                init?.signal?.addEventListener('abort', () => {
+                  reject(new Error('aborted'));
+                });
+              })
           ) as any,
           sleep: async () => {
             nowMs += 1000;
@@ -123,7 +120,7 @@ describe("bootstrap supervision", () => {
     ).rejects.toThrow(/did not become ready within 1s/);
   });
 
-  it("checks DOM readiness on the app target page even when a health endpoint is configured", async () => {
+  it('checks DOM readiness on the app target page even when a health endpoint is configured', async () => {
     let nowMs = 0;
     const page = {
       goto: vi.fn().mockResolvedValue(undefined),
@@ -133,10 +130,10 @@ describe("bootstrap supervision", () => {
     await expect(
       waitForBootstrapReady(
         {
-          targetUrl: "https://example.com",
+          targetUrl: 'https://example.com',
           bootstrap: {
-            readyUrl: "/health",
-            readyIndicator: "#app-ready",
+            readyUrl: '/health',
+            readyIndicator: '#app-ready',
             timeoutSeconds: 1,
           },
         } as any,
@@ -152,28 +149,20 @@ describe("bootstrap supervision", () => {
       )
     ).rejects.toThrow(/did not become ready within 1s/);
 
-    expect(page.goto).toHaveBeenCalledWith("https://example.com");
+    expect(page.goto).toHaveBeenCalledWith('https://example.com');
     expect(page.evaluate).toHaveBeenCalled();
   });
 
-  it("uses taskkill on Windows and kill on other platforms during cleanup", () => {
+  it('uses taskkill on Windows and kill on other platforms during cleanup', () => {
     const processRef = createMockProcess();
     const spawnImpl = vi.fn();
 
-    stopBootstrapProcess(
-      { process: processRef } as any,
-      spawnImpl as any,
-      "win32"
-    );
-    expect(spawnImpl).toHaveBeenCalledWith("taskkill", ["/pid", "4321", "/t", "/f"], {
-      stdio: "ignore",
+    stopBootstrapProcess({ process: processRef } as any, spawnImpl as any, 'win32');
+    expect(spawnImpl).toHaveBeenCalledWith('taskkill', ['/pid', '4321', '/t', '/f'], {
+      stdio: 'ignore',
     });
 
-    stopBootstrapProcess(
-      { process: processRef } as any,
-      spawnImpl as any,
-      "linux"
-    );
-    expect(processRef.kill).toHaveBeenCalledWith("SIGTERM");
+    stopBootstrapProcess({ process: processRef } as any, spawnImpl as any, 'linux');
+    expect(processRef.kill).toHaveBeenCalledWith('SIGTERM');
   });
 });

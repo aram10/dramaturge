@@ -1,4 +1,4 @@
-import type { AdversarialScenario } from "./stateful.js";
+import type { AdversarialScenario } from './stateful.js';
 
 interface ConcurrencyScenarioOptions {
   destructiveActionsAllowed: boolean;
@@ -14,10 +14,10 @@ export function listConcurrencyScenarios(
 
   return [
     {
-      id: "parallel-submit-race",
-      title: "Parallel submit race",
+      id: 'parallel-submit-race',
+      title: 'Parallel submit race',
       description:
-        "In a low-risk workflow, trigger two near-simultaneous submissions or saves to check idempotency, pending-state locking, and duplicate-record prevention.",
+        'In a low-risk workflow, trigger two near-simultaneous submissions or saves to check idempotency, pending-state locking, and duplicate-record prevention.',
       requiresMutation: true,
     },
   ];

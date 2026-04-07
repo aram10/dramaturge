@@ -1,5 +1,5 @@
-import type { RunResult } from "../types.js";
-import { collectFindings } from "./collector.js";
+import type { RunResult } from '../types.js';
+import { collectFindings } from './collector.js';
 
 export function renderJson(result: RunResult): string {
   const findings = collectFindings(result.areaResults);
@@ -21,23 +21,22 @@ export function renderJson(result: RunResult): string {
       partial: result.partial,
     },
     summary: {
-      areasExplored: result.areaResults.filter((a) => a.status === "explored")
-        .length,
+      areasExplored: result.areaResults.filter((a) => a.status === 'explored').length,
       totalSteps: result.areaResults.reduce((sum, a) => sum + a.steps, 0),
       totalFindings: findings.length,
       byCategory: Object.fromEntries(
         (
           [
-            "Bug",
-            "UX Concern",
-            "Accessibility Issue",
-            "Performance Issue",
-            "Visual Glitch",
+            'Bug',
+            'UX Concern',
+            'Accessibility Issue',
+            'Performance Issue',
+            'Visual Glitch',
           ] as const
         ).map((cat) => [cat, findings.filter((f) => f.category === cat).length])
       ),
       bySeverity: Object.fromEntries(
-        (["Critical", "Major", "Minor", "Trivial"] as const).map((sev) => [
+        (['Critical', 'Major', 'Minor', 'Trivial'] as const).map((sev) => [
           sev,
           findings.filter((f) => f.severity === sev).length,
         ])
@@ -56,8 +55,7 @@ export function renderJson(result: RunResult): string {
       evidenceIds: f.evidenceIds ?? [],
       verdict: f.verdict ?? null,
       trace:
-        (f.meta?.repro?.actionIds?.length ?? 0) > 0 ||
-        (f.meta?.repro?.evidenceIds?.length ?? 0) > 0
+        (f.meta?.repro?.actionIds?.length ?? 0) > 0 || (f.meta?.repro?.evidenceIds?.length ?? 0) > 0
           ? {
               actionIds: f.meta?.repro?.actionIds ?? [],
               evidenceIds: f.meta?.repro?.evidenceIds ?? [],

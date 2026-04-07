@@ -1,12 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
-vi.mock("./success-indicator.js", () => ({
+vi.mock('./success-indicator.js', () => ({
   parseIndicator: vi.fn((value: string) => value),
   waitForSuccess: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { authenticateForm } from "./form.js";
-import { waitForSuccess } from "./success-indicator.js";
+import { authenticateForm } from './form.js';
+import { waitForSuccess } from './success-indicator.js';
 
 function createMockStagehand() {
   const page = {
@@ -26,30 +26,27 @@ function createMockStagehand() {
   };
 }
 
-describe("authenticateForm", () => {
-  it("fills configured selectors directly without using model actions", async () => {
+describe('authenticateForm', () => {
+  it('fills configured selectors directly without using model actions', async () => {
     const { stagehand, page } = createMockStagehand();
 
     await authenticateForm(
       stagehand as any,
-      "https://example.com/app",
-      "/login",
+      'https://example.com/app',
+      '/login',
       [
-        { selector: "input[name='email']", value: "user@example.com", secret: false },
-        { selector: "input[name='password']", value: "super-secret", secret: true },
+        { selector: "input[name='email']", value: 'user@example.com', secret: false },
+        { selector: "input[name='password']", value: 'super-secret', secret: true },
       ],
-      { selector: "button[type='submit']", label: "Sign in" },
+      { selector: "button[type='submit']", label: 'Sign in' },
       "selector:[data-testid='user-nav-button']"
     );
 
     expect(stagehand.act).not.toHaveBeenCalled();
-    expect(page.goto).toHaveBeenCalledWith("https://example.com/login");
-    expect(page.fill).toHaveBeenNthCalledWith(1, "input[name='email']", "user@example.com");
-    expect(page.fill).toHaveBeenNthCalledWith(2, "input[name='password']", "super-secret");
+    expect(page.goto).toHaveBeenCalledWith('https://example.com/login');
+    expect(page.fill).toHaveBeenNthCalledWith(1, "input[name='email']", 'user@example.com');
+    expect(page.fill).toHaveBeenNthCalledWith(2, "input[name='password']", 'super-secret');
     expect(page.click).toHaveBeenCalledWith("button[type='submit']");
-    expect(waitForSuccess).toHaveBeenCalledWith(
-      page,
-      "selector:[data-testid='user-nav-button']"
-    );
+    expect(waitForSuccess).toHaveBeenCalledWith(page, "selector:[data-testid='user-nav-button']");
   });
 });

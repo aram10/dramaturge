@@ -29,22 +29,20 @@ export interface SafetyAuditEntry {
 }
 
 const DEFAULT_DESTRUCTIVE_KEYWORDS = [
-  "delete",
-  "remove",
-  "destroy",
-  "purge",
-  "drop",
-  "reset all",
-  "clear all",
-  "wipe",
-  "uninstall",
-  "deactivate account",
-  "close account",
+  'delete',
+  'remove',
+  'destroy',
+  'purge',
+  'drop',
+  'reset all',
+  'clear all',
+  'wipe',
+  'uninstall',
+  'deactivate account',
+  'close account',
 ];
 
-export function createDefaultSafetyConfig(
-  destructiveActionsAllowed: boolean
-): SafetyGuardConfig {
+export function createDefaultSafetyConfig(destructiveActionsAllowed: boolean): SafetyGuardConfig {
   return {
     allowedUrlPatterns: [],
     blockedUrlPatterns: [],
@@ -72,7 +70,7 @@ export class SafetyGuard {
     for (const pattern of this.config.blockedUrlPatterns) {
       if (matchesPattern(pathname, pattern)) {
         const reason = `URL matches blocked pattern: ${pattern}`;
-        this.log(url, "navigate", reason, true);
+        this.log(url, 'navigate', reason, true);
         return reason;
       }
     }
@@ -83,13 +81,13 @@ export class SafetyGuard {
         matchesPattern(pathname, pattern)
       );
       if (!isAllowed) {
-        const reason = "URL not in allowed patterns";
-        this.log(url, "navigate", reason, true);
+        const reason = 'URL not in allowed patterns';
+        this.log(url, 'navigate', reason, true);
         return reason;
       }
     }
 
-    this.log(url, "navigate", "allowed", false);
+    this.log(url, 'navigate', 'allowed', false);
     return null;
   }
 
@@ -102,7 +100,7 @@ export class SafetyGuard {
     }
 
     const upperMethod = method.toUpperCase();
-    if (upperMethod === "DELETE") {
+    if (upperMethod === 'DELETE') {
       const reason = `Destructive HTTP method: ${upperMethod} ${url}`;
       this.log(url, `${upperMethod} request`, reason, true);
       return reason;
@@ -156,7 +154,7 @@ function normalizePathname(url: string): string {
   try {
     return new URL(url).pathname;
   } catch {
-    return url.startsWith("/") ? url : `/${url}`;
+    return url.startsWith('/') ? url : `/${url}`;
   }
 }
 
@@ -164,11 +162,11 @@ function matchesPattern(pathname: string, pattern: string): boolean {
   // Support simple glob: * matches any segment, ** matches any number of segments.
   // Treat the pattern as a glob, not a raw regular expression: escape regex metacharacters
   // other than the glob wildcards before expanding * / **.
-  const escapedPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  const escapedPattern = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
   const regexStr = escapedPattern
-    .replace(/\*\*/g, "___DOUBLESTAR___")
-    .replace(/\*/g, "[^/]*")
-    .replace(/___DOUBLESTAR___/g, ".*");
+    .replace(/\*\*/g, '___DOUBLESTAR___')
+    .replace(/\*/g, '[^/]*')
+    .replace(/___DOUBLESTAR___/g, '.*');
 
   try {
     return new RegExp(`^${regexStr}$`).test(pathname);

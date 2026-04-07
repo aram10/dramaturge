@@ -59,6 +59,9 @@ export const MAX_API_ENDPOINTS_IN_WORKER = 4;
 /** Max login routes to display in worker prompt context. */
 export const MAX_LOGIN_ROUTES_IN_WORKER = 3;
 
+/** Max callback routes to display in worker prompt context. */
+export const MAX_CALLBACK_ROUTES_IN_WORKER = 3;
+
 /** Max breadcrumbs to keep in worker action history buffer. */
 export const MAX_BREADCRUMBS = 8;
 

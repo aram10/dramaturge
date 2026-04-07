@@ -1,6 +1,6 @@
-import { shortId } from "../constants.js";
-import type { Evidence, ReplayableAction } from "../types.js";
-import type { Observation, TraceBundle } from "./types.js";
+import { shortId } from '../constants.js';
+import type { Evidence, ReplayableAction } from '../types.js';
+import type { Observation, TraceBundle } from './types.js';
 
 export function buildTraceBundle(
   observation: Observation,
@@ -20,8 +20,8 @@ export function buildTraceBundle(
     evidenceIds,
     actionIds,
     summary: [
-      `evidence=${evidenceIds.join(", ") || "none"}`,
-      `actions=${actionIds.join(", ") || "none"}`,
+      `evidence=${evidenceIds.join(', ') || 'none'}`,
+      `actions=${actionIds.join(', ') || 'none'}`,
     ],
   };
 }

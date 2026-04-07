@@ -1,7 +1,7 @@
-import type { StateNode, WorkerType } from "../types.js";
-import type { PlannerMemorySignals } from "../memory/types.js";
-import type { DiffContext } from "../diff/types.js";
-import { isNodeAffectedByDiff } from "../diff/diff-hints.js";
+import type { StateNode, WorkerType } from '../types.js';
+import type { PlannerMemorySignals } from '../memory/types.js';
+import type { DiffContext } from '../diff/types.js';
+import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
 
 export interface PriorityContext {
   /** Set of worker types already dispatched for this node. */
@@ -30,8 +30,7 @@ export function computePriority(
   // Novelty: fraction of controls not yet exercised
   const unseenRatio =
     node.controlsDiscovered.length > 0
-      ? 1 -
-        node.controlsExercised.length / node.controlsDiscovered.length
+      ? 1 - node.controlsExercised.length / node.controlsDiscovered.length
       : 1.0;
 
   // Risk: from the planner's LLM assessment (0-1)
@@ -46,7 +45,7 @@ export function computePriority(
   const flakyBoost = ctx.memory?.hasFlakyPageNotes ? 0.05 : 0;
   const suppressionPenalty = ctx.memory?.hasSuppressedFindings ? 0.05 : 0;
 
-  const adversarialPenalty = workerType === "adversarial" ? 0.2 : 0;
+  const adversarialPenalty = workerType === 'adversarial' ? 0.2 : 0;
 
   const diffBoost =
     ctx.diffContext && ctx.nodeUrl && isNodeAffectedByDiff(ctx.nodeUrl, ctx.diffContext)

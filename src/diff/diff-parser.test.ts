@@ -1,58 +1,54 @@
-import { describe, it, expect } from "vitest";
-import { parseDiffNameStatus } from "./diff-parser.js";
+import { describe, it, expect } from 'vitest';
+import { parseDiffNameStatus } from './diff-parser.js';
 
-describe("parseDiffNameStatus", () => {
-  it("parses added, modified, and deleted files", () => {
+describe('parseDiffNameStatus', () => {
+  it('parses added, modified, and deleted files', () => {
     const raw = [
-      "A\tsrc/pages/dashboard/index.tsx",
-      "M\tsrc/api/users.ts",
-      "D\tsrc/old-component.tsx",
-    ].join("\n");
+      'A\tsrc/pages/dashboard/index.tsx',
+      'M\tsrc/api/users.ts',
+      'D\tsrc/old-component.tsx',
+    ].join('\n');
 
     const entries = parseDiffNameStatus(raw);
 
     expect(entries).toEqual([
-      { path: "src/pages/dashboard/index.tsx", status: "added" },
-      { path: "src/api/users.ts", status: "modified" },
-      { path: "src/old-component.tsx", status: "deleted" },
+      { path: 'src/pages/dashboard/index.tsx', status: 'added' },
+      { path: 'src/api/users.ts', status: 'modified' },
+      { path: 'src/old-component.tsx', status: 'deleted' },
     ]);
   });
 
-  it("parses renamed files using the new path", () => {
-    const raw = "R085\tsrc/old-name.ts\tsrc/new-name.ts";
+  it('parses renamed files using the new path', () => {
+    const raw = 'R085\tsrc/old-name.ts\tsrc/new-name.ts';
     const entries = parseDiffNameStatus(raw);
 
-    expect(entries).toEqual([
-      { path: "src/new-name.ts", status: "renamed" },
-    ]);
+    expect(entries).toEqual([{ path: 'src/new-name.ts', status: 'renamed' }]);
   });
 
-  it("parses copied files as added", () => {
-    const raw = "C100\tsrc/original.ts\tsrc/copy.ts";
+  it('parses copied files as added', () => {
+    const raw = 'C100\tsrc/original.ts\tsrc/copy.ts';
     const entries = parseDiffNameStatus(raw);
 
-    expect(entries).toEqual([
-      { path: "src/copy.ts", status: "added" },
-    ]);
+    expect(entries).toEqual([{ path: 'src/copy.ts', status: 'added' }]);
   });
 
-  it("skips blank lines", () => {
-    const raw = "M\tsrc/file.ts\n\n\nA\tsrc/other.ts\n";
+  it('skips blank lines', () => {
+    const raw = 'M\tsrc/file.ts\n\n\nA\tsrc/other.ts\n';
     const entries = parseDiffNameStatus(raw);
 
     expect(entries).toHaveLength(2);
   });
 
-  it("returns empty for empty input", () => {
-    expect(parseDiffNameStatus("")).toEqual([]);
-    expect(parseDiffNameStatus("  \n  ")).toEqual([]);
+  it('returns empty for empty input', () => {
+    expect(parseDiffNameStatus('')).toEqual([]);
+    expect(parseDiffNameStatus('  \n  ')).toEqual([]);
   });
 
-  it("skips malformed lines with no tab", () => {
-    const raw = "no-tab-here\nM\tvalid.ts";
+  it('skips malformed lines with no tab', () => {
+    const raw = 'no-tab-here\nM\tvalid.ts';
     const entries = parseDiffNameStatus(raw);
 
     expect(entries).toHaveLength(1);
-    expect(entries[0].path).toBe("valid.ts");
+    expect(entries[0].path).toBe('valid.ts');
   });
 });

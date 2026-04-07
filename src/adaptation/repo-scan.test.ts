@@ -1,138 +1,138 @@
-import { describe, expect, it } from "vitest";
-import { fileURLToPath } from "node:url";
-import { scanRepository } from "./repo-scan.js";
+import { describe, expect, it } from 'vitest';
+import { fileURLToPath } from 'node:url';
+import { scanRepository } from './repo-scan.js';
 
-const nextFixture = fileURLToPath(new URL("./fixtures/next-app", import.meta.url));
-const sveltekitFixture = fileURLToPath(new URL("./fixtures/sveltekit-app", import.meta.url));
-const reactRouterFixture = fileURLToPath(new URL("./fixtures/react-router-app", import.meta.url));
-const expressFixture = fileURLToPath(new URL("./fixtures/express-app", import.meta.url));
-const vueRouterFixture = fileURLToPath(new URL("./fixtures/vue-router-app", import.meta.url));
-const djangoFixture = fileURLToPath(new URL("./fixtures/django-app", import.meta.url));
-const fastapiFixture = fileURLToPath(new URL("./fixtures/fastapi-app", import.meta.url));
-const tanstackFixture = fileURLToPath(new URL("./fixtures/tanstack-router-app", import.meta.url));
-const nuxtFixture = fileURLToPath(new URL("./fixtures/nuxt-app", import.meta.url));
-const remixFixture = fileURLToPath(new URL("./fixtures/remix-app", import.meta.url));
-const astroFixture = fileURLToPath(new URL("./fixtures/astro-app", import.meta.url));
-const railsFixture = fileURLToPath(new URL("./fixtures/rails-app", import.meta.url));
-const genericFixture = fileURLToPath(new URL("./fixtures/generic-app", import.meta.url));
+const nextFixture = fileURLToPath(new URL('./fixtures/next-app', import.meta.url));
+const sveltekitFixture = fileURLToPath(new URL('./fixtures/sveltekit-app', import.meta.url));
+const reactRouterFixture = fileURLToPath(new URL('./fixtures/react-router-app', import.meta.url));
+const expressFixture = fileURLToPath(new URL('./fixtures/express-app', import.meta.url));
+const vueRouterFixture = fileURLToPath(new URL('./fixtures/vue-router-app', import.meta.url));
+const djangoFixture = fileURLToPath(new URL('./fixtures/django-app', import.meta.url));
+const fastapiFixture = fileURLToPath(new URL('./fixtures/fastapi-app', import.meta.url));
+const tanstackFixture = fileURLToPath(new URL('./fixtures/tanstack-router-app', import.meta.url));
+const nuxtFixture = fileURLToPath(new URL('./fixtures/nuxt-app', import.meta.url));
+const remixFixture = fileURLToPath(new URL('./fixtures/remix-app', import.meta.url));
+const astroFixture = fileURLToPath(new URL('./fixtures/astro-app', import.meta.url));
+const railsFixture = fileURLToPath(new URL('./fixtures/rails-app', import.meta.url));
+const genericFixture = fileURLToPath(new URL('./fixtures/generic-app', import.meta.url));
 
-describe("scanRepository", () => {
-  it("extracts routes, route families, selectors, API endpoints, auth hints, query routes, and expected auth noise from a Next.js repo", () => {
+describe('scanRepository', () => {
+  it('extracts routes, route families, selectors, API endpoints, auth hints, query routes, and expected auth noise from a Next.js repo', () => {
     const hints = scanRepository({
       root: nextFixture,
-      framework: "nextjs",
+      framework: 'nextjs',
     });
 
-    expect(hints.routes).toContain("/");
-    expect(hints.routes).toContain("/login");
-    expect(hints.routes).toContain("/auth/callback");
-    expect(hints.routes).toContain("/manage/knowledge-bases");
-    expect(hints.routes).toContain("/?kb=starter");
-    expect(hints.routes).toContain("/manage/knowledge-bases?status=pending");
+    expect(hints.routes).toContain('/');
+    expect(hints.routes).toContain('/login');
+    expect(hints.routes).toContain('/auth/callback');
+    expect(hints.routes).toContain('/manage/knowledge-bases');
+    expect(hints.routes).toContain('/?kb=starter');
+    expect(hints.routes).toContain('/manage/knowledge-bases?status=pending');
 
-    expect(hints.stableSelectors).toContain("#manage-kb-new-btn");
+    expect(hints.stableSelectors).toContain('#manage-kb-new-btn');
     expect(hints.stableSelectors).toContain('[data-testid="kb-filter-pending"]');
     expect(hints.stableSelectors).toContain('[data-testid="app-nav"]');
 
-    expect(hints.routeFamilies).toContain("/");
-    expect(hints.routeFamilies).toContain("/auth");
-    expect(hints.routeFamilies).toContain("/login");
-    expect(hints.routeFamilies).toContain("/manage");
+    expect(hints.routeFamilies).toContain('/');
+    expect(hints.routeFamilies).toContain('/auth');
+    expect(hints.routeFamilies).toContain('/login');
+    expect(hints.routeFamilies).toContain('/manage');
 
     expect(hints.apiEndpoints).toContainEqual({
-      route: "/api/manage/knowledge-bases",
-      methods: ["GET", "POST"],
+      route: '/api/manage/knowledge-bases',
+      methods: ['GET', 'POST'],
       statuses: [201, 400, 401, 403],
       authRequired: true,
-      validationSchemas: ["CreateKnowledgeBaseSchema"],
+      validationSchemas: ['CreateKnowledgeBaseSchema'],
     });
 
-    expect(hints.authHints.loginRoutes).toContain("/login");
-    expect(hints.authHints.callbackRoutes).toContain("/auth/callback");
+    expect(hints.authHints.loginRoutes).toContain('/login');
+    expect(hints.authHints.callbackRoutes).toContain('/auth/callback');
 
     expect(hints.expectedHttpNoise).toContainEqual({
-      pathPrefix: "/api/manage/knowledge-bases",
+      pathPrefix: '/api/manage/knowledge-bases',
       statuses: [401, 403],
     });
   });
 
-  describe("framework: auto", () => {
-    it("detects Next.js via app directory", () => {
-      const hints = scanRepository({ root: nextFixture, framework: "auto" });
-      expect(hints.routes).toContain("/login");
+  describe('framework: auto', () => {
+    it('detects Next.js via app directory', () => {
+      const hints = scanRepository({ root: nextFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/login');
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
-    it("detects SvelteKit via svelte.config", () => {
-      const hints = scanRepository({ root: sveltekitFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
-      expect(hints.routes).toContain("/login");
+    it('detects SvelteKit via svelte.config', () => {
+      const hints = scanRepository({ root: sveltekitFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
+      expect(hints.routes).toContain('/login');
     });
 
-    it("detects React Router via react-router-dom import", () => {
-      const hints = scanRepository({ root: reactRouterFixture, framework: "auto" });
+    it('detects React Router via react-router-dom import', () => {
+      const hints = scanRepository({ root: reactRouterFixture, framework: 'auto' });
       expect(hints.routes.length).toBeGreaterThan(0);
     });
 
-    it("detects Express via express import", () => {
-      const hints = scanRepository({ root: expressFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
+    it('detects Express via express import', () => {
+      const hints = scanRepository({ root: expressFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
-    it("detects Vue Router via vue-router import", () => {
-      const hints = scanRepository({ root: vueRouterFixture, framework: "auto" });
+    it('detects Vue Router via vue-router import', () => {
+      const hints = scanRepository({ root: vueRouterFixture, framework: 'auto' });
       expect(hints.routes.length).toBeGreaterThan(0);
     });
 
-    it("detects FastAPI via fastapi import", () => {
-      const hints = scanRepository({ root: fastapiFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
-      expect(hints.routes).toContain("/login");
+    it('detects FastAPI via fastapi import', () => {
+      const hints = scanRepository({ root: fastapiFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
+      expect(hints.routes).toContain('/login');
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
-    it("detects Rails via config/routes.rb", () => {
-      const hints = scanRepository({ root: railsFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
-      expect(hints.routes).toContain("/login");
+    it('detects Rails via config/routes.rb', () => {
+      const hints = scanRepository({ root: railsFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
+      expect(hints.routes).toContain('/login');
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
-    it("detects Django via manage.py", () => {
-      const hints = scanRepository({ root: djangoFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
-      expect(hints.routes).toContain("/login");
+    it('detects Django via manage.py', () => {
+      const hints = scanRepository({ root: djangoFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
+      expect(hints.routes).toContain('/login');
     });
 
-    it("detects TanStack Router via @tanstack/react-router import", () => {
-      const hints = scanRepository({ root: tanstackFixture, framework: "auto" });
+    it('detects TanStack Router via @tanstack/react-router import', () => {
+      const hints = scanRepository({ root: tanstackFixture, framework: 'auto' });
       expect(hints.routes.length).toBeGreaterThan(0);
     });
 
-    it("detects Nuxt via nuxt.config.ts", () => {
-      const hints = scanRepository({ root: nuxtFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
-      expect(hints.routes).toContain("/login");
+    it('detects Nuxt via nuxt.config.ts', () => {
+      const hints = scanRepository({ root: nuxtFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
+      expect(hints.routes).toContain('/login');
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
-    it("detects Remix via @remix-run/ imports", () => {
-      const hints = scanRepository({ root: remixFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
-      expect(hints.routes).toContain("/login");
+    it('detects Remix via @remix-run/ imports', () => {
+      const hints = scanRepository({ root: remixFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
+      expect(hints.routes).toContain('/login');
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
-    it("detects Astro via astro.config.mjs", () => {
-      const hints = scanRepository({ root: astroFixture, framework: "auto" });
-      expect(hints.routes).toContain("/");
-      expect(hints.routes).toContain("/login");
+    it('detects Astro via astro.config.mjs', () => {
+      const hints = scanRepository({ root: astroFixture, framework: 'auto' });
+      expect(hints.routes).toContain('/');
+      expect(hints.routes).toContain('/login');
       expect(hints.apiEndpoints.length).toBeGreaterThan(0);
     });
 
-    it("falls back to generic for unrecognized projects", () => {
-      const hints = scanRepository({ root: genericFixture, framework: "auto" });
+    it('falls back to generic for unrecognized projects', () => {
+      const hints = scanRepository({ root: genericFixture, framework: 'auto' });
       expect(hints.routes.length).toBeGreaterThan(0);
     });
   });

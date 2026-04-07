@@ -1,36 +1,28 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import type { ApiEndpointHint, RepoHints } from "./types.js";
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import type { ApiEndpointHint, RepoHints } from './types.js';
 
-const SOURCE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".vue",
-]);
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.vue']);
 const IGNORED_DIRECTORY_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  "coverage",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  "tests",
-  "test",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "mocks",
-  "__mocks__",
-  "generated",
-  "__generated__",
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  'tests',
+  'test',
+  '__tests__',
+  'fixtures',
+  '__fixtures__',
+  'mocks',
+  '__mocks__',
+  'generated',
+  '__generated__',
 ]);
 const IGNORED_FILE_NAME_PATTERNS = [
   /\.test\./i,
@@ -40,19 +32,14 @@ const IGNORED_FILE_NAME_PATTERNS = [
   /\.stories\./i,
 ];
 
-const VUE_ROUTER_IMPORT_RE =
-  /(?:from|require\()\s*["']vue-router["']/;
+const VUE_ROUTER_IMPORT_RE = /(?:from|require\()\s*["']vue-router["']/;
 const CREATE_ROUTER_RE = /\bcreateRouter\s*\(/;
 
 // Route extraction patterns
-const ROUTE_CONFIG_PATH_RE =
-  /\bpath\s*:\s*["'`](\/[^"'`]*)["'`]/g;
-const ROUTER_LINK_TO_RE =
-  /<router-link\s[^>]*?to\s*=\s*["'`](\/[^"'`]*)["'`]/g;
-const ROUTER_PUSH_RE =
-  /router\.push\(\s*["'`](\/[^"'`]*)["'`]/g;
-const ROUTER_REPLACE_RE =
-  /router\.replace\(\s*["'`](\/[^"'`]*)["'`]/g;
+const ROUTE_CONFIG_PATH_RE = /\bpath\s*:\s*["'`](\/[^"'`]*)["'`]/g;
+const ROUTER_LINK_TO_RE = /<router-link\s[^>]*?to\s*=\s*["'`](\/[^"'`]*)["'`]/g;
+const ROUTER_PUSH_RE = /router\.push\(\s*["'`](\/[^"'`]*)["'`]/g;
+const ROUTER_REPLACE_RE = /router\.replace\(\s*["'`](\/[^"'`]*)["'`]/g;
 
 // Selector patterns
 const SELECTOR_RE = /data-testid=["']([^"']+)["']/g;
@@ -61,8 +48,7 @@ const ID_SELECTOR_RE = /\bid\s*=\s*["'`]([^"'`]+)["'`]/g;
 // API / fetch patterns
 const FETCH_RE =
   /fetch\(\s*["'`](\/api\/[^"'`\s]+)["'`](?:\s*,\s*\{[\s\S]*?method:\s*["'`](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["'`][\s\S]*?\})?/g;
-const AXIOS_RE =
-  /axios\.(get|post|put|patch|delete)\(\s*["'`](\/api\/[^"'`\s]+)["'`]/g;
+const AXIOS_RE = /axios\.(get|post|put|patch|delete)\(\s*["'`](\/api\/[^"'`\s]+)["'`]/g;
 
 function isSourceFile(path: string): boolean {
   return [...SOURCE_EXTENSIONS].some((ext) => path.endsWith(ext));
@@ -75,7 +61,7 @@ function shouldIgnoreEntry(name: string, isDirectory: boolean): boolean {
   if (isDirectory) {
     return false;
   }
-  if (name.endsWith(".d.ts")) {
+  if (name.endsWith('.d.ts')) {
     return true;
   }
   return IGNORED_FILE_NAME_PATTERNS.some((pattern) => pattern.test(name));
@@ -95,11 +81,7 @@ function walkFiles(root: string): string[] {
       continue;
     }
 
-    if (
-      entry.isFile() &&
-      isSourceFile(fullPath) &&
-      !shouldIgnoreEntry(basename(fullPath), false)
-    ) {
+    if (entry.isFile() && isSourceFile(fullPath) && !shouldIgnoreEntry(basename(fullPath), false)) {
       results.push(fullPath);
     }
   }
@@ -116,37 +98,29 @@ function uniqueNumbers(values: number[]): number[] {
 }
 
 function routeFamily(route: string): string {
-  const parts = route.split("?")[0]?.split("/").filter(Boolean) ?? [];
-  return parts.length === 0 ? "/" : `/${parts[0]}`;
+  const parts = route.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  return parts.length === 0 ? '/' : `/${parts[0]}`;
 }
 
 function normalizeRoute(raw: string): string {
-  const trimmed = raw.replace(/\/+$/, "");
-  return trimmed || "/";
+  const trimmed = raw.replace(/\/+$/, '');
+  return trimmed || '/';
 }
 
 function extractRouteConfigPaths(content: string): string[] {
-  return [...content.matchAll(ROUTE_CONFIG_PATH_RE)].map((m) =>
-    normalizeRoute(m[1]),
-  );
+  return [...content.matchAll(ROUTE_CONFIG_PATH_RE)].map((m) => normalizeRoute(m[1]));
 }
 
 function extractRouterLinkPaths(content: string): string[] {
-  return [...content.matchAll(ROUTER_LINK_TO_RE)].map((m) =>
-    normalizeRoute(m[1]),
-  );
+  return [...content.matchAll(ROUTER_LINK_TO_RE)].map((m) => normalizeRoute(m[1]));
 }
 
 function extractRouterPushPaths(content: string): string[] {
-  return [...content.matchAll(ROUTER_PUSH_RE)].map((m) =>
-    normalizeRoute(m[1]),
-  );
+  return [...content.matchAll(ROUTER_PUSH_RE)].map((m) => normalizeRoute(m[1]));
 }
 
 function extractRouterReplacePaths(content: string): string[] {
-  return [...content.matchAll(ROUTER_REPLACE_RE)].map((m) =>
-    normalizeRoute(m[1]),
-  );
+  return [...content.matchAll(ROUTER_REPLACE_RE)].map((m) => normalizeRoute(m[1]));
 }
 
 function extractSelectors(content: string): string[] {
@@ -164,11 +138,14 @@ function extractSelectors(content: string): string[] {
 
 function extractFetchEndpoints(
   content: string,
-  endpoints: Map<string, { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }>,
+  endpoints: Map<
+    string,
+    { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }
+  >
 ): void {
   for (const match of content.matchAll(FETCH_RE)) {
-    const route = match[1] ?? "";
-    const method = (match[2] ?? "GET").toUpperCase();
+    const route = match[1] ?? '';
+    const method = (match[2] ?? 'GET').toUpperCase();
     const existing = endpoints.get(route) ?? {
       route,
       methods: [],
@@ -182,11 +159,14 @@ function extractFetchEndpoints(
 
 function extractAxiosEndpoints(
   content: string,
-  endpoints: Map<string, { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }>,
+  endpoints: Map<
+    string,
+    { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }
+  >
 ): void {
   for (const match of content.matchAll(AXIOS_RE)) {
-    const method = (match[1] ?? "GET").toUpperCase();
-    const route = match[2] ?? "";
+    const method = (match[1] ?? 'GET').toUpperCase();
+    const route = match[2] ?? '';
     const existing = endpoints.get(route) ?? {
       route,
       methods: [],
@@ -211,7 +191,7 @@ export function canScanVueRouterRepo(root: string): boolean {
   for (const filePath of walkFiles(root)) {
     if (!isSourceFile(filePath)) continue;
 
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
     if (VUE_ROUTER_IMPORT_RE.test(content) || CREATE_ROUTER_RE.test(content)) {
       return true;
     }
@@ -230,7 +210,7 @@ export function scanVueRouterRepo(root: string): RepoHints {
   const callbackRoutes: string[] = [];
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
 
     // Extract routes from config objects (path: "/...")
     routes.push(...extractRouteConfigPaths(content));

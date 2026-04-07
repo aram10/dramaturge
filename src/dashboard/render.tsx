@@ -1,9 +1,9 @@
-import React from "react";
-import { render } from "ink";
-import type { EngineEventEmitter } from "../engine/event-stream.js";
-import type { Blackboard } from "../a2a/blackboard.js";
-import type { MessageBus } from "../a2a/message-bus.js";
-import { Dashboard } from "./app.js";
+import React from 'react';
+import { render } from 'ink';
+import type { EngineEventEmitter } from '../engine/event-stream.js';
+import type { Blackboard } from '../a2a/blackboard.js';
+import type { MessageBus } from '../a2a/message-bus.js';
+import { Dashboard } from './app.js';
 
 export interface RenderDashboardOptions {
   blackboard?: Blackboard;
