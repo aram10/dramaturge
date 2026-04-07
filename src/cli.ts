@@ -144,8 +144,8 @@ export async function runCli(
     });
 
     if (dashboardHandle) {
-      // Give the dashboard a moment to render the final state before unmounting.
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Allow one event-loop turn for pending dashboard renders before unmounting.
+      await new Promise<void>((resolve) => setImmediate(resolve));
       dashboardHandle.cleanup();
       await dashboardHandle.waitUntilExit;
     }

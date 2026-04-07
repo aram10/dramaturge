@@ -109,7 +109,7 @@ function ActivityFeed({
           else if (item.kind === "error") color = "red";
           else if (item.kind === "state-discovered") color = "green";
           return (
-            <Text key={i} color={color}>
+            <Text key={item.id} color={color}>
               {item.text}
             </Text>
           );

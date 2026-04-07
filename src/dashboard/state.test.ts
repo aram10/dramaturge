@@ -66,19 +66,21 @@ describe("applyRunEnd", () => {
 });
 
 describe("applyTaskStart", () => {
-  it("adds task start entry to activity feed", () => {
+  it("adds task start entry to activity feed with provided timestamp", () => {
     const state = applyTaskStart(initialDashboardState(), {
       taskId: "t1",
       taskNumber: 1,
       nodeId: "n1",
       workerType: "navigation",
       objective: "Explore home page",
-    });
+    }, 1000);
     expect(state.activity).toHaveLength(1);
     expect(state.activity[0].kind).toBe("task-start");
     expect(state.activity[0].text).toContain("[task 1]");
     expect(state.activity[0].text).toContain("navigation");
     expect(state.activity[0].text).toContain("Explore home page");
+    expect(state.activity[0].timestamp).toBe(1000);
+    expect(state.activity[0].id).toBe(1);
   });
 });
 
@@ -190,10 +192,29 @@ describe("activity feed capping", () => {
         nodeId: `n${i}`,
         workerType: "navigation",
         objective: `Task ${i}`,
-      });
+      }, 1000 + i);
     }
     expect(state.activity).toHaveLength(50);
     // Newest item should be first
     expect(state.activity[0].text).toContain("Task 59");
+  });
+
+  it("assigns monotonically increasing IDs across activity items", () => {
+    let state = initialDashboardState();
+    state = applyTaskStart(state, {
+      taskId: "t1",
+      taskNumber: 1,
+      nodeId: "n1",
+      workerType: "navigation",
+      objective: "First",
+    }, 1000);
+    state = applyFinding(state, {
+      taskId: "t1",
+      title: "Bug",
+      severity: "Medium",
+      category: "Bug",
+    }, 2000);
+    expect(state.activity[0].id).toBe(2);
+    expect(state.activity[1].id).toBe(1);
   });
 });
