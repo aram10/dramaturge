@@ -140,4 +140,21 @@ describe("Blackboard", () => {
     (all as any[]).push({ id: "fake" });
     expect(bb.all()).toHaveLength(1);
   });
+
+  it("clones data and tags on post to prevent mutation", () => {
+    const bb = new Blackboard();
+    const data = { title: "original" };
+    const tags = ["tag1"];
+    const entry = bb.post("finding", "a", data, tags);
+
+    // Mutate the original objects
+    data.title = "mutated";
+    tags.push("tag2");
+
+    // Entry should still have the original values
+    expect(entry.data.title).toBe("original");
+    expect(entry.tags).toEqual(["tag1"]);
+    expect(bb.query("finding")[0].data.title).toBe("original");
+    expect(bb.query("finding")[0].tags).toEqual(["tag1"]);
+  });
 });

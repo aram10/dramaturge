@@ -80,6 +80,17 @@ const PostToBlackboardSchema = z.object({
   tags: z.array(z.string()).optional().describe("Tags for other agents to filter on"),
 });
 
+export interface WorkerToolOptions {
+  stagnationTracker?: StagnationTracker;
+  findingContext?: {
+    stateId?: string;
+    objective?: string;
+  };
+  actionRecorder?: ActionRecorder;
+  blackboard?: Blackboard;
+  agentId?: string;
+}
+
 export function createWorkerTools(
   observations: Observation[],
   screenshots: Map<string, Buffer>,
@@ -91,15 +102,9 @@ export function createWorkerTools(
   followupRequests: FollowupRequest[] = [],
   discoveredEdges: DiscoveredEdge[] = [],
   screenshotsEnabled = true,
-  stagnationTracker?: StagnationTracker,
-  findingContext?: {
-    stateId?: string;
-    objective?: string;
-  },
-  actionRecorder?: ActionRecorder,
-  blackboard?: Blackboard,
-  agentId?: string
+  options: WorkerToolOptions = {}
 ) {
+  const { stagnationTracker, findingContext, actionRecorder, blackboard, agentId } = options;
   mkdirSync(screenshotDir, { recursive: true });
   const breadcrumbs: string[] = [];
 

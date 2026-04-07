@@ -42,9 +42,7 @@ describe("createWorkerTools", () => {
       [],
       [],
       true,
-      undefined,
-      undefined,
-      actionRecorder
+      { actionRecorder }
     );
 
     const result = await tools.take_screenshot.execute({
@@ -85,9 +83,7 @@ describe("createWorkerTools", () => {
       [],
       [],
       true,
-      undefined,
-      undefined,
-      actionRecorder
+      { actionRecorder }
     );
 
     const shot = await tools.take_screenshot.execute({
@@ -128,11 +124,7 @@ describe("createWorkerTools", () => {
       [],
       [],
       true,
-      undefined,
-      undefined,
-      undefined,
-      blackboard,
-      "agent-tester"
+      { blackboard, agentId: "agent-tester" }
     );
 
     expect(tools.post_to_blackboard).toBeDefined();
@@ -152,11 +144,7 @@ describe("createWorkerTools", () => {
       [],
       [],
       true,
-      undefined,
-      undefined,
-      undefined,
-      blackboard,
-      "agent-tester"
+      { blackboard, agentId: "agent-tester" }
     );
 
     const result = await (tools as any).post_to_blackboard.execute({

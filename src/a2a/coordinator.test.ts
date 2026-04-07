@@ -189,9 +189,37 @@ describe("Coordinator", () => {
       const history = messageBus.getHistory();
       expect(history[0].toAgent).toBe("*");
       expect(history[0].fromAgent).toBe("agent-reviewer");
+      expect(history[0].role).toBe("agent");
 
       const directives = blackboard.query("directive");
       expect(directives.some((d) => (d.data as any).type === "broadcast")).toBe(true);
+    });
+
+    it("uses coordinator role when fromAgentId is coordinator", () => {
+      const { coordinator, messageBus } = makeCoordinator();
+
+      coordinator.broadcastDirective(
+        "coordinator",
+        "Redirect to forms"
+      );
+
+      const history = messageBus.getHistory();
+      expect(history[0].role).toBe("coordinator");
+    });
+
+    it("prevents metadata from overriding type and text", () => {
+      const { coordinator, blackboard } = makeCoordinator();
+
+      coordinator.broadcastDirective(
+        "agent-reviewer",
+        "Focus on forms",
+        { type: "malicious", text: "overridden" }
+      );
+
+      const directives = blackboard.query("directive");
+      const entry = directives[0];
+      expect((entry.data as any).type).toBe("broadcast");
+      expect((entry.data as any).text).toBe("Focus on forms");
     });
   });
 

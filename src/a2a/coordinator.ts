@@ -189,14 +189,14 @@ export class Coordinator extends Planner {
     metadata?: Record<string, unknown>
   ): void {
     this.deps.messageBus.sendText(fromAgentId, "*", text, {
-      role: "coordinator",
+      role: fromAgentId === "coordinator" ? "coordinator" : "agent",
       metadata,
     });
 
     this.deps.blackboard.post("directive", fromAgentId, {
+      ...metadata,
       type: "broadcast",
       text,
-      ...metadata,
     }, ["broadcast"]);
   }
 
