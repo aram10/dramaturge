@@ -10,6 +10,7 @@ export interface ParsedCliArgs {
   configPath?: string;
   resumeDir?: string;
   diffRef?: string;
+  dashboard: boolean;
   showHelp: boolean;
 }
 
@@ -23,12 +24,13 @@ export interface CliDependencies {
   error: (message: string) => void;
 }
 
-const HELP_TEXT = `Usage: dramaturge [--config <path>] [--resume <run-dir>] [--diff <base-ref>]
+const HELP_TEXT = `Usage: dramaturge [--config <path>] [--resume <run-dir>] [--diff <base-ref>] [--dashboard]
 
 Options:
   --config <path>      Path to config file (default: dramaturge.config.json)
   --resume <run-dir>   Resume a previous run from its output directory
   --diff <base-ref>    Enable diff-aware mode against a git ref (e.g. origin/main)
+  --dashboard          Show a real-time terminal dashboard (powered by Ink)
   --help, -h           Show this help message
 
 Repo-aware config:
@@ -60,11 +62,17 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let configPath: string | undefined;
   let resumeDir: string | undefined;
   let diffRef: string | undefined;
+  let dashboard = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--help" || arg === "-h") {
-      return { configPath, resumeDir, diffRef, showHelp: true };
+      return { configPath, resumeDir, diffRef, dashboard, showHelp: true };
+    }
+
+    if (arg === "--dashboard") {
+      dashboard = true;
+      continue;
     }
 
     if (arg === "--config") {
@@ -100,7 +108,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  return { configPath, resumeDir, diffRef, showHelp: false };
+  return { configPath, resumeDir, diffRef, dashboard, showHelp: false };
 }
 
 export async function runCli(
@@ -117,13 +125,31 @@ export async function runCli(
     const config = dependencies.loadConfig(parsedArgs.configPath);
 
     const eventStream = new EngineEventEmitter();
-    attachCliListeners(eventStream, dependencies.log);
+
+    let dashboardHandle:
+      | { cleanup: () => void; waitUntilExit: Promise<void> }
+      | undefined;
+
+    if (parsedArgs.dashboard) {
+      const { renderDashboard } = await import("./dashboard/render.js");
+      dashboardHandle = renderDashboard(eventStream);
+    } else {
+      attachCliListeners(eventStream, dependencies.log);
+    }
 
     await dependencies.runEngine(config, {
       resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
       eventStream,
       diffRef: parsedArgs.diffRef,
     });
+
+    if (dashboardHandle) {
+      // Allow one event-loop turn for pending dashboard renders before unmounting.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      dashboardHandle.cleanup();
+      await dashboardHandle.waitUntilExit;
+    }
+
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
