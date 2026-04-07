@@ -278,7 +278,9 @@ export async function runEngine(
   trafficObserver.attach(stagehand.context.pages()[0], 'primary');
 
   bootstrapProcess = startBootstrapProcess(config);
-  await waitForBootstrapReady(config, stagehand.context.pages()[0]);
+  await waitForBootstrapReady(config, stagehand.context.pages()[0], undefined, {
+    newPage: () => stagehand.context.newPage(),
+  });
 
   let workerPool: WorkerSession[] = [];
 

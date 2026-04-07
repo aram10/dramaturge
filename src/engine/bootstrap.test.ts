@@ -131,9 +131,6 @@ describe('bootstrap supervision', () => {
     const page = {
       goto: vi.fn(),
       evaluate: vi.fn(),
-      context: vi.fn().mockReturnValue({
-        newPage,
-      }),
     };
 
     await expect(
@@ -150,6 +147,7 @@ describe('bootstrap supervision', () => {
         undefined,
         {
           fetchImpl: vi.fn().mockResolvedValue(createResponse(200, true)) as any,
+          newPage,
           sleep: async () => {
             nowMs += 1000;
           },
@@ -160,7 +158,6 @@ describe('bootstrap supervision', () => {
 
     expect(page.goto).not.toHaveBeenCalled();
     expect(page.evaluate).not.toHaveBeenCalled();
-    expect(page.context).toHaveBeenCalled();
     expect(newPage).toHaveBeenCalled();
     expect(readinessPage.goto).toHaveBeenCalledWith('https://example.com');
     expect(readinessPage.evaluate).toHaveBeenCalled();
