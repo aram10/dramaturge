@@ -1,10 +1,10 @@
 export type JsonSchema = Record<string, unknown>;
 
-export type NormalizedSpecSource = "repo" | "openapi" | "traffic" | "inferred";
+export type NormalizedSpecSource = 'repo' | 'openapi' | 'traffic' | 'inferred';
 
 export interface NormalizedParamSpec {
   name: string;
-  in: "path" | "query" | "header";
+  in: 'path' | 'query' | 'header';
   required: boolean;
   schema?: JsonSchema;
 }

@@ -7,21 +7,21 @@ import type {
   StateDiscoveredEvent,
   ProgressEvent,
   ErrorEvent,
-} from "../engine/event-stream.js";
-import type { AgentRole } from "../types.js";
-import type { A2ATaskStatus, BlackboardEntryKind } from "../a2a/types.js";
+} from '../engine/event-stream.js';
+import type { AgentRole } from '../types.js';
+import type { A2ATaskStatus, BlackboardEntryKind } from '../a2a/types.js';
 
 // --- Activity feed item ---
 
 export type ActivityKind =
-  | "task-start"
-  | "task-complete"
-  | "finding"
-  | "state-discovered"
-  | "error"
-  | "a2a-task"
-  | "a2a-message"
-  | "a2a-blackboard";
+  | 'task-start'
+  | 'task-complete'
+  | 'finding'
+  | 'state-discovered'
+  | 'error'
+  | 'a2a-task'
+  | 'a2a-message'
+  | 'a2a-blackboard';
 
 export interface ActivityItem {
   id: number;
@@ -44,7 +44,7 @@ export interface AgentStatus {
   /** Number of blackboard entries posted by this agent. */
   blackboardPosts: number;
   /** Current status label for display. */
-  currentStatus: "idle" | "working" | "completed";
+  currentStatus: 'idle' | 'working' | 'completed';
 }
 
 // --- A2A event payloads ---
@@ -122,7 +122,7 @@ const MAX_ACTIVITY = 50;
 
 export function initialDashboardState(): DashboardState {
   return {
-    targetUrl: "",
+    targetUrl: '',
     running: false,
     finished: false,
     timeLimitSeconds: 0,
@@ -159,10 +159,7 @@ function pushActivity(
   return { ...state, activity, activitySeq: id };
 }
 
-export function applyRunStart(
-  state: DashboardState,
-  evt: RunStartEvent
-): DashboardState {
+export function applyRunStart(state: DashboardState, evt: RunStartEvent): DashboardState {
   return {
     ...state,
     targetUrl: evt.targetUrl,
@@ -173,10 +170,7 @@ export function applyRunStart(
   };
 }
 
-export function applyRunEnd(
-  state: DashboardState,
-  evt: RunEndEvent
-): DashboardState {
+export function applyRunEnd(state: DashboardState, evt: RunEndEvent): DashboardState {
   return {
     ...state,
     running: false,
@@ -195,7 +189,7 @@ export function applyTaskStart(
   now: number = Date.now()
 ): DashboardState {
   const text = `[task ${evt.taskNumber}] ${evt.workerType}: ${evt.objective}`;
-  return pushActivity(state, "task-start", text, now);
+  return pushActivity(state, 'task-start', text, now);
 }
 
 export function applyTaskComplete(
@@ -206,9 +200,9 @@ export function applyTaskComplete(
   const coverage =
     evt.coverageExercised > 0
       ? ` | coverage: ${evt.coverageExercised}/${evt.coverageDiscovered}`
-      : "";
+      : '';
   const text = `[task ${evt.taskNumber}] ${evt.outcome}: ${evt.findingsCount} finding(s)${coverage}`;
-  return pushActivity(state, "task-complete", text, now);
+  return pushActivity(state, 'task-complete', text, now);
 }
 
 export function applyFinding(
@@ -217,7 +211,7 @@ export function applyFinding(
   now: number = Date.now()
 ): DashboardState {
   const text = `⚠ [${evt.severity}] ${evt.title}`;
-  return pushActivity(state, "finding", text, now);
+  return pushActivity(state, 'finding', text, now);
 }
 
 export function applyStateDiscovered(
@@ -226,13 +220,10 @@ export function applyStateDiscovered(
   now: number = Date.now()
 ): DashboardState {
   const text = `↳ new state: ${evt.pageType} (${evt.totalStates} total)`;
-  return pushActivity(state, "state-discovered", text, now);
+  return pushActivity(state, 'state-discovered', text, now);
 }
 
-export function applyProgress(
-  state: DashboardState,
-  evt: ProgressEvent
-): DashboardState {
+export function applyProgress(state: DashboardState, evt: ProgressEvent): DashboardState {
   return {
     ...state,
     tasksExecuted: evt.tasksExecuted,
@@ -250,7 +241,7 @@ export function applyError(
   now: number = Date.now()
 ): DashboardState {
   const text = `Error [${evt.phase}]: ${evt.message}`;
-  return { ...pushActivity(state, "error", text, now), lastError: evt.message };
+  return { ...pushActivity(state, 'error', text, now), lastError: evt.message };
 }
 
 // --- A2A reducers ---
@@ -270,7 +261,7 @@ function ensureAgent(
       tasksCompleted: 0,
       messagesSent: 0,
       blackboardPosts: 0,
-      currentStatus: "idle",
+      currentStatus: 'idle',
     },
   };
 }
@@ -283,23 +274,23 @@ export function applyA2ATask(
   const agents = ensureAgent(state.agents, evt.agentId, evt.agentRole);
   const agent = agents[evt.agentId];
 
-  const isAssignment = evt.status === "submitted" || evt.status === "working";
-  const isCompletion = evt.status === "completed";
+  const isAssignment = evt.status === 'submitted' || evt.status === 'working';
+  const isCompletion = evt.status === 'completed';
 
   agents[evt.agentId] = {
     ...agent,
     tasksAssigned: isAssignment ? agent.tasksAssigned + 1 : agent.tasksAssigned,
     tasksCompleted: isCompletion ? agent.tasksCompleted + 1 : agent.tasksCompleted,
-    currentStatus: isCompletion ? "completed" : "working",
+    currentStatus: isCompletion ? 'completed' : 'working',
   };
 
-  const statusLabel = evt.status === "submitted" ? "→" : evt.status === "completed" ? "✓" : "●";
+  const statusLabel = evt.status === 'submitted' ? '→' : evt.status === 'completed' ? '✓' : '●';
   const text = `${statusLabel} [${evt.agentRole}] ${evt.objective}`;
 
   return {
     ...pushActivity(
       { ...state, a2aEnabled: true, agents, a2aTasksTotal: state.a2aTasksTotal + 1 },
-      "a2a-task",
+      'a2a-task',
       text,
       now
     ),
@@ -311,7 +302,7 @@ export function applyA2AMessage(
   evt: A2AMessageEvent,
   now: number = Date.now()
 ): DashboardState {
-  const target = evt.toAgent === "*" ? "all" : evt.toAgent;
+  const target = evt.toAgent === '*' ? 'all' : evt.toAgent;
   const text = `✉ ${evt.fromAgent} → ${target}: ${evt.text}`;
 
   // Increment messagesSent on the sender's agent if already tracked
@@ -326,7 +317,7 @@ export function applyA2AMessage(
 
   return pushActivity(
     { ...state, a2aEnabled: true, agents, a2aMessagesTotal: state.a2aMessagesTotal + 1 },
-    "a2a-message",
+    'a2a-message',
     text,
     now
   );
@@ -337,11 +328,7 @@ export function applyA2ABlackboard(
   evt: A2ABlackboardEvent,
   now: number = Date.now()
 ): DashboardState {
-  const agents = ensureAgent(
-    state.agents,
-    evt.agentId,
-    guessRoleFromAgentId(evt.agentId)
-  );
+  const agents = ensureAgent(state.agents, evt.agentId, guessRoleFromAgentId(evt.agentId));
   const agent = agents[evt.agentId];
   agents[evt.agentId] = {
     ...agent,
@@ -352,7 +339,7 @@ export function applyA2ABlackboard(
 
   return pushActivity(
     { ...state, a2aEnabled: true, agents, a2aBlackboardTotal: state.a2aBlackboardTotal + 1 },
-    "a2a-blackboard",
+    'a2a-blackboard',
     text,
     now
   );
@@ -360,9 +347,9 @@ export function applyA2ABlackboard(
 
 /** Best-effort role inference from agent id. Falls back to "reporter". */
 function guessRoleFromAgentId(agentId: string): AgentRole {
-  if (agentId.includes("scout")) return "scout";
-  if (agentId.includes("tester")) return "tester";
-  if (agentId.includes("security")) return "security";
-  if (agentId.includes("reviewer")) return "reviewer";
-  return "reporter";
+  if (agentId.includes('scout')) return 'scout';
+  if (agentId.includes('tester')) return 'tester';
+  if (agentId.includes('security')) return 'security';
+  if (agentId.includes('reviewer')) return 'reviewer';
+  return 'reporter';
 }

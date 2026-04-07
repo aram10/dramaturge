@@ -8,10 +8,10 @@
  * @see https://google.github.io/A2A/
  */
 
-import type { WorkerType, AgentRole } from "../types.js";
+import type { WorkerType, AgentRole } from '../types.js';
 
 // Re-export AgentRole from the canonical location
-export type { AgentRole } from "../types.js";
+export type { AgentRole } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Agent Card  (A2A §3.1)
@@ -56,19 +56,19 @@ export interface AgentCard {
 // ---------------------------------------------------------------------------
 
 export interface TextPart {
-  kind: "text";
+  kind: 'text';
   text: string;
 }
 
 export interface DataPart {
-  kind: "data";
+  kind: 'data';
   mimeType: string;
   /** Serialized JSON payload. */
   data: Record<string, unknown>;
 }
 
 export interface FilePart {
-  kind: "file";
+  kind: 'file';
   mimeType: string;
   path: string;
 }
@@ -85,7 +85,7 @@ export interface A2AMessage {
   fromAgent: string;
   /** Agent that should receive the message, or "*" for broadcast. */
   toAgent: string;
-  role: "agent" | "coordinator";
+  role: 'agent' | 'coordinator';
   parts: Part[];
   timestamp: string;
   /** Optional correlation id for request/response pairs. */
@@ -117,12 +117,12 @@ export interface A2AArtifact {
 // ---------------------------------------------------------------------------
 
 export type A2ATaskStatus =
-  | "submitted"
-  | "working"
-  | "input-required"
-  | "completed"
-  | "failed"
-  | "canceled";
+  | 'submitted'
+  | 'working'
+  | 'input-required'
+  | 'completed'
+  | 'failed'
+  | 'canceled';
 
 export interface A2ATaskStatusUpdate {
   status: A2ATaskStatus;
@@ -153,12 +153,7 @@ export interface A2ATask {
 // Blackboard Entry Types
 // ---------------------------------------------------------------------------
 
-export type BlackboardEntryKind =
-  | "finding"
-  | "coverage"
-  | "navigation"
-  | "message"
-  | "directive";
+export type BlackboardEntryKind = 'finding' | 'coverage' | 'navigation' | 'message' | 'directive';
 
 export interface BlackboardEntry {
   id: string;

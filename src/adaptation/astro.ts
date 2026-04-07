@@ -1,25 +1,33 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
-import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from "./types.js";
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
+import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 
 const ASTRO_PAGE_RE = /\.(?:astro|md|mdx)$/;
 const JS_TS_FILE_RE = /\.(?:ts|js|mjs|cjs)$/;
 const ASTRO_FILE_RE = /\.astro$/;
 const SELECTOR_RE = /\b(id|data-testid)\s*=\s*["'`]([^"'`]+)["'`]/g;
 const STATUS_RE = /status\s*:\s*(\d{3})\b/g;
-const EXPORTED_METHOD_RE =
-  /\bexport\s+const\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b/g;
+const EXPORTED_METHOD_RE = /\bexport\s+const\s+(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\b/g;
 const AUTH_RE =
   /\b(locals\.user|getSession|requireAuth|requireUser|assertRole|unauthorized|forbidden)\b/;
 const VALIDATION_SCHEMA_RE = /\b([A-Z][A-Za-z0-9]+Schema)\b/g;
 
 const IGNORED_DIRS = new Set([
-  "node_modules", ".git", ".astro", "dist", "build", "out", "coverage",
-  ".next", ".nuxt", ".turbo", ".cache",
+  'node_modules',
+  '.git',
+  '.astro',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
 ]);
 
 function toPosix(value: string): string {
-  return value.split(sep).join("/");
+  return value.split(sep).join('/');
 }
 
 function walkFiles(root: string): string[] {
@@ -44,22 +52,22 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function normalizeRoute(routePath: string): string {
-  const normalized = routePath.replace(/\/+$/g, "");
-  return normalized || "/";
+  const normalized = routePath.replace(/\/+$/g, '');
+  return normalized || '/';
 }
 
 function routeFamily(routePath: string): string {
-  const [pathname] = routePath.split("?");
-  if (!pathname || pathname === "/") return "/";
-  const segments = pathname.split("/").filter(Boolean);
-  return segments.length > 0 ? `/${segments[0]}` : "/";
+  const [pathname] = routePath.split('?');
+  if (!pathname || pathname === '/') return '/';
+  const segments = pathname.split('/').filter(Boolean);
+  return segments.length > 0 ? `/${segments[0]}` : '/';
 }
 
 function convertParam(segment: string): string {
-  if (segment.startsWith("[...") && segment.endsWith("]")) {
+  if (segment.startsWith('[...') && segment.endsWith(']')) {
     return `*${segment.slice(4, -1)}`;
   }
-  if (segment.startsWith("[") && segment.endsWith("]")) {
+  if (segment.startsWith('[') && segment.endsWith(']')) {
     return `:${segment.slice(1, -1)}`;
   }
   return segment;
@@ -67,19 +75,19 @@ function convertParam(segment: string): string {
 
 function routeFromFile(pagesDir: string, filePath: string): string {
   const rel = toPosix(relative(pagesDir, filePath));
-  const withoutExt = rel.replace(/\.(?:astro|md|mdx|ts|js|mjs|cjs)$/, "");
-  const segments = withoutExt.split("/").map(convertParam);
-  if (segments.length > 0 && segments[segments.length - 1] === "index") {
+  const withoutExt = rel.replace(/\.(?:astro|md|mdx|ts|js|mjs|cjs)$/, '');
+  const segments = withoutExt.split('/').map(convertParam);
+  if (segments.length > 0 && segments[segments.length - 1] === 'index') {
     segments.pop();
   }
-  return normalizeRoute(`/${segments.join("/")}`);
+  return normalizeRoute(`/${segments.join('/')}`);
 }
 
 function extractStableSelectors(content: string): string[] {
   const selectors: string[] = [];
   for (const match of content.matchAll(SELECTOR_RE)) {
     const [, attr, value] = match;
-    if (attr === "id") {
+    if (attr === 'id') {
       selectors.push(`#${value}`);
     } else {
       selectors.push(`[data-testid="${value}"]`);
@@ -104,9 +112,9 @@ function extractRouteMethods(content: string): string[] {
 export function canScanAstroRepo(root: string): boolean {
   const resolvedRoot = resolve(root);
   return (
-    existsSync(join(resolvedRoot, "astro.config.mjs")) ||
-    existsSync(join(resolvedRoot, "astro.config.ts")) ||
-    existsSync(join(resolvedRoot, "astro.config.js"))
+    existsSync(join(resolvedRoot, 'astro.config.mjs')) ||
+    existsSync(join(resolvedRoot, 'astro.config.ts')) ||
+    existsSync(join(resolvedRoot, 'astro.config.js'))
   );
 }
 
@@ -114,7 +122,7 @@ export function scanAstroRepo(root: string): RepoHints {
   const resolvedRoot = resolve(root);
   const allFiles = walkFiles(resolvedRoot);
 
-  const pagesDir = join(resolvedRoot, "src", "pages");
+  const pagesDir = join(resolvedRoot, 'src', 'pages');
 
   const pageFiles: string[] = [];
   const apiFiles: string[] = [];
@@ -123,7 +131,7 @@ export function scanAstroRepo(root: string): RepoHints {
   for (const filePath of allFiles) {
     const rel = toPosix(relative(resolvedRoot, filePath));
 
-    if (rel.startsWith("src/pages/")) {
+    if (rel.startsWith('src/pages/')) {
       if (ASTRO_PAGE_RE.test(filePath)) {
         pageFiles.push(filePath);
         if (ASTRO_FILE_RE.test(filePath)) {
@@ -132,7 +140,7 @@ export function scanAstroRepo(root: string): RepoHints {
       } else if (JS_TS_FILE_RE.test(filePath)) {
         apiFiles.push(filePath);
       }
-    } else if (rel.startsWith("src/components/") && ASTRO_FILE_RE.test(filePath)) {
+    } else if (rel.startsWith('src/components/') && ASTRO_FILE_RE.test(filePath)) {
       astroFiles.push(filePath);
     }
   }
@@ -148,12 +156,12 @@ export function scanAstroRepo(root: string): RepoHints {
 
   for (const filePath of apiFiles) {
     const route = routeFromFile(pagesDir, filePath);
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
     const methods = extractRouteMethods(content);
     const statuses = extractStatusCodes(content);
     const authRequired = AUTH_RE.test(content);
     const validationSchemas = uniqueSorted(
-      [...content.matchAll(VALIDATION_SCHEMA_RE)].map((m) => m[1]),
+      [...content.matchAll(VALIDATION_SCHEMA_RE)].map((m) => m[1])
     );
 
     const existing = apiEndpointMap.get(route);
@@ -191,25 +199,19 @@ export function scanAstroRepo(root: string): RepoHints {
 
   // Extract selectors from all .astro files (pages + components)
   const stableSelectors = uniqueSorted(
-    astroFiles.flatMap((filePath) =>
-      extractStableSelectors(readFileSync(filePath, "utf-8")),
-    ),
+    astroFiles.flatMap((filePath) => extractStableSelectors(readFileSync(filePath, 'utf-8')))
   );
 
   // Auth hints
-  const loginRoutes = routes.filter((route) =>
-    /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route),
-  );
-  const callbackRoutes = routes.filter((route) =>
-    /(^|\/)(callback|oauth|sso)(\/|$)/i.test(route),
-  );
+  const loginRoutes = routes.filter((route) => /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route));
+  const callbackRoutes = routes.filter((route) => /(^|\/)(callback|oauth|sso)(\/|$)/i.test(route));
 
   // Expected HTTP noise from API files with 401/403
   const expectedHttpNoise: ExpectedHttpNoise[] = [];
   for (const filePath of apiFiles) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
     const statuses = extractStatusCodes(content).filter(
-      (status) => status === 401 || status === 403,
+      (status) => status === 401 || status === 403
     );
     if (statuses.length === 0) continue;
 
@@ -223,7 +225,7 @@ export function scanAstroRepo(root: string): RepoHints {
     const existing = noiseMerged.get(entry.pathPrefix);
     if (existing) {
       existing.statuses = [...new Set([...existing.statuses, ...entry.statuses])].sort(
-        (a, b) => a - b,
+        (a, b) => a - b
       );
     } else {
       noiseMerged.set(entry.pathPrefix, { ...entry });
@@ -240,7 +242,7 @@ export function scanAstroRepo(root: string): RepoHints {
       callbackRoutes: uniqueSorted(callbackRoutes),
     },
     expectedHttpNoise: [...noiseMerged.values()].sort((a, b) =>
-      a.pathPrefix.localeCompare(b.pathPrefix),
+      a.pathPrefix.localeCompare(b.pathPrefix)
     ),
   };
 }

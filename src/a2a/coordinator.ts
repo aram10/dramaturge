@@ -7,19 +7,13 @@
  * communication via the Blackboard and MessageBus.
  */
 
-import { Planner } from "../planner/planner.js";
-import { AGENT_CARDS, agentRoleForWorkerType } from "./agent-cards.js";
-import type { Blackboard } from "./blackboard.js";
-import type { MessageBus } from "./message-bus.js";
-import type {
-  AgentCard,
-  AgentRole,
-  A2ATask,
-  A2ATaskStatus,
-  A2AMessage,
-} from "./types.js";
-import type { FrontierItem, WorkerType } from "../types.js";
-import { shortId } from "../constants.js";
+import { Planner } from '../planner/planner.js';
+import { AGENT_CARDS, agentRoleForWorkerType } from './agent-cards.js';
+import type { Blackboard } from './blackboard.js';
+import type { MessageBus } from './message-bus.js';
+import type { AgentCard, AgentRole, A2ATask, A2ATaskStatus, A2AMessage } from './types.js';
+import type { FrontierItem, WorkerType } from '../types.js';
+import { shortId } from '../constants.js';
 
 export interface CoordinatorDeps {
   blackboard: Blackboard;
@@ -43,9 +37,7 @@ export class Coordinator extends Planner {
   constructor(deps: CoordinatorDeps) {
     super();
     this.deps = deps;
-    this.agents = new Map(
-      Object.entries(AGENT_CARDS) as [AgentRole, AgentCard][]
-    );
+    this.agents = new Map(Object.entries(AGENT_CARDS) as [AgentRole, AgentCard][]);
   }
 
   /** Get the agent card for a given role. */
@@ -72,12 +64,12 @@ export class Coordinator extends Planner {
     const task: A2ATask = {
       id: `a2a-${shortId()}`,
       assignedAgent: card.id,
-      status: "submitted",
+      status: 'submitted',
       messages: [],
       artifacts: [],
       history: [
         {
-          status: "submitted",
+          status: 'submitted',
           timestamp: new Date().toISOString(),
         },
       ],
@@ -92,25 +84,25 @@ export class Coordinator extends Planner {
     this.activeTasks.set(task.id, task);
 
     // Post assignment to blackboard
-    this.deps.blackboard.post("directive", "coordinator", {
-      type: "task-assigned",
-      taskId: task.id,
-      agentId: card.id,
-      agentRole: role,
-      workerType: item.workerType,
-      objective: item.objective,
-    }, [role, item.workerType]);
+    this.deps.blackboard.post(
+      'directive',
+      'coordinator',
+      {
+        type: 'task-assigned',
+        taskId: task.id,
+        agentId: card.id,
+        agentRole: role,
+        workerType: item.workerType,
+        objective: item.objective,
+      },
+      [role, item.workerType]
+    );
 
     // Notify the assigned agent
-    this.deps.messageBus.sendText(
-      "coordinator",
-      card.id,
-      `Task assigned: ${item.objective}`,
-      {
-        role: "coordinator",
-        metadata: { a2aTaskId: task.id, workerType: item.workerType },
-      }
-    );
+    this.deps.messageBus.sendText('coordinator', card.id, `Task assigned: ${item.objective}`, {
+      role: 'coordinator',
+      metadata: { a2aTaskId: task.id, workerType: item.workerType },
+    });
 
     return task;
   }
@@ -118,11 +110,7 @@ export class Coordinator extends Planner {
   /**
    * Update task status through the A2A lifecycle.
    */
-  updateTaskStatus(
-    taskId: string,
-    status: A2ATaskStatus,
-    message?: A2AMessage
-  ): void {
+  updateTaskStatus(taskId: string, status: A2ATaskStatus, message?: A2AMessage): void {
     const task = this.activeTasks.get(taskId);
     if (!task) return;
 
@@ -138,35 +126,41 @@ export class Coordinator extends Planner {
     }
 
     // Post status change to blackboard
-    this.deps.blackboard.post("directive", "coordinator", {
-      type: "task-status-update",
-      taskId,
-      status,
-      agentId: task.assignedAgent,
-    }, [status]);
+    this.deps.blackboard.post(
+      'directive',
+      'coordinator',
+      {
+        type: 'task-status-update',
+        taskId,
+        status,
+        agentId: task.assignedAgent,
+      },
+      [status]
+    );
   }
 
   /**
    * Record a completed task and post findings to the blackboard
    * for the Reviewer and Reporter agents to observe.
    */
-  completeTask(
-    taskId: string,
-    summary: string,
-    findingsCount: number
-  ): void {
-    this.updateTaskStatus(taskId, "completed");
+  completeTask(taskId: string, summary: string, findingsCount: number): void {
+    this.updateTaskStatus(taskId, 'completed');
 
     const task = this.activeTasks.get(taskId);
     if (!task) return;
 
     // Post completion summary to blackboard
-    this.deps.blackboard.post("finding", task.assignedAgent, {
-      type: "task-completed",
-      taskId,
-      summary,
-      findingsCount,
-    }, ["completed"]);
+    this.deps.blackboard.post(
+      'finding',
+      task.assignedAgent,
+      {
+        type: 'task-completed',
+        taskId,
+        summary,
+        findingsCount,
+      },
+      ['completed']
+    );
 
     // Notify the reviewer if findings were detected
     if (findingsCount > 0) {
@@ -183,21 +177,22 @@ export class Coordinator extends Planner {
    * Broadcast a directive to all agents. Used by the Reviewer to redirect
    * agent focus based on observed patterns.
    */
-  broadcastDirective(
-    fromAgentId: string,
-    text: string,
-    metadata?: Record<string, unknown>
-  ): void {
-    this.deps.messageBus.sendText(fromAgentId, "*", text, {
-      role: fromAgentId === "coordinator" ? "coordinator" : "agent",
+  broadcastDirective(fromAgentId: string, text: string, metadata?: Record<string, unknown>): void {
+    this.deps.messageBus.sendText(fromAgentId, '*', text, {
+      role: fromAgentId === 'coordinator' ? 'coordinator' : 'agent',
       metadata,
     });
 
-    this.deps.blackboard.post("directive", fromAgentId, {
-      ...metadata,
-      type: "broadcast",
-      text,
-    }, ["broadcast"]);
+    this.deps.blackboard.post(
+      'directive',
+      fromAgentId,
+      {
+        ...metadata,
+        type: 'broadcast',
+        text,
+      },
+      ['broadcast']
+    );
   }
 
   /** Get an active task by its A2A task id. */
@@ -208,7 +203,7 @@ export class Coordinator extends Planner {
   /** Get all active tasks. */
   getActiveTasks(): A2ATask[] {
     return [...this.activeTasks.values()].filter(
-      (t) => t.status !== "completed" && t.status !== "failed" && t.status !== "canceled"
+      (t) => t.status !== 'completed' && t.status !== 'failed' && t.status !== 'canceled'
     );
   }
 

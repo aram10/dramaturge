@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { StateGraph } from "./state-graph.js";
-import type { PageFingerprint, DiscoveredEdge } from "../types.js";
+import { describe, it, expect } from 'vitest';
+import { StateGraph } from './state-graph.js';
+import type { PageFingerprint, DiscoveredEdge } from '../types.js';
 
 function makeFp(hash: string): PageFingerprint {
   return {
@@ -17,24 +17,24 @@ function makeFp(hash: string): PageFingerprint {
   };
 }
 
-describe("StateGraph", () => {
-  describe("addNode / getNode", () => {
-    it("creates a node with correct properties", () => {
+describe('StateGraph', () => {
+  describe('addNode / getNode', () => {
+    it('creates a node with correct properties', () => {
       const graph = new StateGraph();
-      const fp = makeFp("abc123");
+      const fp = makeFp('abc123');
       const node = graph.addNode({
-        url: "https://example.com",
-        title: "Home",
+        url: 'https://example.com',
+        title: 'Home',
         fingerprint: fp,
-        pageType: "dashboard",
+        pageType: 'dashboard',
         depth: 0,
       });
 
       expect(node.id).toMatch(/^node-/);
-      expect(node.url).toBe("https://example.com");
-      expect(node.title).toBe("Home");
+      expect(node.url).toBe('https://example.com');
+      expect(node.title).toBe('Home');
       expect(node.fingerprint).toBe(fp);
-      expect(node.pageType).toBe("dashboard");
+      expect(node.pageType).toBe('dashboard');
       expect(node.depth).toBe(0);
       expect(node.timesVisited).toBe(0);
       expect(node.controlsDiscovered).toEqual([]);
@@ -43,11 +43,11 @@ describe("StateGraph", () => {
       expect(node.riskScore).toBe(0);
     });
 
-    it("retrieves a node by id", () => {
+    it('retrieves a node by id', () => {
       const graph = new StateGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("abc"),
-        pageType: "form",
+        fingerprint: makeFp('abc'),
+        pageType: 'form',
         depth: 1,
       });
 
@@ -55,18 +55,18 @@ describe("StateGraph", () => {
       expect(retrieved).toBe(node);
     });
 
-    it("throws for unknown node id", () => {
+    it('throws for unknown node id', () => {
       const graph = new StateGraph();
-      expect(() => graph.getNode("node-nonexistent")).toThrow(
-        "StateNode not found: node-nonexistent"
+      expect(() => graph.getNode('node-nonexistent')).toThrow(
+        'StateNode not found: node-nonexistent'
       );
     });
 
-    it("respects custom riskScore", () => {
+    it('respects custom riskScore', () => {
       const graph = new StateGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("risky"),
-        pageType: "settings",
+        fingerprint: makeFp('risky'),
+        pageType: 'settings',
         depth: 0,
         riskScore: 0.9,
       });
@@ -74,13 +74,13 @@ describe("StateGraph", () => {
     });
   });
 
-  describe("findByFingerprint", () => {
-    it("finds an existing node by fingerprint hash", () => {
+  describe('findByFingerprint', () => {
+    it('finds an existing node by fingerprint hash', () => {
       const graph = new StateGraph();
-      const fp = makeFp("match-me");
+      const fp = makeFp('match-me');
       const node = graph.addNode({
         fingerprint: fp,
-        pageType: "list",
+        pageType: 'list',
         depth: 0,
       });
 
@@ -88,78 +88,78 @@ describe("StateGraph", () => {
       expect(found).toBe(node);
     });
 
-    it("returns undefined for unknown fingerprint", () => {
+    it('returns undefined for unknown fingerprint', () => {
       const graph = new StateGraph();
       graph.addNode({
-        fingerprint: makeFp("aaa"),
-        pageType: "form",
+        fingerprint: makeFp('aaa'),
+        pageType: 'form',
         depth: 0,
       });
 
-      const result = graph.findByFingerprint(makeFp("zzz"));
+      const result = graph.findByFingerprint(makeFp('zzz'));
       expect(result).toBeUndefined();
     });
   });
 
-  describe("addEdge", () => {
-    it("creates an edge between two nodes", () => {
+  describe('addEdge', () => {
+    it('creates an edge between two nodes', () => {
       const graph = new StateGraph();
       const a = graph.addNode({
-        fingerprint: makeFp("a"),
-        pageType: "dashboard",
+        fingerprint: makeFp('a'),
+        pageType: 'dashboard',
         depth: 0,
       });
       const b = graph.addNode({
-        fingerprint: makeFp("b"),
-        pageType: "form",
+        fingerprint: makeFp('b'),
+        pageType: 'form',
         depth: 1,
       });
 
       const discoveredEdge: DiscoveredEdge = {
-        actionLabel: "Click Create",
-        navigationHint: { selector: "#create-btn" },
-        targetFingerprint: makeFp("b"),
-        targetPageType: "form",
+        actionLabel: 'Click Create',
+        navigationHint: { selector: '#create-btn' },
+        targetFingerprint: makeFp('b'),
+        targetPageType: 'form',
       };
 
       const edge = graph.addEdge(a.id, b.id, discoveredEdge);
       expect(edge.id).toMatch(/^edge-/);
       expect(edge.fromNodeId).toBe(a.id);
       expect(edge.toNodeId).toBe(b.id);
-      expect(edge.actionLabel).toBe("Click Create");
-      expect(edge.outcome).toBe("success");
+      expect(edge.actionLabel).toBe('Click Create');
+      expect(edge.outcome).toBe('success');
     });
   });
 
-  describe("pathToNode (BFS)", () => {
-    it("returns empty array for root node", () => {
+  describe('pathToNode (BFS)', () => {
+    it('returns empty array for root node', () => {
       const graph = new StateGraph();
       const root = graph.addNode({
-        fingerprint: makeFp("root"),
-        pageType: "dashboard",
+        fingerprint: makeFp('root'),
+        pageType: 'dashboard',
         depth: 0,
       });
       expect(graph.pathToNode(root.id)).toEqual([]);
     });
 
-    it("finds a direct path from root to child", () => {
+    it('finds a direct path from root to child', () => {
       const graph = new StateGraph();
       const root = graph.addNode({
-        fingerprint: makeFp("root"),
-        pageType: "dashboard",
+        fingerprint: makeFp('root'),
+        pageType: 'dashboard',
         depth: 0,
       });
       const child = graph.addNode({
-        fingerprint: makeFp("child"),
-        pageType: "form",
+        fingerprint: makeFp('child'),
+        pageType: 'form',
         depth: 1,
       });
 
       const edge = graph.addEdge(root.id, child.id, {
-        actionLabel: "Click link",
-        navigationHint: { url: "/child" },
-        targetFingerprint: makeFp("child"),
-        targetPageType: "form",
+        actionLabel: 'Click link',
+        navigationHint: { url: '/child' },
+        targetFingerprint: makeFp('child'),
+        targetPageType: 'form',
       });
 
       const path = graph.pathToNode(child.id);
@@ -167,35 +167,35 @@ describe("StateGraph", () => {
       expect(path[0].id).toBe(edge.id);
     });
 
-    it("finds multi-hop path", () => {
+    it('finds multi-hop path', () => {
       const graph = new StateGraph();
       const root = graph.addNode({
-        fingerprint: makeFp("r"),
-        pageType: "dashboard",
+        fingerprint: makeFp('r'),
+        pageType: 'dashboard',
         depth: 0,
       });
       const mid = graph.addNode({
-        fingerprint: makeFp("m"),
-        pageType: "list",
+        fingerprint: makeFp('m'),
+        pageType: 'list',
         depth: 1,
       });
       const leaf = graph.addNode({
-        fingerprint: makeFp("l"),
-        pageType: "detail",
+        fingerprint: makeFp('l'),
+        pageType: 'detail',
         depth: 2,
       });
 
       graph.addEdge(root.id, mid.id, {
-        actionLabel: "Go to list",
-        navigationHint: { url: "/list" },
-        targetFingerprint: makeFp("m"),
-        targetPageType: "list",
+        actionLabel: 'Go to list',
+        navigationHint: { url: '/list' },
+        targetFingerprint: makeFp('m'),
+        targetPageType: 'list',
       });
       graph.addEdge(mid.id, leaf.id, {
-        actionLabel: "Open detail",
-        navigationHint: { selector: ".row" },
-        targetFingerprint: makeFp("l"),
-        targetPageType: "detail",
+        actionLabel: 'Open detail',
+        navigationHint: { selector: '.row' },
+        targetFingerprint: makeFp('l'),
+        targetPageType: 'detail',
       });
 
       const path = graph.pathToNode(leaf.id);
@@ -206,16 +206,16 @@ describe("StateGraph", () => {
       expect(path[1].toNodeId).toBe(leaf.id);
     });
 
-    it("returns empty for unreachable node", () => {
+    it('returns empty for unreachable node', () => {
       const graph = new StateGraph();
       graph.addNode({
-        fingerprint: makeFp("root"),
-        pageType: "dashboard",
+        fingerprint: makeFp('root'),
+        pageType: 'dashboard',
         depth: 0,
       });
       const orphan = graph.addNode({
-        fingerprint: makeFp("orphan"),
-        pageType: "form",
+        fingerprint: makeFp('orphan'),
+        pageType: 'form',
         depth: 1,
       });
       // No edge connecting root → orphan
@@ -223,59 +223,59 @@ describe("StateGraph", () => {
     });
   });
 
-  describe("nodeCount / getAllNodes / getAllEdges", () => {
-    it("tracks node and edge counts", () => {
+  describe('nodeCount / getAllNodes / getAllEdges', () => {
+    it('tracks node and edge counts', () => {
       const graph = new StateGraph();
       expect(graph.nodeCount()).toBe(0);
       expect(graph.getAllNodes()).toEqual([]);
 
       const a = graph.addNode({
-        fingerprint: makeFp("a"),
-        pageType: "dashboard",
+        fingerprint: makeFp('a'),
+        pageType: 'dashboard',
         depth: 0,
       });
       expect(graph.nodeCount()).toBe(1);
 
       const b = graph.addNode({
-        fingerprint: makeFp("b"),
-        pageType: "form",
+        fingerprint: makeFp('b'),
+        pageType: 'form',
         depth: 1,
       });
       expect(graph.nodeCount()).toBe(2);
 
       graph.addEdge(a.id, b.id, {
-        actionLabel: "test",
+        actionLabel: 'test',
         navigationHint: {},
-        targetFingerprint: makeFp("b"),
-        targetPageType: "form",
+        targetFingerprint: makeFp('b'),
+        targetPageType: 'form',
       });
       expect(graph.getAllEdges()).toHaveLength(1);
     });
   });
 
-  describe("summary", () => {
-    it("produces a human-readable summary", () => {
+  describe('summary', () => {
+    it('produces a human-readable summary', () => {
       const graph = new StateGraph();
       graph.addNode({
-        url: "https://example.com",
-        fingerprint: makeFp("root"),
-        pageType: "dashboard",
+        url: 'https://example.com',
+        fingerprint: makeFp('root'),
+        pageType: 'dashboard',
         depth: 0,
       });
 
       const summary = graph.summary();
-      expect(summary).toContain("State graph: 1 nodes, 0 edges");
-      expect(summary).toContain("dashboard");
-      expect(summary).toContain("depth=0");
+      expect(summary).toContain('State graph: 1 nodes, 0 edges');
+      expect(summary).toContain('dashboard');
+      expect(summary).toContain('depth=0');
     });
   });
 
-  describe("mutation methods", () => {
-    it("recordVisit increments timesVisited", () => {
+  describe('mutation methods', () => {
+    it('recordVisit increments timesVisited', () => {
       const graph = new StateGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("v"),
-        pageType: "form",
+        fingerprint: makeFp('v'),
+        pageType: 'form',
         depth: 0,
       });
       expect(node.timesVisited).toBe(0);
@@ -287,73 +287,73 @@ describe("StateGraph", () => {
       expect(node.timesVisited).toBe(2);
     });
 
-    it("addDiscoveredControl deduplicates", () => {
+    it('addDiscoveredControl deduplicates', () => {
       const graph = new StateGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("d"),
-        pageType: "form",
+        fingerprint: makeFp('d'),
+        pageType: 'form',
         depth: 0,
       });
 
-      graph.addDiscoveredControl(node.id, "btn-save");
-      graph.addDiscoveredControl(node.id, "btn-save");
-      graph.addDiscoveredControl(node.id, "btn-cancel");
-      expect(node.controlsDiscovered).toEqual(["btn-save", "btn-cancel"]);
+      graph.addDiscoveredControl(node.id, 'btn-save');
+      graph.addDiscoveredControl(node.id, 'btn-save');
+      graph.addDiscoveredControl(node.id, 'btn-cancel');
+      expect(node.controlsDiscovered).toEqual(['btn-save', 'btn-cancel']);
     });
 
-    it("addExercisedControl deduplicates", () => {
+    it('addExercisedControl deduplicates', () => {
       const graph = new StateGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("e"),
-        pageType: "form",
+        fingerprint: makeFp('e'),
+        pageType: 'form',
         depth: 0,
       });
 
-      graph.addExercisedControl(node.id, "input-name");
-      graph.addExercisedControl(node.id, "input-name");
-      expect(node.controlsExercised).toEqual(["input-name"]);
+      graph.addExercisedControl(node.id, 'input-name');
+      graph.addExercisedControl(node.id, 'input-name');
+      expect(node.controlsExercised).toEqual(['input-name']);
     });
   });
 
-  describe("toMermaid", () => {
-    it("renders an empty graph", () => {
+  describe('toMermaid', () => {
+    it('renders an empty graph', () => {
       const graph = new StateGraph();
-      expect(graph.toMermaid()).toBe("graph TD");
+      expect(graph.toMermaid()).toBe('graph TD');
     });
 
-    it("renders nodes and edges as a Mermaid flowchart", () => {
+    it('renders nodes and edges as a Mermaid flowchart', () => {
       const graph = new StateGraph();
       const a = graph.addNode({
-        fingerprint: makeFp("m1"),
-        pageType: "dashboard",
-        title: "Home",
+        fingerprint: makeFp('m1'),
+        pageType: 'dashboard',
+        title: 'Home',
         depth: 0,
       });
       const b = graph.addNode({
-        fingerprint: makeFp("m2"),
-        pageType: "form",
-        title: "Login",
+        fingerprint: makeFp('m2'),
+        pageType: 'form',
+        title: 'Login',
         depth: 1,
       });
       graph.addEdge(a.id, b.id, {
-        actionLabel: "Click login",
+        actionLabel: 'Click login',
         navigationHint: {},
-        targetFingerprint: makeFp("m2"),
-        targetPageType: "form",
+        targetFingerprint: makeFp('m2'),
+        targetPageType: 'form',
       });
 
       const mermaid = graph.toMermaid();
-      expect(mermaid).toContain("graph TD");
+      expect(mermaid).toContain('graph TD');
       expect(mermaid).toContain(`${a.id}["dashboard: Home"]`);
       expect(mermaid).toContain(`${b.id}["form: Login"]`);
       expect(mermaid).toContain(`${a.id} -->|"Click login"| ${b.id}`);
     });
 
-    it("escapes double quotes in labels", () => {
+    it('escapes double quotes in labels', () => {
       const graph = new StateGraph();
       const node = graph.addNode({
-        fingerprint: makeFp("m3"),
-        pageType: "detail",
+        fingerprint: makeFp('m3'),
+        pageType: 'detail',
         title: 'Item "Special"',
         depth: 0,
       });

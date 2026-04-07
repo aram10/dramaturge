@@ -1,38 +1,38 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import type { RepoHints } from "./types.js";
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import type { RepoHints } from './types.js';
 
 const TEXT_FILE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".json",
-  ".html",
-  ".mdx",
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.json',
+  '.html',
+  '.mdx',
 ]);
 const IGNORED_DIRECTORY_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  "coverage",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  "tests",
-  "test",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "mocks",
-  "__mocks__",
-  "generated",
-  "__generated__",
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  'tests',
+  'test',
+  '__tests__',
+  'fixtures',
+  '__fixtures__',
+  'mocks',
+  '__mocks__',
+  'generated',
+  '__generated__',
 ]);
 const IGNORED_FILE_NAME_PATTERNS = [
   /\.test\./i,
@@ -54,7 +54,7 @@ function shouldIgnoreEntry(name: string, isDirectory: boolean): boolean {
     return false;
   }
 
-  if (name.endsWith(".d.ts")) {
+  if (name.endsWith('.d.ts')) {
     return true;
   }
 
@@ -92,12 +92,12 @@ function uniqueNumbers(values: number[]): number[] {
 }
 
 function collectMatches(content: string, pattern: RegExp): string[] {
-  return [...content.matchAll(pattern)].map((match) => match[1] ?? "");
+  return [...content.matchAll(pattern)].map((match) => match[1] ?? '');
 }
 
 function routeFamily(route: string): string {
-  const parts = route.split("?")[0]?.split("/").filter(Boolean) ?? [];
-  return parts.length === 0 ? "/" : `/${parts[0]}`;
+  const parts = route.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  return parts.length === 0 ? '/' : `/${parts[0]}`;
 }
 
 function createEmptyHints(): RepoHints {
@@ -116,36 +116,34 @@ function createEmptyHints(): RepoHints {
 
 export function scanGenericRepo(root: string): RepoHints {
   const hints = createEmptyHints();
-  const apiEndpoints = new Map<string, { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }>();
+  const apiEndpoints = new Map<
+    string,
+    { route: string; methods: string[]; statuses: number[]; validationSchemas: string[] }
+  >();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
 
-    const routes = collectMatches(
-      content,
-      /["'`](\/(?!api\/)(?!\/)[^"'`\s]*)["'`]/g
-    ).filter((route) => !/\.(css|js|png|jpg|svg|ico)$/.test(route));
+    const routes = collectMatches(content, /["'`](\/(?!api\/)(?!\/)[^"'`\s]*)["'`]/g).filter(
+      (route) => !/\.(css|js|png|jpg|svg|ico)$/.test(route)
+    );
     hints.routes.push(...routes);
 
-    const testIds = collectMatches(
-      content,
-      /data-testid=["']([^"']+)["']/g
-    );
-    const getByTestIds = collectMatches(
-      content,
-      /getByTestId\((?:["'`])([^"'`]+)(?:["'`])\)/g
-    );
+    const testIds = collectMatches(content, /data-testid=["']([^"']+)["']/g);
+    const getByTestIds = collectMatches(content, /getByTestId\((?:["'`])([^"'`]+)(?:["'`])\)/g);
     hints.stableSelectors.push(
       ...testIds.map((testId) => `[data-testid="${testId}"]`),
       ...getByTestIds.map((testId) => `[data-testid="${testId}"]`)
     );
 
-    const fetchMatches = [...content.matchAll(
-      /fetch\(\s*["'`](\/api\/[^"'`\s]+)["'`](?:\s*,\s*\{[\s\S]*?method:\s*["'`](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["'`][\s\S]*?\})?/g
-    )];
+    const fetchMatches = [
+      ...content.matchAll(
+        /fetch\(\s*["'`](\/api\/[^"'`\s]+)["'`](?:\s*,\s*\{[\s\S]*?method:\s*["'`](GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)["'`][\s\S]*?\})?/g
+      ),
+    ];
     for (const match of fetchMatches) {
-      const route = match[1] ?? "";
-      const method = (match[2] ?? "GET").toUpperCase();
+      const route = match[1] ?? '';
+      const method = (match[2] ?? 'GET').toUpperCase();
       const existing = apiEndpoints.get(route) ?? {
         route,
         methods: [],

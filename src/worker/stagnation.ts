@@ -10,10 +10,7 @@ export class StagnationTracker {
   constructor(private readonly threshold: number) {}
 
   recordStep(activity: StepActivity): void {
-    const productive =
-      activity.findings > 0 ||
-      activity.newControls > 0 ||
-      activity.edges > 0;
+    const productive = activity.findings > 0 || activity.newControls > 0 || activity.edges > 0;
 
     if (productive) {
       this.consecutiveIdle = 0;

@@ -50,7 +50,7 @@ export default [
       // Anti-pattern prevention
       'max-params': ['warn', { max: 5 }], // Flag functions with > 5 params
       'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }],
-      'complexity': ['warn', { max: 20 }],
+      complexity: ['warn', { max: 20 }],
       'max-depth': ['warn', { max: 4 }],
     },
   },

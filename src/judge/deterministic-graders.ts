@@ -1,5 +1,5 @@
-import type { Evidence } from "../types.js";
-import type { Observation, JudgeDecision } from "./types.js";
+import type { Evidence } from '../types.js';
+import type { Observation, JudgeDecision } from './types.js';
 
 /**
  * Deterministic judge graders for finding validation.
@@ -18,7 +18,7 @@ export interface DeterministicGradeResult {
   /** Whether the deterministic grader confirmed the finding. */
   confirmed: boolean;
   /** Confidence from the deterministic check. */
-  confidence: "low" | "medium" | "high";
+  confidence: 'low' | 'medium' | 'high';
   /** Human-readable explanation. */
   reason: string;
   /** Source grader that produced this result. */
@@ -36,42 +36,37 @@ export function gradeByConsoleErrors(
   observation: Observation,
   evidence: Evidence[]
 ): DeterministicGradeResult {
-  const linkedEvidence = evidence.filter((ev) =>
-    observation.evidenceIds.includes(ev.id)
-  );
-  const consoleErrors = linkedEvidence.filter(
-    (ev) => ev.type === "console-error"
-  );
+  const linkedEvidence = evidence.filter((ev) => observation.evidenceIds.includes(ev.id));
+  const consoleErrors = linkedEvidence.filter((ev) => ev.type === 'console-error');
 
   const mentionsConsoleError =
-    observation.actual.toLowerCase().includes("console error") ||
-    observation.actual.toLowerCase().includes("error in console") ||
-    observation.title.toLowerCase().includes("console error");
+    observation.actual.toLowerCase().includes('console error') ||
+    observation.actual.toLowerCase().includes('error in console') ||
+    observation.title.toLowerCase().includes('console error');
 
   if (mentionsConsoleError && consoleErrors.length === 0) {
     return {
       confirmed: false,
-      confidence: "low",
-      reason:
-        "Finding mentions console errors but no console-error evidence is linked.",
-      grader: "console-error",
+      confidence: 'low',
+      reason: 'Finding mentions console errors but no console-error evidence is linked.',
+      grader: 'console-error',
     };
   }
 
   if (consoleErrors.length > 0) {
     return {
       confirmed: true,
-      confidence: "high",
+      confidence: 'high',
       reason: `${consoleErrors.length} console error(s) captured as evidence.`,
-      grader: "console-error",
+      grader: 'console-error',
     };
   }
 
   return {
     confirmed: true,
-    confidence: "medium",
-    reason: "No console error evidence applicable — pass-through.",
-    grader: "console-error",
+    confidence: 'medium',
+    reason: 'No console error evidence applicable — pass-through.',
+    grader: 'console-error',
   };
 }
 
@@ -85,12 +80,8 @@ export function gradeByNetworkErrors(
   observation: Observation,
   evidence: Evidence[]
 ): DeterministicGradeResult {
-  const linkedEvidence = evidence.filter((ev) =>
-    observation.evidenceIds.includes(ev.id)
-  );
-  const networkErrors = linkedEvidence.filter(
-    (ev) => ev.type === "network-error"
-  );
+  const linkedEvidence = evidence.filter((ev) => observation.evidenceIds.includes(ev.id));
+  const networkErrors = linkedEvidence.filter((ev) => ev.type === 'network-error');
 
   // Check if the finding text mentions specific HTTP status codes
   const statusPattern = /\b([45]\d{2})\b/g;
@@ -105,26 +96,26 @@ export function gradeByNetworkErrors(
   if (mentionedStatuses.size > 0 && networkErrors.length === 0) {
     return {
       confirmed: false,
-      confidence: "low",
-      reason: `Finding mentions HTTP status ${[...mentionedStatuses].join(", ")} but no network-error evidence is linked.`,
-      grader: "network-error",
+      confidence: 'low',
+      reason: `Finding mentions HTTP status ${[...mentionedStatuses].join(', ')} but no network-error evidence is linked.`,
+      grader: 'network-error',
     };
   }
 
   if (networkErrors.length > 0) {
     return {
       confirmed: true,
-      confidence: "high",
+      confidence: 'high',
       reason: `${networkErrors.length} network error(s) captured as evidence.`,
-      grader: "network-error",
+      grader: 'network-error',
     };
   }
 
   return {
     confirmed: true,
-    confidence: "medium",
-    reason: "No network error evidence applicable — pass-through.",
-    grader: "network-error",
+    confidence: 'medium',
+    reason: 'No network error evidence applicable — pass-through.',
+    grader: 'network-error',
   };
 }
 
@@ -139,16 +130,14 @@ export function gradeByEvidenceCompleteness(
   observation: Observation,
   evidence: Evidence[]
 ): DeterministicGradeResult {
-  const linkedEvidence = evidence.filter((ev) =>
-    observation.evidenceIds.includes(ev.id)
-  );
+  const linkedEvidence = evidence.filter((ev) => observation.evidenceIds.includes(ev.id));
 
   if (linkedEvidence.length === 0) {
     return {
       confirmed: false,
-      confidence: "low",
-      reason: "Finding has no linked evidence.",
-      grader: "evidence-completeness",
+      confidence: 'low',
+      reason: 'Finding has no linked evidence.',
+      grader: 'evidence-completeness',
     };
   }
 
@@ -157,17 +146,17 @@ export function gradeByEvidenceCompleteness(
   if (types.size >= 2) {
     return {
       confirmed: true,
-      confidence: "high",
-      reason: `Finding supported by ${types.size} evidence types: ${[...types].join(", ")}.`,
-      grader: "evidence-completeness",
+      confidence: 'high',
+      reason: `Finding supported by ${types.size} evidence types: ${[...types].join(', ')}.`,
+      grader: 'evidence-completeness',
     };
   }
 
   return {
     confirmed: true,
-    confidence: "medium",
-    reason: `Finding supported by ${linkedEvidence.length} evidence item(s) of type: ${[...types].join(", ")}.`,
-    grader: "evidence-completeness",
+    confidence: 'medium',
+    reason: `Finding supported by ${linkedEvidence.length} evidence item(s) of type: ${[...types].join(', ')}.`,
+    grader: 'evidence-completeness',
   };
 }
 
@@ -182,7 +171,7 @@ export function runDeterministicGraders(
   evidence: Evidence[]
 ): {
   results: DeterministicGradeResult[];
-  combinedConfidence: "low" | "medium" | "high";
+  combinedConfidence: 'low' | 'medium' | 'high';
   allConfirmed: boolean;
 } {
   const results = [
@@ -195,11 +184,8 @@ export function runDeterministicGraders(
 
   const CONFIDENCE_ORDER = { low: 0, medium: 1, high: 2 } as const;
   const lowestConfidence = results.reduce(
-    (min, r) =>
-      CONFIDENCE_ORDER[r.confidence] < CONFIDENCE_ORDER[min]
-        ? r.confidence
-        : min,
-    "high" as "low" | "medium" | "high"
+    (min, r) => (CONFIDENCE_ORDER[r.confidence] < CONFIDENCE_ORDER[min] ? r.confidence : min),
+    'high' as 'low' | 'medium' | 'high'
   );
 
   return {

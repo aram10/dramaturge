@@ -1,5 +1,5 @@
-import { resolve } from "node:path";
-import type { DramaturgeConfig } from "./config.js";
+import { resolve } from 'node:path';
+import type { DramaturgeConfig } from './config.js';
 
 export interface ConfigFileContext {
   configPath: string;
@@ -16,10 +16,10 @@ export type ConfigWithMeta<T> = T & {
 };
 
 export function getConfigFileContext(configPath?: string): ConfigFileContext {
-  const resolvedConfigPath = resolve(configPath ?? "dramaturge.config.json");
+  const resolvedConfigPath = resolve(configPath ?? 'dramaturge.config.json');
   return {
     configPath: resolvedConfigPath,
-    configDir: resolve(resolvedConfigPath, ".."),
+    configDir: resolve(resolvedConfigPath, '..'),
   };
 }
 
@@ -32,7 +32,7 @@ export function normalizeConfigPaths(
   context: ConfigFileContext
 ): ConfigWithMeta<DramaturgeConfig> {
   const auth =
-    config.auth.type === "interactive" || config.auth.type === "stored-state"
+    config.auth.type === 'interactive' || config.auth.type === 'stored-state'
       ? {
           ...config.auth,
           stateFile: resolveFromConfigDir(context.configDir, config.auth.stateFile),
@@ -41,10 +41,7 @@ export function normalizeConfigPaths(
 
   const normalizedRepoContext = config.repoContext
     ? (() => {
-        const repoRoot = resolveFromConfigDir(
-          context.configDir,
-          config.repoContext.root ?? "."
-        );
+        const repoRoot = resolveFromConfigDir(context.configDir, config.repoContext.root ?? '.');
 
         return {
           ...config.repoContext,
@@ -72,10 +69,7 @@ export function normalizeConfigPaths(
     },
     visualRegression: {
       ...config.visualRegression,
-      baselineDir: resolveFromConfigDir(
-        context.configDir,
-        config.visualRegression.baselineDir
-      ),
+      baselineDir: resolveFromConfigDir(context.configDir, config.visualRegression.baselineDir),
     },
     repoContext: normalizedRepoContext,
     bootstrap: config.bootstrap

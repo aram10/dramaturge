@@ -9,8 +9,8 @@
  * aligns with the A2A Artifact sharing model.
  */
 
-import type { BlackboardEntry, BlackboardEntryKind } from "./types.js";
-import { shortId } from "../constants.js";
+import type { BlackboardEntry, BlackboardEntryKind } from './types.js';
+import { shortId } from '../constants.js';
 
 /**
  * A typed blackboard for inter-agent coordination.
@@ -22,7 +22,7 @@ import { shortId } from "../constants.js";
 export class Blackboard {
   private entries: BlackboardEntry[] = [];
   private subscribers = new Map<
-    BlackboardEntryKind | "*",
+    BlackboardEntryKind | '*',
     Array<(entry: BlackboardEntry) => void>
   >();
 
@@ -50,7 +50,7 @@ export class Blackboard {
     }
 
     // Notify wildcard subscribers
-    const wildcardSubs = this.subscribers.get("*");
+    const wildcardSubs = this.subscribers.get('*');
     if (wildcardSubs) {
       for (const fn of wildcardSubs) fn(entry);
     }
@@ -60,7 +60,7 @@ export class Blackboard {
 
   /** Subscribe to entries of a specific kind (or "*" for all). */
   subscribe(
-    kind: BlackboardEntryKind | "*",
+    kind: BlackboardEntryKind | '*',
     callback: (entry: BlackboardEntry) => void
   ): () => void {
     const existing = this.subscribers.get(kind) ?? [];
@@ -105,18 +105,18 @@ export class Blackboard {
   /** Produce a compact text summary for LLM context windows. */
   summarize(maxEntries = 20): string {
     const recent = this.entries.slice(-maxEntries);
-    if (recent.length === 0) return "No entries on the blackboard yet.";
+    if (recent.length === 0) return 'No entries on the blackboard yet.';
 
     const lines = recent.map((e) => {
       const dataPreview =
-        typeof e.data.title === "string"
+        typeof e.data.title === 'string'
           ? e.data.title
-          : typeof e.data.summary === "string"
+          : typeof e.data.summary === 'string'
             ? e.data.summary
             : JSON.stringify(e.data).slice(0, 80);
       return `[${e.kind}] (${e.agentId}) ${dataPreview}`;
     });
 
-    return `Blackboard (${this.entries.length} entries, showing last ${recent.length}):\n${lines.join("\n")}`;
+    return `Blackboard (${this.entries.length} entries, showing last ${recent.length}):\n${lines.join('\n')}`;
   }
 }

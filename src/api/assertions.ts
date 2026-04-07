@@ -1,12 +1,9 @@
-import { shortId } from "../constants.js";
-import { buildConfirmedFindingMeta } from "../repro/repro.js";
-import { redactSensitiveValue, truncateString } from "../redaction.js";
-import {
-  validateOperationResponse,
-  type ContractIndex,
-} from "../spec/contract-index.js";
-import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
-import type { ApiProbeTarget, ApiReplayResponse } from "./types.js";
+import { shortId } from '../constants.js';
+import { buildConfirmedFindingMeta } from '../repro/repro.js';
+import { redactSensitiveValue, truncateString } from '../redaction.js';
+import { validateOperationResponse, type ContractIndex } from '../spec/contract-index.js';
+import type { Evidence, FindingSeverity, RawFinding } from '../types.js';
+import type { ApiProbeTarget, ApiReplayResponse } from './types.js';
 
 interface ApiAssertionArtifact {
   finding: RawFinding;
@@ -15,23 +12,23 @@ interface ApiAssertionArtifact {
 
 function describeBody(body: unknown): string {
   if (body === undefined) {
-    return "no body";
+    return 'no body';
   }
 
   try {
     const serialized = JSON.stringify(redactSensitiveValue(body));
     return serialized.length > 320 ? `${serialized.slice(0, 317)}...` : serialized;
   } catch {
-    return "[Unserializable body]";
+    return '[Unserializable body]';
   }
 }
 
 function severityForStatus(status: number): FindingSeverity {
   if (status >= 500 || status === 0) {
-    return "Major";
+    return 'Major';
   }
 
-  return "Minor";
+  return 'Minor';
 }
 
 export function buildAuthBoundaryFailureArtifacts(input: {
@@ -52,7 +49,7 @@ export function buildAuthBoundaryFailureArtifacts(input: {
   return {
     evidence: {
       id: evidenceId,
-      type: "api-contract",
+      type: 'api-contract',
       summary: `${input.target.method} ${input.target.route} succeeded without authentication`,
       timestamp: new Date().toISOString(),
       areaName: input.areaName,
@@ -60,8 +57,8 @@ export function buildAuthBoundaryFailureArtifacts(input: {
     },
     finding: {
       ref: findingRef,
-      category: "Bug",
-      severity: "Major",
+      category: 'Bug',
+      severity: 'Major',
       title,
       stepsToReproduce: [
         `Open ${input.pageRoute}`,
@@ -79,7 +76,7 @@ export function buildAuthBoundaryFailureArtifacts(input: {
           `status:${input.response.status}`,
         ],
         alternativesConsidered: [
-          "The endpoint may intentionally expose public data despite surrounding UI auth requirements.",
+          'The endpoint may intentionally expose public data despite surrounding UI auth requirements.',
         ],
         suggestedVerification: [
           `Verify backend authorization for ${input.target.method} ${input.target.route}.`,
@@ -88,7 +85,7 @@ export function buildAuthBoundaryFailureArtifacts(input: {
       meta: buildConfirmedFindingMeta({
         route: input.pageRoute,
         objective: `Probe API auth boundaries related to ${input.areaName}`,
-        confidence: "high",
+        confidence: 'high',
         breadcrumbs: [`api auth probe ${input.target.method} ${input.target.route}`],
         evidenceIds: [evidenceId],
       }),
@@ -122,14 +119,14 @@ export function buildContractReplayArtifacts(input: {
   const findingRef = `fid-${shortId()}`;
   const evidenceId = `ev-${shortId()}`;
   const title = `API replay contract deviation: ${input.target.method} ${input.target.route}`;
-  const expectedStatuses = Object.keys(validation.operation.responses).join(", ") || "none";
+  const expectedStatuses = Object.keys(validation.operation.responses).join(', ') || 'none';
   const schemaNote =
-    validation.errors.length > 0 ? `; validation errors: ${validation.errors.join(" | ")}` : "";
+    validation.errors.length > 0 ? `; validation errors: ${validation.errors.join(' | ')}` : '';
 
   return {
     evidence: {
       id: evidenceId,
-      type: "api-contract",
+      type: 'api-contract',
       summary: `${input.target.method} ${input.target.route} replay deviated from contract`,
       timestamp: new Date().toISOString(),
       areaName: input.areaName,
@@ -137,7 +134,7 @@ export function buildContractReplayArtifacts(input: {
     },
     finding: {
       ref: findingRef,
-      category: "Bug",
+      category: 'Bug',
       severity: severityForStatus(input.response.status),
       title,
       stepsToReproduce: [
@@ -157,7 +154,7 @@ export function buildContractReplayArtifacts(input: {
           ...validation.errors.map((error) => `validation:${error}`),
         ],
         alternativesConsidered: [
-          "The observed page flow may intentionally hit a different backend variant than the normalized contract expects.",
+          'The observed page flow may intentionally hit a different backend variant than the normalized contract expects.',
         ],
         suggestedVerification: [
           `Compare the live response for ${input.target.method} ${input.target.route} against the normalized spec.`,
@@ -166,7 +163,8 @@ export function buildContractReplayArtifacts(input: {
       meta: buildConfirmedFindingMeta({
         route: input.pageRoute,
         objective: `Replay API contract checks related to ${input.areaName}`,
-        confidence: input.response.status >= 500 || validation.errors.length > 0 ? "high" : "medium",
+        confidence:
+          input.response.status >= 500 || validation.errors.length > 0 ? 'high' : 'medium',
         breadcrumbs: [`api replay ${input.target.method} ${input.target.route}`],
         evidenceIds: [evidenceId],
       }),

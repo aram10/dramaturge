@@ -1,14 +1,17 @@
-import type { ApiEndpointHint, RepoHints } from "../adaptation/types.js";
-import { addOperation, createEmptyNormalizedSpec } from "./normalized-spec.js";
+import type { ApiEndpointHint, RepoHints } from '../adaptation/types.js';
+import { addOperation, createEmptyNormalizedSpec } from './normalized-spec.js';
 import type {
   NormalizedOperationSpec,
   NormalizedRequestBodySpec,
   NormalizedSpecArtifact,
-} from "./types.js";
+} from './types.js';
 
-const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH"]);
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH']);
 
-function buildRequestBody(endpoint: ApiEndpointHint, method: string): NormalizedRequestBodySpec | undefined {
+function buildRequestBody(
+  endpoint: ApiEndpointHint,
+  method: string
+): NormalizedRequestBodySpec | undefined {
   if (!MUTATING_METHODS.has(method)) {
     return undefined;
   }
@@ -25,7 +28,7 @@ function buildOperation(endpoint: ApiEndpointHint, method: string): NormalizedOp
     id: `${method.toUpperCase()} ${endpoint.route}`,
     method: method.toUpperCase(),
     route: endpoint.route,
-    source: "repo",
+    source: 'repo',
     authRequired: endpoint.authRequired,
     requestBody: buildRequestBody(endpoint, method.toUpperCase()),
     responses: Object.fromEntries(
@@ -44,7 +47,9 @@ function buildOperation(endpoint: ApiEndpointHint, method: string): NormalizedOp
 
 export function buildRepoSpec(repoHints: RepoHints): NormalizedSpecArtifact {
   const artifact = createEmptyNormalizedSpec();
-  artifact.routes = [...new Set([...repoHints.routes, ...repoHints.apiEndpoints.map((endpoint) => endpoint.route)])].sort();
+  artifact.routes = [
+    ...new Set([...repoHints.routes, ...repoHints.apiEndpoints.map((endpoint) => endpoint.route)]),
+  ].sort();
 
   for (const endpoint of repoHints.apiEndpoints) {
     for (const method of endpoint.methods) {

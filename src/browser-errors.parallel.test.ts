@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { BrowserErrorCollector } from "./browser-errors.js";
+import { describe, expect, it } from 'vitest';
+import { BrowserErrorCollector } from './browser-errors.js';
 
 function createMockPage(url: string) {
   const handlers = new Map<string, Function[]>();
@@ -12,7 +12,10 @@ function createMockPage(url: string) {
     },
     off(event: string, fn: Function) {
       const list = handlers.get(event) ?? [];
-      handlers.set(event, list.filter((handler) => handler !== fn));
+      handlers.set(
+        event,
+        list.filter((handler) => handler !== fn)
+      );
     },
     emit(event: string, ...args: unknown[]) {
       const list = handlers.get(event) ?? [];
@@ -21,8 +24,8 @@ function createMockPage(url: string) {
   };
 }
 
-describe("BrowserErrorCollector page isolation", () => {
-  it("flushes only the errors captured for the requested page key", () => {
+describe('BrowserErrorCollector page isolation', () => {
+  it('flushes only the errors captured for the requested page key', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
       captureConsoleWarnings: false,
@@ -30,31 +33,31 @@ describe("BrowserErrorCollector page isolation", () => {
       networkErrorMinStatus: 400,
     });
 
-    const pageA = createMockPage("https://example.com/a");
-    const pageB = createMockPage("https://example.com/b");
+    const pageA = createMockPage('https://example.com/a');
+    const pageB = createMockPage('https://example.com/b');
 
-    collector.attach(pageA as any, "page-a");
-    collector.attach(pageB as any, "page-b");
+    collector.attach(pageA as any, 'page-a');
+    collector.attach(pageB as any, 'page-b');
 
-    pageA.emit("response", {
+    pageA.emit('response', {
       status: () => 401,
-      url: () => "https://example.com/api/protected",
-      statusText: () => "Unauthorized",
-      request: () => ({ method: () => "GET" }),
+      url: () => 'https://example.com/api/protected',
+      statusText: () => 'Unauthorized',
+      request: () => ({ method: () => 'GET' }),
     });
 
-    pageB.emit("response", {
+    pageB.emit('response', {
       status: () => 500,
-      url: () => "https://example.com/api/error",
-      statusText: () => "Internal Server Error",
-      request: () => ({ method: () => "POST" }),
+      url: () => 'https://example.com/api/error',
+      statusText: () => 'Internal Server Error',
+      request: () => ({ method: () => 'POST' }),
     });
 
-    const pageBFlush = collector.flush("page-b");
+    const pageBFlush = collector.flush('page-b');
 
     expect(pageBFlush.findings).toHaveLength(1);
-    expect(pageBFlush.findings[0].title).toContain("500");
-    expect(collector.pendingCount("page-a")).toBe(1);
-    expect(collector.pendingCount("page-b")).toBe(0);
+    expect(pageBFlush.findings[0].title).toContain('500');
+    expect(collector.pendingCount('page-a')).toBe(1);
+    expect(collector.pendingCount('page-b')).toBe(0);
   });
 });

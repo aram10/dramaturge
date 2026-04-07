@@ -1,18 +1,18 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
-import { resolveAgentMode, resolveWorkerModel } from "../config.js";
-import type { Evidence, FrontierItem, RawFinding, WorkerResult } from "../types.js";
-import type { EngineContext } from "./context.js";
-import { executeApiWorkerTask } from "../api/worker.js";
-import { executeWorkerTask } from "../worker/worker.js";
-import { runAccessibilityScan } from "../coverage/accessibility.js";
-import { runVisualRegressionScan } from "../coverage/visual-regression.js";
-import { collectWebVitals, evaluateWebVitals } from "../coverage/web-vitals.js";
-import { runMultiViewportVisualRegression } from "../coverage/responsive-regression.js";
-import { analyzeScreenshot } from "../coverage/vision-analysis.js";
-import { buildApiContractArtifacts } from "../api/contract-oracle.js";
-import { summarizeContractIndex } from "../spec/contract-index.js";
+import type { Stagehand } from '@browserbasehq/stagehand';
+import { resolveAgentMode, resolveWorkerModel } from '../config.js';
+import type { Evidence, FrontierItem, RawFinding, WorkerResult } from '../types.js';
+import type { EngineContext } from './context.js';
+import { executeApiWorkerTask } from '../api/worker.js';
+import { executeWorkerTask } from '../worker/worker.js';
+import { runAccessibilityScan } from '../coverage/accessibility.js';
+import { runVisualRegressionScan } from '../coverage/visual-regression.js';
+import { collectWebVitals, evaluateWebVitals } from '../coverage/web-vitals.js';
+import { runMultiViewportVisualRegression } from '../coverage/responsive-regression.js';
+import { analyzeScreenshot } from '../coverage/vision-analysis.js';
+import { buildApiContractArtifacts } from '../api/contract-oracle.js';
+import { summarizeContractIndex } from '../spec/contract-index.js';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 export interface ExecuteFrontierItemDeps {
   ctx: EngineContext;
@@ -27,16 +27,14 @@ export interface ExecuteFrontierItemDeps {
 export async function executeFrontierItem(
   deps: ExecuteFrontierItemDeps
 ): Promise<{ item: FrontierItem; result: WorkerResult | null }> {
-  const { ctx, stagehand, page, item, taskNumber, pageKey, logPrefix = "" } = deps;
+  const { ctx, stagehand, page, item, taskNumber, pageKey, logPrefix = '' } = deps;
   const node = ctx.graph.getNode(item.nodeId);
   const nodeUrl = node.url ?? ctx.config.targetUrl;
 
   if (ctx.safetyGuard) {
     const blocked = ctx.safetyGuard.checkUrl(nodeUrl);
     if (blocked) {
-      console.log(
-        `${logPrefix}[${taskNumber}] Blocked by safety guard: ${blocked}`
-      );
+      console.log(`${logPrefix}[${taskNumber}] Blocked by safety guard: ${blocked}`);
       return { item, result: null };
     }
   }
@@ -62,7 +60,7 @@ export async function executeFrontierItem(
   ctx.graph.recordVisit(item.nodeId);
   const observedApiEndpoints = ctx.trafficObserver?.snapshot(pageKey) ?? [];
 
-  if (item.workerType === "api") {
+  if (item.workerType === 'api') {
     const result = await executeApiWorkerTask({
       taskId: item.id,
       areaName: node.title ?? node.id,
@@ -83,7 +81,7 @@ export async function executeFrontierItem(
   const preflightFindings: RawFinding[] = [];
   const preflightEvidence: Evidence[] = [];
 
-  if (typeof (page as any)?.evaluate === "function") {
+  if (typeof (page as any)?.evaluate === 'function') {
     const accessibility = await runAccessibilityScan(
       page,
       node.title ?? node.id,
@@ -142,7 +140,7 @@ export async function executeFrontierItem(
   }
 
   let visionContext: string | undefined;
-  if (ctx.config.visionAnalysis.enabled && typeof (page as any)?.screenshot === "function") {
+  if (ctx.config.visionAnalysis.enabled && typeof (page as any)?.screenshot === 'function') {
     try {
       const visionResult = await analyzeScreenshot(page as any, {
         areaName: node.title ?? node.id,

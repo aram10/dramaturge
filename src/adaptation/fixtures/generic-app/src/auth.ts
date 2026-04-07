@@ -1,2 +1,2 @@
-export const loginRoute = "/signin";
-export const callbackRoute = "/oauth/callback";
+export const loginRoute = '/signin';
+export const callbackRoute = '/oauth/callback';

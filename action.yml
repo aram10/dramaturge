@@ -1,26 +1,26 @@
-name: "Dramaturge"
-description: "Run Dramaturge exploratory QA engine against your web application"
+name: 'Dramaturge'
+description: 'Run Dramaturge exploratory QA engine against your web application'
 
 branding:
-  icon: "search"
-  color: "purple"
+  icon: 'search'
+  color: 'purple'
 
 inputs:
   config:
-    description: "Path to Dramaturge config file"
+    description: 'Path to Dramaturge config file'
     required: false
-    default: "dramaturge.config.json"
+    default: 'dramaturge.config.json'
   target-url:
-    description: "Target URL to test (overrides config value)"
+    description: 'Target URL to test (overrides config value)'
     required: false
   anthropic-api-key:
-    description: "Anthropic API key"
+    description: 'Anthropic API key'
     required: false
   openai-api-key:
-    description: "OpenAI API key"
+    description: 'OpenAI API key'
     required: false
   google-api-key:
-    description: "Google Generative AI API key"
+    description: 'Google Generative AI API key'
     required: false
   fail-on-severity:
     description: >
@@ -28,52 +28,52 @@ inputs:
       Accepted values: critical, major, minor, trivial.
       Leave empty to never fail on findings.
     required: false
-    default: ""
+    default: ''
   upload-report:
-    description: "Upload the report as a workflow artifact"
+    description: 'Upload the report as a workflow artifact'
     required: false
-    default: "true"
+    default: 'true'
   post-comment:
-    description: "Post a summary comment on the PR"
+    description: 'Post a summary comment on the PR'
     required: false
-    default: "true"
+    default: 'true'
   report-dir:
-    description: "Directory for report output (overrides config value)"
+    description: 'Directory for report output (overrides config value)'
     required: false
-    default: ""
+    default: ''
   working-directory:
-    description: "Working directory for running Dramaturge"
+    description: 'Working directory for running Dramaturge'
     required: false
-    default: "."
+    default: '.'
   node-version:
-    description: "Node.js version to use"
+    description: 'Node.js version to use'
     required: false
-    default: "20"
+    default: '20'
   dramaturge-version:
     description: 'Dramaturge package version to install (e.g. "0.1.0" or "latest")'
     required: false
-    default: "latest"
+    default: 'latest'
 
 outputs:
   report-path:
-    description: "Path to the generated report directory"
+    description: 'Path to the generated report directory'
     value: ${{ steps.parse.outputs.report-path }}
   finding-count:
-    description: "Total number of findings"
+    description: 'Total number of findings'
     value: ${{ steps.parse.outputs.finding-count }}
   max-severity:
-    description: "Highest severity level found (Critical, Major, Minor, Trivial, or none)"
+    description: 'Highest severity level found (Critical, Major, Minor, Trivial, or none)'
     value: ${{ steps.parse.outputs.max-severity }}
 
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        registry-url: "https://npm.pkg.github.com"
-        scope: "@aram10"
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@aram10'
 
     - name: Install Dramaturge
       shell: bash

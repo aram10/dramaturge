@@ -1,11 +1,7 @@
-import type {
-  ApiReplayRequest,
-  ApiReplayResponse,
-  ApiRequestContextLike,
-} from "./types.js";
+import type { ApiReplayRequest, ApiReplayResponse, ApiRequestContextLike } from './types.js';
 
 async function resolveHeaders(
-  response: Awaited<ReturnType<ApiRequestContextLike["fetch"]>>
+  response: Awaited<ReturnType<ApiRequestContextLike['fetch']>>
 ): Promise<Record<string, string>> {
   return Promise.resolve(response.headers());
 }
@@ -21,7 +17,7 @@ function parseResponseBody(contentType: string | undefined, text: string): unkno
     return undefined;
   }
 
-  if (contentType?.includes("json")) {
+  if (contentType?.includes('json')) {
     try {
       return JSON.parse(text);
     } catch {
@@ -47,6 +43,6 @@ export async function replayApiRequest(
 
   return {
     status: response.status(),
-    body: parseResponseBody(headers["content-type"], text),
+    body: parseResponseBody(headers['content-type'], text),
   };
 }

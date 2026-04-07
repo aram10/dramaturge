@@ -5,8 +5,8 @@ import type {
   PageType,
   NavigationHint,
   DiscoveredEdge,
-} from "../types.js";
-import { shortId, TRUNCATE_MERMAID_LABEL } from "../constants.js";
+} from '../types.js';
+import { shortId, TRUNCATE_MERMAID_LABEL } from '../constants.js';
 
 export interface AddNodeInit {
   url?: string;
@@ -66,7 +66,7 @@ export class StateGraph {
       toNodeId: toId,
       actionLabel: edge.actionLabel,
       navigationHint: edge.navigationHint,
-      outcome: "success",
+      outcome: 'success',
       timestamp: new Date().toISOString(),
     };
     this.edges.set(id, stateEdge);
@@ -82,9 +82,7 @@ export class StateGraph {
     if (!rootNode || rootNode.id === targetId) return [];
 
     const visited = new Set<string>();
-    const queue: Array<{ nodeId: string; path: StateEdge[] }> = [
-      { nodeId: rootNode.id, path: [] },
-    ];
+    const queue: Array<{ nodeId: string; path: StateEdge[] }> = [{ nodeId: rootNode.id, path: [] }];
     visited.add(rootNode.id);
 
     // Build adjacency: fromNodeId → edges
@@ -162,43 +160,36 @@ export class StateGraph {
   summary(): string {
     const nodes = this.getAllNodes();
     const edges = this.getAllEdges();
-    const lines = [
-      `State graph: ${nodes.length} nodes, ${edges.length} edges`,
-    ];
+    const lines = [`State graph: ${nodes.length} nodes, ${edges.length} edges`];
     for (const n of nodes) {
       const exercised = n.controlsExercised.length;
       const discovered = n.controlsDiscovered.length;
-      const coverage =
-        discovered > 0
-          ? `${exercised}/${discovered} controls`
-          : "no controls";
+      const coverage = discovered > 0 ? `${exercised}/${discovered} controls` : 'no controls';
       lines.push(
-        `  [${n.id}] ${n.pageType} depth=${n.depth} visits=${n.timesVisited} ${coverage}${n.url ? ` url=${n.url}` : ""}`
+        `  [${n.id}] ${n.pageType} depth=${n.depth} visits=${n.timesVisited} ${coverage}${n.url ? ` url=${n.url}` : ''}`
       );
     }
-    return lines.join("\n");
+    return lines.join('\n');
   }
 
   /**
    * Render the state graph as a Mermaid flowchart diagram.
    */
   toMermaid(): string {
-    const lines: string[] = ["graph TD"];
+    const lines: string[] = ['graph TD'];
     for (const n of this.nodes.values()) {
-      const label = this.mermaidEscape(
-        `${n.pageType}${n.title ? `: ${n.title}` : ""}`
-      );
+      const label = this.mermaidEscape(`${n.pageType}${n.title ? `: ${n.title}` : ''}`);
       lines.push(`  ${n.id}["${label}"]`);
     }
     for (const e of this.edges.values()) {
       const label = this.mermaidEscape(e.actionLabel);
       lines.push(`  ${e.fromNodeId} -->|"${label}"| ${e.toNodeId}`);
     }
-    return lines.join("\n");
+    return lines.join('\n');
   }
 
   private mermaidEscape(text: string): string {
-    return text.slice(0, TRUNCATE_MERMAID_LABEL).replace(/"/g, "#quot;").replace(/\n/g, " ");
+    return text.slice(0, TRUNCATE_MERMAID_LABEL).replace(/"/g, '#quot;').replace(/\n/g, ' ');
   }
 
   private findRoot(): StateNode | undefined {

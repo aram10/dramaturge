@@ -1,15 +1,15 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
-import { canScanRailsRepo, scanRailsRepo } from "./rails.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, describe, expect, it } from 'vitest';
+import { canScanRailsRepo, scanRailsRepo } from './rails.js';
 
-const fixtureRoot = fileURLToPath(new URL("./fixtures/rails-app", import.meta.url));
+const fixtureRoot = fileURLToPath(new URL('./fixtures/rails-app', import.meta.url));
 const tempDirs: string[] = [];
 
 function createTempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "dramaturge-rails-scan-"));
+  const dir = mkdtempSync(join(tmpdir(), 'dramaturge-rails-scan-'));
   tempDirs.push(dir);
   return dir;
 }
@@ -23,75 +23,71 @@ afterEach(() => {
   }
 });
 
-describe("canScanRailsRepo", () => {
-  it("returns true when config/routes.rb exists", () => {
+describe('canScanRailsRepo', () => {
+  it('returns true when config/routes.rb exists', () => {
     expect(canScanRailsRepo(fixtureRoot)).toBe(true);
   });
 
-  it("returns false for a non-Rails project", () => {
+  it('returns false for a non-Rails project', () => {
     const root = createTempDir();
-    mkdirSync(join(root, "src"), { recursive: true });
-    writeFileSync(join(root, "src", "app.rb"), "puts 'hello'", "utf-8");
+    mkdirSync(join(root, 'src'), { recursive: true });
+    writeFileSync(join(root, 'src', 'app.rb'), "puts 'hello'", 'utf-8');
     expect(canScanRailsRepo(root)).toBe(false);
   });
 });
 
-describe("scanRailsRepo", () => {
-  it("extracts routes from config/routes.rb", () => {
+describe('scanRailsRepo', () => {
+  it('extracts routes from config/routes.rb', () => {
     const hints = scanRailsRepo(fixtureRoot);
 
-    expect(hints.routes).toContain("/");
-    expect(hints.routes).toContain("/dashboard");
-    expect(hints.routes).toContain("/login");
-    expect(hints.routes).toContain("/oauth/callback");
-    expect(hints.routes).toContain("/api/users");
-    expect(hints.routes).toContain("/api/users/:id");
+    expect(hints.routes).toContain('/');
+    expect(hints.routes).toContain('/dashboard');
+    expect(hints.routes).toContain('/login');
+    expect(hints.routes).toContain('/oauth/callback');
+    expect(hints.routes).toContain('/api/users');
+    expect(hints.routes).toContain('/api/users/:id');
   });
 
-  it("extracts route families", () => {
+  it('extracts route families', () => {
     const hints = scanRailsRepo(fixtureRoot);
 
-    expect(hints.routeFamilies).toContain("/");
-    expect(hints.routeFamilies).toContain("/dashboard");
-    expect(hints.routeFamilies).toContain("/api");
-    expect(hints.routeFamilies).toContain("/login");
-    expect(hints.routeFamilies).toContain("/oauth");
+    expect(hints.routeFamilies).toContain('/');
+    expect(hints.routeFamilies).toContain('/dashboard');
+    expect(hints.routeFamilies).toContain('/api');
+    expect(hints.routeFamilies).toContain('/login');
+    expect(hints.routeFamilies).toContain('/oauth');
   });
 
-  it("extracts auth hints", () => {
+  it('extracts auth hints', () => {
     const hints = scanRailsRepo(fixtureRoot);
 
-    expect(hints.authHints.loginRoutes).toContain("/login");
-    expect(hints.authHints.callbackRoutes).toContain("/oauth/callback");
+    expect(hints.authHints.loginRoutes).toContain('/login');
+    expect(hints.authHints.callbackRoutes).toContain('/oauth/callback');
   });
 
-  it("extracts selectors from .erb templates", () => {
+  it('extracts selectors from .erb templates', () => {
     const hints = scanRailsRepo(fixtureRoot);
 
     expect(hints.stableSelectors).toContain('[data-testid="dashboard-panel"]');
     expect(hints.stableSelectors).toContain('[data-testid="refresh-btn"]');
-    expect(hints.stableSelectors).toContain("#dashboard-container");
+    expect(hints.stableSelectors).toContain('#dashboard-container');
   });
 
-  it("detects API endpoints with methods", () => {
+  it('detects API endpoints with methods', () => {
     const hints = scanRailsRepo(fixtureRoot);
 
     expect(hints.apiEndpoints.length).toBeGreaterThan(0);
-    const usersEndpoint = hints.apiEndpoints.find(
-      (ep) => ep.route === "/api/users",
-    );
+    const usersEndpoint = hints.apiEndpoints.find((ep) => ep.route === '/api/users');
     expect(usersEndpoint).toBeDefined();
-    expect(usersEndpoint?.methods).toContain("GET");
-    expect(usersEndpoint?.methods).toContain("POST");
+    expect(usersEndpoint?.methods).toContain('GET');
+    expect(usersEndpoint?.methods).toContain('POST');
   });
 
-  it("detects expected HTTP noise for auth-guarded routes", () => {
+  it('detects expected HTTP noise for auth-guarded routes', () => {
     const hints = scanRailsRepo(fixtureRoot);
 
     expect(hints.expectedHttpNoise.length).toBeGreaterThan(0);
-    const usersNoise = hints.expectedHttpNoise.find(
-      (n) => n.pathPrefix === "/api/users",
-    );
+    const usersNoise = hints.expectedHttpNoise.find((n) => n.pathPrefix === '/api/users');
     expect(usersNoise).toBeDefined();
     expect(usersNoise?.statuses).toContain(401);
     expect(usersNoise?.statuses).toContain(403);

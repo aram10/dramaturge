@@ -7,9 +7,9 @@ import type {
   RunConfigMeta,
   RunMemoryMeta,
   RunResult,
-} from "../types.js";
-import { CATEGORY_PREFIX } from "../types.js";
-import { FINDING_ID_PAD } from "../constants.js";
+} from '../types.js';
+import { CATEGORY_PREFIX } from '../types.js';
+import { FINDING_ID_PAD } from '../constants.js';
 
 const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   Critical: 0,
@@ -55,10 +55,7 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
         existing.impactedAreas = Array.from(new Set([...existing.impactedAreas, area.name]));
         existing.occurrenceCount = existing.occurrences.length;
         existing.evidenceIds = Array.from(
-          new Set([
-            ...(existing.evidenceIds ?? []),
-            ...(raw.evidenceIds ?? []),
-          ])
+          new Set([...(existing.evidenceIds ?? []), ...(raw.evidenceIds ?? [])])
         );
         if (existing.meta?.repro || raw.meta?.repro) {
           existing.meta = existing.meta ?? raw.meta;
@@ -70,7 +67,7 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
                 objective:
                   existing.meta.repro?.objective ??
                   raw.meta?.repro?.objective ??
-                  "Investigate observed issue",
+                  'Investigate observed issue',
                 actionIds: Array.from(
                   new Set([
                     ...(existing.meta.repro?.actionIds ?? []),
@@ -99,11 +96,9 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
       grouped.set(groupKey, {
         ...raw,
         ref: findingRef,
-        id: "",
+        id: '',
         area: area.name,
-        screenshot: raw.screenshotRef
-          ? `screenshots/${raw.screenshotRef}.png`
-          : undefined,
+        screenshot: raw.screenshotRef ? `screenshots/${raw.screenshotRef}.png` : undefined,
         occurrenceCount: 1,
         impactedAreas: [area.name],
         occurrences: [occurrence],
@@ -126,7 +121,7 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
   // Re-number IDs after sorting
   for (let i = 0; i < findings.length; i++) {
     const prefix = CATEGORY_PREFIX[findings[i].category];
-    findings[i].id = `${prefix}-${String(i + 1).padStart(FINDING_ID_PAD, "0")}`;
+    findings[i].id = `${prefix}-${String(i + 1).padStart(FINDING_ID_PAD, '0')}`;
   }
 
   return findings;
@@ -142,7 +137,7 @@ export function buildRunResult(
   stateGraphMermaid?: string,
   runConfig?: RunConfigMeta,
   runMemory?: RunMemoryMeta,
-  diffSummary?: DiffSummary,
+  diffSummary?: DiffSummary
 ): RunResult {
   return {
     targetUrl,

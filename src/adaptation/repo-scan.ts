@@ -1,26 +1,21 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { z } from "zod";
-import { parseJsoncObject } from "../utils/jsonc.js";
-import { canScanAstroRepo, scanAstroRepo } from "./astro.js";
-import { scanDjangoRepo } from "./django.js";
-import { scanExpressRepo } from "./express.js";
-import { scanFastApiRepo } from "./fastapi.js";
-import { scanGenericRepo } from "./generic.js";
-import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
-import { canScanNuxtRepo, scanNuxtRepo } from "./nuxt.js";
-import { canScanRailsRepo, scanRailsRepo } from "./rails.js";
-import { scanReactRouterRepo } from "./react-router.js";
-import { canScanRemixRepo, scanRemixRepo } from "./remix.js";
-import { canScanSvelteKitRepo, scanSvelteKitRepo } from "./sveltekit.js";
-import { scanTanStackRouterRepo } from "./tanstack-router.js";
-import { scanVueRouterRepo } from "./vue-router.js";
-import type {
-  RepoFramework,
-  RepoHints,
-  RepoHintsOverride,
-  RepoScanOptions,
-} from "./types.js";
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { z } from 'zod';
+import { parseJsoncObject } from '../utils/jsonc.js';
+import { canScanAstroRepo, scanAstroRepo } from './astro.js';
+import { scanDjangoRepo } from './django.js';
+import { scanExpressRepo } from './express.js';
+import { scanFastApiRepo } from './fastapi.js';
+import { scanGenericRepo } from './generic.js';
+import { canScanNextJsRepo, scanNextJsRepo } from './nextjs.js';
+import { canScanNuxtRepo, scanNuxtRepo } from './nuxt.js';
+import { canScanRailsRepo, scanRailsRepo } from './rails.js';
+import { scanReactRouterRepo } from './react-router.js';
+import { canScanRemixRepo, scanRemixRepo } from './remix.js';
+import { canScanSvelteKitRepo, scanSvelteKitRepo } from './sveltekit.js';
+import { scanTanStackRouterRepo } from './tanstack-router.js';
+import { scanVueRouterRepo } from './vue-router.js';
+import type { RepoFramework, RepoHints, RepoHintsOverride, RepoScanOptions } from './types.js';
 
 const ExpectedHttpNoiseSchema = z.object({
   method: z.string().optional(),
@@ -32,15 +27,17 @@ const RepoHintsOverrideSchema = z.object({
   routes: z.array(z.string()).optional(),
   routeFamilies: z.array(z.string()).optional(),
   stableSelectors: z.array(z.string()).optional(),
-  apiEndpoints: z.array(
-    z.object({
-      route: z.string(),
-      methods: z.array(z.string()),
-      statuses: z.array(z.number().int()),
-      authRequired: z.boolean().optional(),
-      validationSchemas: z.array(z.string()).optional(),
-    })
-  ).optional(),
+  apiEndpoints: z
+    .array(
+      z.object({
+        route: z.string(),
+        methods: z.array(z.string()),
+        statuses: z.array(z.number().int()),
+        authRequired: z.boolean().optional(),
+        validationSchemas: z.array(z.string()).optional(),
+      })
+    )
+    .optional(),
   authHints: z
     .object({
       loginRoutes: z.array(z.string()).optional(),
@@ -73,19 +70,10 @@ function mergeRepoHints(base: RepoHints, override?: RepoHintsOverride): RepoHint
 
   return {
     routes: uniqueSorted([...base.routes, ...(override.routes ?? [])]),
-    routeFamilies: uniqueSorted([
-      ...base.routeFamilies,
-      ...(override.routeFamilies ?? []),
-    ]),
-    stableSelectors: uniqueSorted([
-      ...base.stableSelectors,
-      ...(override.stableSelectors ?? []),
-    ]),
-    apiEndpoints: [
-      ...base.apiEndpoints,
-      ...(override.apiEndpoints ?? []),
-    ]
-      .reduce<RepoHints["apiEndpoints"]>((acc, endpoint) => {
+    routeFamilies: uniqueSorted([...base.routeFamilies, ...(override.routeFamilies ?? [])]),
+    stableSelectors: uniqueSorted([...base.stableSelectors, ...(override.stableSelectors ?? [])]),
+    apiEndpoints: [...base.apiEndpoints, ...(override.apiEndpoints ?? [])]
+      .reduce<RepoHints['apiEndpoints']>((acc, endpoint) => {
         const existing = acc.find((candidate) => candidate.route === endpoint.route);
         if (!existing) {
           acc.push({
@@ -120,10 +108,9 @@ function mergeRepoHints(base: RepoHints, override?: RepoHintsOverride): RepoHint
         ...(override.authHints?.callbackRoutes ?? []),
       ]),
     },
-    expectedHttpNoise: [
-      ...base.expectedHttpNoise,
-      ...(override.expectedHttpNoise ?? []),
-    ].sort((left, right) => left.pathPrefix.localeCompare(right.pathPrefix)),
+    expectedHttpNoise: [...base.expectedHttpNoise, ...(override.expectedHttpNoise ?? [])].sort(
+      (left, right) => left.pathPrefix.localeCompare(right.pathPrefix)
+    ),
   };
 }
 
@@ -135,20 +122,20 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
     throw new Error(`Repo hints file not found: ${resolvedHintsPath}`);
   }
 
-  const raw = readFileSync(resolvedHintsPath, "utf-8");
+  const raw = readFileSync(resolvedHintsPath, 'utf-8');
   return RepoHintsOverrideSchema.parse(parseJsoncObject(raw));
 }
 
 function detectFramework(root: string): RepoFramework {
   // Check framework-specific markers first (no full file walk needed)
-  if (canScanNuxtRepo(root)) return "nuxt";
-  if (canScanSvelteKitRepo(root)) return "sveltekit";
-  if (canScanAstroRepo(root)) return "astro";
+  if (canScanNuxtRepo(root)) return 'nuxt';
+  if (canScanSvelteKitRepo(root)) return 'sveltekit';
+  if (canScanAstroRepo(root)) return 'astro';
   // Remix before Next.js: Next.js only checks for `app/` which Remix also has
-  if (canScanRemixRepo(root)) return "remix";
+  if (canScanRemixRepo(root)) return 'remix';
   // Rails before Next.js: Next.js only checks for `app/` which Rails also has
-  if (canScanRailsRepo(root)) return "rails";
-  if (canScanNextJsRepo(root)) return "nextjs";
+  if (canScanRailsRepo(root)) return 'rails';
+  if (canScanNextJsRepo(root)) return 'nextjs';
 
   // Single-pass walk for remaining framework detection
   const signatures = {
@@ -161,25 +148,47 @@ function detectFramework(root: string): RepoFramework {
   };
 
   const TANSTACK_RE = /(?:from|require\()\s*["'](?:@tanstack\/react-router|@tanstack\/router)["']/;
-  const REACT_ROUTER_RE = /(?:from|require\()\s*["'](?:react-router-dom|react-router|@remix-run\/router)["']/;
+  const REACT_ROUTER_RE =
+    /(?:from|require\()\s*["'](?:react-router-dom|react-router|@remix-run\/router)["']/;
   const VUE_ROUTER_RE = /(?:from|require\()\s*["']vue-router["']/;
   const VUE_CREATE_ROUTER_RE = /\bcreateRouter\s*\(/;
   const EXPRESS_RE = /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+)["']/;
   const FASTAPI_IMPORT_RE = /(?:from\s+fastapi\s+import|import\s+fastapi)\b/;
   const DJANGO_SETTINGS_RE = /(?:INSTALLED_APPS|django)/;
 
-  if (existsSync(join(resolve(root), "manage.py"))) {
+  if (existsSync(join(resolve(root), 'manage.py'))) {
     signatures.django = true;
   }
 
   try {
-    const jsExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+    const jsExtensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
     const ignoredDirs = new Set([
-      "node_modules", ".git", "dist", "build", "out", "coverage",
-      ".next", ".nuxt", ".turbo", ".cache",
-      "tests", "test", "__tests__", "fixtures", "__fixtures__",
-      "mocks", "__mocks__", "generated", "__generated__",
-      "__pycache__", ".venv", "venv", "env", "migrations", "static", "media",
+      'node_modules',
+      '.git',
+      'dist',
+      'build',
+      'out',
+      'coverage',
+      '.next',
+      '.nuxt',
+      '.turbo',
+      '.cache',
+      'tests',
+      'test',
+      '__tests__',
+      'fixtures',
+      '__fixtures__',
+      'mocks',
+      '__mocks__',
+      'generated',
+      '__generated__',
+      '__pycache__',
+      '.venv',
+      'venv',
+      'env',
+      'migrations',
+      'static',
+      'media',
     ]);
 
     const queue = [resolve(root)];
@@ -197,24 +206,24 @@ function detectFramework(root: string): RepoFramework {
         if (!entry.isFile()) continue;
 
         const name = entry.name;
-        const dotIdx = name.lastIndexOf(".");
+        const dotIdx = name.lastIndexOf('.');
         const isJs = dotIdx >= 0 && jsExtensions.has(name.slice(dotIdx));
-        const isPy = name.endsWith(".py");
+        const isPy = name.endsWith('.py');
 
         if (!isJs && !isPy) continue;
 
         // Python framework detection
         if (isPy) {
           if (!signatures.fastapi) {
-            const content = readFileSync(fullPath, "utf-8");
+            const content = readFileSync(fullPath, 'utf-8');
             if (FASTAPI_IMPORT_RE.test(content)) {
               signatures.fastapi = true;
             }
           }
-          if (name === "urls.py") {
+          if (name === 'urls.py') {
             signatures.django = true;
-          } else if (name === "settings.py") {
-            const content = readFileSync(fullPath, "utf-8");
+          } else if (name === 'settings.py') {
+            const content = readFileSync(fullPath, 'utf-8');
             if (DJANGO_SETTINGS_RE.test(content)) {
               signatures.django = true;
             }
@@ -223,14 +232,17 @@ function detectFramework(root: string): RepoFramework {
         }
 
         // JS/TS framework detection
-        const content = readFileSync(fullPath, "utf-8");
+        const content = readFileSync(fullPath, 'utf-8');
         if (!signatures.tanstackRouter && TANSTACK_RE.test(content)) {
           signatures.tanstackRouter = true;
         }
         if (!signatures.reactRouter && REACT_ROUTER_RE.test(content)) {
           signatures.reactRouter = true;
         }
-        if (!signatures.vueRouter && (VUE_ROUTER_RE.test(content) || VUE_CREATE_ROUTER_RE.test(content))) {
+        if (
+          !signatures.vueRouter &&
+          (VUE_ROUTER_RE.test(content) || VUE_CREATE_ROUTER_RE.test(content))
+        ) {
           signatures.vueRouter = true;
         }
         if (!signatures.express && EXPRESS_RE.test(content)) {
@@ -242,61 +254,58 @@ function detectFramework(root: string): RepoFramework {
     // Fall through to generic
   }
 
-  if (signatures.tanstackRouter) return "tanstack-router";
-  if (signatures.reactRouter) return "react-router";
-  if (signatures.vueRouter) return "vue-router";
-  if (signatures.express) return "express";
-  if (signatures.fastapi) return "fastapi";
-  if (signatures.django) return "django";
-  return "generic";
+  if (signatures.tanstackRouter) return 'tanstack-router';
+  if (signatures.reactRouter) return 'react-router';
+  if (signatures.vueRouter) return 'vue-router';
+  if (signatures.express) return 'express';
+  if (signatures.fastapi) return 'fastapi';
+  if (signatures.django) return 'django';
+  return 'generic';
 }
 
 export function scanRepository(options: RepoScanOptions): RepoHints {
   const root = options.root;
-  const framework =
-    options.framework === "auto"
-      ? detectFramework(root)
-      : options.framework;
+  const framework = options.framework === 'auto' ? detectFramework(root) : options.framework;
 
   let scanned: RepoHints;
   switch (framework) {
-    case "nextjs":
+    case 'nextjs':
       scanned = scanNextJsRepo(root);
       break;
-    case "nuxt":
+    case 'nuxt':
       scanned = scanNuxtRepo(root);
       break;
-    case "sveltekit":
+    case 'sveltekit':
       scanned = scanSvelteKitRepo(root);
       break;
-    case "remix":
+    case 'remix':
       scanned = scanRemixRepo(root);
       break;
-    case "astro":
+    case 'astro':
       scanned = scanAstroRepo(root);
       break;
-    case "react-router":
+    case 'react-router':
       scanned = scanReactRouterRepo(root);
       break;
-    case "express":
+    case 'express':
       scanned = scanExpressRepo(root);
       break;
-    case "vue-router":
+    case 'vue-router':
       scanned = scanVueRouterRepo(root);
       break;
-    case "django":
+    case 'django':
       scanned = scanDjangoRepo(root);
       break;
-    case "rails":
+    case 'rails':
       scanned = scanRailsRepo(root);
       break;
-    case "fastapi":
+    case 'fastapi':
       scanned = scanFastApiRepo(root);
       break;
-    case "tanstack-router":
+    case 'tanstack-router':
       scanned = scanTanStackRouterRepo(root);
       break;
-    case "generic":
+    case 'generic':
       scanned = scanGenericRepo(root);
       break;
     default:

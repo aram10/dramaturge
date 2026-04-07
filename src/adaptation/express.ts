@@ -1,35 +1,28 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from "./types.js";
+import { readdirSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 
-const SOURCE_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-]);
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const IGNORED_DIRECTORY_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  "coverage",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  "tests",
-  "test",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "mocks",
-  "__mocks__",
-  "generated",
-  "__generated__",
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  'tests',
+  'test',
+  '__tests__',
+  'fixtures',
+  '__fixtures__',
+  'mocks',
+  '__mocks__',
+  'generated',
+  '__generated__',
 ]);
 const IGNORED_FILE_NAME_PATTERNS = [
   /\.test\./i,
@@ -39,8 +32,7 @@ const IGNORED_FILE_NAME_PATTERNS = [
   /\.stories\./i,
 ];
 
-const EXPRESS_IMPORT_RE =
-  /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+)["']/;
+const EXPRESS_IMPORT_RE = /(?:from|require\()\s*["'](?:express|fastify|@fastify\/[^"']+)["']/;
 
 const ROUTE_HANDLER_BLOCK_RE =
   /(?:app|router|server|fastify)\.(get|post|put|patch|delete|options|head)\s*\(\s*["'`](\/[^"'`]*)["'`][^)]*(?:\([^)]*\))*[^;]*;/g;
@@ -66,7 +58,7 @@ function shouldIgnoreEntry(name: string, isDirectory: boolean): boolean {
   if (isDirectory) {
     return false;
   }
-  if (name.endsWith(".d.ts")) {
+  if (name.endsWith('.d.ts')) {
     return true;
   }
   return IGNORED_FILE_NAME_PATTERNS.some((pattern) => pattern.test(name));
@@ -86,11 +78,7 @@ function walkFiles(root: string): string[] {
       continue;
     }
 
-    if (
-      entry.isFile() &&
-      isSourceFile(fullPath) &&
-      !shouldIgnoreEntry(basename(fullPath), false)
-    ) {
+    if (entry.isFile() && isSourceFile(fullPath) && !shouldIgnoreEntry(basename(fullPath), false)) {
       results.push(fullPath);
     }
   }
@@ -107,29 +95,25 @@ function uniqueNumbers(values: number[]): number[] {
 }
 
 function routeFamily(route: string): string {
-  const parts = route.split("?")[0]?.split("/").filter(Boolean) ?? [];
-  return parts.length === 0 ? "/" : `/${parts[0]}`;
+  const parts = route.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  return parts.length === 0 ? '/' : `/${parts[0]}`;
 }
 
 function normalizeRoute(raw: string): string {
-  const trimmed = raw.replace(/\/+$/, "");
-  return trimmed || "/";
+  const trimmed = raw.replace(/\/+$/, '');
+  return trimmed || '/';
 }
 
-function extractRouteHandlers(
-  content: string,
-): { method: string; route: string; block: string }[] {
+function extractRouteHandlers(content: string): { method: string; route: string; block: string }[] {
   return [...content.matchAll(ROUTE_HANDLER_BLOCK_RE)].map((m) => ({
-    method: (m[1] ?? "").toUpperCase(),
-    route: normalizeRoute(m[2] ?? ""),
+    method: (m[1] ?? '').toUpperCase(),
+    route: normalizeRoute(m[2] ?? ''),
     block: m[0],
   }));
 }
 
 function extractStatusCodes(content: string): number[] {
-  return [...content.matchAll(STATUS_CODE_RE)].map((m) =>
-    Number.parseInt(m[1] ?? "0", 10),
-  );
+  return [...content.matchAll(STATUS_CODE_RE)].map((m) => Number.parseInt(m[1] ?? '0', 10));
 }
 
 function extractSelectors(content: string): string[] {
@@ -152,7 +136,7 @@ export function canScanExpressRepo(root: string): boolean {
   for (const filePath of walkFiles(root)) {
     if (!isSourceFile(filePath)) continue;
 
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
     if (EXPRESS_IMPORT_RE.test(content)) {
       return true;
     }
@@ -165,14 +149,20 @@ export function scanExpressRepo(root: string): RepoHints {
   const selectors: string[] = [];
   const apiEndpoints = new Map<
     string,
-    { route: string; methods: string[]; statuses: number[]; authRequired: boolean; validationSchemas: string[] }
+    {
+      route: string;
+      methods: string[];
+      statuses: number[];
+      authRequired: boolean;
+      validationSchemas: string[];
+    }
   >();
   const loginRoutes: string[] = [];
   const callbackRoutes: string[] = [];
   const noiseMap = new Map<string, { method?: string; pathPrefix: string; statuses: number[] }>();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
 
     const handlers = extractRouteHandlers(content);
 
@@ -213,10 +203,7 @@ export function scanExpressRepo(root: string): RepoHints {
           pathPrefix: route,
           statuses: [],
         };
-        existingNoise.statuses = uniqueNumbers([
-          ...existingNoise.statuses,
-          ...authStatuses,
-        ]);
+        existingNoise.statuses = uniqueNumbers([...existingNoise.statuses, ...authStatuses]);
         noiseMap.set(key, existingNoise);
       }
     }

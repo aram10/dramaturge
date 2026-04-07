@@ -1,31 +1,28 @@
-import type { AdversarialConfig } from "../config.js";
-import { listClickPathScenarios } from "./click-path.js";
-import { listConcurrencyScenarios } from "./concurrency.js";
-import { listSecurityScenarios } from "./security.js";
-import {
-  listStatefulScenarios,
-  type AdversarialScenario,
-} from "./stateful.js";
+import type { AdversarialConfig } from '../config.js';
+import { listClickPathScenarios } from './click-path.js';
+import { listConcurrencyScenarios } from './concurrency.js';
+import { listSecurityScenarios } from './security.js';
+import { listStatefulScenarios, type AdversarialScenario } from './stateful.js';
 
 const SCENARIO_PRIORITY: Record<string, number> = {
-  "authz-route-swap": 0,
-  "parallel-submit-race": 1,
-  "double-submit": 2,
-  "back-button-resubmission": 3,
-  "stale-detail-view": 4,
-  "back-button-state-mismatch": 5,
+  'authz-route-swap': 0,
+  'parallel-submit-race': 1,
+  'double-submit': 2,
+  'back-button-resubmission': 3,
+  'stale-detail-view': 4,
+  'back-button-state-mismatch': 5,
   // Click-path audit patterns
-  "sequential-undo": 6,
-  "async-race-condition": 7,
-  "stale-closure-handler": 8,
-  "missing-state-transition": 9,
-  "conditional-dead-path": 10,
-  "effect-interference": 11,
+  'sequential-undo': 6,
+  'async-race-condition': 7,
+  'stale-closure-handler': 8,
+  'missing-state-transition': 9,
+  'conditional-dead-path': 10,
+  'effect-interference': 11,
   // OWASP-informed security patterns
-  "csrf-token-absence": 12,
-  "xss-input-reflection": 13,
-  "missing-rate-limit": 14,
-  "open-redirect": 15,
+  'csrf-token-absence': 12,
+  'xss-input-reflection': 13,
+  'missing-rate-limit': 14,
+  'open-redirect': 15,
 };
 
 export function listAdversarialScenarios(

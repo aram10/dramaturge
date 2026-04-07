@@ -1,17 +1,17 @@
-import type { CoverageSnapshot, WorkerResult } from "../types.js";
-import { stripRedactedHeaders, stripRedactedValue } from "../redaction.js";
-import { buildAuthBoundaryFailureArtifacts, buildContractReplayArtifacts } from "./assertions.js";
+import type { CoverageSnapshot, WorkerResult } from '../types.js';
+import { stripRedactedHeaders, stripRedactedValue } from '../redaction.js';
+import { buildAuthBoundaryFailureArtifacts, buildContractReplayArtifacts } from './assertions.js';
 import {
   buildApiProbeDiagnosticsEvidence,
   createApiProbeDiagnostics,
   formatApiProbeSummary,
   recordApiProbeFailure,
   recordApiProbeSuccess,
-} from "./diagnostics.js";
-import { selectApiProbeTargets } from "./correlation.js";
-import { buildProbeCases, filterProbeTargets } from "./probes.js";
-import { replayApiRequest } from "./replay.js";
-import type { ExecuteApiWorkerTaskInput } from "./types.js";
+} from './diagnostics.js';
+import { selectApiProbeTargets } from './correlation.js';
+import { buildProbeCases, filterProbeTargets } from './probes.js';
+import { replayApiRequest } from './replay.js';
+import type { ExecuteApiWorkerTaskInput } from './types.js';
 
 function createEmptyCoverageSnapshot(): CoverageSnapshot {
   return {
@@ -24,8 +24,8 @@ function createEmptyCoverageSnapshot(): CoverageSnapshot {
 export async function executeApiWorkerTask(
   input: ExecuteApiWorkerTaskInput
 ): Promise<WorkerResult> {
-  const findings: WorkerResult["findings"] = [];
-  const evidence: WorkerResult["evidence"] = [];
+  const findings: WorkerResult['findings'] = [];
+  const evidence: WorkerResult['evidence'] = [];
   const diagnostics = createApiProbeDiagnostics();
   const targets = filterProbeTargets(
     selectApiProbeTargets({
@@ -45,8 +45,8 @@ export async function executeApiWorkerTask(
       coverageSnapshot: createEmptyCoverageSnapshot(),
       followupRequests: [],
       discoveredEdges: [],
-      outcome: "completed",
-      summary: "No eligible API probes for this node",
+      outcome: 'completed',
+      summary: 'No eligible API probes for this node',
     };
   }
 
@@ -76,17 +76,12 @@ export async function executeApiWorkerTask(
         }
 
         try {
-          const response = await replayApiRequest(
-            requestContext,
-            {
-              url: target.sample?.url
-                ? new URL(target.sample.url, input.targetUrl).href
-                : url,
-              method: target.method,
-              headers: stripRedactedHeaders(target.sample?.headers),
-              data: stripRedactedValue(target.sample?.data),
-            }
-          );
+          const response = await replayApiRequest(requestContext, {
+            url: target.sample?.url ? new URL(target.sample.url, input.targetUrl).href : url,
+            method: target.method,
+            headers: stripRedactedHeaders(target.sample?.headers),
+            data: stripRedactedValue(target.sample?.data),
+          });
           recordApiProbeSuccess(diagnostics);
 
           if (!probeCase.isolated) {
@@ -115,8 +110,7 @@ export async function executeApiWorkerTask(
             evidence.push(authArtifacts.evidence);
           }
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = error instanceof Error ? error.message : String(error);
           recordApiProbeFailure(
             diagnostics,
             `${probeCase.name} ${target.method} ${target.route}: ${message}`
@@ -128,10 +122,7 @@ export async function executeApiWorkerTask(
     await isolatedContext?.dispose?.();
   }
 
-  const diagnosticsEvidence = buildApiProbeDiagnosticsEvidence(
-    input.areaName,
-    diagnostics
-  );
+  const diagnosticsEvidence = buildApiProbeDiagnosticsEvidence(input.areaName, diagnostics);
   if (diagnosticsEvidence) {
     evidence.push(diagnosticsEvidence);
   }
@@ -143,7 +134,7 @@ export async function executeApiWorkerTask(
     coverageSnapshot: createEmptyCoverageSnapshot(),
     followupRequests: [],
     discoveredEdges: [],
-    outcome: "completed",
+    outcome: 'completed',
     summary: formatApiProbeSummary(targets.length, diagnostics),
   };
 }

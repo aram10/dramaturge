@@ -1,4 +1,4 @@
-import type { JudgeConfig as RuntimeJudgeConfig } from "../config.js";
+import type { JudgeConfig as RuntimeJudgeConfig } from '../config.js';
 import type {
   Evidence,
   FindingCategory,
@@ -6,7 +6,7 @@ import type {
   FindingSeverity,
   FindingVerdict,
   ReplayableAction,
-} from "../types.js";
+} from '../types.js';
 
 export interface Observation {
   id: string;

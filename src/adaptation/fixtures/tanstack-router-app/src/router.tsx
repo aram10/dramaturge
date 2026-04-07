@@ -1,37 +1,37 @@
-import { createRouter, createRoute, createRootRoute, createFileRoute } from "@tanstack/react-router";
+import {
+  createRouter,
+  createRoute,
+  createRootRoute,
+  createFileRoute,
+} from '@tanstack/react-router';
 
 const rootRoute = createRootRoute();
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/",
+  path: '/',
 });
 
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/dashboard",
+  path: '/dashboard',
   loader: async () => {
-    return fetch("/api/dashboard-data");
+    return fetch('/api/dashboard-data');
   },
 });
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/login",
+  path: '/login',
 });
 
 const callbackRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/oauth/callback",
+  path: '/oauth/callback',
 });
 
-const profileRoute = createFileRoute("/settings/profile");
+const profileRoute = createFileRoute('/settings/profile');
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([
-    indexRoute,
-    dashboardRoute,
-    loginRoute,
-    callbackRoute,
-  ]),
+  routeTree: rootRoute.addChildren([indexRoute, dashboardRoute, loginRoute, callbackRoute]),
 });

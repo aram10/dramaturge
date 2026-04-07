@@ -1,6 +1,6 @@
-import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
-import { type ContractIndex } from "../spec/contract-index.js";
-import type { ApiProbeTarget } from "./types.js";
+import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
+import { type ContractIndex } from '../spec/contract-index.js';
+import type { ApiProbeTarget } from './types.js';
 
 interface SelectApiProbeTargetsInput {
   pageRoute: string;
@@ -23,16 +23,16 @@ function normalizeRoutePath(route: string): string {
 
 function tokenizeRoute(route: string): string[] {
   return normalizeRoutePath(route)
-    .split("/")
+    .split('/')
     .filter(Boolean)
     .map((segment) => segment.toLowerCase())
     .filter(
       (segment) =>
-        segment !== "api" &&
+        segment !== 'api' &&
         !/^\d+$/.test(segment) &&
-        !segment.startsWith("[") &&
-        !segment.startsWith("{") &&
-        !segment.startsWith(":")
+        !segment.startsWith('[') &&
+        !segment.startsWith('{') &&
+        !segment.startsWith(':')
     );
 }
 
@@ -40,16 +40,12 @@ function computeRouteScore(pageTokens: string[], route: string, observedBoost: n
   const routeTokens = tokenizeRoute(route);
   const overlap = routeTokens.filter((token) => pageTokens.includes(token)).length;
   const prefixBoost =
-    pageTokens.length > 0 && normalizeRoutePath(route).includes(pageTokens[0] ?? "")
-      ? 0.25
-      : 0;
+    pageTokens.length > 0 && normalizeRoutePath(route).includes(pageTokens[0] ?? '') ? 0.25 : 0;
 
   return overlap + observedBoost + prefixBoost;
 }
 
-export function selectApiProbeTargets(
-  input: SelectApiProbeTargetsInput
-): ApiProbeTarget[] {
+export function selectApiProbeTargets(input: SelectApiProbeTargetsInput): ApiProbeTarget[] {
   const pageTokens = tokenizeRoute(input.pageRoute);
   const ranked = new Map<string, RankedProbeTarget>();
 
@@ -65,7 +61,7 @@ export function selectApiProbeTargets(
     existing.observedStatuses = [
       ...new Set([...existing.observedStatuses, ...candidate.observedStatuses]),
     ].sort((left, right) => left - right);
-    existing.source = existing.source === "observed" ? "observed" : candidate.source;
+    existing.source = existing.source === 'observed' ? 'observed' : candidate.source;
     existing.operation = existing.operation ?? candidate.operation;
   };
 
@@ -89,7 +85,7 @@ export function selectApiProbeTargets(
         method,
         authRequired: false,
         observedStatuses,
-        source: "observed",
+        source: 'observed',
         sample,
         score: computeRouteScore(pageTokens, endpoint.route, 1),
       });
@@ -108,7 +104,7 @@ export function selectApiProbeTargets(
       authRequired: operation.authRequired === true,
       operation,
       observedStatuses: [],
-      source: "contract",
+      source: 'contract',
       score: routeScore + (operation.authRequired ? 0.1 : 0),
     });
   }
@@ -120,7 +116,7 @@ export function selectApiProbeTargets(
       }
 
       if (left.source !== right.source) {
-        return left.source === "observed" ? -1 : 1;
+        return left.source === 'observed' ? -1 : 1;
       }
 
       return `${left.method} ${left.route}`.localeCompare(`${right.method} ${right.route}`);

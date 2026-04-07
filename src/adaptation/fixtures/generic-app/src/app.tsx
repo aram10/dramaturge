@@ -1,4 +1,4 @@
-export const routes = ["/", "/settings/profile", "/billing"];
+export const routes = ['/', '/settings/profile', '/billing'];
 
 export function App() {
   return (

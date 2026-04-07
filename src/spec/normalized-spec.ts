@@ -1,5 +1,5 @@
-import type { NormalizedOperationSpec, NormalizedSpecArtifact } from "./types.js";
-import { buildOperationKey } from "./validators.js";
+import type { NormalizedOperationSpec, NormalizedSpecArtifact } from './types.js';
+import { buildOperationKey } from './validators.js';
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))].sort();
