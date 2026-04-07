@@ -25,7 +25,8 @@ export interface Evidence {
     | "network-error"
     | "accessibility-scan"
     | "visual-diff"
-    | "api-contract";
+    | "api-contract"
+    | "vision-analysis";
   summary: string;
   path?: string;
   timestamp: string;
