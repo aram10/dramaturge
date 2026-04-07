@@ -81,14 +81,16 @@ function initWorker(
     opts.screenshotDir, opts.areaName,
     followupRequests, discoveredEdges,
     opts.screenshotsEnabled,
-    stagnationTracker,
     {
-      stateId: opts.stateId,
-      objective: opts.objectiveDescription
-        ? `${opts.objectiveLabel}: ${opts.objectiveDescription}`
-        : opts.objectiveLabel,
-    },
-    actionRecorder
+      stagnationTracker,
+      findingContext: {
+        stateId: opts.stateId,
+        objective: opts.objectiveDescription
+          ? `${opts.objectiveLabel}: ${opts.objectiveDescription}`
+          : opts.objectiveLabel,
+      },
+      actionRecorder,
+    }
   );
 
   const systemPrompt = buildWorkerSystemPrompt(

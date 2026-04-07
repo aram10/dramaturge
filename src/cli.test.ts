@@ -11,6 +11,7 @@ describe("parseCliArgs", () => {
       configPath: "custom.json",
       resumeDir: "./reports/run-1",
       diffRef: undefined,
+      dashboard: false,
       showHelp: false,
     });
   });
@@ -35,6 +36,23 @@ describe("parseCliArgs", () => {
   it("throws when --diff has no value", () => {
     expect(() => parseCliArgs(["--diff"])).toThrow("Missing value for --diff");
   });
+
+  it("parses --dashboard flag", () => {
+    const result = parseCliArgs(["--dashboard"]);
+    expect(result.dashboard).toBe(true);
+    expect(result.showHelp).toBe(false);
+  });
+
+  it("parses --dashboard alongside other flags", () => {
+    const result = parseCliArgs(["--config", "c.json", "--dashboard"]);
+    expect(result.configPath).toBe("c.json");
+    expect(result.dashboard).toBe(true);
+  });
+
+  it("defaults dashboard to false", () => {
+    const result = parseCliArgs([]);
+    expect(result.dashboard).toBe(false);
+  });
 });
 
 describe("buildHelpText", () => {
@@ -44,6 +62,7 @@ describe("buildHelpText", () => {
     expect(helpText).toContain("Usage: dramaturge");
     expect(helpText).toContain("--config <path>");
     expect(helpText).toContain("--resume <run-dir>");
+    expect(helpText).toContain("--dashboard");
   });
 });
 
