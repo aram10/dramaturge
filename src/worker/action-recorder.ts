@@ -349,12 +349,12 @@ export class ActionRecorder {
     });
   }
 
-  private patchQueryMethod(target: any, method: QueryMethod): void {
+  private patchQueryMethod(target: Record<string, unknown> | undefined, method: QueryMethod): void {
     if (!target || typeof target[method] !== 'function') {
       return;
     }
 
-    const original = target[method];
+    const original = target[method] as (...args: unknown[]) => unknown;
     target[method] = (...args: unknown[]) => {
       const locator = original.apply(target, args);
       const selectorHint = describeQuery(method, args);
@@ -365,17 +365,18 @@ export class ActionRecorder {
     });
   }
 
-  private wrapLocator(locator: any, selectorHint: string): any {
+  private wrapLocator(locator: unknown, selectorHint: string): unknown {
     if (!locator || typeof locator !== 'object') {
       return locator;
     }
 
-    const existing = this.wrappedLocators.get(locator);
+    const locatorObject = locator as Record<string, unknown>;
+    const existing = this.wrappedLocators.get(locatorObject);
     if (existing) {
       return existing;
     }
 
-    const proxy = new Proxy(locator, {
+    const proxy = new Proxy(locatorObject, {
       get: (target, prop, receiver) => {
         const value = Reflect.get(target, prop, receiver);
         if (typeof prop !== 'string' || typeof value !== 'function') {
@@ -429,7 +430,7 @@ export class ActionRecorder {
       },
     });
 
-    this.wrappedLocators.set(locator, proxy);
+    this.wrappedLocators.set(locatorObject, proxy);
     return proxy;
   }
 }
