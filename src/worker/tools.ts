@@ -8,6 +8,8 @@ import type { CoverageTracker } from "../coverage/tracker.js";
 import type { StagnationTracker } from "./stagnation.js";
 import type { ActionRecorder } from "./action-recorder.js";
 import type { Observation } from "../judge/types.js";
+import type { Blackboard } from "../a2a/blackboard.js";
+import type { BlackboardEntryKind } from "../a2a/types.js";
 
 type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
 
@@ -71,6 +73,24 @@ const ReportDiscoveredEdgeSchema = z.object({
   actionDescription: z.string().optional().describe("Natural language action description"),
 });
 
+const PostToBlackboardSchema = z.object({
+  kind: z.enum(["finding", "coverage", "navigation", "message", "directive"])
+    .describe("Category of the blackboard entry"),
+  summary: z.string().describe("Short summary of what you are sharing with other agents"),
+  tags: z.array(z.string()).optional().describe("Tags for other agents to filter on"),
+});
+
+export interface WorkerToolOptions {
+  stagnationTracker?: StagnationTracker;
+  findingContext?: {
+    stateId?: string;
+    objective?: string;
+  };
+  actionRecorder?: ActionRecorder;
+  blackboard?: Blackboard;
+  agentId?: string;
+}
+
 export function createWorkerTools(
   observations: Observation[],
   screenshots: Map<string, Buffer>,
@@ -82,13 +102,9 @@ export function createWorkerTools(
   followupRequests: FollowupRequest[] = [],
   discoveredEdges: DiscoveredEdge[] = [],
   screenshotsEnabled = true,
-  stagnationTracker?: StagnationTracker,
-  findingContext?: {
-    stateId?: string;
-    objective?: string;
-  },
-  actionRecorder?: ActionRecorder
+  options: WorkerToolOptions = {}
 ) {
+  const { stagnationTracker, findingContext, actionRecorder, blackboard, agentId } = options;
   mkdirSync(screenshotDir, { recursive: true });
   const breadcrumbs: string[] = [];
 
@@ -281,5 +297,28 @@ export function createWorkerTools(
         };
       },
     },
+
+    ...(blackboard
+      ? {
+          post_to_blackboard: {
+            description:
+              "Share a signal with other agents on the team blackboard. Use this to flag suspicious behaviors, coverage gaps, or interesting patterns.",
+            inputSchema: PostToBlackboardSchema,
+            execute: async (input: z.infer<typeof PostToBlackboardSchema>) => {
+              const entry = blackboard.post(
+                input.kind as BlackboardEntryKind,
+                agentId ?? areaName,
+                { summary: input.summary, route: page.url() },
+                input.tags ?? []
+              );
+              return {
+                posted: true,
+                entryId: entry.id,
+                message: `Posted to blackboard: ${input.summary}`,
+              };
+            },
+          },
+        }
+      : {}),
   };
 }
