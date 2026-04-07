@@ -25,6 +25,8 @@ import type { Observation } from '../judge/types.js';
 import { judgeWorkerObservations } from '../judge/judge.js';
 import { hasLLMApiKey, judgeObservationWithLLM } from '../llm.js';
 
+type StagehandToolSet = NonNullable<Parameters<Stagehand['agent']>[0]>['tools'];
+
 interface WorkerSetup {
   observations: Observation[];
   screenshots: Map<string, Buffer>;
@@ -97,6 +99,7 @@ function initWorker(
       actionRecorder,
     }
   );
+  const stagehandTools: StagehandToolSet = tools;
 
   const systemPrompt = buildWorkerSystemPrompt(
     opts.appDescription,
@@ -118,7 +121,7 @@ function initWorker(
     mode: opts.agentMode,
     model: opts.model,
     systemPrompt,
-    tools: tools as any,
+    tools: stagehandTools,
   });
 
   return {
