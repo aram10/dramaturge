@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Text, Box } from "ink";
 import type { EngineEventEmitter } from "../engine/event-stream.js";
+import type { Blackboard } from "../a2a/blackboard.js";
+import type { MessageBus } from "../a2a/message-bus.js";
 import {
   type DashboardState,
+  type AgentStatus,
   initialDashboardState,
   applyRunStart,
   applyRunEnd,
@@ -12,6 +15,9 @@ import {
   applyStateDiscovered,
   applyProgress,
   applyError,
+  applyA2ATask,
+  applyA2AMessage,
+  applyA2ABlackboard,
 } from "./state.js";
 
 // --- Utility helpers ---
@@ -108,6 +114,9 @@ function ActivityFeed({
           if (item.kind === "finding") color = "yellow";
           else if (item.kind === "error") color = "red";
           else if (item.kind === "state-discovered") color = "green";
+          else if (item.kind === "a2a-task") color = "cyan";
+          else if (item.kind === "a2a-message") color = "blue";
+          else if (item.kind === "a2a-blackboard") color = "magenta";
           return (
             <Text key={item.id} color={color}>
               {item.text}
@@ -148,20 +157,92 @@ function FinishedSummary({
       <Text>
         {state.tasksExecuted} tasks · {state.totalFindings} findings ·{" "}
         {state.statesDiscovered} states
+        {state.a2aEnabled
+          ? ` · ${state.a2aTasksTotal} A2A tasks · ${state.a2aMessagesTotal} messages`
+          : ""}
       </Text>
+    </Box>
+  );
+}
+
+const ROLE_ICONS: Record<string, string> = {
+  scout: "🔭",
+  tester: "🧪",
+  security: "🛡️",
+  reviewer: "📝",
+  reporter: "📊",
+};
+
+function AgentPanel({
+  agents,
+  a2aTasksTotal,
+  a2aMessagesTotal,
+  a2aBlackboardTotal,
+}: {
+  agents: Readonly<Record<string, AgentStatus>>;
+  a2aTasksTotal: number;
+  a2aMessagesTotal: number;
+  a2aBlackboardTotal: number;
+}): React.ReactElement {
+  const agentList = Object.values(agents);
+  return (
+    <Box flexDirection="column" marginTop={1}>
+      <Text bold underline>
+        Agents (A2A)
+      </Text>
+      <Box justifyContent="space-around">
+        <Text>
+          <Text bold>A2A Tasks:</Text> {a2aTasksTotal}
+        </Text>
+        <Text>
+          <Text bold>Messages:</Text> {a2aMessagesTotal}
+        </Text>
+        <Text>
+          <Text bold>Blackboard:</Text> {a2aBlackboardTotal}
+        </Text>
+      </Box>
+      {agentList.length === 0 ? (
+        <Text dimColor>No agents active yet…</Text>
+      ) : (
+        agentList.map((agent) => {
+          const icon = ROLE_ICONS[agent.role] ?? "●";
+          const statusColor =
+            agent.currentStatus === "working"
+              ? "cyan"
+              : agent.currentStatus === "completed"
+                ? "green"
+                : undefined;
+          return (
+            <Text key={agent.agentId}>
+              {icon}{" "}
+              <Text bold>{agent.role}</Text>{" "}
+              <Text dimColor>({agent.agentId})</Text>{" "}
+              <Text color={statusColor}>{agent.currentStatus}</Text>
+              {"  "}tasks: {agent.tasksAssigned}/{agent.tasksCompleted}
+              {"  "}posts: {agent.blackboardPosts}
+            </Text>
+          );
+        })
+      )}
     </Box>
   );
 }
 
 // --- Main Dashboard component ---
 
+export interface DashboardProps {
+  eventStream: EngineEventEmitter;
+  blackboard?: Blackboard;
+  messageBus?: MessageBus;
+}
+
 const ACTIVITY_LINES = 15;
 
 export function Dashboard({
   eventStream,
-}: {
-  eventStream: EngineEventEmitter;
-}): React.ReactElement {
+  blackboard,
+  messageBus,
+}: DashboardProps): React.ReactElement {
   const [state, setState] = useState<DashboardState>(initialDashboardState);
 
   useEffect(() => {
@@ -192,6 +273,47 @@ export function Dashboard({
     eventStream.on("progress", onProgress);
     eventStream.on("run:error", onError);
 
+    const cleanups: (() => void)[] = [];
+
+    // Wire A2A blackboard subscription
+    if (blackboard) {
+      const unsub = blackboard.subscribe("*", (entry) => {
+        const summary =
+          typeof entry.data.summary === "string"
+            ? entry.data.summary
+            : typeof entry.data.title === "string"
+              ? entry.data.title
+              : JSON.stringify(entry.data).slice(0, 60);
+        setState((s) =>
+          applyA2ABlackboard(s, {
+            kind: entry.kind,
+            agentId: entry.agentId,
+            summary,
+          })
+        );
+      });
+      cleanups.push(unsub);
+    }
+
+    // Wire A2A message bus subscription
+    if (messageBus) {
+      const unsub = messageBus.onAny((msg) => {
+        const text =
+          msg.parts
+            .filter((p): p is { kind: "text"; text: string } => p.kind === "text")
+            .map((p) => p.text)
+            .join(" ") || "(non-text message)";
+        setState((s) =>
+          applyA2AMessage(s, {
+            fromAgent: msg.fromAgent,
+            toAgent: msg.toAgent,
+            text: text.slice(0, 80),
+          })
+        );
+      });
+      cleanups.push(unsub);
+    }
+
     return () => {
       eventStream.off("run:start", onRunStart);
       eventStream.off("run:end", onRunEnd);
@@ -201,13 +323,22 @@ export function Dashboard({
       eventStream.off("state:discovered", onStateDiscovered);
       eventStream.off("progress", onProgress);
       eventStream.off("run:error", onError);
+      for (const cleanup of cleanups) cleanup();
     };
-  }, [eventStream]);
+  }, [eventStream, blackboard, messageBus]);
 
   return (
     <Box flexDirection="column" paddingX={1}>
       <Header state={state} />
       <Stats state={state} />
+      {state.a2aEnabled && (
+        <AgentPanel
+          agents={state.agents}
+          a2aTasksTotal={state.a2aTasksTotal}
+          a2aMessagesTotal={state.a2aMessagesTotal}
+          a2aBlackboardTotal={state.a2aBlackboardTotal}
+        />
+      )}
       <ActivityFeed activity={state.activity} maxLines={ACTIVITY_LINES} />
       <ErrorBanner message={state.lastError} />
       <FinishedSummary state={state} />
