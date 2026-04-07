@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { REDACTED_VALUE } from '../redaction.js';
+import { ActionRecorder } from '../worker/action-recorder.js';
 import { renderJson } from './json.js';
 import type { AreaResult, RunResult } from '../types.js';
 
@@ -170,5 +172,45 @@ describe('renderJson', () => {
         kind: 'click',
       }),
     ]);
+  });
+
+  it('serializes redacted replayable input values without leaking the original secret', () => {
+    const secret = 'super-secret-password';
+    const recorder = new ActionRecorder();
+    const action = recorder.recordToolAction({
+      kind: 'input',
+      selector: "input[name='password']",
+      value: secret,
+      summary: "input input[name='password'] -> worked",
+      source: 'page',
+      status: 'worked',
+    });
+    const report = JSON.parse(
+      renderJson(
+        makeResult([
+          {
+            name: 'Login',
+            steps: 1,
+            findings: [],
+            screenshots: new Map(),
+            evidence: [],
+            replayableActions: [action],
+            coverage: { controlsDiscovered: 1, controlsExercised: 1, events: [] },
+            pageType: 'auth',
+            status: 'explored',
+          },
+        ])
+      )
+    );
+
+    expect(report.actions).toEqual([
+      expect.objectContaining({
+        id: action.id,
+        kind: 'input',
+        value: REDACTED_VALUE,
+        areaName: 'Login',
+      }),
+    ]);
+    expect(JSON.stringify(report)).not.toContain(secret);
   });
 });
