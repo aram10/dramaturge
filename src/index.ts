@@ -120,10 +120,15 @@ export type {
   ContractIndex,
 } from "./spec/contract-index.js";
 export { renderDashboard } from "./dashboard/render.js";
+export type { RenderDashboardOptions } from "./dashboard/render.js";
 export type {
   DashboardState,
   ActivityItem,
   ActivityKind,
+  AgentStatus,
+  A2ATaskEvent,
+  A2AMessageEvent,
+  A2ABlackboardEvent,
 } from "./dashboard/state.js";
 export type {
   EvalCaseResult,
