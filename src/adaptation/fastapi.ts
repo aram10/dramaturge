@@ -121,6 +121,14 @@ function convertPathParams(route: string): string {
   return route.replace(/\{(\w+)\}/g, ":$1");
 }
 
+function normalizeRoute(raw: string): string {
+  let cleaned = raw.replace(/\/+$/, "");
+  if (cleaned && !cleaned.startsWith("/")) {
+    cleaned = `/${cleaned}`;
+  }
+  return cleaned || "/";
+}
+
 function extractSelectors(content: string): string[] {
   const selectors: string[] = [];
 
@@ -181,19 +189,24 @@ export function scanFastApiRepo(root: string): RepoHints {
 
     // Extract routes from FastAPI decorators in .py files
     if (filePath.endsWith(".py")) {
-      const fileStatusCodes = extractStatusCodes(content);
       const pydanticModels = extractPydanticModels(content);
-      const hasAuthDependency = AUTH_DEPENDS_RE.test(content);
+      const isApiRouterFile = /\bAPIRouter\s*\(/.test(content);
 
       for (const match of content.matchAll(FASTAPI_ROUTE_RE)) {
         const method = (match[1] ?? "").toUpperCase();
         const rawRoute = match[2] ?? "";
-        const route = convertPathParams(rawRoute);
+        const route = normalizeRoute(convertPathParams(rawRoute));
 
         routes.push(route);
 
+        // Extract status codes and auth from the specific handler block
+        const decoratorIdx = match.index ?? 0;
+        const functionBlock = content.slice(decoratorIdx, decoratorIdx + 500);
+        const handlerStatusCodes = extractStatusCodes(functionBlock);
+        const handlerHasAuth = AUTH_DEPENDS_RE.test(functionBlock);
+
         // Detect API endpoints: routes starting with /api/ or from APIRouter files
-        const isApiRoute = /^\/api\//i.test(route) || /\bAPIRouter\s*\(/.test(content);
+        const isApiRoute = /^\/api\//i.test(route) || isApiRouterFile;
         if (isApiRoute) {
           const existing = apiEndpoints.get(route) ?? {
             route,
@@ -203,20 +216,13 @@ export function scanFastApiRepo(root: string): RepoHints {
             validationSchemas: [],
           };
           existing.methods.push(method);
-          existing.statuses.push(...fileStatusCodes);
-          if (hasAuthDependency) {
+          existing.statuses.push(...handlerStatusCodes);
+          if (handlerHasAuth) {
             existing.authRequired = true;
           }
           existing.validationSchemas.push(...pydanticModels);
           apiEndpoints.set(route, existing);
         }
-
-        // Check auth dependency on this specific handler
-        // Look at the lines following the decorator for Depends(...)
-        // 500 chars is enough to cover the function signature and first few lines
-        const decoratorIdx = content.indexOf(match[0]);
-        const functionBlock = content.slice(decoratorIdx, decoratorIdx + 500);
-        const handlerHasAuth = AUTH_DEPENDS_RE.test(functionBlock);
 
         if (handlerHasAuth && isApiRoute) {
           const key = route;

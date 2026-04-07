@@ -36,7 +36,7 @@ function walkFiles(root: string): string[] {
     const fullPath = join(root, entry.name);
     if (entry.isDirectory()) {
       files.push(...walkFiles(fullPath));
-    } else {
+    } else if (entry.isFile()) {
       files.push(fullPath);
     }
   }
