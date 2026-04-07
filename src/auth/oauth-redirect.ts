@@ -1,5 +1,6 @@
 import type { Stagehand } from '@browserbasehq/stagehand';
 import type { OAuthRedirectStep } from '../config.js';
+import { setInputRecordingPolicy } from '../worker/input-recording-policy.js';
 import { parseIndicator, waitForSuccess } from './success-indicator.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
@@ -61,6 +62,7 @@ export async function authenticateOAuthRedirect(
         await clickSelector(page, step.selector);
         break;
       case 'fill':
+        setInputRecordingPolicy(page as object, step.selector, step.secret ? 'secret' : 'safe');
         await fillSelector(page, step.selector, step.value);
         break;
       case 'wait-for-selector':
