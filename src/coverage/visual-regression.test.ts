@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PNG } from "pngjs";
+import type { VisualRegressionPage } from "../browser/page-interface.js";
 import { comparePngBuffers, runVisualRegressionScan } from "./visual-regression.js";
 
 function makeSolidPng(
@@ -23,7 +24,7 @@ function makeSolidPng(
   return PNG.sync.write(png);
 }
 
-function createMockPage(buffer: Buffer) {
+function createMockPage(buffer: Buffer): VisualRegressionPage {
   return {
     async screenshot() {
       return buffer;
@@ -32,7 +33,13 @@ function createMockPage(buffer: Buffer) {
       return { width: 4, height: 4 };
     },
     locator(selector: string) {
-      return { selector };
+      return {
+        selector,
+        click: async () => undefined,
+        count: async () => 1,
+        fill: async () => undefined,
+        waitFor: async () => undefined,
+      };
     },
   };
 }
@@ -71,7 +78,7 @@ describe("runVisualRegressionScan", () => {
     const baselineDir = join(tempDir, "baselines");
     const outputDir = join(tempDir, "run");
 
-    const result = await runVisualRegressionScan(createMockPage(makeSolidPng([0, 100, 200, 255])) as any, {
+    const result = await runVisualRegressionScan(createMockPage(makeSolidPng([0, 100, 200, 255])), {
       areaName: "Dashboard",
       route: "https://example.com/dashboard",
       fingerprintHash: "dashboard-hash",
@@ -94,7 +101,7 @@ describe("runVisualRegressionScan", () => {
     const baselinePage = createMockPage(makeSolidPng([0, 100, 200, 255]));
     const changedPage = createMockPage(makeSolidPng([220, 40, 10, 255]));
 
-    await runVisualRegressionScan(baselinePage as any, {
+    await runVisualRegressionScan(baselinePage, {
       areaName: "Dashboard",
       route: "https://example.com/dashboard",
       fingerprintHash: "dashboard-hash",
@@ -106,7 +113,7 @@ describe("runVisualRegressionScan", () => {
       maskSelectors: [],
     });
 
-    const result = await runVisualRegressionScan(changedPage as any, {
+    const result = await runVisualRegressionScan(changedPage, {
       areaName: "Dashboard",
       route: "https://example.com/dashboard",
       fingerprintHash: "dashboard-hash",
