@@ -5,7 +5,7 @@ import { parseJsoncObject } from "../utils/jsonc.js";
 import { canScanAstroRepo, scanAstroRepo } from "./astro.js";
 import { scanDjangoRepo } from "./django.js";
 import { scanExpressRepo } from "./express.js";
-import { canScanFastApiRepo, scanFastApiRepo } from "./fastapi.js";
+import { scanFastApiRepo } from "./fastapi.js";
 import { scanGenericRepo } from "./generic.js";
 import { canScanNextJsRepo, scanNextJsRepo } from "./nextjs.js";
 import { canScanNuxtRepo, scanNuxtRepo } from "./nuxt.js";

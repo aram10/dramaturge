@@ -307,11 +307,13 @@ export function scanRailsRepo(root: string): RepoHints {
     const content = readFileSync(filePath, "utf-8");
 
     // Controller analysis
+    const relToControllers = relative(controllersDir, filePath);
     if (
       filePath.endsWith(".rb") &&
-      filePath.startsWith(controllersDir + "/")
+      !relToControllers.startsWith("..") &&
+      relToControllers !== filePath
     ) {
-      const relPath = relative(controllersDir, filePath);
+      const relPath = relToControllers;
       const controllerPrefix =
         "/" + relPath.replace(/_controller\.rb$/, "").replace(/\\/g, "/");
 
