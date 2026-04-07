@@ -1,5 +1,5 @@
-import type { FrontierItem } from "../types.js";
-import { REQUEUE_PRIORITY_DECAY } from "../constants.js";
+import type { FrontierItem } from '../types.js';
+import { REQUEUE_PRIORITY_DECAY } from '../constants.js';
 
 export class FrontierQueue {
   /** Sorted descending by priority — highest-priority items first. */
@@ -20,8 +20,8 @@ export class FrontierQueue {
    */
   dequeueHighest(): FrontierItem | undefined {
     for (let i = 0; i < this.items.length; i++) {
-      if (this.items[i].status === "pending") {
-        this.items[i].status = "in-progress";
+      if (this.items[i].status === 'pending') {
+        this.items[i].status = 'in-progress';
         return this.items[i];
       }
     }
@@ -36,7 +36,7 @@ export class FrontierQueue {
     const idx = this.items.indexOf(item);
     if (idx !== -1) this.items.splice(idx, 1);
 
-    item.status = "pending";
+    item.status = 'pending';
     item.priority *= REQUEUE_PRIORITY_DECAY;
 
     // Re-insert at correct sorted position
@@ -44,11 +44,11 @@ export class FrontierQueue {
   }
 
   hasItems(): boolean {
-    return this.items.some((i) => i.status === "pending");
+    return this.items.some((i) => i.status === 'pending');
   }
 
   size(): number {
-    return this.items.filter((i) => i.status === "pending").length;
+    return this.items.filter((i) => i.status === 'pending').length;
   }
 
   /**
@@ -56,7 +56,7 @@ export class FrontierQueue {
    * Returns removed items for blind spot recording.
    */
   pruneLowest(fraction: number): FrontierItem[] {
-    const pending = this.items.filter((i) => i.status === "pending");
+    const pending = this.items.filter((i) => i.status === 'pending');
     // Items are sorted descending, so lowest are at the end of pending
     pending.sort((a, b) => a.priority - b.priority);
     const cutCount = Math.ceil(pending.length * fraction);
@@ -70,9 +70,9 @@ export class FrontierQueue {
    * Drain all remaining pending items (for end-of-run blind spot recording).
    */
   drain(): FrontierItem[] {
-    const remaining = this.items.filter((i) => i.status === "pending");
+    const remaining = this.items.filter((i) => i.status === 'pending');
     for (const item of remaining) {
-      item.status = "completed";
+      item.status = 'completed';
     }
     return remaining;
   }

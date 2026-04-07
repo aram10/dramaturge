@@ -1,18 +1,18 @@
 export type RepoFramework =
-  | "auto"
-  | "nextjs"
-  | "nuxt"
-  | "sveltekit"
-  | "remix"
-  | "astro"
-  | "react-router"
-  | "express"
-  | "vue-router"
-  | "django"
-  | "fastapi"
-  | "rails"
-  | "tanstack-router"
-  | "generic";
+  | 'auto'
+  | 'nextjs'
+  | 'nuxt'
+  | 'sveltekit'
+  | 'remix'
+  | 'astro'
+  | 'react-router'
+  | 'express'
+  | 'vue-router'
+  | 'django'
+  | 'fastapi'
+  | 'rails'
+  | 'tanstack-router'
+  | 'generic';
 
 export interface ExpectedHttpNoise {
   method?: string;
@@ -51,6 +51,6 @@ export interface RepoHintsOverride {
   routeFamilies?: string[];
   stableSelectors?: string[];
   apiEndpoints?: ApiEndpointHint[];
-  authHints?: Partial<RepoHints["authHints"]>;
+  authHints?: Partial<RepoHints['authHints']>;
   expectedHttpNoise?: ExpectedHttpNoise[];
 }

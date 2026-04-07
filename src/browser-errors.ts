@@ -1,17 +1,17 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
+import type { Stagehand } from '@browserbasehq/stagehand';
 import type {
   RawFinding,
   Evidence,
   BrowserConsoleError,
   BrowserNetworkError,
   BrowserPageError,
-} from "./types.js";
-import { shortId, TRUNCATE_GROUP_KEY, TRUNCATE_SUMMARY, TRUNCATE_TITLE } from "./constants.js";
-import type { PolicyConfig } from "./policy/types.js";
-import { shouldSuppressFinding } from "./policy/policy.js";
-import { buildAutoCaptureFindingMeta } from "./repro/repro.js";
+} from './types.js';
+import { shortId, TRUNCATE_GROUP_KEY, TRUNCATE_SUMMARY, TRUNCATE_TITLE } from './constants.js';
+import type { PolicyConfig } from './policy/types.js';
+import { shouldSuppressFinding } from './policy/policy.js';
+import { buildAutoCaptureFindingMeta } from './repro/repro.js';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 export interface BrowserErrorCollectorOptions {
   captureConsole: boolean;
@@ -38,7 +38,7 @@ export class BrowserErrorCollector {
   }
 
   /** Attach event listeners to a page. Safe to call for multiple pages. */
-  attach(page: StagehandPage, pageKey = "default"): void {
+  attach(page: StagehandPage, pageKey = 'default'): void {
     if (this.teardownFns.has(pageKey)) {
       this.detach(pageKey);
     }
@@ -51,19 +51,19 @@ export class BrowserErrorCollector {
       const onConsole = (msg: { type: () => string; text: () => string }) => {
         const type = msg.type();
         const shouldCapture =
-          (type === "error" && this.options.captureConsole) ||
-          (type === "warning" && this.options.captureConsoleWarnings);
+          (type === 'error' && this.options.captureConsole) ||
+          (type === 'warning' && this.options.captureConsoleWarnings);
         if (shouldCapture) {
           bucket.consoleErrors.push({
-            level: type as "error" | "warning",
+            level: type as 'error' | 'warning',
             text: msg.text(),
             url: page.url(),
             timestamp: new Date().toISOString(),
           });
         }
       };
-      p.on("console", onConsole);
-      teardowns.push(() => p.off("console", onConsole));
+      p.on('console', onConsole);
+      teardowns.push(() => p.off('console', onConsole));
     }
 
     if (this.options.captureConsole) {
@@ -74,13 +74,18 @@ export class BrowserErrorCollector {
           timestamp: new Date().toISOString(),
         });
       };
-      p.on("pageerror", onPageError);
-      teardowns.push(() => p.off("pageerror", onPageError));
+      p.on('pageerror', onPageError);
+      teardowns.push(() => p.off('pageerror', onPageError));
     }
 
     if (this.options.captureNetwork) {
       const minStatus = this.options.networkErrorMinStatus;
-      const onResponse = (response: { status: () => number; url: () => string; statusText: () => string; request: () => { method: () => string } }) => {
+      const onResponse = (response: {
+        status: () => number;
+        url: () => string;
+        statusText: () => string;
+        request: () => { method: () => string };
+      }) => {
         const status = response.status();
         if (status >= minStatus) {
           bucket.networkErrors.push({
@@ -92,10 +97,14 @@ export class BrowserErrorCollector {
           });
         }
       };
-      p.on("response", onResponse);
-      teardowns.push(() => p.off("response", onResponse));
+      p.on('response', onResponse);
+      teardowns.push(() => p.off('response', onResponse));
 
-      const onRequestFailed = (request: { url: () => string; method: () => string; failure: () => { errorText: string } | null }) => {
+      const onRequestFailed = (request: {
+        url: () => string;
+        method: () => string;
+        failure: () => { errorText: string } | null;
+      }) => {
         const failure = request.failure();
         if (failure) {
           bucket.networkErrors.push({
@@ -107,8 +116,8 @@ export class BrowserErrorCollector {
           });
         }
       };
-      p.on("requestfailed", onRequestFailed);
-      teardowns.push(() => p.off("requestfailed", onRequestFailed));
+      p.on('requestfailed', onRequestFailed);
+      teardowns.push(() => p.off('requestfailed', onRequestFailed));
     }
 
     this.teardownFns.set(pageKey, teardowns);
@@ -129,17 +138,17 @@ export class BrowserErrorCollector {
   }
 
   /** Drain captured errors into findings + evidence, clearing internal buffers. */
-  flush(pageKey = "default"): { findings: RawFinding[]; evidence: Evidence[] } {
+  flush(pageKey = 'default'): { findings: RawFinding[]; evidence: Evidence[] } {
     const findings: RawFinding[] = [];
     const evidence: Evidence[] = [];
     const bucket = this.getBucket(pageKey);
 
     const emit = (
-      evidenceType: Evidence["type"],
+      evidenceType: Evidence['type'],
       summary: string,
       timestamp: string,
-      finding: Omit<RawFinding, "evidenceIds" | "meta">,
-      metaFactory?: (evidenceIds: string[]) => RawFinding["meta"]
+      finding: Omit<RawFinding, 'evidenceIds' | 'meta'>,
+      metaFactory?: (evidenceIds: string[]) => RawFinding['meta']
     ) => {
       const evidenceId = `ev-${shortId()}`;
       const findingRef = `fid-${shortId()}`;
@@ -171,25 +180,30 @@ export class BrowserErrorCollector {
       const first = errors[0];
       if (
         this.options.policy &&
-        shouldSuppressFinding({ type: "console", error: first }, this.options.policy)
+        shouldSuppressFinding({ type: 'console', error: first }, this.options.policy)
       ) {
         continue;
       }
-      emit("console-error", `${first.level}: ${msg.slice(0, TRUNCATE_SUMMARY)}`, first.timestamp, {
-        category: "Bug",
-        severity: first.level === "error" ? "Major" : "Minor",
-        title: `Browser console ${first.level}: ${msg.slice(0, TRUNCATE_TITLE)}`,
-        stepsToReproduce: [`Navigate to ${first.url}`],
-        expected: "No console errors",
-        actual: `${errors.length} occurrence(s): ${msg.slice(0, TRUNCATE_GROUP_KEY)}`,
-      }, (evidenceIds) =>
-        buildAutoCaptureFindingMeta({
-          route: first.url,
-          objective: "Observe auto-captured browser failure",
-          confidence: first.level === "error" ? "high" : "medium",
-          breadcrumbs: [`auto-captured console ${first.level}`],
-          evidenceIds,
-        })
+      emit(
+        'console-error',
+        `${first.level}: ${msg.slice(0, TRUNCATE_SUMMARY)}`,
+        first.timestamp,
+        {
+          category: 'Bug',
+          severity: first.level === 'error' ? 'Major' : 'Minor',
+          title: `Browser console ${first.level}: ${msg.slice(0, TRUNCATE_TITLE)}`,
+          stepsToReproduce: [`Navigate to ${first.url}`],
+          expected: 'No console errors',
+          actual: `${errors.length} occurrence(s): ${msg.slice(0, TRUNCATE_GROUP_KEY)}`,
+        },
+        (evidenceIds) =>
+          buildAutoCaptureFindingMeta({
+            route: first.url,
+            objective: 'Observe auto-captured browser failure',
+            confidence: first.level === 'error' ? 'high' : 'medium',
+            breadcrumbs: [`auto-captured console ${first.level}`],
+            evidenceIds,
+          })
       );
     }
 
@@ -197,25 +211,30 @@ export class BrowserErrorCollector {
     for (const err of bucket.pageErrors) {
       if (
         this.options.policy &&
-        shouldSuppressFinding({ type: "console", error: err }, this.options.policy)
+        shouldSuppressFinding({ type: 'console', error: err }, this.options.policy)
       ) {
         continue;
       }
-      emit("console-error", `Uncaught: ${err.message.slice(0, TRUNCATE_SUMMARY)}`, err.timestamp, {
-        category: "Bug",
-        severity: "Critical",
-        title: `Uncaught exception: ${err.message.slice(0, TRUNCATE_TITLE)}`,
-        stepsToReproduce: [`Navigate to ${err.url}`],
-        expected: "No uncaught exceptions",
-        actual: err.message,
-      }, (evidenceIds) =>
-        buildAutoCaptureFindingMeta({
-          route: err.url,
-          objective: "Observe auto-captured browser failure",
-          confidence: "high",
-          breadcrumbs: ["auto-captured uncaught exception"],
-          evidenceIds,
-        })
+      emit(
+        'console-error',
+        `Uncaught: ${err.message.slice(0, TRUNCATE_SUMMARY)}`,
+        err.timestamp,
+        {
+          category: 'Bug',
+          severity: 'Critical',
+          title: `Uncaught exception: ${err.message.slice(0, TRUNCATE_TITLE)}`,
+          stepsToReproduce: [`Navigate to ${err.url}`],
+          expected: 'No uncaught exceptions',
+          actual: err.message,
+        },
+        (evidenceIds) =>
+          buildAutoCaptureFindingMeta({
+            route: err.url,
+            objective: 'Observe auto-captured browser failure',
+            confidence: 'high',
+            breadcrumbs: ['auto-captured uncaught exception'],
+            evidenceIds,
+          })
       );
     }
 
@@ -232,32 +251,37 @@ export class BrowserErrorCollector {
       const first = errors[0];
       if (
         this.options.policy &&
-        shouldSuppressFinding({ type: "network", error: first }, this.options.policy)
+        shouldSuppressFinding({ type: 'network', error: first }, this.options.policy)
       ) {
         continue;
       }
-      const statusLabel = first.status === 0 ? "failed" : `${first.status}`;
+      const statusLabel = first.status === 0 ? 'failed' : `${first.status}`;
       let pathname: string;
       try {
         pathname = new URL(first.url).pathname;
       } catch {
         pathname = first.url;
       }
-      emit("network-error", `${first.method} ${first.url} → ${statusLabel}`, first.timestamp, {
-        category: "Bug",
-        severity: first.status >= 500 ? "Major" : "Minor",
-        title: `Network ${statusLabel}: ${first.method} ${pathname}`,
-        stepsToReproduce: [`Request: ${first.method} ${first.url}`],
-        expected: "Successful HTTP response (2xx/3xx)",
-        actual: `${errors.length} occurrence(s): ${first.status} ${first.statusText}`,
-      }, (evidenceIds) =>
-        buildAutoCaptureFindingMeta({
-          route: first.url,
-          objective: "Observe auto-captured browser failure",
-          confidence: first.status === 0 || first.status >= 500 ? "high" : "medium",
-          breadcrumbs: [`auto-captured ${first.method} ${pathname} -> ${statusLabel}`],
-          evidenceIds,
-        })
+      emit(
+        'network-error',
+        `${first.method} ${first.url} → ${statusLabel}`,
+        first.timestamp,
+        {
+          category: 'Bug',
+          severity: first.status >= 500 ? 'Major' : 'Minor',
+          title: `Network ${statusLabel}: ${first.method} ${pathname}`,
+          stepsToReproduce: [`Request: ${first.method} ${first.url}`],
+          expected: 'Successful HTTP response (2xx/3xx)',
+          actual: `${errors.length} occurrence(s): ${first.status} ${first.statusText}`,
+        },
+        (evidenceIds) =>
+          buildAutoCaptureFindingMeta({
+            route: first.url,
+            objective: 'Observe auto-captured browser failure',
+            confidence: first.status === 0 || first.status >= 500 ? 'high' : 'medium',
+            breadcrumbs: [`auto-captured ${first.method} ${pathname} -> ${statusLabel}`],
+            evidenceIds,
+          })
       );
     }
 
@@ -269,13 +293,9 @@ export class BrowserErrorCollector {
     return { findings, evidence };
   }
 
-  pendingCount(pageKey = "default"): number {
+  pendingCount(pageKey = 'default'): number {
     const bucket = this.getBucket(pageKey);
-    return (
-      bucket.consoleErrors.length +
-      bucket.networkErrors.length +
-      bucket.pageErrors.length
-    );
+    return bucket.consoleErrors.length + bucket.networkErrors.length + bucket.pageErrors.length;
   }
 
   private getBucket(pageKey: string): ErrorBucket {

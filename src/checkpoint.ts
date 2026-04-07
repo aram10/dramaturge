@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   Checkpoint,
   RawFinding,
@@ -7,12 +7,12 @@ import type {
   ReplayableAction,
   BlindSpot,
   FrontierItem,
-} from "./types.js";
-import type { StateGraph } from "./graph/state-graph.js";
-import type { FrontierQueue } from "./graph/frontier.js";
-import type { CoverageTracker } from "./coverage/tracker.js";
+} from './types.js';
+import type { StateGraph } from './graph/state-graph.js';
+import type { FrontierQueue } from './graph/frontier.js';
+import type { CoverageTracker } from './coverage/tracker.js';
 
-const CHECKPOINT_FILE = "checkpoint.json";
+const CHECKPOINT_FILE = 'checkpoint.json';
 
 interface SaveCheckpointOptions {
   frontierSnapshot?: FrontierItem[];
@@ -28,7 +28,7 @@ export function saveCheckpoint(
   coverage: CoverageTracker,
   completedTaskIds: string[],
   tasksExecuted: number,
-  plannerState: Record<string, FrontierItem["workerType"][]>,
+  plannerState: Record<string, FrontierItem['workerType'][]>,
   options?: SaveCheckpointOptions
 ): void {
   const checkpoint: Checkpoint = {
@@ -40,8 +40,7 @@ export function saveCheckpoint(
       edges: graph.getAllEdges(),
     },
     frontierSnapshot:
-      options?.frontierSnapshot?.map((item) => ({ ...item })) ??
-      frontier.snapshot(),
+      options?.frontierSnapshot?.map((item) => ({ ...item })) ?? frontier.snapshot(),
     findingsByNode: Object.fromEntries(findingsByNode.entries()),
     evidenceByNode: Object.fromEntries(evidenceByNode.entries()),
     actionsByNode: Object.fromEntries(actionsByNode.entries()),
@@ -51,14 +50,14 @@ export function saveCheckpoint(
   };
 
   const path = join(outputDir, CHECKPOINT_FILE);
-  writeFileSync(path, JSON.stringify(checkpoint), "utf-8");
+  writeFileSync(path, JSON.stringify(checkpoint), 'utf-8');
 }
 
 export function loadCheckpoint(runDir: string): Checkpoint | null {
   const path = join(runDir, CHECKPOINT_FILE);
   if (!existsSync(path)) return null;
 
-  const raw = readFileSync(path, "utf-8");
+  const raw = readFileSync(path, 'utf-8');
   let data: Checkpoint;
   try {
     data = JSON.parse(raw) as Checkpoint;
@@ -83,7 +82,7 @@ export function hydrateFromCheckpoint(
   actionsByNode: Map<string, ReplayableAction[]>;
   completedTaskIds: Set<string>;
   tasksExecuted: number;
-  plannerState: Record<string, FrontierItem["workerType"][]>;
+  plannerState: Record<string, FrontierItem['workerType'][]>;
 } {
   // Restore graph nodes
   for (const node of checkpoint.graphSnapshot.nodes) {
@@ -95,9 +94,7 @@ export function hydrateFromCheckpoint(
   }
 
   // Restore frontier (only pending items)
-  const pendingItems = checkpoint.frontierSnapshot.filter(
-    (i) => i.status === "pending"
-  );
+  const pendingItems = checkpoint.frontierSnapshot.filter((i) => i.status === 'pending');
   frontier.enqueueMany(pendingItems);
 
   // Restore blind spots

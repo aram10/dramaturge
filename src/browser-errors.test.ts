@@ -1,10 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
-import { BrowserErrorCollector } from "./browser-errors.js";
+import { describe, it, expect, vi } from 'vitest';
+import { BrowserErrorCollector } from './browser-errors.js';
 
 function createMockPage() {
   const handlers = new Map<string, Function[]>();
   return {
-    url: () => "https://example.com/test",
+    url: () => 'https://example.com/test',
     on(event: string, fn: Function) {
       const list = handlers.get(event) ?? [];
       list.push(fn);
@@ -12,7 +12,10 @@ function createMockPage() {
     },
     off(event: string, fn: Function) {
       const list = handlers.get(event) ?? [];
-      handlers.set(event, list.filter((f) => f !== fn));
+      handlers.set(
+        event,
+        list.filter((f) => f !== fn)
+      );
     },
     emit(event: string, ...args: unknown[]) {
       const list = handlers.get(event) ?? [];
@@ -22,8 +25,8 @@ function createMockPage() {
   };
 }
 
-describe("BrowserErrorCollector", () => {
-  it("captures console errors", () => {
+describe('BrowserErrorCollector', () => {
+  it('captures console errors', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
       captureConsoleWarnings: false,
@@ -34,21 +37,21 @@ describe("BrowserErrorCollector", () => {
     collector.attach(page as any);
 
     // Simulate console error
-    page.emit("console", { type: () => "error", text: () => "Uncaught TypeError: foo" });
-    page.emit("console", { type: () => "log", text: () => "normal log" }); // should be ignored
-    page.emit("console", { type: () => "warning", text: () => "deprecation warning" });
+    page.emit('console', { type: () => 'error', text: () => 'Uncaught TypeError: foo' });
+    page.emit('console', { type: () => 'log', text: () => 'normal log' }); // should be ignored
+    page.emit('console', { type: () => 'warning', text: () => 'deprecation warning' });
 
     expect(collector.pendingCount()).toBe(1);
 
     const { findings, evidence } = collector.flush();
     expect(findings).toHaveLength(1);
-    expect(findings[0].title).toContain("console error");
-    expect(findings[0].severity).toBe("Major");
+    expect(findings[0].title).toContain('console error');
+    expect(findings[0].severity).toBe('Major');
     expect(evidence).toHaveLength(1);
     expect(collector.pendingCount()).toBe(0);
   });
 
-  it("captures console warnings only when explicitly enabled", () => {
+  it('captures console warnings only when explicitly enabled', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
       captureConsoleWarnings: true,
@@ -58,15 +61,15 @@ describe("BrowserErrorCollector", () => {
     const page = createMockPage();
     collector.attach(page as any);
 
-    page.emit("console", { type: () => "warning", text: () => "deprecation warning" });
+    page.emit('console', { type: () => 'warning', text: () => 'deprecation warning' });
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(1);
-    expect(findings[0].title).toContain("console warning");
-    expect(findings[0].severity).toBe("Minor");
+    expect(findings[0].title).toContain('console warning');
+    expect(findings[0].severity).toBe('Minor');
   });
 
-  it("captures page errors (uncaught exceptions)", () => {
+  it('captures page errors (uncaught exceptions)', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
       captureConsoleWarnings: false,
@@ -76,15 +79,15 @@ describe("BrowserErrorCollector", () => {
     const page = createMockPage();
     collector.attach(page as any);
 
-    page.emit("pageerror", new Error("Cannot read properties of null"));
+    page.emit('pageerror', new Error('Cannot read properties of null'));
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(1);
-    expect(findings[0].severity).toBe("Critical");
-    expect(findings[0].title).toContain("Uncaught exception");
+    expect(findings[0].severity).toBe('Critical');
+    expect(findings[0].title).toContain('Uncaught exception');
   });
 
-  it("captures network errors (4xx/5xx)", () => {
+  it('captures network errors (4xx/5xx)', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
       captureConsoleWarnings: false,
@@ -95,34 +98,34 @@ describe("BrowserErrorCollector", () => {
     collector.attach(page as any);
 
     // 404 response
-    page.emit("response", {
+    page.emit('response', {
       status: () => 404,
-      url: () => "https://example.com/api/missing",
-      statusText: () => "Not Found",
-      request: () => ({ method: () => "GET" }),
+      url: () => 'https://example.com/api/missing',
+      statusText: () => 'Not Found',
+      request: () => ({ method: () => 'GET' }),
     });
     // 500 response
-    page.emit("response", {
+    page.emit('response', {
       status: () => 500,
-      url: () => "https://example.com/api/error",
-      statusText: () => "Internal Server Error",
-      request: () => ({ method: () => "POST" }),
+      url: () => 'https://example.com/api/error',
+      statusText: () => 'Internal Server Error',
+      request: () => ({ method: () => 'POST' }),
     });
     // 200 response (should be ignored)
-    page.emit("response", {
+    page.emit('response', {
       status: () => 200,
-      url: () => "https://example.com/api/ok",
-      statusText: () => "OK",
-      request: () => ({ method: () => "GET" }),
+      url: () => 'https://example.com/api/ok',
+      statusText: () => 'OK',
+      request: () => ({ method: () => 'GET' }),
     });
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(2);
-    expect(findings[0].severity).toBe("Minor"); // 404
-    expect(findings[1].severity).toBe("Major"); // 500
+    expect(findings[0].severity).toBe('Minor'); // 404
+    expect(findings[1].severity).toBe('Major'); // 500
   });
 
-  it("captures failed requests (dns failures, etc.)", () => {
+  it('captures failed requests (dns failures, etc.)', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
       captureConsoleWarnings: false,
@@ -132,19 +135,19 @@ describe("BrowserErrorCollector", () => {
     const page = createMockPage();
     collector.attach(page as any);
 
-    page.emit("requestfailed", {
-      url: () => "https://dead-host.example.com/api",
-      method: () => "GET",
-      failure: () => ({ errorText: "net::ERR_NAME_NOT_RESOLVED" }),
+    page.emit('requestfailed', {
+      url: () => 'https://dead-host.example.com/api',
+      method: () => 'GET',
+      failure: () => ({ errorText: 'net::ERR_NAME_NOT_RESOLVED' }),
     });
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(1);
-    expect(findings[0].title).toContain("Network failed");
-    expect(findings[0].actual).toContain("net::ERR_NAME_NOT_RESOLVED");
+    expect(findings[0].title).toContain('Network failed');
+    expect(findings[0].actual).toContain('net::ERR_NAME_NOT_RESOLVED');
   });
 
-  it("deduplicates repeated console errors", () => {
+  it('deduplicates repeated console errors', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
       captureConsoleWarnings: false,
@@ -156,15 +159,15 @@ describe("BrowserErrorCollector", () => {
 
     // Same error 3 times
     for (let i = 0; i < 3; i++) {
-      page.emit("console", { type: () => "error", text: () => "ResizeObserver loop" });
+      page.emit('console', { type: () => 'error', text: () => 'ResizeObserver loop' });
     }
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(1); // grouped
-    expect(findings[0].actual).toContain("3 occurrence(s)");
+    expect(findings[0].actual).toContain('3 occurrence(s)');
   });
 
-  it("deduplicates repeated network errors by URL+status", () => {
+  it('deduplicates repeated network errors by URL+status', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
       captureConsoleWarnings: false,
@@ -176,20 +179,20 @@ describe("BrowserErrorCollector", () => {
 
     // Same 404 three times
     for (let i = 0; i < 3; i++) {
-      page.emit("response", {
+      page.emit('response', {
         status: () => 404,
-        url: () => "https://example.com/missing.js",
-        statusText: () => "Not Found",
-        request: () => ({ method: () => "GET" }),
+        url: () => 'https://example.com/missing.js',
+        statusText: () => 'Not Found',
+        request: () => ({ method: () => 'GET' }),
       });
     }
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(1);
-    expect(findings[0].actual).toContain("3 occurrence(s)");
+    expect(findings[0].actual).toContain('3 occurrence(s)');
   });
 
-  it("detach removes all listeners", () => {
+  it('detach removes all listeners', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
       captureConsoleWarnings: false,
@@ -200,7 +203,7 @@ describe("BrowserErrorCollector", () => {
     collector.attach(page as any);
 
     // Should have listeners
-    expect(page._handlers.get("console")?.length).toBeGreaterThan(0);
+    expect(page._handlers.get('console')?.length).toBeGreaterThan(0);
 
     collector.detach();
 
@@ -210,7 +213,7 @@ describe("BrowserErrorCollector", () => {
     }
   });
 
-  it("does not stack duplicate listeners when attaching the same page key twice", () => {
+  it('does not stack duplicate listeners when attaching the same page key twice', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
       captureConsoleWarnings: false,
@@ -219,17 +222,17 @@ describe("BrowserErrorCollector", () => {
     });
     const page = createMockPage();
 
-    collector.attach(page as any, "shared");
-    const initialConsoleListeners = page._handlers.get("console")?.length ?? 0;
-    const initialResponseListeners = page._handlers.get("response")?.length ?? 0;
+    collector.attach(page as any, 'shared');
+    const initialConsoleListeners = page._handlers.get('console')?.length ?? 0;
+    const initialResponseListeners = page._handlers.get('response')?.length ?? 0;
 
-    collector.attach(page as any, "shared");
+    collector.attach(page as any, 'shared');
 
-    expect(page._handlers.get("console")).toHaveLength(initialConsoleListeners);
-    expect(page._handlers.get("response")).toHaveLength(initialResponseListeners);
+    expect(page._handlers.get('console')).toHaveLength(initialConsoleListeners);
+    expect(page._handlers.get('response')).toHaveLength(initialResponseListeners);
   });
 
-  it("returns empty when nothing captured", () => {
+  it('returns empty when nothing captured', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: true,
       captureConsoleWarnings: false,
@@ -242,7 +245,7 @@ describe("BrowserErrorCollector", () => {
     expect(evidence).toHaveLength(0);
   });
 
-  it("respects networkErrorMinStatus threshold", () => {
+  it('respects networkErrorMinStatus threshold', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
       captureConsoleWarnings: false,
@@ -252,25 +255,25 @@ describe("BrowserErrorCollector", () => {
     const page = createMockPage();
     collector.attach(page as any);
 
-    page.emit("response", {
+    page.emit('response', {
       status: () => 404,
-      url: () => "https://example.com/not-found",
-      statusText: () => "Not Found",
-      request: () => ({ method: () => "GET" }),
+      url: () => 'https://example.com/not-found',
+      statusText: () => 'Not Found',
+      request: () => ({ method: () => 'GET' }),
     });
-    page.emit("response", {
+    page.emit('response', {
       status: () => 503,
-      url: () => "https://example.com/unavailable",
-      statusText: () => "Service Unavailable",
-      request: () => ({ method: () => "GET" }),
+      url: () => 'https://example.com/unavailable',
+      statusText: () => 'Service Unavailable',
+      request: () => ({ method: () => 'GET' }),
     });
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(1); // only the 503
-    expect(findings[0].title).toContain("503");
+    expect(findings[0].title).toContain('503');
   });
 
-  it("suppresses expected auth noise while preserving unexpected failures", () => {
+  it('suppresses expected auth noise while preserving unexpected failures', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,
       captureConsoleWarnings: false,
@@ -279,7 +282,7 @@ describe("BrowserErrorCollector", () => {
       policy: {
         expectedResponses: [
           {
-            pathPrefix: "/api/manage/knowledge-bases",
+            pathPrefix: '/api/manage/knowledge-bases',
             statuses: [401, 403],
           },
         ],
@@ -289,21 +292,21 @@ describe("BrowserErrorCollector", () => {
     const page = createMockPage();
     collector.attach(page as any);
 
-    page.emit("response", {
+    page.emit('response', {
       status: () => 401,
-      url: () => "https://example.com/api/manage/knowledge-bases",
-      statusText: () => "Unauthorized",
-      request: () => ({ method: () => "GET" }),
+      url: () => 'https://example.com/api/manage/knowledge-bases',
+      statusText: () => 'Unauthorized',
+      request: () => ({ method: () => 'GET' }),
     });
-    page.emit("response", {
+    page.emit('response', {
       status: () => 500,
-      url: () => "https://example.com/api/manage/knowledge-bases",
-      statusText: () => "Internal Server Error",
-      request: () => ({ method: () => "GET" }),
+      url: () => 'https://example.com/api/manage/knowledge-bases',
+      statusText: () => 'Internal Server Error',
+      request: () => ({ method: () => 'GET' }),
     });
 
     const { findings } = collector.flush();
     expect(findings).toHaveLength(1);
-    expect(findings[0].title).toContain("500");
+    expect(findings[0].title).toContain('500');
   });
 });

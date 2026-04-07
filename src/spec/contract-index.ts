@@ -1,9 +1,6 @@
-import { validateJsonSchema } from "./ajv.js";
-import type {
-  NormalizedOperationSpec,
-  NormalizedSpecArtifact,
-} from "./types.js";
-import { buildOperationKey } from "./validators.js";
+import { validateJsonSchema } from './ajv.js';
+import type { NormalizedOperationSpec, NormalizedSpecArtifact } from './types.js';
+import { buildOperationKey } from './validators.js';
 
 export interface ContractIndex {
   operations: NormalizedOperationSpec[];
@@ -11,16 +8,12 @@ export interface ContractIndex {
 }
 
 function isDynamicSegment(segment: string): boolean {
-  return (
-    /^\[[^\]]+\]$/.test(segment) ||
-    /^\{[^}]+\}$/.test(segment) ||
-    /^:[^/]+$/.test(segment)
-  );
+  return /^\[[^\]]+\]$/.test(segment) || /^\{[^}]+\}$/.test(segment) || /^:[^/]+$/.test(segment);
 }
 
 function routeMatches(candidateRoute: string, observedRoute: string): boolean {
-  const candidateSegments = candidateRoute.split("/").filter(Boolean);
-  const observedSegments = observedRoute.split("/").filter(Boolean);
+  const candidateSegments = candidateRoute.split('/').filter(Boolean);
+  const observedSegments = observedRoute.split('/').filter(Boolean);
 
   if (candidateSegments.length !== observedSegments.length) {
     return false;
@@ -61,8 +54,7 @@ export function matchContractOperation(
   }
 
   return index.operations.find(
-    (operation) =>
-      operation.method === normalizedMethod && routeMatches(operation.route, route)
+    (operation) => operation.method === normalizedMethod && routeMatches(operation.route, route)
   );
 }
 
@@ -77,12 +69,12 @@ export function summarizeContractIndex(index: ContractIndex, limit = 4): string[
   return index.operations.slice(0, limit).map((operation) => {
     const parts = [
       `${operation.method} ${operation.route}`,
-      `statuses ${Object.keys(operation.responses).join(", ") || "none"}`,
-      operation.requestBody?.required ? "request body required" : undefined,
-      operation.authRequired ? "requires auth" : undefined,
+      `statuses ${Object.keys(operation.responses).join(', ') || 'none'}`,
+      operation.requestBody?.required ? 'request body required' : undefined,
+      operation.authRequired ? 'requires auth' : undefined,
     ].filter(Boolean);
 
-    return `${parts[0]} (${parts.slice(1).join("; ")})`;
+    return `${parts[0]} (${parts.slice(1).join('; ')})`;
   });
 }
 

@@ -6,8 +6,8 @@ import type {
   PageType,
   StateEdge,
   StateNode,
-} from "../types.js";
-import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
+} from '../types.js';
+import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
 
 export interface HistoricalFindingRecord {
   signature: string;
@@ -30,7 +30,7 @@ export interface HistoricalFlakyPageRecord {
   route?: string;
   fingerprintHash?: string;
   note: string;
-  source: "visual-regression" | "manual";
+  source: 'visual-regression' | 'manual';
   firstSeenAt: string;
   lastSeenAt: string;
   count: number;
@@ -87,5 +87,5 @@ export interface FlakyPageInput {
   route?: string;
   fingerprintHash?: string;
   note: string;
-  source?: HistoricalFlakyPageRecord["source"];
+  source?: HistoricalFlakyPageRecord['source'];
 }

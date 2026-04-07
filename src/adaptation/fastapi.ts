@@ -1,35 +1,35 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from "./types.js";
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 
-const SOURCE_EXTENSIONS = new Set([".py", ".html"]);
+const SOURCE_EXTENSIONS = new Set(['.py', '.html']);
 const IGNORED_DIRECTORY_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  "coverage",
-  ".next",
-  ".nuxt",
-  ".turbo",
-  ".cache",
-  "tests",
-  "test",
-  "__tests__",
-  "fixtures",
-  "__fixtures__",
-  "mocks",
-  "__mocks__",
-  "generated",
-  "__generated__",
-  "__pycache__",
-  ".venv",
-  "venv",
-  "env",
-  "migrations",
-  "static",
-  "media",
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'out',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.turbo',
+  '.cache',
+  'tests',
+  'test',
+  '__tests__',
+  'fixtures',
+  '__fixtures__',
+  'mocks',
+  '__mocks__',
+  'generated',
+  '__generated__',
+  '__pycache__',
+  '.venv',
+  'venv',
+  'env',
+  'migrations',
+  'static',
+  'media',
 ]);
 const IGNORED_FILE_NAME_PATTERNS = [
   /\.test\./i,
@@ -52,7 +52,8 @@ const HTTP_EXCEPTION_RE = /HTTPException\s*\(\s*status_code\s*=\s*(\d+)/g;
 const STATUS_CONST_RE = /status\.HTTP_(\d{3})_/g;
 
 // Auth dependency patterns
-const AUTH_DEPENDS_RE = /Depends\s*\(\s*(get_current_user|require_auth|verify_token|get_user|check_auth)\b/;
+const AUTH_DEPENDS_RE =
+  /Depends\s*\(\s*(get_current_user|require_auth|verify_token|get_user|check_auth)\b/;
 
 // Pydantic model detection
 const PYDANTIC_MODEL_RE = /class\s+(\w+)\s*\(\s*BaseModel\s*\)/g;
@@ -91,11 +92,7 @@ function walkFiles(root: string): string[] {
       continue;
     }
 
-    if (
-      entry.isFile() &&
-      isSourceFile(fullPath) &&
-      !shouldIgnoreEntry(basename(fullPath), false)
-    ) {
+    if (entry.isFile() && isSourceFile(fullPath) && !shouldIgnoreEntry(basename(fullPath), false)) {
       results.push(fullPath);
     }
   }
@@ -112,21 +109,21 @@ function uniqueNumbers(values: number[]): number[] {
 }
 
 function routeFamily(route: string): string {
-  const parts = route.split("?")[0]?.split("/").filter(Boolean) ?? [];
-  return parts.length === 0 ? "/" : `/${parts[0]}`;
+  const parts = route.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  return parts.length === 0 ? '/' : `/${parts[0]}`;
 }
 
 function convertPathParams(route: string): string {
   // Convert FastAPI {param} to :param
-  return route.replace(/\{(\w+)\}/g, ":$1");
+  return route.replace(/\{(\w+)\}/g, ':$1');
 }
 
 function normalizeRoute(raw: string): string {
-  let cleaned = raw.replace(/\/+$/, "");
-  if (cleaned && !cleaned.startsWith("/")) {
+  let cleaned = raw.replace(/\/+$/, '');
+  if (cleaned && !cleaned.startsWith('/')) {
     cleaned = `/${cleaned}`;
   }
-  return cleaned || "/";
+  return cleaned || '/';
 }
 
 function extractSelectors(content: string): string[] {
@@ -159,13 +156,13 @@ function extractStatusCodes(content: string): number[] {
 }
 
 function extractPydanticModels(content: string): string[] {
-  return [...content.matchAll(PYDANTIC_MODEL_RE)].map((m) => m[1] ?? "").filter(Boolean);
+  return [...content.matchAll(PYDANTIC_MODEL_RE)].map((m) => m[1] ?? '').filter(Boolean);
 }
 
 export function canScanFastApiRepo(root: string): boolean {
   for (const filePath of walkFiles(root)) {
-    if (!filePath.endsWith(".py")) continue;
-    const content = readFileSync(filePath, "utf-8");
+    if (!filePath.endsWith('.py')) continue;
+    const content = readFileSync(filePath, 'utf-8');
     if (FASTAPI_IMPORT_RE.test(content)) {
       return true;
     }
@@ -178,23 +175,29 @@ export function scanFastApiRepo(root: string): RepoHints {
   const selectors: string[] = [];
   const apiEndpoints = new Map<
     string,
-    { route: string; methods: string[]; statuses: number[]; authRequired: boolean; validationSchemas: string[] }
+    {
+      route: string;
+      methods: string[];
+      statuses: number[];
+      authRequired: boolean;
+      validationSchemas: string[];
+    }
   >();
   const loginRoutes: string[] = [];
   const callbackRoutes: string[] = [];
   const noiseMap = new Map<string, { method?: string; pathPrefix: string; statuses: number[] }>();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
 
     // Extract routes from FastAPI decorators in .py files
-    if (filePath.endsWith(".py")) {
+    if (filePath.endsWith('.py')) {
       const pydanticModels = extractPydanticModels(content);
       const isApiRouterFile = /\bAPIRouter\s*\(/.test(content);
 
       for (const match of content.matchAll(FASTAPI_ROUTE_RE)) {
-        const method = (match[1] ?? "").toUpperCase();
-        const rawRoute = match[2] ?? "";
+        const method = (match[1] ?? '').toUpperCase();
+        const rawRoute = match[2] ?? '';
         const route = normalizeRoute(convertPathParams(rawRoute));
 
         routes.push(route);
@@ -230,11 +233,7 @@ export function scanFastApiRepo(root: string): RepoHints {
             pathPrefix: route,
             statuses: [],
           };
-          existingNoise.statuses = uniqueNumbers([
-            ...existingNoise.statuses,
-            401,
-            403,
-          ]);
+          existingNoise.statuses = uniqueNumbers([...existingNoise.statuses, 401, 403]);
           noiseMap.set(key, existingNoise);
         }
 
@@ -249,12 +248,12 @@ export function scanFastApiRepo(root: string): RepoHints {
     }
 
     // Extract stable selectors from template files
-    if (filePath.endsWith(".html")) {
+    if (filePath.endsWith('.html')) {
       selectors.push(...extractSelectors(content));
     }
   }
 
-  const sortedRoutes = uniqueSorted(routes.map((r) => r || "/"));
+  const sortedRoutes = uniqueSorted(routes.map((r) => r || '/'));
   const sortedFamilies = uniqueSorted(sortedRoutes.map(routeFamily));
   const sortedSelectors = uniqueSorted(selectors);
   const sortedEndpoints: ApiEndpointHint[] = [...apiEndpoints.values()]

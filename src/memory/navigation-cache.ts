@@ -1,10 +1,10 @@
-import type { MissionConfig } from "../types.js";
-import type { RepoHints } from "../adaptation/types.js";
-import { FrontierQueue } from "../graph/frontier.js";
-import { StateGraph } from "../graph/state-graph.js";
-import { Planner } from "../planner/planner.js";
-import type { MemoryStore } from "./store.js";
-import type { NavigationMemorySnapshot } from "./types.js";
+import type { MissionConfig } from '../types.js';
+import type { RepoHints } from '../adaptation/types.js';
+import { FrontierQueue } from '../graph/frontier.js';
+import { StateGraph } from '../graph/state-graph.js';
+import { Planner } from '../planner/planner.js';
+import type { MemoryStore } from './store.js';
+import type { NavigationMemorySnapshot } from './types.js';
 
 export interface SeedGraphFromNavigationMemoryInput {
   graph: StateGraph;
@@ -25,15 +25,7 @@ export interface SeedGraphFromNavigationMemoryResult {
 export function seedGraphFromNavigationMemory(
   input: SeedGraphFromNavigationMemoryInput
 ): SeedGraphFromNavigationMemoryResult {
-  const {
-    graph,
-    frontier,
-    planner,
-    snapshot,
-    mission,
-    repoHints,
-    memoryStore,
-  } = input;
+  const { graph, frontier, planner, snapshot, mission, repoHints, memoryStore } = input;
 
   for (const node of snapshot.nodes) {
     graph.restoreNode(node);

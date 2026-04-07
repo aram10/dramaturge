@@ -1,20 +1,20 @@
-import { describe, it, expect } from "vitest";
-import { buildStabilityChecker } from "./page-stability.js";
+import { describe, it, expect } from 'vitest';
+import { buildStabilityChecker } from './page-stability.js';
 
-describe("buildStabilityChecker", () => {
-  it("returns a page.evaluate-compatible function string", () => {
+describe('buildStabilityChecker', () => {
+  it('returns a page.evaluate-compatible function string', () => {
     const checker = buildStabilityChecker();
-    expect(typeof checker).toBe("string");
-    expect(checker).toContain("MutationObserver");
+    expect(typeof checker).toBe('string');
+    expect(checker).toContain('MutationObserver');
   });
 
-  it("contains timeout fallback", () => {
+  it('contains timeout fallback', () => {
     const checker = buildStabilityChecker();
-    expect(checker).toContain("timeout");
+    expect(checker).toContain('timeout');
   });
 
-  it("contains quiet period logic", () => {
+  it('contains quiet period logic', () => {
     const checker = buildStabilityChecker();
-    expect(checker).toContain("QUIET_MS");
+    expect(checker).toContain('QUIET_MS');
   });
 });

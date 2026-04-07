@@ -1,18 +1,18 @@
 export type FindingCategory =
-  | "Bug"
-  | "UX Concern"
-  | "Accessibility Issue"
-  | "Performance Issue"
-  | "Visual Glitch";
+  | 'Bug'
+  | 'UX Concern'
+  | 'Accessibility Issue'
+  | 'Performance Issue'
+  | 'Visual Glitch';
 
-export type FindingSeverity = "Critical" | "Major" | "Minor" | "Trivial";
+export type FindingSeverity = 'Critical' | 'Major' | 'Minor' | 'Trivial';
 
 export const CATEGORY_PREFIX: Record<FindingCategory, string> = {
-  Bug: "BUG",
-  "UX Concern": "UX",
-  "Accessibility Issue": "A11Y",
-  "Performance Issue": "PERF",
-  "Visual Glitch": "VIS",
+  Bug: 'BUG',
+  'UX Concern': 'UX',
+  'Accessibility Issue': 'A11Y',
+  'Performance Issue': 'PERF',
+  'Visual Glitch': 'VIS',
 };
 
 // --- Evidence model ---
@@ -20,13 +20,13 @@ export const CATEGORY_PREFIX: Record<FindingCategory, string> = {
 export interface Evidence {
   id: string;
   type:
-    | "screenshot"
-    | "console-error"
-    | "network-error"
-    | "accessibility-scan"
-    | "visual-diff"
-    | "api-contract"
-    | "vision-analysis";
+    | 'screenshot'
+    | 'console-error'
+    | 'network-error'
+    | 'accessibility-scan'
+    | 'visual-diff'
+    | 'api-contract'
+    | 'vision-analysis';
   summary: string;
   path?: string;
   timestamp: string;
@@ -38,28 +38,22 @@ export interface Evidence {
 // --- Page classification ---
 
 export type PageType =
-  | "landing"
-  | "dashboard"
-  | "list"
-  | "detail"
-  | "form"
-  | "wizard"
-  | "settings"
-  | "modal"
-  | "auth"
-  | "unknown";
+  | 'landing'
+  | 'dashboard'
+  | 'list'
+  | 'detail'
+  | 'form'
+  | 'wizard'
+  | 'settings'
+  | 'modal'
+  | 'auth'
+  | 'unknown';
 
 // --- Coverage tracking ---
 
-export type ControlAction =
-  | "click"
-  | "input"
-  | "submit"
-  | "toggle"
-  | "open"
-  | "close";
+export type ControlAction = 'click' | 'input' | 'submit' | 'toggle' | 'open' | 'close';
 
-export type ControlOutcome = "worked" | "blocked" | "error" | "unclear";
+export type ControlOutcome = 'worked' | 'blocked' | 'error' | 'unclear';
 
 export interface CoverageEvent {
   controlId: string;
@@ -76,9 +70,9 @@ export interface CoverageSnapshot {
 
 // --- Findings ---
 
-export type FindingSource = "agent" | "auto-capture" | "confirmed";
+export type FindingSource = 'agent' | 'auto-capture' | 'confirmed';
 
-export type FindingConfidence = "low" | "medium" | "high";
+export type FindingConfidence = 'low' | 'medium' | 'high';
 
 export interface ReproArtifact {
   stateId?: string;
@@ -163,7 +157,7 @@ export interface AreaResult {
   coverage: CoverageSnapshot;
   pageType: PageType;
   fingerprint?: PageFingerprint;
-  status: "explored" | "failed" | "timeout" | "skipped";
+  status: 'explored' | 'failed' | 'timeout' | 'skipped';
   failureReason?: string;
 }
 
@@ -255,25 +249,21 @@ export interface StateEdge {
   toNodeId: string;
   actionLabel: string;
   navigationHint: NavigationHint;
-  outcome: "success" | "blocked" | "error" | "same-state";
+  outcome: 'success' | 'blocked' | 'error' | 'same-state';
   timestamp: string;
 }
 
 // --- Frontier ---
 
-export type WorkerType = "navigation" | "form" | "crud" | "api" | "adversarial";
+export type WorkerType = 'navigation' | 'form' | 'crud' | 'api' | 'adversarial';
 
 /**
  * Specialized agent roles within the multi-agent orchestration.
  * @see src/a2a/types.ts for the full A2A protocol types.
  */
-export type AgentRole = "scout" | "tester" | "security" | "reviewer" | "reporter";
+export type AgentRole = 'scout' | 'tester' | 'security' | 'reviewer' | 'reporter';
 
-export type FrontierItemStatus =
-  | "pending"
-  | "in-progress"
-  | "completed"
-  | "blocked";
+export type FrontierItemStatus = 'pending' | 'in-progress' | 'completed' | 'blocked';
 
 export interface FrontierItem {
   id: string;
@@ -321,24 +311,24 @@ export interface WorkerResult {
   coverageSnapshot: CoverageSnapshot;
   followupRequests: FollowupRequest[];
   discoveredEdges: DiscoveredEdge[];
-  outcome: "completed" | "blocked" | "timed-out" | "failed";
+  outcome: 'completed' | 'blocked' | 'timed-out' | 'failed';
   summary: string;
 }
 
 export type ReplayableActionKind =
-  | "navigate"
+  | 'navigate'
   | ControlAction
-  | "keydown"
-  | "screenshot"
-  | "discover-edge";
+  | 'keydown'
+  | 'screenshot'
+  | 'discover-edge';
 
-export type ReplayableActionStatus = ControlOutcome | "recorded";
+export type ReplayableActionStatus = ControlOutcome | 'recorded';
 
 export interface ReplayableAction {
   id: string;
   kind: ReplayableActionKind;
   summary: string;
-  source: "page" | "worker-tool";
+  source: 'page' | 'worker-tool';
   status: ReplayableActionStatus;
   timestamp: string;
   selector?: string;
@@ -352,13 +342,8 @@ export interface ReplayableAction {
 export interface BlindSpot {
   nodeId?: string;
   summary: string;
-  reason:
-    | "blocked"
-    | "time-budget"
-    | "pruned"
-    | "state-unreachable"
-    | "unknown";
-  severity: "low" | "medium" | "high";
+  reason: 'blocked' | 'time-budget' | 'pruned' | 'state-unreachable' | 'unknown';
+  severity: 'low' | 'medium' | 'high';
 }
 
 // --- Mission Config ---
@@ -390,7 +375,7 @@ export interface BudgetConfig {
 // --- Browser Error Capture ---
 
 export interface BrowserConsoleError {
-  level: "error" | "warning";
+  level: 'error' | 'warning';
   text: string;
   url: string;
   timestamp: string;

@@ -1,40 +1,36 @@
-import { describe, expect, it } from "vitest";
-import { join, resolve } from "node:path";
-import {
-  getConfigFileContext,
-  normalizeConfigPaths,
-  resolveResumeDir,
-} from "./config-paths.js";
+import { describe, expect, it } from 'vitest';
+import { join, resolve } from 'node:path';
+import { getConfigFileContext, normalizeConfigPaths, resolveResumeDir } from './config-paths.js';
 
-describe("getConfigFileContext", () => {
-  it("derives an absolute config path and config directory", () => {
-    const context = getConfigFileContext("./configs/dramaturge.config.json");
+describe('getConfigFileContext', () => {
+  it('derives an absolute config path and config directory', () => {
+    const context = getConfigFileContext('./configs/dramaturge.config.json');
 
     expect(context).toEqual({
-      configPath: resolve("./configs/dramaturge.config.json"),
-      configDir: resolve("./configs"),
+      configPath: resolve('./configs/dramaturge.config.json'),
+      configDir: resolve('./configs'),
     });
   });
 });
 
-describe("normalizeConfigPaths", () => {
-  it("resolves file-system config relative to the config file", () => {
-    const configPath = resolve("C:/tmp/dramaturge/configs/dramaturge.config.json");
+describe('normalizeConfigPaths', () => {
+  it('resolves file-system config relative to the config file', () => {
+    const configPath = resolve('C:/tmp/dramaturge/configs/dramaturge.config.json');
     const normalized = normalizeConfigPaths(
       {
-        targetUrl: "https://example.com/app",
-        appDescription: "Standalone app",
+        targetUrl: 'https://example.com/app',
+        appDescription: 'Standalone app',
         auth: {
-          type: "interactive",
-          loginUrl: "/login",
+          type: 'interactive',
+          loginUrl: '/login',
           successIndicator: "selector:[data-testid='app-shell']",
-          stateFile: "./state/user.json",
+          stateFile: './state/user.json',
           manualTimeoutSeconds: 120,
         },
         models: {
-          planner: "anthropic/claude-sonnet-4-6",
-          worker: "anthropic/claude-haiku-4-5",
-          agentMode: "cua",
+          planner: 'anthropic/claude-sonnet-4-6',
+          worker: 'anthropic/claude-haiku-4-5',
+          agentMode: 'cua',
         },
         exploration: {
           maxAreasToExplore: 10,
@@ -42,18 +38,18 @@ describe("normalizeConfigPaths", () => {
           totalTimeout: 900,
         },
         output: {
-          dir: "./reports",
-          format: "markdown",
+          dir: './reports',
+          format: 'markdown',
           screenshots: true,
         },
         memory: {
           enabled: true,
-          dir: "./.dramaturge",
+          dir: './.dramaturge',
           warmStart: true,
         },
         visualRegression: {
           enabled: true,
-          baselineDir: "./.dramaturge/visual-baselines",
+          baselineDir: './.dramaturge/visual-baselines',
           diffPixelRatioThreshold: 0.01,
           includeAA: false,
           fullPage: true,
@@ -102,14 +98,14 @@ describe("normalizeConfigPaths", () => {
           intervalTasks: 5,
         },
         repoContext: {
-          root: "../host-app",
-          framework: "nextjs",
-          hintsFile: "./hints/dramaturge.hints.jsonc",
-          specFile: "./specs/dramaturge.openapi.json",
+          root: '../host-app',
+          framework: 'nextjs',
+          hintsFile: './hints/dramaturge.hints.jsonc',
+          specFile: './specs/dramaturge.openapi.json',
         },
         bootstrap: {
-          command: "pnpm dev",
-          cwd: "../host-app",
+          command: 'pnpm dev',
+          cwd: '../host-app',
           timeoutSeconds: 120,
         },
         policy: {
@@ -121,56 +117,56 @@ describe("normalizeConfigPaths", () => {
     );
 
     expect(normalized.auth).toMatchObject({
-      type: "interactive",
-      stateFile: resolve("C:/tmp/dramaturge/configs/state/user.json"),
+      type: 'interactive',
+      stateFile: resolve('C:/tmp/dramaturge/configs/state/user.json'),
     });
-    expect(normalized.output.dir).toBe(resolve("C:/tmp/dramaturge/configs/reports"));
+    expect(normalized.output.dir).toBe(resolve('C:/tmp/dramaturge/configs/reports'));
     expect(normalized.memory).toMatchObject({
       enabled: true,
-      dir: resolve("C:/tmp/dramaturge/configs/.dramaturge"),
+      dir: resolve('C:/tmp/dramaturge/configs/.dramaturge'),
     });
     expect(normalized.visualRegression).toMatchObject({
       enabled: true,
-      baselineDir: resolve("C:/tmp/dramaturge/configs/.dramaturge/visual-baselines"),
+      baselineDir: resolve('C:/tmp/dramaturge/configs/.dramaturge/visual-baselines'),
       maskSelectors: ["[data-testid='clock']"],
     });
     expect(normalized.repoContext).toMatchObject({
-      root: resolve("C:/tmp/dramaturge/host-app"),
-      hintsFile: resolve("C:/tmp/dramaturge/host-app/hints/dramaturge.hints.jsonc"),
-      specFile: resolve("C:/tmp/dramaturge/host-app/specs/dramaturge.openapi.json"),
+      root: resolve('C:/tmp/dramaturge/host-app'),
+      hintsFile: resolve('C:/tmp/dramaturge/host-app/hints/dramaturge.hints.jsonc'),
+      specFile: resolve('C:/tmp/dramaturge/host-app/specs/dramaturge.openapi.json'),
     });
     expect(normalized.bootstrap).toMatchObject({
-      cwd: resolve("C:/tmp/dramaturge/host-app"),
+      cwd: resolve('C:/tmp/dramaturge/host-app'),
     });
     expect(normalized._meta).toEqual({
       configPath,
-      configDir: resolve("C:/tmp/dramaturge/configs"),
+      configDir: resolve('C:/tmp/dramaturge/configs'),
     });
   });
 });
 
-describe("resolveResumeDir", () => {
-  it("resolves relative resume directories from the config directory", () => {
+describe('resolveResumeDir', () => {
+  it('resolves relative resume directories from the config directory', () => {
     expect(
-      resolveResumeDir("./runs/last", {
-        _meta: { configDir: resolve("C:/tmp/dramaturge/configs") },
+      resolveResumeDir('./runs/last', {
+        _meta: { configDir: resolve('C:/tmp/dramaturge/configs') },
       })
-    ).toBe(resolve("C:/tmp/dramaturge/configs/runs/last"));
+    ).toBe(resolve('C:/tmp/dramaturge/configs/runs/last'));
   });
 
-  it("preserves absolute resume directories", () => {
-    const absolutePath = resolve("C:/tmp/dramaturge/reports/run-1");
+  it('preserves absolute resume directories', () => {
+    const absolutePath = resolve('C:/tmp/dramaturge/reports/run-1');
     expect(
       resolveResumeDir(absolutePath, {
-        _meta: { configDir: resolve("C:/tmp/dramaturge/configs") },
+        _meta: { configDir: resolve('C:/tmp/dramaturge/configs') },
       })
     ).toBe(absolutePath);
   });
 
-  it("returns undefined when no resume dir is provided", () => {
+  it('returns undefined when no resume dir is provided', () => {
     expect(
       resolveResumeDir(undefined, {
-        _meta: { configDir: resolve("C:/tmp/dramaturge/configs") },
+        _meta: { configDir: resolve('C:/tmp/dramaturge/configs') },
       })
     ).toBeUndefined();
   });

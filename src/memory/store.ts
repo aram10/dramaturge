@@ -1,13 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { DramaturgeConfig } from "../config.js";
-import type { AreaResult, RawFinding, RunMemoryMeta } from "../types.js";
-import type { StateGraph } from "../graph/state-graph.js";
-import { collectFindings, buildFindingGroupKey } from "../report/collector.js";
-import type {
-  ObservedApiEndpoint,
-  ObservedApiRequestSample,
-} from "../network/traffic-observer.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { DramaturgeConfig } from '../config.js';
+import type { AreaResult, RawFinding, RunMemoryMeta } from '../types.js';
+import type { StateGraph } from '../graph/state-graph.js';
+import { collectFindings, buildFindingGroupKey } from '../report/collector.js';
+import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/traffic-observer.js';
 import type {
   FlakyPageInput,
   HistoricalFlakyPageRecord,
@@ -17,9 +14,9 @@ import type {
   NavigationMemorySnapshot,
   PlannerMemorySignals,
   WorkerHistoryContext,
-} from "./types.js";
+} from './types.js';
 
-const STORE_FILE = "memory.json";
+const STORE_FILE = 'memory.json';
 const CURRENT_MEMORY_VERSION = 1 as const;
 
 function createEmptySnapshot(): MemorySnapshot {
@@ -42,7 +39,7 @@ function normalizeRoute(urlOrPath?: string): string | undefined {
   try {
     return new URL(urlOrPath).pathname;
   } catch {
-    return urlOrPath.startsWith("/") ? urlOrPath : `/${urlOrPath}`;
+    return urlOrPath.startsWith('/') ? urlOrPath : `/${urlOrPath}`;
   }
 }
 
@@ -69,25 +66,19 @@ function uniqueNumbers(values: number[]): number[] {
   return Array.from(new Set(values)).sort((left, right) => left - right);
 }
 
-function cloneObservedApiSample(
-  sample: ObservedApiRequestSample
-): ObservedApiRequestSample {
+function cloneObservedApiSample(sample: ObservedApiRequestSample): ObservedApiRequestSample {
   return {
     method: sample.method,
     status: sample.status,
     url: sample.url,
     ...(sample.headers ? { headers: { ...sample.headers } } : {}),
     ...(sample.data !== undefined ? { data: sample.data } : {}),
-    ...(sample.responseBody !== undefined
-      ? { responseBody: sample.responseBody }
-      : {}),
+    ...(sample.responseBody !== undefined ? { responseBody: sample.responseBody } : {}),
     ...(sample.failure ? { failure: sample.failure } : {}),
   };
 }
 
-function cloneObservedEndpoint(
-  endpoint: ObservedApiEndpoint
-): ObservedApiEndpoint {
+function cloneObservedEndpoint(endpoint: ObservedApiEndpoint): ObservedApiEndpoint {
   const samples = endpoint.samples?.map((sample) => cloneObservedApiSample(sample)) ?? [];
   const responses =
     endpoint.responses?.map((response) => ({
@@ -105,9 +96,7 @@ function cloneObservedEndpoint(
   };
 }
 
-function uniqueObservedSamples(
-  samples: ObservedApiRequestSample[]
-): ObservedApiRequestSample[] {
+function uniqueObservedSamples(samples: ObservedApiRequestSample[]): ObservedApiRequestSample[] {
   const seen = new Set<string>();
   const results: ObservedApiRequestSample[] = [];
 
@@ -132,10 +121,10 @@ function uniqueObservedSamples(
 }
 
 function uniqueObservedResponses(
-  responses: NonNullable<ObservedApiEndpoint["responses"]>
-): NonNullable<ObservedApiEndpoint["responses"]> {
+  responses: NonNullable<ObservedApiEndpoint['responses']>
+): NonNullable<ObservedApiEndpoint['responses']> {
   const seen = new Set<string>();
-  const results: NonNullable<ObservedApiEndpoint["responses"]> = [];
+  const results: NonNullable<ObservedApiEndpoint['responses']> = [];
 
   for (const response of responses) {
     const signature = JSON.stringify([response.status, response.body ?? null]);
@@ -159,10 +148,10 @@ function routeTokens(urlOrPath?: string): string[] {
   }
 
   return route
-    .split("/")
+    .split('/')
     .filter(Boolean)
     .map((segment) => segment.toLowerCase())
-    .filter((segment) => !segment.startsWith(":") && !/^\d+$/.test(segment));
+    .filter((segment) => !segment.startsWith(':') && !/^\d+$/.test(segment));
 }
 
 function matchesRoute(
@@ -184,7 +173,9 @@ function matchesRoute(
   return route === normalizedCandidate;
 }
 
-export function buildFindingSignature(finding: Pick<RawFinding, "category" | "severity" | "title" | "expected" | "actual">): string {
+export function buildFindingSignature(
+  finding: Pick<RawFinding, 'category' | 'severity' | 'title' | 'expected' | 'actual'>
+): string {
   return buildFindingGroupKey(finding);
 }
 
@@ -201,7 +192,7 @@ export class MemoryStore {
       } else {
         let raw: MemorySnapshot;
         try {
-          raw = JSON.parse(readFileSync(path, "utf-8")) as MemorySnapshot;
+          raw = JSON.parse(readFileSync(path, 'utf-8')) as MemorySnapshot;
         } catch {
           throw new Error(`Failed to parse memory store JSON: ${path}`);
         }
@@ -261,7 +252,11 @@ export class MemoryStore {
     this.persist(snapshot);
   }
 
-  markFindingSuppressed(signature: string, reason: string, dismissedAt = new Date().toISOString()): void {
+  markFindingSuppressed(
+    signature: string,
+    reason: string,
+    dismissedAt = new Date().toISOString()
+  ): void {
     const snapshot = this.getSnapshot();
     const existing = snapshot.findingHistory[signature];
     if (!existing) {
@@ -280,7 +275,7 @@ export class MemoryStore {
   recordFlakyPage(input: FlakyPageInput): void {
     const snapshot = this.getSnapshot();
     const route = normalizeRoute(input.route);
-    const key = `${input.fingerprintHash ?? "no-fingerprint"}::${route ?? "no-route"}::${input.note}`;
+    const key = `${input.fingerprintHash ?? 'no-fingerprint'}::${route ?? 'no-route'}::${input.note}`;
     const existing = snapshot.flakyPages.find((record) => record.key === key);
     const now = new Date().toISOString();
 
@@ -296,7 +291,7 @@ export class MemoryStore {
       route,
       fingerprintHash: input.fingerprintHash,
       note: input.note,
-      source: input.source ?? "manual",
+      source: input.source ?? 'manual',
       firstSeenAt: now,
       lastSeenAt: now,
       count: 1,
@@ -330,10 +325,7 @@ export class MemoryStore {
       if (existing) {
         existing.methods = uniqueSortedStrings([...existing.methods, ...endpoint.methods]);
         existing.statuses = uniqueNumbers([...existing.statuses, ...endpoint.statuses]);
-        existing.failures = uniqueSortedStrings([
-          ...existing.failures,
-          ...endpoint.failures,
-        ]);
+        existing.failures = uniqueSortedStrings([...existing.failures, ...endpoint.failures]);
         const mergedSamples = uniqueObservedSamples([
           ...(existing.samples ?? []),
           ...(endpoint.samples ?? []),
@@ -362,12 +354,8 @@ export class MemoryStore {
         methods: uniqueSortedStrings(endpoint.methods),
         statuses: uniqueNumbers(endpoint.statuses),
         failures: uniqueSortedStrings(endpoint.failures),
-        ...(endpoint.samples
-          ? { samples: uniqueObservedSamples(endpoint.samples) }
-          : {}),
-        ...(endpoint.responses
-          ? { responses: uniqueObservedResponses(endpoint.responses) }
-          : {}),
+        ...(endpoint.samples ? { samples: uniqueObservedSamples(endpoint.samples) } : {}),
+        ...(endpoint.responses ? { responses: uniqueObservedResponses(endpoint.responses) } : {}),
         firstSeenAt: runAt,
         lastSeenAt: runAt,
         runCount: 1,
@@ -390,9 +378,9 @@ export class MemoryStore {
 
   rememberAuthFromConfig(config: DramaturgeConfig): void {
     switch (config.auth.type) {
-      case "form":
-      case "oauth-redirect":
-      case "interactive":
+      case 'form':
+      case 'oauth-redirect':
+      case 'interactive':
         this.rememberAuthHint(config.auth.loginUrl);
         break;
       default:
@@ -406,9 +394,7 @@ export class MemoryStore {
       return undefined;
     }
     const expectedOrigin = normalizeOrigin(targetUrl) ?? targetUrl;
-    return snapshot.navigation.targetOrigin === expectedOrigin
-      ? snapshot.navigation
-      : undefined;
+    return snapshot.navigation.targetOrigin === expectedOrigin ? snapshot.navigation : undefined;
   }
 
   getWorkerContext(input: MemoryRouteMatchInput): WorkerHistoryContext {
@@ -469,7 +455,9 @@ export class MemoryStore {
       return [];
     }
 
-    const matchedNode = navigation.nodes.find((node) => matchesRoute(input, node.url, node.fingerprint.hash));
+    const matchedNode = navigation.nodes.find((node) =>
+      matchesRoute(input, node.url, node.fingerprint.hash)
+    );
     if (!matchedNode) {
       return [];
     }
@@ -483,7 +471,8 @@ export class MemoryStore {
 
     for (const edge of navigation.edges.filter((item) => item.fromNodeId === matchedNode.id)) {
       const targetNode = navigation.nodes.find((node) => node.id === edge.toNodeId);
-      const destination = normalizeRoute(targetNode?.url) ?? targetNode?.fingerprint.normalizedPath ?? edge.toNodeId;
+      const destination =
+        normalizeRoute(targetNode?.url) ?? targetNode?.fingerprint.normalizedPath ?? edge.toNodeId;
       hints.push(`Known transition: ${edge.actionLabel} -> ${destination}`);
     }
 
@@ -519,9 +508,7 @@ export class MemoryStore {
       failures: [...record.failures],
       ...(record.samples
         ? {
-            samples: record.samples.map((sample) =>
-              cloneObservedApiSample(sample)
-            ),
+            samples: record.samples.map((sample) => cloneObservedApiSample(sample)),
           }
         : {}),
       ...(record.responses
@@ -538,7 +525,7 @@ export class MemoryStore {
   private persist(snapshot: MemorySnapshot): void {
     snapshot.updatedAt = new Date().toISOString();
     mkdirSync(this.dir, { recursive: true });
-    writeFileSync(this.storePath(), JSON.stringify(snapshot, null, 2), "utf-8");
+    writeFileSync(this.storePath(), JSON.stringify(snapshot, null, 2), 'utf-8');
     this.snapshot = snapshot;
   }
 

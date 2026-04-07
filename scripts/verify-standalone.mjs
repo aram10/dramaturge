@@ -8,14 +8,14 @@ import {
   rmSync,
   statSync,
   writeFileSync,
-} from "node:fs";
-import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+} from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const PACKAGE_DIR = resolve(SCRIPT_DIR, "..");
+const PACKAGE_DIR = resolve(SCRIPT_DIR, '..');
 
 const HELP_TEXT = `Usage: node scripts/verify-standalone.mjs [options]
 
@@ -29,19 +29,19 @@ Options:
 const FORBIDDEN_TEXT_CHECKS = [
   {
     pattern: /tests\/interactive-login\.ts/g,
-    reason: "external auth helper",
+    reason: 'external auth helper',
   },
   {
     pattern: /pnpm local:up/g,
-    reason: "repo-root bootstrap command",
+    reason: 'repo-root bootstrap command',
   },
   {
     pattern: /\.\.\/playwright/g,
-    reason: "parent-directory auth path",
+    reason: 'parent-directory auth path',
   },
 ];
 
-const PACKAGE_TEXT_PATHS = ["README.md", "dramaturge.config.example.json"];
+const PACKAGE_TEXT_PATHS = ['README.md', 'dramaturge.config.example.json'];
 
 export function buildVerifyStandaloneHelpText() {
   return HELP_TEXT;
@@ -55,29 +55,29 @@ export function parseVerifyStandaloneArgs(args) {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg === "--help" || arg === "-h") {
+    if (arg === '--help' || arg === '-h') {
       return { keepTemp, packFile, showHelp: true, tempDir };
     }
 
-    if (arg === "--keep-temp") {
+    if (arg === '--keep-temp') {
       keepTemp = true;
       continue;
     }
 
-    if (arg === "--pack-file") {
+    if (arg === '--pack-file') {
       const value = args[i + 1];
       if (!value) {
-        throw new Error("Missing value for --pack-file");
+        throw new Error('Missing value for --pack-file');
       }
       packFile = value;
       i++;
       continue;
     }
 
-    if (arg === "--temp-dir") {
+    if (arg === '--temp-dir') {
       const value = args[i + 1];
       if (!value) {
-        throw new Error("Missing value for --temp-dir");
+        throw new Error('Missing value for --temp-dir');
       }
       tempDir = value;
       i++;
@@ -91,8 +91,8 @@ export function parseVerifyStandaloneArgs(args) {
 }
 
 function resolveCommand(command) {
-  if (process.platform === "win32" && command === "pnpm") {
-    return "pnpm.cmd";
+  if (process.platform === 'win32' && command === 'pnpm') {
+    return 'pnpm.cmd';
   }
 
   return command;
@@ -107,47 +107,35 @@ function quoteForWindowsCmd(value) {
     return value;
   }
 
-  return `"${value.replace(/(["^])/g, "^$1")}"`;
+  return `"${value.replace(/(["^])/g, '^$1')}"`;
 }
 
 function runCommand(command, args, options = {}) {
   const result =
-    process.platform === "win32" && command === "pnpm"
+    process.platform === 'win32' && command === 'pnpm'
       ? spawnSync(
-          process.env.ComSpec ?? "cmd.exe",
-          [
-            "/d",
-            "/s",
-            "/c",
-            [command, ...args].map(quoteForWindowsCmd).join(" "),
-          ],
+          process.env.ComSpec ?? 'cmd.exe',
+          ['/d', '/s', '/c', [command, ...args].map(quoteForWindowsCmd).join(' ')],
           {
             cwd: options.cwd,
-            encoding: "utf-8",
-            stdio: "pipe",
+            encoding: 'utf-8',
+            stdio: 'pipe',
           }
         )
       : spawnSync(resolveCommand(command), args, {
           cwd: options.cwd,
-          encoding: "utf-8",
-          stdio: "pipe",
+          encoding: 'utf-8',
+          stdio: 'pipe',
         });
 
   if (result.status !== 0) {
-    const output = [result.stdout, result.stderr]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-    throw new Error(
-      `Command failed: ${command} ${args.join(" ")}${
-        output ? `\n${output}` : ""
-      }`
-    );
+    const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+    throw new Error(`Command failed: ${command} ${args.join(' ')}${output ? `\n${output}` : ''}`);
   }
 
   return {
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
   };
 }
 
@@ -166,7 +154,7 @@ function collectTextFiles(packageDir, relativePath, files) {
   }
 
   if (/\.(md|json|jsonc)$/i.test(relativePath)) {
-    files.push(relativePath.replace(/\\/g, "/"));
+    files.push(relativePath.replace(/\\/g, '/'));
   }
 }
 
@@ -178,7 +166,7 @@ export function scanPackageTextFiles(packageDir) {
 
   const issues = [];
   for (const file of files) {
-    const contents = readFileSync(join(packageDir, file), "utf-8");
+    const contents = readFileSync(join(packageDir, file), 'utf-8');
 
     for (const check of FORBIDDEN_TEXT_CHECKS) {
       if (check.pattern.test(contents)) {
@@ -190,12 +178,12 @@ export function scanPackageTextFiles(packageDir) {
       check.pattern.lastIndex = 0;
     }
 
-    const isConfigLikeFile = file === "dramaturge.config.example.json";
+    const isConfigLikeFile = file === 'dramaturge.config.example.json';
 
-    if (isConfigLikeFile && contents.includes("../")) {
+    if (isConfigLikeFile && contents.includes('../')) {
       issues.push({
         file,
-        reason: "parent-directory config path",
+        reason: 'parent-directory config path',
       });
     }
   }
@@ -204,31 +192,27 @@ export function scanPackageTextFiles(packageDir) {
 }
 
 function formatIssues(issues) {
-  return issues
-    .map((issue) => `- ${issue.file}: ${issue.reason}`)
-    .join("\n");
+  return issues.map((issue) => `- ${issue.file}: ${issue.reason}`).join('\n');
 }
 
 function findPackedTarball(packDir) {
   const tarballs = readdirSync(packDir)
-    .filter((entry) => entry.endsWith(".tgz"))
+    .filter((entry) => entry.endsWith('.tgz'))
     .sort();
 
   if (tarballs.length !== 1) {
-    throw new Error(
-      `Expected exactly one tarball in ${packDir}, found ${tarballs.length}`
-    );
+    throw new Error(`Expected exactly one tarball in ${packDir}, found ${tarballs.length}`);
   }
 
   return join(packDir, tarballs[0]);
 }
 
 function getInstalledPackageDir(consumerDir, packageName) {
-  return join(consumerDir, "node_modules", ...packageName.split("/"));
+  return join(consumerDir, 'node_modules', ...packageName.split('/'));
 }
 
 function loadPackageMetadata(packageDir) {
-  return JSON.parse(readFileSync(join(packageDir, "package.json"), "utf-8"));
+  return JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf-8'));
 }
 
 function verifyInstalledConfigLoad(consumerDir, packageName, installedPackageDir) {
@@ -267,25 +251,17 @@ function verifyInstalledConfigLoad(consumerDir, packageName, installedPackageDir
     }));
   `;
 
-  const result = runCommand(
-    process.execPath,
-    ["--input-type=module", "-e", verificationScript],
-    { cwd: consumerDir }
-  );
+  const result = runCommand(process.execPath, ['--input-type=module', '-e', verificationScript], {
+    cwd: consumerDir,
+  });
 
   const packageDirFromOutput = JSON.parse(result.stdout.trim()).installedPackageDir;
-  if (
-    realpathSync.native(packageDirFromOutput) !==
-    realpathSync.native(installedPackageDir)
-  ) {
-    throw new Error("Installed package directory did not match the resolved package path");
+  if (realpathSync.native(packageDirFromOutput) !== realpathSync.native(installedPackageDir)) {
+    throw new Error('Installed package directory did not match the resolved package path');
   }
 }
 
-export async function runStandaloneVerification(
-  args = process.argv.slice(2),
-  io = console
-) {
+export async function runStandaloneVerification(args = process.argv.slice(2), io = console) {
   const parsed = parseVerifyStandaloneArgs(args);
   if (parsed.showHelp) {
     io.log(buildVerifyStandaloneHelpText());
@@ -294,19 +270,19 @@ export async function runStandaloneVerification(
 
   const tempRoot = parsed.tempDir
     ? resolve(parsed.tempDir)
-    : mkdtempSync(join(tmpdir(), "dramaturge-standalone-"));
-  const packDir = join(tempRoot, "pack");
-  const consumerDir = join(tempRoot, "consumer");
+    : mkdtempSync(join(tmpdir(), 'dramaturge-standalone-'));
+  const packDir = join(tempRoot, 'pack');
+  const consumerDir = join(tempRoot, 'consumer');
   const keepTempOnExit = parsed.keepTemp;
   mkdirSync(packDir, { recursive: true });
   mkdirSync(consumerDir, { recursive: true });
 
   try {
     const tarballPath = parsed.packFile
-        ? resolve(parsed.packFile)
+      ? resolve(parsed.packFile)
       : (() => {
-          io.log("Packing Dramaturge into a standalone tarball...");
-          runCommand("pnpm", ["pack", "--pack-destination", packDir], {
+          io.log('Packing Dramaturge into a standalone tarball...');
+          runCommand('pnpm', ['pack', '--pack-destination', packDir], {
             cwd: PACKAGE_DIR,
           });
           return findPackedTarball(packDir);
@@ -318,41 +294,37 @@ export async function runStandaloneVerification(
 
     io.log(`Installing ${tarballPath} into an isolated temp directory...`);
     writeFileSync(
-      join(consumerDir, "package.json"),
+      join(consumerDir, 'package.json'),
       JSON.stringify(
         {
-          name: "dramaturge-standalone-smoke",
+          name: 'dramaturge-standalone-smoke',
           private: true,
-          type: "module",
+          type: 'module',
         },
         null,
         2
       ),
-      "utf-8"
+      'utf-8'
     );
 
-    runCommand("pnpm", ["add", tarballPath], { cwd: consumerDir });
+    runCommand('pnpm', ['add', tarballPath], { cwd: consumerDir });
 
     const packageMetadata = loadPackageMetadata(PACKAGE_DIR);
     const packageName = packageMetadata.name;
     const installedPackageDir = getInstalledPackageDir(consumerDir, packageName);
     if (!existsSync(installedPackageDir)) {
-      throw new Error(
-        `Installed package directory was not found at ${installedPackageDir}`
-      );
+      throw new Error(`Installed package directory was not found at ${installedPackageDir}`);
     }
 
     const issues = scanPackageTextFiles(installedPackageDir);
     if (issues.length > 0) {
-      throw new Error(
-        `Found standalone packaging issues:\n${formatIssues(issues)}`
-      );
+      throw new Error(`Found standalone packaging issues:\n${formatIssues(issues)}`);
     }
 
-    io.log("Running CLI smoke check...");
-    runCommand("pnpm", ["exec", "dramaturge", "--help"], { cwd: consumerDir });
+    io.log('Running CLI smoke check...');
+    runCommand('pnpm', ['exec', 'dramaturge', '--help'], { cwd: consumerDir });
 
-    io.log("Loading the packaged standalone example...");
+    io.log('Loading the packaged standalone example...');
     verifyInstalledConfigLoad(consumerDir, packageName, installedPackageDir);
 
     io.log(
@@ -375,8 +347,7 @@ export async function runStandaloneVerification(
 }
 
 const executedDirectly =
-  process.argv[1] &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (executedDirectly) {
   const exitCode = await runStandaloneVerification();

@@ -1,25 +1,20 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join, relative } from "node:path";
-import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from "./types.js";
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, join, relative } from 'node:path';
+import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 
 const IGNORED_DIRECTORY_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "tmp",
-  "log",
-  "vendor",
-  "public",
-  "coverage",
-  "test",
-  "spec",
+  'node_modules',
+  '.git',
+  'tmp',
+  'log',
+  'vendor',
+  'public',
+  'coverage',
+  'test',
+  'spec',
 ]);
 
-const IGNORED_FILE_NAME_PATTERNS = [
-  /\.test\./i,
-  /\.spec\./i,
-  /\.fixture\./i,
-  /\.mock\./i,
-];
+const IGNORED_FILE_NAME_PATTERNS = [/\.test\./i, /\.spec\./i, /\.fixture\./i, /\.mock\./i];
 
 const SELECTOR_RE = /data-testid=["']([^"']+)["']/g;
 const ID_SELECTOR_RE = /\bid\s*=\s*["']([^"']+)["']/g;
@@ -54,7 +49,7 @@ interface ParsedRoute {
 }
 
 function isSourceFile(name: string): boolean {
-  return name.endsWith(".rb") || name.endsWith(".erb");
+  return name.endsWith('.rb') || name.endsWith('.erb');
 }
 
 function shouldIgnoreEntry(name: string, isDirectory: boolean): boolean {
@@ -72,7 +67,11 @@ function walkFiles(root: string): string[] {
       results.push(...walkFiles(fullPath));
       continue;
     }
-    if (entry.isFile() && isSourceFile(entry.name) && !shouldIgnoreEntry(basename(fullPath), false)) {
+    if (
+      entry.isFile() &&
+      isSourceFile(entry.name) &&
+      !shouldIgnoreEntry(basename(fullPath), false)
+    ) {
       results.push(fullPath);
     }
   }
@@ -88,25 +87,25 @@ function uniqueNumbers(values: number[]): number[] {
 }
 
 function routeFamily(route: string): string {
-  const parts = route.split("?")[0]?.split("/").filter(Boolean) ?? [];
-  return parts.length === 0 ? "/" : `/${parts[0]}`;
+  const parts = route.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  return parts.length === 0 ? '/' : `/${parts[0]}`;
 }
 
 function normalizePath(raw: string): string {
-  let cleaned = raw.replace(/\/+$/, "");
-  if (cleaned && !cleaned.startsWith("/")) cleaned = `/${cleaned}`;
-  return cleaned || "/";
+  let cleaned = raw.replace(/\/+$/, '');
+  if (cleaned && !cleaned.startsWith('/')) cleaned = `/${cleaned}`;
+  return cleaned || '/';
 }
 
 function parseRoutesFile(content: string): ParsedRoute[] {
-  const lines = content.split("\n");
+  const lines = content.split('\n');
   const routes: ParsedRoute[] = [];
   const prefixStack: string[] = [];
   let blockDepth = 0;
   const namespaceDepths: number[] = [];
 
   for (const line of lines) {
-    const trimmed = line.replace(/#.*$/, "").trim();
+    const trimmed = line.replace(/#.*$/, '').trim();
     if (!trimmed) continue;
 
     const nsMatch = trimmed.match(/^namespace\s+:(\w+)\s+do\s*$/);
@@ -134,68 +133,63 @@ function parseRoutesFile(content: string): ParsedRoute[] {
       continue;
     }
 
-    const prefix =
-      prefixStack.length > 0 ? "/" + prefixStack.join("/") : "";
+    const prefix = prefixStack.length > 0 ? '/' + prefixStack.join('/') : '';
 
     // root "controller#action"
     if (/^root\s+/.test(trimmed)) {
-      routes.push({ path: "/", methods: ["GET"] });
+      routes.push({ path: '/', methods: ['GET'] });
       continue;
     }
 
     // HTTP verb routes
-    const httpMatch = trimmed.match(
-      /^(get|post|put|patch|delete)\s+["']([^"']+)["']/,
-    );
+    const httpMatch = trimmed.match(/^(get|post|put|patch|delete)\s+["']([^"']+)["']/);
     if (httpMatch) {
       const method = httpMatch[1].toUpperCase();
       let path = httpMatch[2];
-      if (!path.startsWith("/")) path = "/" + path;
+      if (!path.startsWith('/')) path = '/' + path;
       routes.push({ path: normalizePath(prefix + path), methods: [method] });
       continue;
     }
 
     // resources :name, only: [...]
-    const resourcesMatch = trimmed.match(
-      /^resources\s+:(\w+)(?:\s*,\s*only:\s*\[([^\]]*)\])?/,
-    );
+    const resourcesMatch = trimmed.match(/^resources\s+:(\w+)(?:\s*,\s*only:\s*\[([^\]]*)\])?/);
     if (resourcesMatch) {
       const name = resourcesMatch[1];
       const onlyStr = resourcesMatch[2];
-      const basePath = prefix + "/" + name;
+      const basePath = prefix + '/' + name;
 
       let actions: string[];
       if (onlyStr !== undefined) {
         actions = onlyStr
-          .split(",")
-          .map((s) => s.trim().replace(/^:/, ""))
+          .split(',')
+          .map((s) => s.trim().replace(/^:/, ''))
           .filter(Boolean);
       } else {
-        actions = ["index", "create", "show", "update", "destroy", "new", "edit"];
+        actions = ['index', 'create', 'show', 'update', 'destroy', 'new', 'edit'];
       }
 
       for (const action of actions) {
         switch (action) {
-          case "index":
-            routes.push({ path: normalizePath(basePath), methods: ["GET"] });
+          case 'index':
+            routes.push({ path: normalizePath(basePath), methods: ['GET'] });
             break;
-          case "create":
-            routes.push({ path: normalizePath(basePath), methods: ["POST"] });
+          case 'create':
+            routes.push({ path: normalizePath(basePath), methods: ['POST'] });
             break;
-          case "show":
-            routes.push({ path: normalizePath(basePath + "/:id"), methods: ["GET"] });
+          case 'show':
+            routes.push({ path: normalizePath(basePath + '/:id'), methods: ['GET'] });
             break;
-          case "update":
-            routes.push({ path: normalizePath(basePath + "/:id"), methods: ["PUT", "PATCH"] });
+          case 'update':
+            routes.push({ path: normalizePath(basePath + '/:id'), methods: ['PUT', 'PATCH'] });
             break;
-          case "destroy":
-            routes.push({ path: normalizePath(basePath + "/:id"), methods: ["DELETE"] });
+          case 'destroy':
+            routes.push({ path: normalizePath(basePath + '/:id'), methods: ['DELETE'] });
             break;
-          case "new":
-            routes.push({ path: normalizePath(basePath + "/new"), methods: ["GET"] });
+          case 'new':
+            routes.push({ path: normalizePath(basePath + '/new'), methods: ['GET'] });
             break;
-          case "edit":
-            routes.push({ path: normalizePath(basePath + "/:id/edit"), methods: ["GET"] });
+          case 'edit':
+            routes.push({ path: normalizePath(basePath + '/:id/edit'), methods: ['GET'] });
             break;
         }
       }
@@ -237,13 +231,13 @@ function extractSelectors(content: string): string[] {
 }
 
 export function canScanRailsRepo(root: string): boolean {
-  if (existsSync(join(root, "config", "routes.rb"))) return true;
-  const gemfilePath = join(root, "Gemfile");
+  if (existsSync(join(root, 'config', 'routes.rb'))) return true;
+  const gemfilePath = join(root, 'Gemfile');
   if (existsSync(gemfilePath)) {
-    const content = readFileSync(gemfilePath, "utf-8");
+    const content = readFileSync(gemfilePath, 'utf-8');
     if (/gem\s+["']rails["']/.test(content)) return true;
   }
-  if (existsSync(join(root, "bin", "rails"))) return true;
+  if (existsSync(join(root, 'bin', 'rails'))) return true;
   return false;
 }
 
@@ -262,15 +256,12 @@ export function scanRailsRepo(root: string): RepoHints {
   >();
   const loginRoutes: string[] = [];
   const callbackRoutes: string[] = [];
-  const noiseMap = new Map<
-    string,
-    { method?: string; pathPrefix: string; statuses: number[] }
-  >();
+  const noiseMap = new Map<string, { method?: string; pathPrefix: string; statuses: number[] }>();
 
   // Phase 1: Parse routes from config/routes.rb
-  const routesPath = join(root, "config", "routes.rb");
+  const routesPath = join(root, 'config', 'routes.rb');
   if (existsSync(routesPath)) {
-    const routesContent = readFileSync(routesPath, "utf-8");
+    const routesContent = readFileSync(routesPath, 'utf-8');
     const parsedRoutes = parseRoutesFile(routesContent);
 
     for (const parsed of parsedRoutes) {
@@ -301,21 +292,20 @@ export function scanRailsRepo(root: string): RepoHints {
   }
 
   // Phase 2: Walk files for controllers and templates
-  const controllersDir = join(root, "app", "controllers");
+  const controllersDir = join(root, 'app', 'controllers');
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, "utf-8");
+    const content = readFileSync(filePath, 'utf-8');
 
     // Controller analysis
     const relToControllers = relative(controllersDir, filePath);
     if (
-      filePath.endsWith(".rb") &&
-      !relToControllers.startsWith("..") &&
+      filePath.endsWith('.rb') &&
+      !relToControllers.startsWith('..') &&
       relToControllers !== filePath
     ) {
       const relPath = relToControllers;
-      const controllerPrefix =
-        "/" + relPath.replace(/_controller\.rb$/, "").replace(/\\/g, "/");
+      const controllerPrefix = '/' + relPath.replace(/_controller\.rb$/, '').replace(/\\/g, '/');
 
       const hasAuth = AUTH_MIDDLEWARE_RE.test(content);
       const statuses = extractStatusCodes(content);
@@ -328,11 +318,7 @@ export function scanRailsRepo(root: string): RepoHints {
               pathPrefix: route,
               statuses: [],
             };
-            existing.statuses = uniqueNumbers([
-              ...existing.statuses,
-              401,
-              403,
-            ]);
+            existing.statuses = uniqueNumbers([...existing.statuses, 401, 403]);
             noiseMap.set(route, existing);
           }
           ep.statuses = uniqueNumbers([...ep.statuses, ...statuses]);
@@ -341,7 +327,7 @@ export function scanRailsRepo(root: string): RepoHints {
     }
 
     // Template selector extraction
-    if (filePath.endsWith(".erb")) {
+    if (filePath.endsWith('.erb')) {
       selectors.push(...extractSelectors(content));
     }
   }

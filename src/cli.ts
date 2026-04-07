@@ -1,10 +1,17 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
-import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from "./config.js";
-import { resolveResumeDir } from "./config-paths.js";
-import { runEngine, type RunEngineOptions } from "./engine.js";
-import { EngineEventEmitter } from "./engine/event-stream.js";
-import type { ErrorEvent, FindingEvent, ProgressEvent, StateDiscoveredEvent, TaskStartEvent, TaskCompleteEvent } from "./engine/event-stream.js";
+import { pathToFileURL } from 'node:url';
+import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from './config.js';
+import { resolveResumeDir } from './config-paths.js';
+import { runEngine, type RunEngineOptions } from './engine.js';
+import { EngineEventEmitter } from './engine/event-stream.js';
+import type {
+  ErrorEvent,
+  FindingEvent,
+  ProgressEvent,
+  StateDiscoveredEvent,
+  TaskStartEvent,
+  TaskCompleteEvent,
+} from './engine/event-stream.js';
 
 export interface ParsedCliArgs {
   configPath?: string;
@@ -16,10 +23,7 @@ export interface ParsedCliArgs {
 
 export interface CliDependencies {
   loadConfig: (configPath?: string) => LoadedDramaturgeConfig;
-  runEngine: (
-    config: DramaturgeConfig,
-    options?: RunEngineOptions
-  ) => Promise<void>;
+  runEngine: (config: DramaturgeConfig, options?: RunEngineOptions) => Promise<void>;
   log: (message: string) => void;
   error: (message: string) => void;
 }
@@ -66,39 +70,39 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === "--help" || arg === "-h") {
+    if (arg === '--help' || arg === '-h') {
       return { configPath, resumeDir, diffRef, dashboard, showHelp: true };
     }
 
-    if (arg === "--dashboard") {
+    if (arg === '--dashboard') {
       dashboard = true;
       continue;
     }
 
-    if (arg === "--config") {
+    if (arg === '--config') {
       const value = args[i + 1];
       if (!value) {
-        throw new Error("Missing value for --config");
+        throw new Error('Missing value for --config');
       }
       configPath = value;
       i++;
       continue;
     }
 
-    if (arg === "--resume") {
+    if (arg === '--resume') {
       const value = args[i + 1];
       if (!value) {
-        throw new Error("Missing value for --resume");
+        throw new Error('Missing value for --resume');
       }
       resumeDir = value;
       i++;
       continue;
     }
 
-    if (arg === "--diff") {
+    if (arg === '--diff') {
       const value = args[i + 1];
       if (!value) {
-        throw new Error("Missing value for --diff");
+        throw new Error('Missing value for --diff');
       }
       diffRef = value;
       i++;
@@ -126,12 +130,10 @@ export async function runCli(
 
     const eventStream = new EngineEventEmitter();
 
-    let dashboardHandle:
-      | { cleanup: () => void; waitUntilExit: Promise<void> }
-      | undefined;
+    let dashboardHandle: { cleanup: () => void; waitUntilExit: Promise<void> } | undefined;
 
     if (parsedArgs.dashboard) {
-      const { renderDashboard } = await import("./dashboard/render.js");
+      const { renderDashboard } = await import('./dashboard/render.js');
       dashboardHandle = renderDashboard(eventStream);
     } else {
       attachCliListeners(eventStream, dependencies.log);
@@ -166,41 +168,40 @@ export function attachCliListeners(
   emitter: EngineEventEmitter,
   log: (message: string) => void
 ): void {
-  emitter.on("task:start", (evt: TaskStartEvent) => {
+  emitter.on('task:start', (evt: TaskStartEvent) => {
     log(`[task ${evt.taskNumber}] ${evt.workerType}: ${evt.objective}`);
   });
 
-  emitter.on("task:complete", (evt: TaskCompleteEvent) => {
+  emitter.on('task:complete', (evt: TaskCompleteEvent) => {
     const coverage =
       evt.coverageExercised > 0
         ? ` | coverage: ${evt.coverageExercised}/${evt.coverageDiscovered}`
-        : "";
+        : '';
     log(`[task ${evt.taskNumber}] ${evt.outcome}: ${evt.findingsCount} finding(s)${coverage}`);
   });
 
-  emitter.on("finding", (evt: FindingEvent) => {
+  emitter.on('finding', (evt: FindingEvent) => {
     log(`  ⚠ [${evt.severity}] ${evt.title}`);
   });
 
-  emitter.on("state:discovered", (evt: StateDiscoveredEvent) => {
+  emitter.on('state:discovered', (evt: StateDiscoveredEvent) => {
     log(`  ↳ new state: ${evt.pageType} (${evt.totalStates} total)`);
   });
 
-  emitter.on("progress", (evt: ProgressEvent) => {
+  emitter.on('progress', (evt: ProgressEvent) => {
     const pct = Math.round(evt.estimatedProgress * 100);
     log(
       `── progress: ${pct}% | ${evt.tasksExecuted} done, ${evt.tasksRemaining} queued, ${evt.totalFindings} finding(s), ${evt.statesDiscovered} state(s)`
     );
   });
 
-  emitter.on("run:error", (evt: ErrorEvent) => {
+  emitter.on('run:error', (evt: ErrorEvent) => {
     log(`Error: ${evt.message}`);
   });
 }
 
 const executedDirectly =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === pathToFileURL(process.argv[1]).href;
+  typeof process.argv[1] === 'string' && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (executedDirectly) {
   const exitCode = await runCli();

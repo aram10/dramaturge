@@ -1,6 +1,6 @@
-import type { RepoHints, ApiEndpointHint } from "../adaptation/types.js";
-import type { DiffContext, DiffFileEntry } from "./types.js";
-import { getChangedFiles } from "./diff-parser.js";
+import type { RepoHints, ApiEndpointHint } from '../adaptation/types.js';
+import type { DiffContext, DiffFileEntry } from './types.js';
+import { getChangedFiles } from './diff-parser.js';
 
 /**
  * Build a DiffContext by running `git diff` against `baseRef` and matching
@@ -13,7 +13,7 @@ import { getChangedFiles } from "./diff-parser.js";
 export function buildDiffContext(
   baseRef: string,
   repoRoot: string,
-  repoHints?: RepoHints,
+  repoHints?: RepoHints
 ): DiffContext {
   const changedFiles = getChangedFiles(baseRef, repoRoot);
   return buildDiffContextFromFiles(baseRef, changedFiles, repoHints);
@@ -26,7 +26,7 @@ export function buildDiffContext(
 export function buildDiffContextFromFiles(
   baseRef: string,
   changedFiles: DiffFileEntry[],
-  repoHints?: RepoHints,
+  repoHints?: RepoHints
 ): DiffContext {
   if (!repoHints || changedFiles.length === 0) {
     return {
@@ -55,10 +55,7 @@ export function buildDiffContextFromFiles(
  * Check whether a `StateNode` (identified by its URL) sits within the
  * diff-affected scope.  Used by the priority system and the finding tagger.
  */
-export function isNodeAffectedByDiff(
-  nodeUrl: string | undefined,
-  diff: DiffContext,
-): boolean {
+export function isNodeAffectedByDiff(nodeUrl: string | undefined, diff: DiffContext): boolean {
   if (!nodeUrl) return false;
 
   let pathname: string;
@@ -92,7 +89,7 @@ function unique(values: string[]): string[] {
 }
 
 function normalisePath(p: string): string {
-  return ("/" + p.replace(/\/+/g, "/").replace(/^\/|\/$/g, "")).toLowerCase();
+  return ('/' + p.replace(/\/+/g, '/').replace(/^\/|\/$/g, '')).toLowerCase();
 }
 
 /**
@@ -102,24 +99,24 @@ function normalisePath(p: string): string {
 function routeToRegex(route: string): RegExp {
   // Split on parameter-like segments, escape the literal parts, rejoin
   const PARAM_RE = /:[a-zA-Z_]\w*|\[\.\.\.[\w]*\]|\[[\w]+\]/g;
-  let pattern = "";
+  let pattern = '';
   let lastIndex = 0;
 
   for (const m of route.matchAll(PARAM_RE)) {
     // Escape the literal part before this param
     pattern += escapeRegex(route.slice(lastIndex, m.index));
     // Replace param with a wildcard
-    pattern += m[0].startsWith("[...") ? ".*" : "[^/]+";
+    pattern += m[0].startsWith('[...') ? '.*' : '[^/]+';
     lastIndex = m.index! + m[0].length;
   }
   // Escape remaining literal tail
   pattern += escapeRegex(route.slice(lastIndex));
 
-  return new RegExp(`^${pattern}$`, "i");
+  return new RegExp(`^${pattern}$`, 'i');
 }
 
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function routeMatchesPath(route: string, path: string): boolean {
@@ -139,20 +136,25 @@ function routeMatchesPath(route: string, path: string): boolean {
  */
 function fileMatchesRoute(filePath: string, route: string): boolean {
   const normalised = normalisePath(route);
-  const segments = normalised.split("/").filter(Boolean);
+  const segments = normalised.split('/').filter(Boolean);
   if (segments.length === 0) return false;
 
   // Strip parameter markers for file-matching
   const routeTokens = segments
-    .filter((seg) => !seg.startsWith(":") && !seg.startsWith("["))
+    .filter((seg) => !seg.startsWith(':') && !seg.startsWith('['))
     .map((seg) => seg.toLowerCase());
 
   if (routeTokens.length === 0) return true; // route is purely params → any file matches
 
-  const fileNorm = filePath.toLowerCase().replace(/\\/g, "/");
+  const fileNorm = filePath.toLowerCase().replace(/\\/g, '/');
 
   // All non-parameter route tokens must appear as path segments in the file
-  return routeTokens.every((token) => fileNorm.includes(`/${token}`) || fileNorm.includes(`${token}/`) || fileNorm.includes(`${token}.`));
+  return routeTokens.every(
+    (token) =>
+      fileNorm.includes(`/${token}`) ||
+      fileNorm.includes(`${token}/`) ||
+      fileNorm.includes(`${token}.`)
+  );
 }
 
 function matchRoutes(files: DiffFileEntry[], routes: string[]): string[] {
@@ -168,10 +170,7 @@ function matchRoutes(files: DiffFileEntry[], routes: string[]): string[] {
   return matched;
 }
 
-function matchApiEndpoints(
-  files: DiffFileEntry[],
-  endpoints: ApiEndpointHint[],
-): string[] {
+function matchApiEndpoints(files: DiffFileEntry[], endpoints: ApiEndpointHint[]): string[] {
   const matched: string[] = [];
   for (const endpoint of endpoints) {
     for (const file of files) {

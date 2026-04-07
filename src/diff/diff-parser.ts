@@ -1,17 +1,17 @@
-import { execFileSync } from "node:child_process";
-import type { DiffFileEntry } from "./types.js";
+import { execFileSync } from 'node:child_process';
+import type { DiffFileEntry } from './types.js';
 
 /**
  * Status letter → DiffFileEntry["status"] mapping.
  * Git diff --name-status prefixes each line with a letter:
  *   A = added, M = modified, D = deleted, R### = renamed, C### = copied (treated as added).
  */
-function statusFromLetter(letter: string): DiffFileEntry["status"] {
-  if (letter === "A" || letter.startsWith("C")) return "added";
-  if (letter === "M") return "modified";
-  if (letter === "D") return "deleted";
-  if (letter.startsWith("R")) return "renamed";
-  return "modified";
+function statusFromLetter(letter: string): DiffFileEntry['status'] {
+  if (letter === 'A' || letter.startsWith('C')) return 'added';
+  if (letter === 'M') return 'modified';
+  if (letter === 'D') return 'deleted';
+  if (letter.startsWith('R')) return 'renamed';
+  return 'modified';
 }
 
 /**
@@ -23,11 +23,11 @@ function statusFromLetter(letter: string): DiffFileEntry["status"] {
  */
 export function parseDiffNameStatus(raw: string): DiffFileEntry[] {
   const entries: DiffFileEntry[] = [];
-  for (const line of raw.split("\n")) {
+  for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    const parts = trimmed.split("\t");
+    const parts = trimmed.split('\t');
     if (parts.length < 2) continue;
 
     const statusLetter = parts[0];
@@ -47,14 +47,11 @@ export function parseDiffNameStatus(raw: string): DiffFileEntry[] {
  * If the command fails (e.g. invalid ref, not a git repo) an empty
  * array is returned so callers can degrade gracefully.
  */
-export function getChangedFiles(
-  baseRef: string,
-  repoRoot: string,
-): DiffFileEntry[] {
+export function getChangedFiles(baseRef: string, repoRoot: string): DiffFileEntry[] {
   try {
-    const output = execFileSync("git", ["diff", "--name-status", baseRef], {
+    const output = execFileSync('git', ['diff', '--name-status', baseRef], {
       cwd: repoRoot,
-      encoding: "utf-8",
+      encoding: 'utf-8',
       timeout: 30_000,
     });
     return parseDiffNameStatus(output);

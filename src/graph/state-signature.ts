@@ -1,4 +1,4 @@
-import type { StateSignature } from "../types.js";
+import type { StateSignature } from '../types.js';
 
 const TRACKING_QUERY_PARAM_PATTERNS = [
   /^utm_/i,
@@ -10,8 +10,8 @@ const TRACKING_QUERY_PARAM_PATTERNS = [
 ];
 
 function normalizePathname(pathname: string): string {
-  const normalized = pathname.replace(/\/+$/g, "");
-  return normalized || "/";
+  const normalized = pathname.replace(/\/+$/g, '');
+  return normalized || '/';
 }
 
 function isTrackingQueryParam(key: string): boolean {
@@ -19,19 +19,16 @@ function isTrackingQueryParam(key: string): boolean {
 }
 
 export function normalizeUiMarkers(markers: string[]): string[] {
-  return [...new Set(
-    markers
-      .map((marker) => marker.trim().replace(/\s+/g, " ").toLowerCase())
-      .filter(Boolean)
-  )].sort();
+  return [
+    ...new Set(
+      markers.map((marker) => marker.trim().replace(/\s+/g, ' ').toLowerCase()).filter(Boolean)
+    ),
+  ].sort();
 }
 
-export function buildStateSignatureFromUrl(
-  rawUrl: string,
-  baseUrl?: string
-): StateSignature {
+export function buildStateSignatureFromUrl(rawUrl: string, baseUrl?: string): StateSignature {
   try {
-    const url = new URL(rawUrl, baseUrl ?? "http://placeholder");
+    const url = new URL(rawUrl, baseUrl ?? 'http://placeholder');
     const query = [...url.searchParams.entries()]
       .filter(([key]) => !isTrackingQueryParam(key))
       .sort(([aKey, aValue], [bKey, bValue]) => {
@@ -68,16 +65,13 @@ export function buildStateSignature(
 export function buildStateSignatureKey(signature: StateSignature): string {
   const queryKey = signature.query
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join("&");
-  const uiKey = signature.uiMarkers.join(",");
+    .join('&');
+  const uiKey = signature.uiMarkers.join(',');
 
   return `${signature.pathname}?${queryKey}#${uiKey}`;
 }
 
-export function signaturesEqual(
-  left: StateSignature,
-  right: StateSignature
-): boolean {
+export function signaturesEqual(left: StateSignature, right: StateSignature): boolean {
   return buildStateSignatureKey(left) === buildStateSignatureKey(right);
 }
 

@@ -1,6 +1,6 @@
-import type { Stagehand } from "@browserbasehq/stagehand";
+import type { Stagehand } from '@browserbasehq/stagehand';
 
-type StagehandPage = ReturnType<Stagehand["context"]["pages"]>[number];
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 export interface StorageStateOrigin {
   origin: string;
@@ -16,7 +16,7 @@ export interface BrowserStorageState {
     expires: number;
     httpOnly: boolean;
     secure: boolean;
-    sameSite: "Strict" | "Lax" | "None";
+    sameSite: 'Strict' | 'Lax' | 'None';
   }>;
   origins: StorageStateOrigin[];
 }
@@ -24,7 +24,7 @@ export interface BrowserStorageState {
 function getPrimaryPage(stagehand: Stagehand): StagehandPage {
   const page = stagehand.context.pages()[0];
   if (!page) {
-    throw new Error("No browser page available for auth state operations.");
+    throw new Error('No browser page available for auth state operations.');
   }
   return page;
 }
@@ -51,25 +51,22 @@ export async function applyStorageState(
     );
   }
 
-  await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
 
   const targetOrigin = new URL(targetUrl).origin;
-  const matchingOrigin = state.origins?.find((origin) =>
-    origin.origin === targetOrigin && origin.localStorage?.length > 0
+  const matchingOrigin = state.origins?.find(
+    (origin) => origin.origin === targetOrigin && origin.localStorage?.length > 0
   );
 
   if (!matchingOrigin) return;
 
-  await page.evaluate(
-    (items: Array<{ name: string; value: string }>) => {
-      for (const item of items) {
-        localStorage.setItem(item.name, item.value);
-      }
-    },
-    matchingOrigin.localStorage
-  );
+  await page.evaluate((items: Array<{ name: string; value: string }>) => {
+    for (const item of items) {
+      localStorage.setItem(item.name, item.value);
+    }
+  }, matchingOrigin.localStorage);
 
-  await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
 }
 
 export async function captureStorageState(
@@ -82,7 +79,7 @@ export async function captureStorageState(
     const items: Array<{ name: string; value: string }> = [];
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
-      if (key) items.push({ name: key, value: window.localStorage.getItem(key) ?? "" });
+      if (key) items.push({ name: key, value: window.localStorage.getItem(key) ?? '' });
     }
     return items;
   });

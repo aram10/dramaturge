@@ -6,8 +6,8 @@
  * traffic; worker agents see only messages addressed to them.
  */
 
-import type { A2AMessage, Part } from "./types.js";
-import { shortId } from "../constants.js";
+import type { A2AMessage, Part } from './types.js';
+import { shortId } from '../constants.js';
 
 type MessageHandler = (message: A2AMessage) => void;
 
@@ -24,7 +24,7 @@ export class MessageBus {
     toAgent: string,
     parts: Part[],
     options?: {
-      role?: A2AMessage["role"];
+      role?: A2AMessage['role'];
       correlationId?: string;
       metadata?: Record<string, unknown>;
     }
@@ -33,7 +33,7 @@ export class MessageBus {
       id: `msg-${shortId()}`,
       fromAgent,
       toAgent,
-      role: options?.role ?? "agent",
+      role: options?.role ?? 'agent',
       parts,
       timestamp: new Date().toISOString(),
       correlationId: options?.correlationId,
@@ -42,7 +42,7 @@ export class MessageBus {
 
     this.history.push(message);
 
-    if (toAgent === "*") {
+    if (toAgent === '*') {
       // Broadcast
       for (const handler of this.broadcastHandlers) handler(message);
       for (const [, handlers] of this.handlers) {
@@ -66,12 +66,12 @@ export class MessageBus {
     toAgent: string,
     text: string,
     options?: {
-      role?: A2AMessage["role"];
+      role?: A2AMessage['role'];
       correlationId?: string;
       metadata?: Record<string, unknown>;
     }
   ): A2AMessage {
-    return this.send(fromAgent, toAgent, [{ kind: "text", text }], options);
+    return this.send(fromAgent, toAgent, [{ kind: 'text', text }], options);
   }
 
   /**
@@ -116,9 +116,7 @@ export class MessageBus {
 
   /** Get messages addressed to a specific agent. */
   getMessagesTo(agentId: string): readonly A2AMessage[] {
-    return this.history.filter(
-      (m) => m.toAgent === agentId || m.toAgent === "*"
-    );
+    return this.history.filter((m) => m.toAgent === agentId || m.toAgent === '*');
   }
 
   /** Total messages sent. */

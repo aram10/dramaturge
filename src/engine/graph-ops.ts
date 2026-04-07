@@ -1,9 +1,9 @@
-import type { EngineContext } from "./context.js";
-import type { WorkerResult, FrontierItem } from "../types.js";
-import { captureFingerprint } from "../graph/fingerprint.js";
-import { classifyPage } from "../planner/page-classifier.js";
-import { emitEngineEvent } from "./event-stream.js";
-import { isNodeAffectedByDiff } from "../diff/diff-hints.js";
+import type { EngineContext } from './context.js';
+import type { WorkerResult, FrontierItem } from '../types.js';
+import { captureFingerprint } from '../graph/fingerprint.js';
+import { classifyPage } from '../planner/page-classifier.js';
+import { emitEngineEvent } from './event-stream.js';
+import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
 
 function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): void {
   const existing = map.get(nodeId) ?? [];
@@ -19,7 +19,7 @@ export function collectResults(ctx: EngineContext, nodeId: string, result: Worke
   for (const event of result.coverageSnapshot.events) {
     ctx.globalCoverage.recordEvent(event);
     ctx.graph.addDiscoveredControl(nodeId, event.controlId);
-    if (event.outcome === "worked") {
+    if (event.outcome === 'worked') {
       ctx.graph.addExercisedControl(nodeId, event.controlId);
     }
   }
@@ -42,17 +42,17 @@ export async function expandGraph(
 
     // Workers report discovered edges with an empty fingerprint hash when
     // they haven't navigated to the target page yet. Resolve by navigating.
-    if (fingerprint.hash === "") {
-      const resolved = await resolveEdgeFingerprint(
-        ctx,
-        sourceNodeId,
-        edge.navigationHint
-      );
+    if (fingerprint.hash === '') {
+      const resolved = await resolveEdgeFingerprint(ctx, sourceNodeId, edge.navigationHint);
       if (!resolved) continue;
       fingerprint = resolved.fingerprint;
       pageType = resolved.pageType;
       edge.navigationHint.url = edge.navigationHint.url ?? resolved.url;
-      try { await ctx.page.goto(ctx.config.targetUrl); } catch { /* best-effort */ }
+      try {
+        await ctx.page.goto(ctx.config.targetUrl);
+      } catch {
+        /* best-effort */
+      }
     }
 
     const existing = ctx.graph.findByFingerprint(fingerprint);
@@ -63,8 +63,8 @@ export async function expandGraph(
       const diffHasScope =
         ctx.diffContext &&
         (ctx.diffContext.affectedRoutes.length > 0 ||
-         ctx.diffContext.affectedApiEndpoints.length > 0 ||
-         ctx.diffContext.affectedRouteFamilies.length > 0);
+          ctx.diffContext.affectedApiEndpoints.length > 0 ||
+          ctx.diffContext.affectedRouteFamilies.length > 0);
       if (
         diffHasScope &&
         ctx.config.diffAware.restrictToChanged &&
@@ -74,7 +74,8 @@ export async function expandGraph(
       }
 
       const newNode = ctx.graph.addNode({
-        fingerprint, pageType,
+        fingerprint,
+        pageType,
         url: edge.navigationHint.url,
         depth: sourceNode.depth + 1,
         navigationHint: edge.navigationHint,
@@ -90,7 +91,7 @@ export async function expandGraph(
             ctx.repoHints,
             ctx.config.llm.requestTimeoutMs,
             ctx.memoryStore?.getPlannerSignals(newNode),
-            ctx.diffContext,
+            ctx.diffContext
           )
         : ctx.planner.proposeTasks(
             newNode,
@@ -98,12 +99,14 @@ export async function expandGraph(
             ctx.mission,
             ctx.repoHints,
             ctx.memoryStore?.getPlannerSignals(newNode),
-            ctx.diffContext,
+            ctx.diffContext
           );
       ctx.frontier.enqueueMany(newTasks);
-      console.log(`  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`);
+      console.log(
+        `  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`
+      );
 
-      emitEngineEvent(ctx.eventStream, "state:discovered", {
+      emitEngineEvent(ctx.eventStream, 'state:discovered', {
         nodeId: newNode.id,
         url: edge.navigationHint.url,
         pageType: newNode.pageType,
@@ -134,7 +137,7 @@ async function resolveEdgeFingerprint(
     );
     if (!navigation.success) {
       console.log(
-        `  Could not resolve discovered edge: ${navigation.reason ?? "navigation failed"}`
+        `  Could not resolve discovered edge: ${navigation.reason ?? 'navigation failed'}`
       );
       return null;
     }
@@ -142,15 +145,21 @@ async function resolveEdgeFingerprint(
     return {
       fingerprint: await captureFingerprint(ctx.page),
       pageType: await classifyPage(ctx.page),
-      url: typeof ctx.page.url === "function" ? ctx.page.url() : undefined,
+      url: typeof ctx.page.url === 'function' ? ctx.page.url() : undefined,
     };
   } catch (error) {
-    console.log(`  Could not resolve discovered edge: ${error instanceof Error ? error.message : String(error)}`);
+    console.log(
+      `  Could not resolve discovered edge: ${error instanceof Error ? error.message : String(error)}`
+    );
     return null;
   }
 }
 
-export function routeFollowups(ctx: EngineContext, sourceNodeId: string, result: WorkerResult): void {
+export function routeFollowups(
+  ctx: EngineContext,
+  sourceNodeId: string,
+  result: WorkerResult
+): void {
   for (const followup of result.followupRequests) {
     ctx.frontier.enqueue(ctx.planner.routeFollowup(followup, sourceNodeId));
   }
@@ -163,19 +172,15 @@ export function maintainFrontier(ctx: EngineContext): void {
       ctx.globalCoverage.addBlindSpot({
         nodeId: p.nodeId,
         summary: `Pruned: ${p.objective}`,
-        reason: "pruned",
-        severity: "low",
+        reason: 'pruned',
+        severity: 'low',
       });
     }
     console.log(`  Pruned ${pruned.length} low-priority frontier items`);
   }
 }
 
-export function flushBrowserErrors(
-  ctx: EngineContext,
-  nodeId: string,
-  pageKey: string
-): void {
+export function flushBrowserErrors(ctx: EngineContext, nodeId: string, pageKey: string): void {
   if (ctx.errorCollector.pendingCount(pageKey) === 0) return;
   const { findings, evidence } = ctx.errorCollector.flush(pageKey);
   if (findings.length === 0) return;
@@ -186,11 +191,7 @@ export function flushBrowserErrors(
   console.log(`  Auto-captured ${findings.length} browser error(s)`);
 }
 
-export function assignPageNodeOwner(
-  ctx: EngineContext,
-  pageKey: string,
-  nodeId: string
-): void {
+export function assignPageNodeOwner(ctx: EngineContext, pageKey: string, nodeId: string): void {
   const currentOwner = ctx.pageNodeOwners.get(pageKey);
   if (currentOwner && currentOwner !== nodeId) {
     flushBrowserErrors(ctx, currentOwner, pageKey);
@@ -198,10 +199,7 @@ export function assignPageNodeOwner(
   ctx.pageNodeOwners.set(pageKey, nodeId);
 }
 
-export function flushOwnedBrowserErrors(
-  ctx: EngineContext,
-  pageKey: string
-): void {
+export function flushOwnedBrowserErrors(ctx: EngineContext, pageKey: string): void {
   const owner = ctx.pageNodeOwners.get(pageKey);
   if (!owner) return;
   flushBrowserErrors(ctx, owner, pageKey);

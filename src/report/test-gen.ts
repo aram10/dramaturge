@@ -1,8 +1,8 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { ReplayableAction, RunResult } from "../types.js";
-import { collectFindings } from "./collector.js";
-import { inferAssertions } from "./assertion-inference.js";
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { ReplayableAction, RunResult } from '../types.js';
+import { collectFindings } from './collector.js';
+import { inferAssertions } from './assertion-inference.js';
 
 export interface GeneratedPlaywrightTest {
   filename: string;
@@ -12,8 +12,8 @@ export interface GeneratedPlaywrightTest {
 function slugify(value: string): string {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 }
 
@@ -23,17 +23,17 @@ function escapeString(value: string): string {
 
 function renderAction(action: ReplayableAction): string | null {
   switch (action.kind) {
-    case "navigate":
+    case 'navigate':
       return action.url ? `await page.goto(${escapeString(action.url)});` : null;
-    case "click":
-    case "toggle":
-    case "submit":
-    case "open":
-    case "close":
+    case 'click':
+    case 'toggle':
+    case 'submit':
+    case 'open':
+    case 'close':
       return action.selector
         ? `await page.locator(${escapeString(action.selector)}).click();`
         : `// ${action.summary}`;
-    case "input":
+    case 'input':
       if (!action.selector) {
         return `// ${action.summary}`;
       }
@@ -41,7 +41,7 @@ function renderAction(action: ReplayableAction): string | null {
         return `await page.locator(${escapeString(action.selector)}).fill(${escapeString(action.value)});`;
       }
       return `// ${action.summary}`;
-    case "keydown":
+    case 'keydown':
       return action.key
         ? `await page.keyboard.press(${escapeString(action.key)});`
         : `// ${action.summary}`;
@@ -79,10 +79,7 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         .filter((a) => impactedAreaNames.has(a.name))
         .flatMap((a) => a.evidence);
       const reproEvidenceIds = new Set(finding.meta?.repro?.evidenceIds ?? []);
-      const findingEvidenceIds = new Set([
-        ...(finding.evidenceIds ?? []),
-        ...reproEvidenceIds,
-      ]);
+      const findingEvidenceIds = new Set([...(finding.evidenceIds ?? []), ...reproEvidenceIds]);
       const evidenceTypes = [
         ...new Set(
           allLinkedEvidence
@@ -103,16 +100,14 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         evidenceTypes,
       });
 
-      const preambles = assertions
-        .filter((a) => a.preamble)
-        .map((a) => a.preamble!);
+      const preambles = assertions.filter((a) => a.preamble).map((a) => a.preamble!);
 
       const lines = [
         'import { test, expect } from "@playwright/test";',
-        "",
+        '',
         `test(${escapeString(`${finding.id}: ${finding.title}`)}, async ({ page }) => {`,
-        `  // Expected: ${finding.expected.replace(/[\r\n]+/g, " ")}`,
-        `  // Actual: ${finding.actual.replace(/[\r\n]+/g, " ")}`,
+        `  // Expected: ${finding.expected.replace(/[\r\n]+/g, ' ')}`,
+        `  // Actual: ${finding.actual.replace(/[\r\n]+/g, ' ')}`,
       ];
 
       // Preamble code (event listeners) must appear before navigation to capture all events.
@@ -127,9 +122,9 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
           lines.push(`  ${action}`);
         }
       } else if (breadcrumbs.length > 0) {
-        lines.push("  // Breadcrumbs:");
+        lines.push('  // Breadcrumbs:');
         for (const breadcrumb of breadcrumbs) {
-          lines.push(`  // - ${breadcrumb.replace(/[\r\n]+/g, " ")}`);
+          lines.push(`  // - ${breadcrumb.replace(/[\r\n]+/g, ' ')}`);
         }
       }
 
@@ -138,13 +133,13 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
           lines.push(`  ${assertion.code}`);
         }
       } else {
-        lines.push("  // No confident assertion could be inferred automatically.");
+        lines.push('  // No confident assertion could be inferred automatically.');
       }
-      lines.push("});");
+      lines.push('});');
 
       return {
         filename,
-        content: `${lines.join("\n")}\n`,
+        content: `${lines.join('\n')}\n`,
       };
     });
 }
@@ -158,11 +153,11 @@ export function writeGeneratedPlaywrightTests(
     return [];
   }
 
-  const testsDir = join(outputDir, "generated-tests");
+  const testsDir = join(outputDir, 'generated-tests');
   mkdirSync(testsDir, { recursive: true });
 
   for (const testFile of generated) {
-    writeFileSync(join(testsDir, testFile.filename), testFile.content, "utf-8");
+    writeFileSync(join(testsDir, testFile.filename), testFile.content, 'utf-8');
   }
 
   return generated;

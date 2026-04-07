@@ -1,12 +1,9 @@
-import type { DramaturgeConfig } from "../config.js";
-import type {
-  ObservedApiEndpoint,
-  ObservedApiRequestSample,
-} from "../network/traffic-observer.js";
-import type { ContractIndex } from "../spec/contract-index.js";
-import type { NormalizedOperationSpec } from "../spec/types.js";
+import type { DramaturgeConfig } from '../config.js';
+import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/traffic-observer.js';
+import type { ContractIndex } from '../spec/contract-index.js';
+import type { NormalizedOperationSpec } from '../spec/types.js';
 
-export type ApiTestingConfig = DramaturgeConfig["apiTesting"];
+export type ApiTestingConfig = DramaturgeConfig['apiTesting'];
 
 export interface ApiRequestResponseLike {
   status(): number;
@@ -37,7 +34,7 @@ export interface ApiProbeTarget {
   authRequired: boolean;
   operation?: NormalizedOperationSpec;
   observedStatuses: number[];
-  source: "observed" | "contract";
+  source: 'observed' | 'contract';
   sample?: ObservedApiRequestSample;
 }
 

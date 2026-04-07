@@ -1,9 +1,4 @@
-import type {
-  FindingConfidence,
-  FindingMeta,
-  FindingSource,
-  ReproArtifact,
-} from "../types.js";
+import type { FindingConfidence, FindingMeta, FindingSource, ReproArtifact } from '../types.js';
 
 interface ReproInput {
   stateId?: string;
@@ -43,8 +38,8 @@ export function buildAgentFindingMeta(
 ): FindingMeta {
   return buildFindingMeta({
     ...input,
-    source: "agent",
-    confidence: input.confidence ?? "medium",
+    source: 'agent',
+    confidence: input.confidence ?? 'medium',
   });
 }
 
@@ -53,8 +48,8 @@ export function buildAutoCaptureFindingMeta(
 ): FindingMeta {
   return buildFindingMeta({
     ...input,
-    source: "auto-capture",
-    confidence: input.confidence ?? "medium",
+    source: 'auto-capture',
+    confidence: input.confidence ?? 'medium',
   });
 }
 
@@ -63,7 +58,7 @@ export function buildConfirmedFindingMeta(
 ): FindingMeta {
   return buildFindingMeta({
     ...input,
-    source: "confirmed",
-    confidence: input.confidence ?? "high",
+    source: 'confirmed',
+    confidence: input.confidence ?? 'high',
   });
 }
