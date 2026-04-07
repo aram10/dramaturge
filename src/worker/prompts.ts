@@ -1,10 +1,17 @@
-import type { AdversarialConfig } from "../config.js";
-import type { MissionConfig, PageType, WorkerType, AgentRole } from "../types.js";
-import type { RepoHints } from "../adaptation/types.js";
-import type { WorkerHistoryContext } from "../memory/types.js";
-import type { ObservedApiEndpoint } from "../network/traffic-observer.js";
-import { summarizeAdversarialPayloadFamilies } from "../adversarial/payloads.js";
-import { summarizeAdversarialScenarios } from "../adversarial/scenarios.js";
+import type { AdversarialConfig } from '../config.js';
+import type { MissionConfig, PageType, WorkerType, AgentRole } from '../types.js';
+import type { RepoHints } from '../adaptation/types.js';
+import type { WorkerHistoryContext } from '../memory/types.js';
+import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
+import { summarizeAdversarialPayloadFamilies } from '../adversarial/payloads.js';
+import { summarizeAdversarialScenarios } from '../adversarial/scenarios.js';
+import {
+  MAX_ROUTES_IN_WORKER,
+  MAX_ROUTE_FAMILIES_IN_WORKER,
+  MAX_STABLE_SELECTORS_IN_WORKER,
+  MAX_API_ENDPOINTS_IN_WORKER,
+  MAX_LOGIN_ROUTES_IN_WORKER,
+} from '../constants.js';
 
 interface AppContext {
   knownPatterns?: string[];
@@ -14,184 +21,186 @@ interface AppContext {
 
 function formatObservedApiEndpoint(endpoint: ObservedApiEndpoint): string {
   const statuses =
-    endpoint.statuses.length > 0 ? `statuses=${endpoint.statuses.join(", ")}` : undefined;
+    endpoint.statuses.length > 0 ? `statuses=${endpoint.statuses.join(', ')}` : undefined;
   const failures =
-    endpoint.failures.length > 0 ? `failures=${endpoint.failures.join(" | ")}` : undefined;
+    endpoint.failures.length > 0 ? `failures=${endpoint.failures.join(' | ')}` : undefined;
 
-  return `- ${endpoint.methods.join("/") || "ANY"} ${endpoint.route}${
+  return `- ${endpoint.methods.join('/') || 'ANY'} ${endpoint.route}${
     [statuses, failures].filter(Boolean).length > 0
-      ? ` (${[statuses, failures].filter(Boolean).join("; ")})`
-      : ""
+      ? ` (${[statuses, failures].filter(Boolean).join('; ')})`
+      : ''
   }`;
 }
 
 function buildAppContextSection(ctx?: AppContext): string {
-  if (!ctx) return "";
+  if (!ctx) return '';
   const parts: string[] = [];
 
   if (ctx.knownPatterns?.length) {
-    parts.push("## Known Patterns (Expected Behavior)");
+    parts.push('## Known Patterns (Expected Behavior)');
     for (const p of ctx.knownPatterns) parts.push(`- ${p}`);
   }
 
   if (ctx.notBugs?.length) {
-    parts.push("\n## These are NOT bugs \u2014 do not report them:");
+    parts.push('\n## These are NOT bugs \u2014 do not report them:');
     for (const nb of ctx.notBugs) parts.push(`- ${nb}`);
   }
 
   if (ctx.ignoredBehaviors?.length) {
-    parts.push("\n## Behaviors to Ignore:");
+    parts.push('\n## Behaviors to Ignore:');
     for (const ib of ctx.ignoredBehaviors) parts.push(`- ${ib}`);
   }
 
-  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+  return parts.length > 0 ? `\n\n${parts.join('\n')}` : '';
 }
 
 function buildRepoHintsSection(repoHints?: RepoHints): string {
-  if (!repoHints) return "";
+  if (!repoHints) return '';
 
   const parts: string[] = [];
 
   if (repoHints.routes.length > 0) {
-    parts.push("## Repo Hints");
+    parts.push('## Repo Hints');
     parts.push(
-      `Known route families: ${repoHints.routes.slice(0, 6).join(", ")}`
+      `Known route families: ${repoHints.routes.slice(0, MAX_ROUTES_IN_WORKER).join(', ')}`
     );
   }
 
   if ((repoHints.routeFamilies?.length ?? 0) > 0) {
-    if (parts.length === 0) parts.push("## Repo Hints");
-    parts.push(`Route families: ${repoHints.routeFamilies.slice(0, 6).join(", ")}`);
+    if (parts.length === 0) parts.push('## Repo Hints');
+    parts.push(
+      `Route families: ${repoHints.routeFamilies.slice(0, MAX_ROUTE_FAMILIES_IN_WORKER).join(', ')}`
+    );
   }
 
   if (repoHints.stableSelectors.length > 0) {
     parts.push(
-      `Stable selectors: ${repoHints.stableSelectors.slice(0, 6).join(", ")}`
+      `Stable selectors: ${repoHints.stableSelectors.slice(0, MAX_STABLE_SELECTORS_IN_WORKER).join(', ')}`
     );
   }
 
   if ((repoHints.apiEndpoints?.length ?? 0) > 0) {
-    if (parts.length === 0) parts.push("## Repo Hints");
+    if (parts.length === 0) parts.push('## Repo Hints');
     parts.push(
       `API endpoints: ${repoHints.apiEndpoints
-        .slice(0, 4)
+        .slice(0, MAX_API_ENDPOINTS_IN_WORKER)
         .map((endpoint) => {
           const details = [
             endpoint.statuses.length > 0
-              ? `expected statuses ${endpoint.statuses.join(", ")}`
+              ? `expected statuses ${endpoint.statuses.join(', ')}`
               : undefined,
-            endpoint.authRequired ? "requires auth" : undefined,
+            endpoint.authRequired ? 'requires auth' : undefined,
             (endpoint.validationSchemas?.length ?? 0) > 0
-              ? `validation schemas ${endpoint.validationSchemas?.join(", ")}`
+              ? `validation schemas ${endpoint.validationSchemas?.join(', ')}`
               : undefined,
           ].filter(Boolean);
-          return `${endpoint.methods.join("/") || "ANY"} ${endpoint.route}${
-            details.length > 0 ? ` (${details.join("; ")})` : ""
+          return `${endpoint.methods.join('/') || 'ANY'} ${endpoint.route}${
+            details.length > 0 ? ` (${details.join('; ')})` : ''
           }`;
         })
-        .join(", ")}`
+        .join(', ')}`
     );
   }
 
   if (repoHints.authHints.loginRoutes.length > 0) {
     parts.push(
-      `Login routes: ${repoHints.authHints.loginRoutes.slice(0, 3).join(", ")}`
+      `Login routes: ${repoHints.authHints.loginRoutes.slice(0, MAX_LOGIN_ROUTES_IN_WORKER).join(', ')}`
     );
   }
 
   if (repoHints.authHints.callbackRoutes.length > 0) {
-    parts.push(
-      `Callback routes: ${repoHints.authHints.callbackRoutes.slice(0, 3).join(", ")}`
-    );
+    parts.push(`Callback routes: ${repoHints.authHints.callbackRoutes.slice(0, 3).join(', ')}`);
   }
 
-  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+  return parts.length > 0 ? `\n\n${parts.join('\n')}` : '';
 }
 
 function buildMissionSection(mission?: MissionConfig): string {
-  if (!mission) return "";
+  if (!mission) return '';
 
   const parts: string[] = [];
 
   if (mission.criticalFlows?.length) {
-    parts.push("## Critical Flows");
+    parts.push('## Critical Flows');
     for (const flow of mission.criticalFlows) {
       parts.push(`- Prioritize: ${flow}`);
     }
   }
 
   if (!mission.destructiveActionsAllowed) {
-    parts.push("## Safety Guardrail");
+    parts.push('## Safety Guardrail');
     parts.push(
-      "Destructive actions are disabled for this run. Do not delete records, clear lists, or trigger irreversible changes."
+      'Destructive actions are disabled for this run. Do not delete records, clear lists, or trigger irreversible changes.'
     );
   }
 
-  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+  return parts.length > 0 ? `\n\n${parts.join('\n')}` : '';
 }
 
 function buildContractSummarySection(contractSummary?: string[]): string {
-  if (!contractSummary?.length) return "";
+  if (!contractSummary?.length) return '';
 
   return `\n\n## Contract Expectations\n${contractSummary
     .slice(0, 6)
     .map((summary) => `- ${summary}`)
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 function buildObservedApiSection(observedApiEndpoints?: ObservedApiEndpoint[]): string {
-  if (!observedApiEndpoints?.length) return "";
+  if (!observedApiEndpoints?.length) return '';
 
   return `\n\n## Observed API Traffic\n${observedApiEndpoints
     .slice(0, 6)
     .map((endpoint) => formatObservedApiEndpoint(endpoint))
-    .join("\n")}`;
+    .join('\n')}`;
 }
 
 function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
-  if (!history) return "";
+  if (!history) return '';
 
   const parts: string[] = [];
 
   if (history.suppressedFindings.length > 0) {
-    parts.push("## Historical Notes");
+    parts.push('## Historical Notes');
     parts.push(
       `Previously suppressed findings to avoid re-reporting unless the behavior materially changed: ${history.suppressedFindings.join(
-        " | "
+        ' | '
       )}`
     );
   }
 
   if (history.flakyPageNotes.length > 0) {
-    if (parts.length === 0) parts.push("## Historical Notes");
-    parts.push(`Historically dynamic page notes: ${history.flakyPageNotes.join(" | ")}`);
+    if (parts.length === 0) parts.push('## Historical Notes');
+    parts.push(`Historically dynamic page notes: ${history.flakyPageNotes.join(' | ')}`);
   }
 
   if (history.navigationHints.length > 0) {
-    if (parts.length === 0) parts.push("## Historical Notes");
-    parts.push(`Navigation hints from prior runs: ${history.navigationHints.join(" | ")}`);
+    if (parts.length === 0) parts.push('## Historical Notes');
+    parts.push(`Navigation hints from prior runs: ${history.navigationHints.join(' | ')}`);
   }
 
   if (history.authHints.length > 0) {
-    if (parts.length === 0) parts.push("## Historical Notes");
-    parts.push(`Authentication hints from prior runs: ${history.authHints.join(" | ")}`);
+    if (parts.length === 0) parts.push('## Historical Notes');
+    parts.push(`Authentication hints from prior runs: ${history.authHints.join(' | ')}`);
   }
 
   if (history.apiHints.length > 0) {
-    if (parts.length === 0) parts.push("## Historical Notes");
-    parts.push("Historical API hints:");
-    parts.push(...history.apiHints.slice(0, 4).map((endpoint) => formatObservedApiEndpoint(endpoint)));
+    if (parts.length === 0) parts.push('## Historical Notes');
+    parts.push('Historical API hints:');
+    parts.push(
+      ...history.apiHints.slice(0, 4).map((endpoint) => formatObservedApiEndpoint(endpoint))
+    );
   }
 
-  return parts.length > 0 ? `\n\n${parts.join("\n")}` : "";
+  return parts.length > 0 ? `\n\n${parts.join('\n')}` : '';
 }
 
 function sanitizeVisionContext(visionContext: string): string {
-  return visionContext.replace(/```/g, "``\\`");
+  return visionContext.replace(/```/g, '``\\`');
 }
 
 function buildVisionContextSection(visionContext?: string): string {
-  if (!visionContext) return "";
+  if (!visionContext) return '';
 
   const sanitized = sanitizeVisionContext(visionContext);
 
@@ -212,8 +221,8 @@ function buildAdversarialSection(
   adversarialConfig?: AdversarialConfig,
   mission?: MissionConfig
 ): string {
-  if (workerType !== "adversarial" || !adversarialConfig?.enabled) {
-    return "";
+  if (workerType !== 'adversarial' || !adversarialConfig?.enabled) {
+    return '';
   }
 
   const scenarios = summarizeAdversarialScenarios(
@@ -225,24 +234,24 @@ function buildAdversarialSection(
   });
 
   const parts = [
-    "## Adversarial Mode",
+    '## Adversarial Mode',
     adversarialConfig.safeMode
-      ? "Safe mode is enabled. Prefer read-only, state-preserving probes and avoid submissions that could create or destroy records."
-      : "Safe mode is disabled. Use stronger payloads carefully and stay within the assigned area.",
-    "Probe sequences:",
+      ? 'Safe mode is enabled. Prefer read-only, state-preserving probes and avoid submissions that could create or destroy records.'
+      : 'Safe mode is disabled. Use stronger payloads carefully and stay within the assigned area.',
+    'Probe sequences:',
     ...scenarios.map((scenario) => `- ${scenario}`),
-    "Payload families:",
+    'Payload families:',
     ...payloads.map((payload) => `- ${payload}`),
     !mission?.destructiveActionsAllowed
-      ? "Do not run mutation-dependent probes unless the run explicitly allows destructive actions."
-      : "Keep mutation-dependent probes narrowly scoped and clean up any low-risk test data you create.",
+      ? 'Do not run mutation-dependent probes unless the run explicitly allows destructive actions.'
+      : 'Keep mutation-dependent probes narrowly scoped and clean up any low-risk test data you create.',
   ];
 
-  return `\n\n${parts.join("\n")}`;
+  return `\n\n${parts.join('\n')}`;
 }
 
 export function buildAgentRoleSection(agentRole?: AgentRole, blackboardSummary?: string): string {
-  if (!agentRole) return "";
+  if (!agentRole) return '';
 
   const parts: string[] = [];
   parts.push(`\n\n## Agent Role: ${agentRole.charAt(0).toUpperCase() + agentRole.slice(1)}`);
@@ -252,12 +261,12 @@ export function buildAgentRoleSection(agentRole?: AgentRole, blackboardSummary?:
     parts.push(`\n## Team Blackboard\n${blackboardSummary}`);
   }
 
-  return parts.join("\n");
+  return parts.join('\n');
 }
 
 function getAgentRoleGuidance(role: AgentRole): string {
   switch (role) {
-    case "scout":
+    case 'scout':
       return `You are the Scout Agent. Your primary mission is rapid surface-area mapping.
 - Prioritize discovering navigation targets (links, buttons, menus) over deep testing.
 - Classify each page you visit (form, list, detail, dashboard, etc.).
@@ -265,7 +274,7 @@ function getAgentRoleGuidance(role: AgentRole): string {
 - Spend minimal time on individual interactions — breadth over depth.
 - Use request_followup to flag areas needing deeper investigation by other agents.`;
 
-    case "tester":
+    case 'tester':
       return `You are the Tester Agent. Your mission is thorough, deep testing of specific flows.
 - Focus on the assigned page type: forms, CRUD operations, or API contracts.
 - Test validation rules, edge cases, error states, and success paths.
@@ -273,7 +282,7 @@ function getAgentRoleGuidance(role: AgentRole): string {
 - Report findings with detailed reproduction steps and evidence.
 - Request security agent follow-up if you notice suspicious input handling.`;
 
-    case "security":
+    case 'security':
       return `You are the Security Agent. Your mission is adversarial testing with security-domain knowledge.
 - Probe for OWASP Top 10 vulnerabilities relevant to the UI context.
 - Test authentication boundaries, authorization bypasses, and session handling.
@@ -282,7 +291,7 @@ function getAgentRoleGuidance(role: AgentRole): string {
 - Report findings with security impact assessment and OWASP category tags.
 - Stay within safe-mode constraints unless explicitly allowed to mutate.`;
 
-    case "reviewer":
+    case 'reviewer':
       return `You are the Reviewer Agent. Your mission is real-time quality oversight.
 - Monitor findings from other agents on the blackboard.
 - Validate finding severity and categorization.
@@ -290,7 +299,7 @@ function getAgentRoleGuidance(role: AgentRole): string {
 - Suggest targeted follow-up investigations to the coordinator.
 - Flag false positives and recommend dismissals.`;
 
-    case "reporter":
+    case 'reporter':
       return `You are the Reporter Agent. Your mission is synthesis and narrative.
 - Aggregate findings across all agents into a coherent summary.
 - Group related findings into themes (e.g., "form validation gaps").
@@ -317,13 +326,12 @@ export function buildWorkerSystemPrompt(
   agentRole?: AgentRole,
   blackboardSummary?: string
 ): string {
-  const areaContext = areaDescription
-    ? `\n\nAbout this area: ${areaDescription}`
-    : "";
+  const areaContext = areaDescription ? `\n\nAbout this area: ${areaDescription}` : '';
 
-  const pageTypeContext = pageType && pageType !== "unknown"
-    ? `\n\n## Page Type Detected: ${pageType}\n${getPageTypeGuidance(pageType)}`
-    : "";
+  const pageTypeContext =
+    pageType && pageType !== 'unknown'
+      ? `\n\n## Page Type Detected: ${pageType}\n${getPageTypeGuidance(pageType)}`
+      : '';
 
   return `You are an autonomous QA tester exploring a web application. Your job is to find bugs, UX issues, accessibility problems, and visual glitches through hands-on exploration.
 
@@ -367,7 +375,7 @@ Use the mark_control_exercised tool after interacting with any control (button, 
 
 function getPageTypeGuidance(pageType: PageType): string {
   switch (pageType) {
-    case "form":
+    case 'form':
       return `This page contains form inputs. Focus on:
 - Required field validation (submit with empty required fields)
 - Input boundary testing (very long strings, special characters, SQL-like input)
@@ -375,7 +383,7 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Save success and failure feedback
 - Dirty-form warnings when navigating away`;
 
-    case "list":
+    case 'list':
       return `This page contains a list or table. Focus on:
 - Filter and search functionality
 - Sort behavior on column headers
@@ -384,7 +392,7 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Empty state when filters match nothing
 - Bulk selection behavior (if present)`;
 
-    case "detail":
+    case 'detail':
       return `This is a detail/view page. Focus on:
 - Data display correctness
 - Edit/delete actions
@@ -392,7 +400,7 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Related data sections
 - Action button behavior`;
 
-    case "dashboard":
+    case 'dashboard':
       return `This is a dashboard page. Focus on:
 - Widget loading and display
 - Data freshness indicators
@@ -400,7 +408,7 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Empty/error states for individual widgets
 - Layout and responsive behavior`;
 
-    case "settings":
+    case 'settings':
       return `This is a settings page. Focus on:
 - Save/apply behavior
 - Reset to defaults
@@ -408,7 +416,7 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Immediate vs. deferred settings
 - Confirmation dialogs for destructive changes`;
 
-    case "wizard":
+    case 'wizard':
       return `This is a multi-step wizard. Focus on:
 - Step progression (next/back)
 - Validation at each step before proceeding
@@ -416,7 +424,7 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Skip/cancel behavior
 - Final confirmation step`;
 
-    case "modal":
+    case 'modal':
       return `A modal dialog is open. Focus on:
 - Close behavior (X button, Escape key, backdrop click)
 - Focus trapping within the modal
@@ -424,14 +432,14 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Scroll behavior for long content
 - Stacking behavior if another modal opens`;
 
-    case "auth":
+    case 'auth':
       return `This is an authentication page. Focus on:
 - Form validation (empty fields, invalid formats)
 - Error messages for bad credentials
 - Password visibility toggle
 - Remember me / stay signed in options`;
 
-    case "landing":
+    case 'landing':
       return `This is a landing/home page. Focus on:
 - Navigation links working correctly
 - Hero section display
@@ -439,6 +447,6 @@ function getPageTypeGuidance(pageType: PageType): string {
 - Content loading`;
 
     default:
-      return "";
+      return '';
   }
 }
