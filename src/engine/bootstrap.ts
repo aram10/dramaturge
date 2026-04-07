@@ -24,6 +24,7 @@ interface WaitForBootstrapReadyDeps {
   sleep?: (ms: number) => Promise<unknown>;
   now?: () => number;
   requestTimeoutMs?: number;
+  newPage?: () => Promise<StagehandPage>;
 }
 
 function createBootstrapStatus(processRef?: ChildProcess, command?: string): BootstrapStatus {
@@ -132,14 +133,14 @@ async function isReadyUrlReachable(
 }
 
 async function hasReadyIndicator(
-  page: StagehandPage,
+  newPage: () => Promise<StagehandPage>,
   pageUrl: string,
   selector: string
 ): Promise<boolean> {
   let readinessPage: StagehandPage | undefined;
 
   try {
-    readinessPage = await page.context().newPage();
+    readinessPage = await newPage();
     await readinessPage.goto(pageUrl);
     const found = await readinessPage.evaluate(
       `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
@@ -176,6 +177,15 @@ export async function waitForBootstrapReady(
   const sleep = deps.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const now = deps.now ?? (() => Date.now());
   const requestTimeoutMs = deps.requestTimeoutMs ?? DEFAULT_READY_REQUEST_TIMEOUT_MS;
+  const newPage = deps.newPage;
+  const checkReadyIndicator =
+    readyIndicator && newPage
+      ? () => hasReadyIndicator(newPage, readyIndicatorUrl, readyIndicator)
+      : undefined;
+
+  if (readyIndicator && !checkReadyIndicator) {
+    throw new Error('Bootstrap readyIndicator checks require an isolated page factory.');
+  }
 
   const deadline = now() + config.bootstrap.timeoutSeconds * 1000;
   while (now() < deadline) {
@@ -186,8 +196,7 @@ export async function waitForBootstrapReady(
     const urlReady =
       !config.bootstrap.readyUrl ||
       (await isReadyUrlReachable(readyUrl, fetchImpl, requestTimeoutMs));
-    const indicatorReady =
-      !readyIndicator || (await hasReadyIndicator(page, readyIndicatorUrl, readyIndicator));
+    const indicatorReady = !checkReadyIndicator || (await checkReadyIndicator());
 
     if (urlReady && indicatorReady) {
       console.log('Bootstrap target is ready.');
