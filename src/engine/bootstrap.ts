@@ -86,7 +86,8 @@ function formatBootstrapFailure(summary: string, status?: BootstrapStatus): stri
 
 export function startBootstrapProcess(
   config: DramaturgeConfig,
-  spawnImpl: SpawnLike = spawn
+  spawnImpl: SpawnLike = spawn,
+  platform = process.platform
 ): BootstrapStatus | undefined {
   const command = config.bootstrap?.command;
   if (!command) {
@@ -96,7 +97,7 @@ export function startBootstrapProcess(
   console.log(`Starting bootstrap command: ${command}`);
   const processRef = spawnImpl(command, {
     cwd: config.bootstrap?.cwd,
-    detached: process.platform !== 'win32',
+    detached: platform !== 'win32',
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });

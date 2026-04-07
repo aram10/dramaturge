@@ -164,18 +164,42 @@ describe('bootstrap supervision', () => {
           cwd: '/tmp/app',
         },
       } as any,
-      spawnImpl as any
+      spawnImpl as any,
+      'linux'
     );
 
     expect(spawnImpl).toHaveBeenCalledWith('pnpm dev', {
       cwd: '/tmp/app',
-      detached: process.platform !== 'win32',
+      detached: true,
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   });
 
-  it('uses taskkill on Windows and terminates the process group on Unix during cleanup', () => {
+  it('does not detach bootstrap commands on Windows', () => {
+    const processRef = createMockProcess();
+    const spawnImpl = vi.fn().mockReturnValue(processRef);
+
+    startBootstrapProcess(
+      {
+        bootstrap: {
+          command: 'pnpm dev',
+          cwd: 'C:/tmp/app',
+        },
+      } as any,
+      spawnImpl as any,
+      'win32'
+    );
+
+    expect(spawnImpl).toHaveBeenCalledWith('pnpm dev', {
+      cwd: 'C:/tmp/app',
+      detached: false,
+      shell: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  });
+
+  it('uses taskkill on Windows during cleanup without attempting a process-group kill', () => {
     const processRef = createMockProcess();
     const spawnImpl = vi.fn();
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
@@ -184,8 +208,17 @@ describe('bootstrap supervision', () => {
     expect(spawnImpl).toHaveBeenCalledWith('taskkill', ['/pid', '4321', '/t', '/f'], {
       stdio: 'ignore',
     });
+    expect(killSpy).not.toHaveBeenCalled();
+    expect(processRef.kill).not.toHaveBeenCalled();
 
-    stopBootstrapProcess({ process: processRef } as any, spawnImpl as any, 'linux');
+    killSpy.mockRestore();
+  });
+
+  it('terminates the process group on Unix during cleanup', () => {
+    const processRef = createMockProcess();
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+    stopBootstrapProcess({ process: processRef } as any, vi.fn() as any, 'linux');
     expect(killSpy).toHaveBeenCalledWith(-4321, 'SIGTERM');
     expect(processRef.kill).not.toHaveBeenCalled();
 
