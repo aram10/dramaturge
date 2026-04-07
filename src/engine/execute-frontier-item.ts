@@ -8,6 +8,7 @@ import { runAccessibilityScan } from "../coverage/accessibility.js";
 import { runVisualRegressionScan } from "../coverage/visual-regression.js";
 import { collectWebVitals, evaluateWebVitals } from "../coverage/web-vitals.js";
 import { runMultiViewportVisualRegression } from "../coverage/responsive-regression.js";
+import { analyzeScreenshot } from "../coverage/vision-analysis.js";
 import { buildApiContractArtifacts } from "../api/contract-oracle.js";
 import { summarizeContractIndex } from "../spec/contract-index.js";
 
@@ -140,6 +141,30 @@ export async function executeFrontierItem(
     }
   }
 
+  let visionContext: string | undefined;
+  if (ctx.config.visionAnalysis.enabled && typeof (page as any)?.screenshot === "function") {
+    try {
+      const visionResult = await analyzeScreenshot(page as any, {
+        areaName: node.title ?? node.id,
+        route: node.url ?? ctx.config.targetUrl,
+        pageType: node.pageType,
+        model: ctx.config.visionAnalysis.model,
+        fullPage: ctx.config.visionAnalysis.fullPage,
+        maxResponseTokens: ctx.config.visionAnalysis.maxResponseTokens,
+        requestTimeoutMs: ctx.config.visionAnalysis.requestTimeoutMs,
+      });
+      preflightFindings.push(...visionResult.findings);
+      preflightEvidence.push(...visionResult.evidence);
+      if (visionResult.pageDescription) {
+        visionContext = visionResult.pageDescription;
+      }
+    } catch (err) {
+      console.warn(
+        `Vision analysis failed for "${node.title ?? node.id}": ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
   const result = await executeWorkerTask(
     stagehand,
     {
@@ -163,7 +188,8 @@ export async function executeFrontierItem(
     ctx.mission,
     history,
     ctx.config.adversarial,
-    ctx.config.judge
+    ctx.config.judge,
+    visionContext
   );
 
   const apiContract = buildApiContractArtifacts({

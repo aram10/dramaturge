@@ -6,6 +6,7 @@ import { runAccessibilityScan } from "../coverage/accessibility.js";
 import { runVisualRegressionScan } from "../coverage/visual-regression.js";
 import { collectWebVitals, evaluateWebVitals } from "../coverage/web-vitals.js";
 import { runMultiViewportVisualRegression } from "../coverage/responsive-regression.js";
+import { analyzeScreenshot } from "../coverage/vision-analysis.js";
 import { SafetyGuard } from "../policy/safety-guard.js";
 
 vi.mock("../worker/worker.js", () => ({
@@ -49,6 +50,14 @@ vi.mock("../coverage/responsive-regression.js", () => ({
   }),
 }));
 
+vi.mock("../coverage/vision-analysis.js", () => ({
+  analyzeScreenshot: vi.fn().mockResolvedValue({
+    findings: [],
+    evidence: [],
+    pageDescription: "",
+  }),
+}));
+
 describe("executeFrontierItem", () => {
   beforeEach(() => {
     vi.mocked(executeWorkerTask).mockReset();
@@ -58,6 +67,7 @@ describe("executeFrontierItem", () => {
     vi.mocked(collectWebVitals).mockReset();
     vi.mocked(evaluateWebVitals).mockReset();
     vi.mocked(runMultiViewportVisualRegression).mockReset();
+    vi.mocked(analyzeScreenshot).mockReset();
     vi.mocked(runAccessibilityScan).mockResolvedValue({
       findings: [],
       evidence: [],
@@ -78,6 +88,11 @@ describe("executeFrontierItem", () => {
     vi.mocked(runMultiViewportVisualRegression).mockResolvedValue({
       findings: [],
       evidence: [],
+    });
+    vi.mocked(analyzeScreenshot).mockResolvedValue({
+      findings: [],
+      evidence: [],
+      pageDescription: "",
     });
   });
 
@@ -137,6 +152,7 @@ describe("executeFrontierItem", () => {
         },
         webVitals: { enabled: false, thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 } },
         responsiveRegression: { enabled: false },
+        visionAnalysis: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 12,
@@ -258,6 +274,7 @@ describe("executeFrontierItem", () => {
         destructiveActionsAllowed: false,
         criticalFlows: ["knowledge-bases"],
       },
+      undefined,
       undefined,
       undefined,
       undefined
@@ -433,6 +450,7 @@ describe("executeFrontierItem", () => {
         },
         webVitals: { enabled: false, thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 } },
         responsiveRegression: { enabled: false },
+        visionAnalysis: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 5,
@@ -554,6 +572,7 @@ describe("executeFrontierItem", () => {
         responsiveRegression: {
           enabled: true,
         },
+        visionAnalysis: { enabled: false },
       },
       budget: {
         maxStepsPerTask: 5,
@@ -624,6 +643,165 @@ describe("executeFrontierItem", () => {
         route: "https://example.com/dashboard",
         fingerprintHash: "fp-dashboard",
       }),
+    );
+  });
+
+  it("runs vision analysis when enabled and merges findings into the result", async () => {
+    const visionFinding = {
+      ref: "fid-vision-1",
+      category: "Visual Glitch" as const,
+      severity: "Minor" as const,
+      title: "Overlapping labels on chart",
+      stepsToReproduce: ["Navigate to /dashboard"],
+      expected: "Labels should not overlap",
+      actual: "X-axis labels overlap at narrow widths",
+      evidenceIds: ["ev-vision-1"],
+    };
+    const visionEvidence = {
+      id: "ev-vision-1",
+      type: "vision-analysis" as const,
+      summary: "Vision analysis for Dashboard: 1 anomaly(ies) detected",
+      timestamp: new Date().toISOString(),
+      areaName: "Dashboard",
+      relatedFindingIds: ["fid-vision-1"],
+    };
+
+    vi.mocked(analyzeScreenshot).mockResolvedValue({
+      findings: [visionFinding],
+      evidence: [visionEvidence],
+      pageDescription: "A dashboard with sidebar and main content area.",
+    });
+
+    vi.mocked(executeWorkerTask).mockResolvedValue({
+      taskId: "task-vision",
+      findings: [
+        {
+          ref: "fid-worker-1",
+          category: "Bug" as const,
+          severity: "Major" as const,
+          title: "Button does not respond",
+          stepsToReproduce: ["Click the save button"],
+          expected: "Data should save",
+          actual: "Nothing happens",
+        },
+      ],
+      evidence: [],
+      coverageSnapshot: {
+        controlsDiscovered: 3,
+        controlsExercised: 2,
+        events: [],
+      },
+      followupRequests: [],
+      discoveredEdges: [],
+      outcome: "completed",
+      summary: "explored dashboard",
+    });
+
+    const ctx = {
+      config: {
+        targetUrl: "https://example.com",
+        appDescription: "Dashboard app",
+        models: {
+          planner: "anthropic/claude-sonnet-4-6",
+          worker: "anthropic/claude-haiku-4-5",
+          agentMode: "cua",
+        },
+        budget: {
+          stagnationThreshold: 3,
+        },
+        output: {
+          screenshots: true,
+        },
+        visualRegression: {
+          enabled: false,
+        },
+        webVitals: { enabled: false, thresholds: { lcpMs: 2500, cls: 0.1, inpMs: 200 } },
+        responsiveRegression: { enabled: false },
+        visionAnalysis: {
+          enabled: true,
+          model: "anthropic/claude-sonnet-4-20250514",
+          fullPage: false,
+          maxResponseTokens: 1024,
+          requestTimeoutMs: 30_000,
+        },
+      },
+      budget: {
+        maxStepsPerTask: 5,
+      },
+      screenshotDir: "C:/tmp/screenshots",
+      outputDir: "C:/tmp/output",
+      navigator: {
+        navigateTo: vi.fn().mockResolvedValue({ success: true }),
+      },
+      planner: {
+        recordDispatch: vi.fn(),
+      },
+      graph: {
+        getNode: vi.fn().mockReturnValue({
+          id: "node-dash",
+          title: "Dashboard",
+          pageType: "dashboard",
+          url: "https://example.com/dashboard",
+          fingerprint: { hash: "fp-dash" },
+          controlsDiscovered: [],
+          controlsExercised: [],
+        }),
+        recordVisit: vi.fn(),
+      },
+      trafficObserver: {
+        resetPage: vi.fn(),
+        snapshot: vi.fn().mockReturnValue([]),
+      },
+    } as any;
+
+    const page = {
+      evaluate: vi.fn(),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from("fake-png")),
+    } as any;
+
+    const result = await executeFrontierItem({
+      ctx,
+      stagehand: {} as any,
+      page,
+      item: {
+        id: "task-vision",
+        nodeId: "node-dash",
+        workerType: "navigation",
+        objective: "Inspect the dashboard",
+        priority: 0.8,
+        reason: "coverage",
+        retryCount: 0,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+      } as const,
+      taskNumber: 4,
+      pageKey: "page-vision",
+    });
+
+    // 1. analyzeScreenshot is called with the configured options
+    expect(analyzeScreenshot).toHaveBeenCalledWith(
+      page,
+      expect.objectContaining({
+        areaName: "Dashboard",
+        route: "https://example.com/dashboard",
+        pageType: "dashboard",
+        model: "anthropic/claude-sonnet-4-20250514",
+        fullPage: false,
+        maxResponseTokens: 1024,
+        requestTimeoutMs: 30_000,
+      }),
+    );
+
+    // 2. Vision findings/evidence are prepended into the final result
+    expect(result.result).not.toBeNull();
+    expect(result.result!.findings[0]).toEqual(visionFinding);
+    expect(result.result!.findings).toHaveLength(2);
+    expect(result.result!.evidence[0]).toEqual(visionEvidence);
+
+    // 3. executeWorkerTask receives the visionContext argument (last positional arg)
+    const workerCallArgs = vi.mocked(executeWorkerTask).mock.calls[0];
+    expect(workerCallArgs[workerCallArgs.length - 1]).toBe(
+      "A dashboard with sidebar and main content area.",
     );
   });
 

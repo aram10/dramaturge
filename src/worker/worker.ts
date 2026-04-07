@@ -59,6 +59,7 @@ function initWorker(
     workerType?: WorkerTask["workerType"];
     adversarialConfig?: AdversarialConfig;
     judgeConfig?: JudgeConfig;
+    visionContext?: string;
   }
 ): WorkerSetup {
   const observations: Observation[] = [];
@@ -104,7 +105,8 @@ function initWorker(
     opts.mission,
     opts.history,
     opts.workerType,
-    opts.adversarialConfig
+    opts.adversarialConfig,
+    opts.visionContext
   );
 
   const agent = stagehand.agent({
@@ -294,7 +296,8 @@ export async function executeWorkerTask(
   mission?: MissionConfig,
   history?: WorkerHistoryContext,
   adversarialConfig?: AdversarialConfig,
-  judgeConfig?: JudgeConfig
+  judgeConfig?: JudgeConfig,
+  visionContext?: string
 ): Promise<WorkerResult> {
   const {
     observations,
@@ -324,6 +327,7 @@ export async function executeWorkerTask(
     workerType: task.workerType,
     adversarialConfig,
     judgeConfig,
+    visionContext,
   });
 
   try {
