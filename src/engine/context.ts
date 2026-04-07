@@ -24,6 +24,9 @@ import type { ApiRequestContextLike } from "../api/types.js";
 import type { SafetyGuard } from "../policy/safety-guard.js";
 import type { EngineEventEmitter } from "./event-stream.js";
 import type { DiffContext } from "../diff/types.js";
+import type { Blackboard } from "../a2a/blackboard.js";
+import type { MessageBus } from "../a2a/message-bus.js";
+import type { Coordinator } from "../a2a/coordinator.js";
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -55,4 +58,8 @@ export interface EngineContext {
   createIsolatedApiRequestContext?: () => Promise<ApiRequestContextLike>;
   safetyGuard?: SafetyGuard;
   eventStream?: EngineEventEmitter;
+  /** Multi-agent coordination layer (A2A protocol). */
+  blackboard?: Blackboard;
+  messageBus?: MessageBus;
+  coordinator?: Coordinator;
 }
