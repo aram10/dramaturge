@@ -80,6 +80,13 @@ function stripJsonComments(input) {
   return output;
 }
 
+/**
+ * Parses a GitHub Actions boolean input string while supporting a fallback.
+ *
+ * @param {string | undefined | null} value
+ * @param {boolean} defaultValue
+ * @returns {boolean}
+ */
 export function parseBooleanInput(value, defaultValue) {
   if (value === undefined || value === null || value === '') {
     return defaultValue;
@@ -88,6 +95,18 @@ export function parseBooleanInput(value, defaultValue) {
   return value.toLowerCase() === 'true';
 }
 
+/**
+ * Applies the action's explicit inputs on top of the loaded user config.
+ *
+ * @param {Record<string, any>} config
+ * @param {{
+ *   targetUrl?: string,
+ *   reportDir?: string,
+ *   forceJsonOutput?: boolean,
+ *   forceHeadless?: boolean,
+ * }} [options]
+ * @returns {Record<string, any>}
+ */
 export function applyActionOverrides(
   config,
   { targetUrl = '', reportDir = '', forceJsonOutput = true, forceHeadless = true } = {}
@@ -123,6 +142,21 @@ export function applyActionOverrides(
   return nextConfig;
 }
 
+/**
+ * Loads a user config file, layers explicit action overrides, writes the
+ * temporary CI config file, and returns the generated paths.
+ *
+ * @param {{
+ *   configPath?: string,
+ *   targetUrl?: string,
+ *   reportDir?: string,
+ *   forceJsonOutput?: boolean,
+ *   forceHeadless?: boolean,
+ *   runnerTemp?: string,
+ *   githubOutput?: string,
+ * }} [options]
+ * @returns {{ config: Record<string, any>, configPath: string, reportDir: string }}
+ */
 export function prepareConfig({
   configPath = 'dramaturge.config.json',
   targetUrl = '',
