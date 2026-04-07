@@ -339,6 +339,36 @@ describe("applyA2AMessage", () => {
     expect(state.activity[0].text).toContain("all");
     expect(state.activity[0].text).not.toContain("*");
   });
+
+  it("increments messagesSent on an already-tracked sender agent", () => {
+    let state = applyA2ATask(initialDashboardState(), {
+      taskId: "a2a-1",
+      agentId: "agent-tester",
+      agentRole: "tester",
+      status: "working",
+      objective: "Test form",
+    }, 1000);
+
+    expect(state.agents["agent-tester"].messagesSent).toBe(0);
+
+    state = applyA2AMessage(state, {
+      fromAgent: "agent-tester",
+      toAgent: "agent-reviewer",
+      text: "Found issue",
+    }, 2000);
+
+    expect(state.agents["agent-tester"].messagesSent).toBe(1);
+  });
+
+  it("does not create agent entry for unknown sender", () => {
+    const state = applyA2AMessage(initialDashboardState(), {
+      fromAgent: "unknown-agent",
+      toAgent: "agent-reviewer",
+      text: "Hello",
+    });
+
+    expect(state.agents["unknown-agent"]).toBeUndefined();
+  });
 });
 
 describe("applyA2ABlackboard", () => {

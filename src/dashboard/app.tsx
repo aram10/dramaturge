@@ -3,7 +3,6 @@ import { Text, Box } from "ink";
 import type { EngineEventEmitter } from "../engine/event-stream.js";
 import type { Blackboard } from "../a2a/blackboard.js";
 import type { MessageBus } from "../a2a/message-bus.js";
-import type { Coordinator } from "../a2a/coordinator.js";
 import {
   type DashboardState,
   type AgentStatus,
@@ -235,7 +234,6 @@ export interface DashboardProps {
   eventStream: EngineEventEmitter;
   blackboard?: Blackboard;
   messageBus?: MessageBus;
-  coordinator?: Coordinator;
 }
 
 const ACTIVITY_LINES = 15;
