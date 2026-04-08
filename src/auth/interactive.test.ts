@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { BrowserSessionLike, StorageStatePage } from '../browser/page-interface.js';
 
 vi.mock('./success-indicator.js', () => ({
   parseIndicator: vi.fn((value: string) => value),
@@ -26,6 +27,8 @@ function createMockStagehand() {
       if (Array.isArray(items)) return undefined;
       return [{ name: 'theme', value: 'dark' }];
     }),
+    locator: vi.fn(),
+    url: vi.fn().mockReturnValue('https://example.com/app'),
   };
 
   const context = {
@@ -46,7 +49,7 @@ function createMockStagehand() {
   };
 
   return {
-    stagehand: { context },
+    browser: { context } satisfies BrowserSessionLike<StorageStatePage>,
     page,
   };
 }
@@ -92,17 +95,17 @@ describe('authenticateInteractive', () => {
       'utf-8'
     );
 
-    const { stagehand, page } = createMockStagehand();
+    const { browser, page } = createMockStagehand();
 
     await authenticateInteractive(
-      stagehand as any,
+      browser,
       'https://example.com/app',
       '/login',
       "selector:[data-testid='app-shell']",
       stateFile
     );
 
-    expect(stagehand.context.addCookies).toHaveBeenCalledWith([
+    expect(browser.context.addCookies).toHaveBeenCalledWith([
       {
         name: 'session',
         value: 'cached-cookie',
@@ -123,16 +126,23 @@ describe('authenticateInteractive', () => {
     expect(page.goto).toHaveBeenNthCalledWith(2, 'https://example.com/app', {
       waitUntil: 'domcontentloaded',
     });
-    expect(waitForSuccess).toHaveBeenCalledWith(page, "selector:[data-testid='app-shell']", 10_000);
+    expect(waitForSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goto: page.goto,
+        evaluate: page.evaluate,
+      }),
+      "selector:[data-testid='app-shell']",
+      10_000
+    );
   });
 
   it('persists full storage state after manual login', async () => {
     const dir = createTempDir();
     const stateFile = join(dir, 'nested', 'user.json');
-    const { stagehand, page } = createMockStagehand();
+    const { browser, page } = createMockStagehand();
 
     await authenticateInteractive(
-      stagehand as any,
+      browser,
       'https://example.com/app',
       '/login',
       "selector:[data-testid='app-shell']",
@@ -143,7 +153,14 @@ describe('authenticateInteractive', () => {
     expect(page.goto).toHaveBeenCalledWith('https://example.com/login', {
       waitUntil: 'domcontentloaded',
     });
-    expect(waitForSuccess).toHaveBeenCalledWith(page, "selector:[data-testid='app-shell']", 45_000);
+    expect(waitForSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goto: page.goto,
+        evaluate: page.evaluate,
+      }),
+      "selector:[data-testid='app-shell']",
+      45_000
+    );
 
     const saved = JSON.parse(readFileSync(stateFile, 'utf-8'));
     expect(saved).toEqual({

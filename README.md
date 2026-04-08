@@ -35,6 +35,12 @@ pnpm exec dramaturge-auth-state \
   --success-url https://your-app.example.com/
 ```
 
+## GitHub Action
+
+The composite GitHub Action reads your config file and only applies explicit action inputs as overrides. In addition to `target-url` and `report-dir`, the action exposes `force-json-output` and `force-headless` so CI-specific behavior is declared at the action boundary instead of being silently implied. Both default to `true`; set either input to `false` to preserve the corresponding `config.output.format` or `config.browser.headless` value from your config file.
+
+Leave `force-json-output` enabled when you rely on the action's machine-readable CI outputs. PR comments, severity/threshold enforcement, and parsed finding counts all depend on `report.json`, so a markdown-only run will skip those JSON-based steps.
+
 ## What It Does
 
 - explores apps with specialized `navigation`, `form`, `crud`, `api`, and `adversarial` workers

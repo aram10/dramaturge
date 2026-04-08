@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ActionRecorder } from './action-recorder.js';
+import { setInputRecordingPolicy } from './input-recording-policy.js';
 
 function createMockPage() {
   function createLocator(selector: string) {
@@ -8,6 +9,9 @@ function createMockPage() {
         return undefined;
       },
       async fill(_value: string) {
+        return undefined;
+      },
+      async type(_value: string) {
         return undefined;
       },
       async press(_key: string) {
@@ -49,7 +53,8 @@ function createMockPage() {
 describe('ActionRecorder', () => {
   it('records page navigation and common locator interactions', async () => {
     const page = createMockPage();
-    const recorder = new ActionRecorder(page as any);
+    setInputRecordingPolicy(page, "input[name='email']", 'safe');
+    const recorder = new ActionRecorder(page);
     recorder.start();
 
     await page.goto('https://example.com/login');
@@ -83,7 +88,7 @@ describe('ActionRecorder', () => {
 
   it('records chained locator queries with selector context', async () => {
     const page = createMockPage();
-    const recorder = new ActionRecorder(page as any);
+    const recorder = new ActionRecorder(page);
     recorder.start();
 
     await page.locator("[data-testid='dialog']").getByRole('button', { name: 'Save' }).click();
@@ -97,9 +102,9 @@ describe('ActionRecorder', () => {
     ]);
   });
 
-  it('records selectOption values as input actions', async () => {
+  it('records selectOption values as redacted input actions by default', async () => {
     const page = createMockPage();
-    const recorder = new ActionRecorder(page as any);
+    const recorder = new ActionRecorder(page);
     recorder.start();
 
     await page.locator("select[name='country']").selectOption('US');
@@ -108,15 +113,73 @@ describe('ActionRecorder', () => {
       expect.objectContaining({
         kind: 'input',
         selector: "select[name='country']",
-        value: 'US',
+        value: undefined,
+        redacted: true,
         status: 'worked',
       }),
     ]);
   });
 
+  it('redacts recorded input values by default', async () => {
+    const page = createMockPage();
+    const recorder = new ActionRecorder(page);
+    recorder.start();
+
+    await page.locator("input[name='email']").fill('user@example.com');
+
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({
+        kind: 'input',
+        selector: "input[name='email']",
+        value: undefined,
+        redacted: true,
+        status: 'worked',
+      }),
+    ]);
+    expect(JSON.stringify(recorder.getActions())).not.toContain('user@example.com');
+    expect(JSON.stringify(recorder.getActions())).not.toContain('[REDACTED]');
+  });
+
+  it('matches safe input policies even when configured selectors include surrounding whitespace', async () => {
+    const page = createMockPage();
+    setInputRecordingPolicy(page, "  input[name='email']  ", 'safe');
+    const recorder = new ActionRecorder(page);
+    recorder.start();
+
+    await page.locator("input[name='email']").fill('user@example.com');
+
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({
+        kind: 'input',
+        selector: "input[name='email']",
+        value: 'user@example.com',
+      }),
+    ]);
+  });
+
+  it('redacts input values for sensitive selectors before persisting them', async () => {
+    const page = createMockPage();
+    const recorder = new ActionRecorder(page);
+    recorder.start();
+
+    await page.getByRole('textbox', { name: 'Password' }).fill('super-secret-password');
+
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({
+        kind: 'input',
+        selector: 'role=textbox[name=Password]',
+        value: undefined,
+        redacted: true,
+        status: 'worked',
+      }),
+    ]);
+    expect(JSON.stringify(recorder.getActions())).not.toContain('super-secret-password');
+    expect(JSON.stringify(recorder.getActions())).not.toContain('[REDACTED]');
+  });
+
   it('stops recording for already wrapped locators after stop is called', async () => {
     const page = createMockPage();
-    const recorder = new ActionRecorder(page as any);
+    const recorder = new ActionRecorder(page);
     recorder.start();
 
     const saveButton = page.getByRole('button', { name: 'Save' });
@@ -149,5 +212,30 @@ describe('ActionRecorder', () => {
       'capture screenshot create-button',
       'submit save-button -> worked',
     ]);
+  });
+
+  it('redacts worker-tool input actions for sensitive labels at the recording boundary', () => {
+    const recorder = new ActionRecorder();
+    const placeholder = 'example-secret';
+
+    const action = recorder.recordToolAction({
+      kind: 'input',
+      selector: 'label=API token',
+      value: placeholder,
+      summary: 'input label=API token -> worked',
+      status: 'worked',
+    });
+
+    expect(action).toMatchObject({
+      kind: 'input',
+      selector: 'label=API token',
+      redacted: true,
+    });
+    expect(action.value).toBeUndefined();
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({ value: undefined, redacted: true }),
+    ]);
+    expect(JSON.stringify(recorder.getActions())).not.toContain(placeholder);
+    expect(JSON.stringify(recorder.getActions())).not.toContain('[REDACTED]');
   });
 });

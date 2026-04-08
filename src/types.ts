@@ -334,6 +334,7 @@ export interface ReplayableAction {
   selector?: string;
   url?: string;
   value?: string;
+  redacted?: boolean;
   key?: string;
 }
 

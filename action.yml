@@ -41,6 +41,22 @@ inputs:
     description: 'Directory for report output (overrides config value)'
     required: false
     default: ''
+  force-json-output:
+    description: >
+      When true, the action explicitly overrides config.output.format to ensure a
+      JSON report is available for parsing. A markdown-only config becomes both;
+      an unset format becomes json. Set to false to preserve the configured
+      output.format. Leave this enabled when you rely on finding-count,
+      max-severity, PR comments, or fail-on-severity enforcement.
+    required: false
+    default: 'true'
+  force-headless:
+    description: >
+      When true, the action explicitly overrides config.browser.headless to true
+      for the action run. Set to false to preserve the configured headless
+      value.
+    required: false
+    default: 'true'
   working-directory:
     description: 'Working directory for running Dramaturge'
     required: false
@@ -57,7 +73,7 @@ inputs:
 outputs:
   report-path:
     description: 'Path to the generated report directory'
-    value: ${{ steps.parse.outputs.report-path }}
+    value: ${{ steps.parse.outputs.report-path || steps.config.outputs.report-dir }}
   finding-count:
     description: 'Total number of findings'
     value: ${{ steps.parse.outputs.finding-count }}
@@ -93,6 +109,8 @@ runs:
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_TARGET_URL: ${{ inputs.target-url }}
         INPUT_REPORT_DIR: ${{ inputs.report-dir }}
+        INPUT_FORCE_JSON_OUTPUT: ${{ inputs.force-json-output }}
+        INPUT_FORCE_HEADLESS: ${{ inputs.force-headless }}
       run: node "${{ github.action_path }}/action/prepare-config.js"
 
     - name: Run Dramaturge
@@ -108,7 +126,7 @@ runs:
 
     - name: Parse results
       id: parse
-      if: always() && steps.config.outcome == 'success'
+      if: always() && steps.config.outcome == 'success' && steps.config.outputs.json-output-enabled == 'true'
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
@@ -117,14 +135,21 @@ runs:
           "${{ inputs.fail-on-severity }}"
 
     - name: Fail on Dramaturge error
-      if: always() && steps.run.outcome == 'failure' && steps.parse.outputs.finding-count == '0'
+      if: always() && steps.run.outcome == 'failure' && steps.config.outputs.json-output-enabled == 'true' && steps.parse.outputs.finding-count == '0'
+      shell: bash
+      run: |
+        echo "::error::Dramaturge failed to run. Check the 'Run Dramaturge' step for details."
+        exit 1
+
+    - name: Fail on Dramaturge error without JSON parsing
+      if: always() && steps.run.outcome == 'failure' && steps.config.outputs.json-output-enabled != 'true'
       shell: bash
       run: |
         echo "::error::Dramaturge failed to run. Check the 'Run Dramaturge' step for details."
         exit 1
 
     - name: Post PR comment
-      if: always() && inputs.post-comment == 'true' && github.event_name == 'pull_request' && steps.parse.outcome == 'success'
+      if: always() && inputs.post-comment == 'true' && github.event_name == 'pull_request' && steps.config.outputs.json-output-enabled == 'true' && steps.parse.outcome == 'success'
       uses: actions/github-script@v7
       with:
         script: |
@@ -171,15 +196,15 @@ runs:
           }
 
     - name: Upload report artifact
-      if: always() && inputs.upload-report == 'true' && steps.parse.outcome == 'success'
+      if: always() && inputs.upload-report == 'true' && steps.config.outcome == 'success'
       uses: actions/upload-artifact@v4
       with:
         name: dramaturge-report
-        path: ${{ steps.parse.outputs.report-path }}
+        path: ${{ steps.parse.outputs.report-path || steps.config.outputs.report-dir }}
         if-no-files-found: warn
 
     - name: Check severity threshold
-      if: always() && inputs.fail-on-severity != '' && steps.parse.outputs.threshold-exceeded == 'true'
+      if: always() && inputs.fail-on-severity != '' && steps.config.outputs.json-output-enabled == 'true' && steps.parse.outputs.threshold-exceeded == 'true'
       shell: bash
       run: |
         echo "::error::Dramaturge found findings at or above '${{ inputs.fail-on-severity }}' severity (max: ${{ steps.parse.outputs.max-severity }})"

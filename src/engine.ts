@@ -1,6 +1,5 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Stagehand } from '@browserbasehq/stagehand';
 import { request as playwrightRequest } from 'playwright';
 import type { LoadedDramaturgeConfig, DramaturgeConfig } from './config.js';
 import { resolveResumeDir } from './config-paths.js';
@@ -56,6 +55,7 @@ import {
   type BootstrapStatus,
 } from './engine/bootstrap.js';
 import { emitEngineEvent, type EngineEventEmitter } from './engine/event-stream.js';
+import { adaptStagehand } from './browser/page-interface.js';
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -278,7 +278,9 @@ export async function runEngine(
   trafficObserver.attach(stagehand.context.pages()[0], 'primary');
 
   bootstrapProcess = startBootstrapProcess(config);
-  await waitForBootstrapReady(config, stagehand.context.pages()[0]);
+  await waitForBootstrapReady(config, stagehand.context.pages()[0], bootstrapProcess, {
+    newPage: () => stagehand.context.newPage(),
+  });
 
   let workerPool: WorkerSession[] = [];
 
@@ -335,6 +337,11 @@ export async function runEngine(
   });
 
   try {
+    bootstrapProcess = startBootstrapProcess(config);
+    await waitForBootstrapReady(config, stagehand.context.pages()[0], bootstrapProcess, {
+      newPage: () => stagehand.context.newPage(),
+    });
+
     // Authenticate primary browser
     console.log(`\nAuthenticating (strategy: ${config.auth.type})...`);
     await authenticate(stagehand, config);
@@ -342,7 +349,10 @@ export async function runEngine(
     memoryStore?.rememberAuthFromConfig(config);
 
     if (concurrency > 1) {
-      const sharedWorkerState = await captureStorageState(stagehand, config.targetUrl);
+      const sharedWorkerState = await captureStorageState(
+        adaptStagehand(stagehand),
+        config.targetUrl
+      );
       workerPool = await initWorkerPool(
         config,
         concurrency - 1,
