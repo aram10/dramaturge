@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { loadConfig } from '../config.js';
 import {
   applyActionOverrides,
   isJsonOutputEnabled,
@@ -149,5 +150,117 @@ describe('prepare-config', () => {
 
     expect(result.jsonOutputEnabled).toBe(false);
     expect(result.reportDir).toBe(resolve(dir, './dramaturge-reports'));
+  });
+
+  it('preserves relative path semantics when loaded by loadConfig', () => {
+    const repoDir = createTempDir();
+    const configDir = join(repoDir, 'configs');
+    mkdirSync(configDir);
+
+    const configPath = join(configDir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          targetUrl: 'https://example.com/app',
+          appDescription: 'Test app',
+          auth: {
+            type: 'stored-state',
+            stateFile: './state/user.json',
+          },
+          output: {
+            dir: './reports',
+          },
+          memory: {
+            enabled: true,
+            dir: './.dramaturge',
+          },
+          visualRegression: {
+            enabled: true,
+            baselineDir: './baselines',
+          },
+          repoContext: {
+            root: '../app',
+            framework: 'nextjs',
+            hintsFile: './dramaturge.hints.jsonc',
+            specFile: './dramaturge.openapi.json',
+          },
+          bootstrap: {
+            command: 'pnpm dev',
+            cwd: '../app',
+          },
+        },
+        null,
+        2
+      )
+    );
+
+    const result = prepareConfig({ configPath });
+    const loaded = loadConfig(result.configPath);
+
+    expect(dirname(result.configPath)).toBe(configDir);
+    expect(result.reportDir).toBe(resolve(configDir, 'reports'));
+    expect(loaded.auth).toMatchObject({
+      type: 'stored-state',
+      stateFile: resolve(configDir, 'state/user.json'),
+    });
+    expect(loaded.output.dir).toBe(resolve(configDir, 'reports'));
+    expect(loaded.memory?.dir).toBe(resolve(configDir, '.dramaturge'));
+    expect(loaded.visualRegression?.baselineDir).toBe(resolve(configDir, 'baselines'));
+    expect(loaded.repoContext).toMatchObject({
+      root: resolve(repoDir, 'app'),
+      hintsFile: resolve(repoDir, 'app/dramaturge.hints.jsonc'),
+      specFile: resolve(repoDir, 'app/dramaturge.openapi.json'),
+    });
+    expect(loaded.bootstrap?.cwd).toBe(resolve(repoDir, 'app'));
+  });
+
+  it('returns an absolute report directory when a relative report-dir override is provided', () => {
+    const repoDir = createTempDir();
+    const configDir = join(repoDir, 'configs');
+    mkdirSync(configDir);
+
+    const configPath = join(configDir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        targetUrl: 'https://example.com/app',
+        appDescription: 'Test app',
+        auth: { type: 'none' },
+      })
+    );
+
+    const result = prepareConfig({
+      configPath,
+      reportDir: './ci-reports',
+    });
+    const loaded = loadConfig(result.configPath);
+
+    expect(result.reportDir).toBe(resolve(configDir, 'ci-reports'));
+    expect(loaded.output.dir).toBe(resolve(configDir, 'ci-reports'));
+  });
+
+  it('creates the config directory when no user config file exists yet', () => {
+    const repoDir = createTempDir();
+    const configPath = join(repoDir, 'missing', 'nested', 'dramaturge.config.json');
+
+    const result = prepareConfig({
+      configPath,
+      targetUrl: 'https://example.com/app',
+    });
+    const preparedConfig = JSON.parse(readFileSync(result.configPath, 'utf-8'));
+
+    expect(dirname(result.configPath)).toBe(resolve(repoDir, 'missing', 'nested'));
+    expect(existsSync(result.configPath)).toBe(true);
+    expect(result.reportDir).toBe(resolve(repoDir, 'missing', 'nested', 'dramaturge-reports'));
+    expect(preparedConfig).toMatchObject({
+      targetUrl: 'https://example.com/app',
+      output: {
+        format: 'json',
+      },
+      browser: {
+        headless: true,
+      },
+    });
   });
 });
