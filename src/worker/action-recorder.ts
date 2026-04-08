@@ -155,7 +155,13 @@ function sanitizeRecordedAction(
     return { value: undefined, redacted: true };
   }
 
-  if (kind === 'input' && value != null && selector && isSensitiveKey(selector)) {
+  if (
+    kind === 'input' &&
+    value !== undefined &&
+    value !== null &&
+    selector &&
+    isSensitiveKey(selector)
+  ) {
     return { value: undefined, redacted: true };
   }
 
