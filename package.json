@@ -103,7 +103,7 @@
   },
   "pnpm": {
     "overrides": {
-      "langsmith": "0.4.6"
+      "langsmith@<0.4.6": "0.4.6"
     }
   }
 }
