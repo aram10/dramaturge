@@ -15,9 +15,9 @@ Agentic exploratory QA engine: TypeScript 5.8, Node ≥ 20, ES modules, pnpm 9, 
 - Lint: `pnpm run lint`
 - Format: `pnpm run format:check`
 
-## Must Follow
-- Named exports only — no default exports
-- `.js` extension in all relative imports: `import { X } from './module.js'`
+## Must Follow (Dramaturge source — not `src/adaptation/fixtures/**`)
+- Named exports only — no default exports (fixtures use framework-native patterns)
+- `.js` extension in all relative imports (fixtures are exempt): `import { X } from './module.js'`
 - `import type` for type-only imports
 - Semicolons always, single quotes, 2-space indent, 100-char width
 - Trailing commas ES5 style

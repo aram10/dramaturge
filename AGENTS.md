@@ -24,8 +24,11 @@ Single test: `pnpm run test -- --run src/config.test.ts`
 ## Code Standards
 
 ### Must Follow
-- Named exports only — **never** use default exports
-- All relative imports use `.js` extension: `import { X } from './module.js'`
+
+These rules apply to Dramaturge source code and tests. Files under `src/adaptation/fixtures/**` are framework sample apps that intentionally use framework-native conventions (default exports, extensionless imports) — leave them as-is.
+
+- Named exports only — **never** use default exports (outside fixtures)
+- All relative imports use `.js` extension (outside fixtures): `import { X } from './module.js'`
 - Use `import type` for type-only imports
 - Semicolons always, single quotes, 2-space indent, 100-char line width
 - Trailing commas ES5 style
