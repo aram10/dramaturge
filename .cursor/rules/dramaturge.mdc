@@ -1,0 +1,39 @@
+---
+description: TypeScript code style and module conventions for Dramaturge
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: true
+---
+
+# Dramaturge — TypeScript Rules
+
+## Project
+Agentic exploratory QA engine: TypeScript 5.8, Node ≥ 20, ES modules, pnpm 9, Vitest 4, Playwright + Stagehand.
+
+## Commands
+- Build: `pnpm run build`
+- Test: `pnpm run test`
+- Lint: `pnpm run lint`
+- Format: `pnpm run format:check`
+
+## Must Follow
+- Named exports only — no default exports
+- `.js` extension in all relative imports: `import { X } from './module.js'`
+- `import type` for type-only imports
+- Semicolons always, single quotes, 2-space indent, 100-char width
+- Trailing commas ES5 style
+- `const` by default, no `var`, no `any`
+- Zod for config validation, discriminated unions for variant types
+- Options objects for 3+ parameter functions
+- Max 150 lines/function, complexity ≤ 20, depth ≤ 4, params ≤ 5
+- Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `perf:`, `ci:`
+
+## Testing
+- Co-located: `foo.test.ts` beside `foo.ts`
+- `vi.hoisted()` for mock factories, `vi.mock()` with `.js` paths
+- `vi.clearAllMocks()` in `beforeEach`
+- Factory helpers with `Partial<T>` overrides
+- Never remove existing tests
+
+## Error Handling
+- Permissive: catch errors, return structured outcomes, don't crash
+- Workers: `completed | blocked | timed-out | failed`
