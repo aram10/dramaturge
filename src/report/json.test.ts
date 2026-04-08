@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { REDACTED_VALUE } from '../redaction.js';
 import { ActionRecorder } from '../worker/action-recorder.js';
 import { renderJson } from './json.js';
 import type { AreaResult, RunResult } from '../types.js';
@@ -207,10 +206,12 @@ describe('renderJson', () => {
       expect.objectContaining({
         id: action.id,
         kind: 'input',
-        value: REDACTED_VALUE,
+        redacted: true,
         areaName: 'Login',
       }),
     ]);
+    expect(report.actions[0]).not.toHaveProperty('value');
     expect(JSON.stringify(report)).not.toContain(secret);
+    expect(JSON.stringify(report)).not.toContain('[REDACTED]');
   });
 });

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { REDACTED_VALUE } from '../redaction.js';
 import { ActionRecorder } from './action-recorder.js';
 
 function createMockPage() {
@@ -126,11 +125,13 @@ describe('ActionRecorder', () => {
       expect.objectContaining({
         kind: 'input',
         selector: 'role=textbox[name=Password]',
-        value: REDACTED_VALUE,
+        value: undefined,
+        redacted: true,
         status: 'worked',
       }),
     ]);
     expect(JSON.stringify(recorder.getActions())).not.toContain('super-secret-password');
+    expect(JSON.stringify(recorder.getActions())).not.toContain('[REDACTED]');
   });
 
   it('stops recording for already wrapped locators after stop is called', async () => {
@@ -172,17 +173,26 @@ describe('ActionRecorder', () => {
 
   it('redacts worker-tool input actions for sensitive labels at the recording boundary', () => {
     const recorder = new ActionRecorder();
+    const placeholder = 'example-secret';
 
     const action = recorder.recordToolAction({
       kind: 'input',
       selector: 'label=API token',
-      value: 'sk-live-secret',
+      value: placeholder,
       summary: 'input label=API token -> worked',
       status: 'worked',
     });
 
-    expect(action.value).toBe(REDACTED_VALUE);
-    expect(recorder.getActions()).toEqual([expect.objectContaining({ value: REDACTED_VALUE })]);
-    expect(JSON.stringify(recorder.getActions())).not.toContain('sk-live-secret');
+    expect(action).toMatchObject({
+      kind: 'input',
+      selector: 'label=API token',
+      redacted: true,
+    });
+    expect(action.value).toBeUndefined();
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({ value: undefined, redacted: true }),
+    ]);
+    expect(JSON.stringify(recorder.getActions())).not.toContain(placeholder);
+    expect(JSON.stringify(recorder.getActions())).not.toContain('[REDACTED]');
   });
 });

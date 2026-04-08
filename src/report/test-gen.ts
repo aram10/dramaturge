@@ -37,6 +37,9 @@ function renderAction(action: ReplayableAction): string | null {
       if (!action.selector) {
         return `// ${action.summary}`;
       }
+      if (action.redacted) {
+        return `// ${action.summary} (redacted value omitted)`;
+      }
       if (action.value != null) {
         return `await page.locator(${escapeString(action.selector)}).fill(${escapeString(action.value)});`;
       }
