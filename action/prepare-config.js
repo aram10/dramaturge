@@ -12,12 +12,11 @@
  *   INPUT_REPORT_DIR  – report directory override
  *   INPUT_FORCE_JSON_OUTPUT – whether to ensure JSON output is enabled
  *   INPUT_FORCE_HEADLESS – whether to force browser.headless=true
- *   RUNNER_TEMP       – GitHub Actions runner temp directory
  *   GITHUB_OUTPUT     – GitHub Actions output file
  */
 
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -88,11 +87,16 @@ function stripJsonComments(input) {
  * @returns {boolean}
  */
 export function parseBooleanInput(value, defaultValue) {
-  if (value === undefined || value === null || value === '') {
+  if (value === undefined || value === null) {
     return defaultValue;
   }
 
-  return value.toLowerCase() === 'true';
+  const normalizedValue = value.trim();
+  if (normalizedValue === '') {
+    return defaultValue;
+  }
+
+  return normalizedValue.toLowerCase() === 'true';
 }
 
 /**
@@ -143,6 +147,17 @@ export function applyActionOverrides(
 }
 
 /**
+ * Returns whether the prepared config will emit a JSON report.
+ *
+ * @param {Record<string, any>} config
+ * @returns {boolean}
+ */
+export function isJsonOutputEnabled(config) {
+  const format = config.output?.format;
+  return format === 'json' || format === 'both';
+}
+
+/**
  * Loads a user config file, layers explicit action overrides, writes the
  * temporary CI config file, and returns the generated paths.
  *
@@ -152,10 +167,14 @@ export function applyActionOverrides(
  *   reportDir?: string,
  *   forceJsonOutput?: boolean,
  *   forceHeadless?: boolean,
- *   runnerTemp?: string,
  *   githubOutput?: string,
  * }} [options]
- * @returns {{ config: Record<string, any>, configPath: string, reportDir: string }}
+ * @returns {{
+ *   config: Record<string, any>,
+ *   configPath: string,
+ *   reportDir: string,
+ *   jsonOutputEnabled: boolean,
+ * }}
  */
 export function prepareConfig({
   configPath = 'dramaturge.config.json',
@@ -163,7 +182,6 @@ export function prepareConfig({
   reportDir = '',
   forceJsonOutput = true,
   forceHeadless = true,
-  runnerTemp = '/tmp',
   githubOutput = '',
 } = {}) {
   let config = {};
@@ -179,20 +197,25 @@ export function prepareConfig({
     forceHeadless,
   });
 
-  const tmpConfig = join(runnerTemp, `dramaturge-ci-config-${process.pid}.json`);
+  const resolvedConfigPath = resolve(configPath);
+  const configDir = dirname(resolvedConfigPath);
+  const tmpConfig = join(configDir, `dramaturge-ci-config-${process.pid}.json`);
   writeFileSync(tmpConfig, JSON.stringify(preparedConfig, null, 2));
 
-  const effectiveReportDir = preparedConfig.output?.dir || './dramaturge-reports';
+  const effectiveReportDir = resolve(configDir, preparedConfig.output?.dir || './dramaturge-reports');
+  const jsonOutputEnabled = isJsonOutputEnabled(preparedConfig);
 
   if (githubOutput) {
     appendFileSync(githubOutput, `config-path=${tmpConfig}\n`);
     appendFileSync(githubOutput, `report-dir=${effectiveReportDir}\n`);
+    appendFileSync(githubOutput, `json-output-enabled=${String(jsonOutputEnabled)}\n`);
   }
 
   return {
     config: preparedConfig,
     configPath: tmpConfig,
     reportDir: effectiveReportDir,
+    jsonOutputEnabled,
   };
 }
 
@@ -203,7 +226,6 @@ function main() {
     reportDir: process.env.INPUT_REPORT_DIR || '',
     forceJsonOutput: parseBooleanInput(process.env.INPUT_FORCE_JSON_OUTPUT, true),
     forceHeadless: parseBooleanInput(process.env.INPUT_FORCE_HEADLESS, true),
-    runnerTemp: process.env.RUNNER_TEMP || '/tmp',
     githubOutput: process.env.GITHUB_OUTPUT || '',
   });
 

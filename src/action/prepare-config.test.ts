@@ -1,9 +1,10 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyActionOverrides,
+  isJsonOutputEnabled,
   parseBooleanInput,
   prepareConfig,
 } from '../../action/prepare-config.js';
@@ -36,6 +37,12 @@ describe('prepare-config', () => {
       expect(parseBooleanInput('true', false)).toBe(true);
       expect(parseBooleanInput('TRUE', false)).toBe(true);
       expect(parseBooleanInput('false', true)).toBe(false);
+    });
+
+    it('trims surrounding whitespace before parsing', () => {
+      expect(parseBooleanInput(' true\n', false)).toBe(true);
+      expect(parseBooleanInput('  ', true)).toBe(true);
+      expect(parseBooleanInput(' false ', true)).toBe(false);
     });
   });
 
@@ -81,9 +88,22 @@ describe('prepare-config', () => {
     });
   });
 
-  it('writes a temporary config file and supports JSONC comments', () => {
+  describe('isJsonOutputEnabled', () => {
+    it('returns true for json and both formats', () => {
+      expect(isJsonOutputEnabled({ output: { format: 'json' } })).toBe(true);
+      expect(isJsonOutputEnabled({ output: { format: 'both' } })).toBe(true);
+    });
+
+    it('returns false for markdown-only output', () => {
+      expect(isJsonOutputEnabled({ output: { format: 'markdown' } })).toBe(false);
+    });
+  });
+
+  it('writes the temporary config beside the source config and resolves the report dir', () => {
     const dir = createTempDir();
-    const configPath = join(dir, 'dramaturge.config.json');
+    const configDir = join(dir, 'configs');
+    const configPath = join(configDir, 'dramaturge.config.json');
+    mkdirSync(configDir, { recursive: true });
 
     writeFileSync(
       configPath,
@@ -98,12 +118,36 @@ describe('prepare-config', () => {
     const result = prepareConfig({
       configPath,
       reportDir: './ci-reports',
-      runnerTemp: dir,
     });
 
     const written = JSON.parse(readFileSync(result.configPath, 'utf-8'));
     expect(written.output).toEqual({ format: 'both', dir: './ci-reports' });
     expect(written.browser).toEqual({ headless: true });
-    expect(result.reportDir).toBe('./ci-reports');
+    expect(result.configPath).toBe(
+      join(dirname(resolve(configPath)), `dramaturge-ci-config-${process.pid}.json`)
+    );
+    expect(result.reportDir).toBe(resolve(configDir, './ci-reports'));
+    expect(result.jsonOutputEnabled).toBe(true);
+  });
+
+  it('reports when JSON output remains disabled', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+
+    writeFileSync(
+      configPath,
+      `{
+        "output": { "format": "markdown" }
+      }`,
+      'utf-8'
+    );
+
+    const result = prepareConfig({
+      configPath,
+      forceJsonOutput: false,
+    });
+
+    expect(result.jsonOutputEnabled).toBe(false);
+    expect(result.reportDir).toBe(resolve(dir, './dramaturge-reports'));
   });
 });
