@@ -333,7 +333,9 @@ export async function runEngine(
 
   try {
     bootstrapProcess = startBootstrapProcess(config);
-    await waitForBootstrapReady(config, stagehand.context.pages()[0], bootstrapProcess);
+    await waitForBootstrapReady(config, stagehand.context.pages()[0], bootstrapProcess, {
+      newPage: () => stagehand.context.newPage(),
+    });
 
     // Authenticate primary browser
     console.log(`\nAuthenticating (strategy: ${config.auth.type})...`);
