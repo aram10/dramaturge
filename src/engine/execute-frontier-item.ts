@@ -1,6 +1,7 @@
 import type { Stagehand } from '@browserbasehq/stagehand';
 import { resolveAgentMode, resolveWorkerModel } from '../config.js';
 import type { Evidence, FrontierItem, RawFinding, WorkerResult } from '../types.js';
+import { hasEvaluate, hasRequestContext, hasScreenshot } from '../browser/page-interface.js';
 import type { EngineContext } from './context.js';
 import { executeApiWorkerTask } from '../api/worker.js';
 import { executeWorkerTask } from '../worker/worker.js';
@@ -61,6 +62,9 @@ export async function executeFrontierItem(
   const observedApiEndpoints = ctx.trafficObserver?.snapshot(pageKey) ?? [];
 
   if (item.workerType === 'api') {
+    if (!hasRequestContext(page)) {
+      throw new Error('Browser page does not expose an authenticated request context.');
+    }
     const result = await executeApiWorkerTask({
       taskId: item.id,
       areaName: node.title ?? node.id,
@@ -68,7 +72,7 @@ export async function executeFrontierItem(
       targetUrl: ctx.config.targetUrl,
       observedEndpoints: observedApiEndpoints,
       contractIndex: ctx.contractIndex,
-      authenticatedRequestContext: (page as any).request,
+      authenticatedRequestContext: page.request,
       createIsolatedRequestContext: ctx.createIsolatedApiRequestContext,
       config: ctx.config.apiTesting,
     });
@@ -81,7 +85,7 @@ export async function executeFrontierItem(
   const preflightFindings: RawFinding[] = [];
   const preflightEvidence: Evidence[] = [];
 
-  if (typeof (page as any)?.evaluate === 'function') {
+  if (hasEvaluate(page)) {
     const accessibility = await runAccessibilityScan(
       page,
       node.title ?? node.id,
@@ -140,9 +144,9 @@ export async function executeFrontierItem(
   }
 
   let visionContext: string | undefined;
-  if (ctx.config.visionAnalysis.enabled && typeof (page as any)?.screenshot === 'function') {
+  if (ctx.config.visionAnalysis.enabled && hasScreenshot(page)) {
     try {
-      const visionResult = await analyzeScreenshot(page as any, {
+      const visionResult = await analyzeScreenshot(page, {
         areaName: node.title ?? node.id,
         route: node.url ?? ctx.config.targetUrl,
         pageType: node.pageType,
