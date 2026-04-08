@@ -278,7 +278,7 @@ export async function runEngine(
   trafficObserver.attach(stagehand.context.pages()[0], 'primary');
 
   bootstrapProcess = startBootstrapProcess(config);
-  await waitForBootstrapReady(config, stagehand.context.pages()[0], undefined, {
+  await waitForBootstrapReady(config, stagehand.context.pages()[0], bootstrapProcess, {
     newPage: () => stagehand.context.newPage(),
   });
 

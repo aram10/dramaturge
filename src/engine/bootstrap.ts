@@ -135,13 +135,17 @@ async function isReadyUrlReachable(
 async function hasReadyIndicator(
   newPage: () => Promise<StagehandPage>,
   pageUrl: string,
-  selector: string
+  selector: string,
+  navigationTimeoutMs: number
 ): Promise<boolean> {
   let readinessPage: StagehandPage | undefined;
 
   try {
     readinessPage = await newPage();
-    await readinessPage.goto(pageUrl);
+    await readinessPage.goto(pageUrl, {
+      waitUntil: 'domcontentloaded',
+      timeoutMs: navigationTimeoutMs,
+    });
     const found = await readinessPage.evaluate(
       `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
     );
@@ -155,7 +159,7 @@ async function hasReadyIndicator(
 
 export async function waitForBootstrapReady(
   config: DramaturgeConfig,
-  page: StagehandPage,
+  _page: StagehandPage,
   status?: BootstrapStatus,
   deps: WaitForBootstrapReadyDeps = {}
 ): Promise<void> {
@@ -178,12 +182,8 @@ export async function waitForBootstrapReady(
   const now = deps.now ?? (() => Date.now());
   const requestTimeoutMs = deps.requestTimeoutMs ?? DEFAULT_READY_REQUEST_TIMEOUT_MS;
   const newPage = deps.newPage;
-  const checkReadyIndicator =
-    readyIndicator && newPage
-      ? () => hasReadyIndicator(newPage, readyIndicatorUrl, readyIndicator)
-      : undefined;
 
-  if (readyIndicator && !checkReadyIndicator) {
+  if (readyIndicator && !newPage) {
     throw new Error('Bootstrap readyIndicator checks require a newPage factory in dependencies.');
   }
 
@@ -195,8 +195,20 @@ export async function waitForBootstrapReady(
 
     const urlReady =
       !config.bootstrap.readyUrl ||
-      (await isReadyUrlReachable(readyUrl, fetchImpl, requestTimeoutMs));
-    const indicatorReady = !checkReadyIndicator || (await checkReadyIndicator());
+      (await isReadyUrlReachable(
+        readyUrl,
+        fetchImpl,
+        Math.max(1, Math.min(requestTimeoutMs, deadline - now()))
+      ));
+    const indicatorReady =
+      !readyIndicator ||
+      !newPage ||
+      (await hasReadyIndicator(
+        newPage,
+        readyIndicatorUrl,
+        readyIndicator,
+        Math.max(1, Math.min(requestTimeoutMs, deadline - now()))
+      ));
 
     if (urlReady && indicatorReady) {
       console.log('Bootstrap target is ready.');
