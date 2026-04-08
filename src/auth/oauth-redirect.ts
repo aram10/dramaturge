@@ -1,4 +1,5 @@
 import type { OAuthRedirectStep } from '../config.js';
+import { setInputRecordingPolicy } from '../worker/input-recording-policy.js';
 import {
   adaptDeterministicAuthPage,
   getPrimaryPage,
@@ -14,7 +15,8 @@ export async function authenticateOAuthRedirect(
   steps: OAuthRedirectStep[],
   successIndicator: string
 ): Promise<void> {
-  const page = adaptDeterministicAuthPage(getPrimaryPage(browser, 'OAuth redirect authentication'));
+  const primaryPage = getPrimaryPage(browser, 'OAuth redirect authentication');
+  const page = adaptDeterministicAuthPage(primaryPage);
   const fullLoginUrl = new URL(loginUrl, targetUrl).href;
 
   await page.goto(fullLoginUrl);
@@ -25,6 +27,11 @@ export async function authenticateOAuthRedirect(
         await page.click(step.selector);
         break;
       case 'fill':
+        setInputRecordingPolicy(
+          primaryPage as object,
+          step.selector,
+          step.secret ? 'secret' : 'safe'
+        );
         await page.fill(step.selector, step.value);
         break;
       case 'wait-for-selector':

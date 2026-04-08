@@ -1,4 +1,5 @@
 import type { FormAuthField, FormAuthSubmit } from '../config.js';
+import { setInputRecordingPolicy } from '../worker/input-recording-policy.js';
 import {
   adaptDeterministicAuthPage,
   getPrimaryPage,
@@ -15,12 +16,18 @@ export async function authenticateForm(
   submit: FormAuthSubmit,
   successIndicator: string
 ): Promise<void> {
-  const page = adaptDeterministicAuthPage(getPrimaryPage(browser, 'form authentication'));
+  const primaryPage = getPrimaryPage(browser, 'form authentication');
+  const page = adaptDeterministicAuthPage(primaryPage);
   const fullLoginUrl = new URL(loginUrl, targetUrl).href;
 
   await page.goto(fullLoginUrl);
 
   for (const field of fields) {
+    setInputRecordingPolicy(
+      primaryPage as object,
+      field.selector,
+      field.secret ? 'secret' : 'safe'
+    );
     await page.fill(field.selector, field.value);
   }
 

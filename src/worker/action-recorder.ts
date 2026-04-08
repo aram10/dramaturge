@@ -8,6 +8,7 @@ import type {
   ReplayableActionKind,
   ReplayableActionStatus,
 } from '../types.js';
+import { getInputRecordingPolicy } from './input-recording-policy.js';
 
 type QueryMethod =
   | 'locator'
@@ -147,9 +148,20 @@ function normalizeActionValue(value: unknown): string | undefined {
 function sanitizeRecordedAction(
   kind: ReplayableActionKind,
   selector: string | undefined,
-  value: string | undefined
+  value: string | undefined,
+  redacted?: boolean
 ): Pick<ReplayableAction, 'value' | 'redacted'> {
-  if (kind === 'input' && value != null && selector && isSensitiveKey(selector)) {
+  if (redacted) {
+    return { value: undefined, redacted: true };
+  }
+
+  if (
+    kind === 'input' &&
+    value !== undefined &&
+    value !== null &&
+    selector &&
+    isSensitiveKey(selector)
+  ) {
     return { value: undefined, redacted: true };
   }
 
@@ -267,7 +279,12 @@ export class ActionRecorder {
   }
 
   private recordAction(action: Omit<ReplayableAction, 'id' | 'timestamp'>): ReplayableAction {
-    const sanitized = sanitizeRecordedAction(action.kind, action.selector, action.value);
+    const sanitized = sanitizeRecordedAction(
+      action.kind,
+      action.selector,
+      action.value,
+      action.redacted
+    );
     const recorded: ReplayableAction = {
       id: `act-${shortId()}`,
       timestamp: new Date().toISOString(),
@@ -276,6 +293,23 @@ export class ActionRecorder {
     };
     this.actions.push(recorded);
     return recorded;
+  }
+
+  private getRecordedInput(
+    selector: string,
+    value: unknown
+  ): Pick<ReplayableAction, 'value' | 'redacted'> {
+    const normalized = normalizeActionValue(value);
+    if (normalized == null) {
+      return { value: undefined };
+    }
+
+    const policy = getInputRecordingPolicy(this.page as object | undefined, selector);
+    if (policy === 'safe') {
+      return { value: normalized };
+    }
+
+    return { value: undefined, redacted: true };
   }
 
   private patchPageNavigation(method: 'goto' | 'goBack' | 'goForward' | 'reload'): void {
@@ -335,10 +369,9 @@ export class ActionRecorder {
           this.recordToolAction({
             kind: mapActionMethodToKind(method),
             selector,
-            value:
-              method === 'fill' || method === 'type' || method === 'selectOption'
-                ? normalizeActionValue(args[1])
-                : undefined,
+            ...(method === 'fill' || method === 'type' || method === 'selectOption'
+              ? this.getRecordedInput(selector, args[1])
+              : {}),
             key: method === 'press' ? String(args[1] ?? '') : undefined,
             summary: summarizeAction(mapActionMethodToKind(method), selector, 'worked'),
             source: 'page',
@@ -418,10 +451,9 @@ export class ActionRecorder {
               this.recordToolAction({
                 kind,
                 selector: selectorHint,
-                value:
-                  prop === 'fill' || prop === 'type' || prop === 'selectOption'
-                    ? normalizeActionValue(args[0])
-                    : undefined,
+                ...(prop === 'fill' || prop === 'type' || prop === 'selectOption'
+                  ? this.getRecordedInput(selectorHint, args[0])
+                  : {}),
                 key: prop === 'press' ? String(args[0] ?? '') : undefined,
                 summary: summarizeAction(kind, selectorHint, 'worked'),
                 source: 'page',
