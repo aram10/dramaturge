@@ -142,6 +142,23 @@ describe('ActionRecorder', () => {
     ]);
   });
 
+  it('matches safe input policies even when configured selectors include surrounding whitespace', async () => {
+    const page = createMockPage();
+    setInputRecordingPolicy(page as any, "  input[name='email']  ", 'safe');
+    const recorder = new ActionRecorder(page as any);
+    recorder.start();
+
+    await page.locator("input[name='email']").fill('user@example.com');
+
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({
+        kind: 'input',
+        selector: "input[name='email']",
+        value: 'user@example.com',
+      }),
+    ]);
+  });
+
   it('stops recording for already wrapped locators after stop is called', async () => {
     const page = createMockPage();
     const recorder = new ActionRecorder(page as any);
