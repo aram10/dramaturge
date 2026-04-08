@@ -80,11 +80,13 @@ src/
 
 ## Code Conventions
 
-- **Named exports only** — no default exports anywhere
-- **ES module imports with `.js` extension**: `import { X } from './module.js'`
+These conventions apply to Dramaturge runtime/library code and tests. Files under `src/adaptation/fixtures/**` are framework sample apps that intentionally use framework-native patterns (default exports, aliased imports, extensionless imports) — do not "fix" those.
+
+- **Named exports only** — no default exports (outside fixtures)
+- **ES module imports with `.js` extension** (outside fixtures): `import { X } from './module.js'`
 - **`import type`** for type-only imports: `import type { Config } from './config.js'`
 - **Barrel files**: `src/index.ts` (public API), `src/a2a/index.ts`
-- **No path aliases** — all imports are relative
+- **No path aliases** (outside fixtures) — all imports are relative
 - **Discriminated unions** for polymorphic types (auth strategies, worker types, frontier status)
 - **Zod schemas** for all configuration validation
 - **Options objects** for functions with >2-3 parameters (e.g., `WorkerToolOptions`)
@@ -138,9 +140,9 @@ Do not edit `CHANGELOG.md` — it is auto-generated.
 
 ## Pitfalls
 
-- Never use default exports
+- Never use default exports in Dramaturge source (fixtures under `src/adaptation/fixtures/**` are exempt)
 - Never use `any` — use `unknown` and narrow, or define proper types
-- Always use `.js` extension in relative imports (TypeScript compiles to ESM)
+- Always use `.js` extension in relative imports outside fixtures (TypeScript compiles to ESM)
 - Do not add `console.log` for debugging — the codebase uses structured evidence/findings
 - Config files support JSONC (comments allowed) — use `parseJsoncObject()` from `src/utils/jsonc.js`
 - Stagehand operations are async and may timeout — always handle failures gracefully

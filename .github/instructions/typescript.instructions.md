@@ -5,9 +5,12 @@ applyTo: "**/*.ts,**/*.tsx"
 # TypeScript Conventions — Dramaturge
 
 ## Module System
-- ES modules with `.js` extension in all relative imports (TypeScript compiles to ESM)
+
+These rules apply to Dramaturge source code, not to framework sample apps under `src/adaptation/fixtures/**` which intentionally use framework-native conventions (default exports, extensionless imports).
+
+- ES modules with `.js` extension in all relative imports outside `src/adaptation/fixtures/**` (TypeScript compiles to ESM)
 - Use `import type { X }` for type-only imports — never mix value and type imports
-- Named exports only; no default exports
+- Named exports only; no default exports outside `src/adaptation/fixtures/**`
 
 ## Type Safety
 - Strict mode enabled; honor it — no `@ts-ignore` or `@ts-expect-error` without justification

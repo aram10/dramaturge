@@ -27,8 +27,10 @@ pnpm run format:check  # Prettier
 
 ## Coding Conventions
 
-- **Named exports only** — never use default exports
-- All relative imports must use `.js` extension: `import { Foo } from './foo.js'`
+These rules apply to Dramaturge source code and tests. Files under `src/adaptation/fixtures/**` are framework sample apps that intentionally use framework-native conventions (default exports, extensionless imports) — do not refactor those.
+
+- **Named exports only** — never use default exports (outside `src/adaptation/fixtures/**`)
+- All relative imports must use `.js` extension (outside fixtures): `import { Foo } from './foo.js'`
 - Use `import type { X }` for type-only imports
 - Semicolons always, single quotes, 2-space indent, 100-char print width
 - Trailing commas in ES5 positions
@@ -70,9 +72,9 @@ Append `!` for breaking changes. Do not edit CHANGELOG.md.
 
 ## What to Avoid
 
-- Default exports
+- Default exports (in Dramaturge source — `src/adaptation/fixtures/**` is exempt)
 - The `any` type
-- Missing `.js` in relative import paths
+- Missing `.js` in relative import paths (fixtures exempt)
 - `console.log` for debugging (use structured evidence/findings)
 - Editing `CHANGELOG.md`, `dist/`, or `pnpm-lock.yaml` directly
 - Removing or disabling existing tests
