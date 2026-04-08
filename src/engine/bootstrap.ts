@@ -1,13 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import type { Stagehand } from '@browserbasehq/stagehand';
 import type { DramaturgeConfig } from '../config.js';
 
 const BOOTSTRAP_LOG_LIMIT = 20;
 const DEFAULT_READY_REQUEST_TIMEOUT_MS = 5_000;
 
-type StagehandPage = {
-  goto(url: string): Promise<unknown>;
-  evaluate(script: string): Promise<unknown>;
-};
+type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 type SpawnLike = typeof spawn;
 
@@ -26,6 +24,7 @@ interface WaitForBootstrapReadyDeps {
   sleep?: (ms: number) => Promise<unknown>;
   now?: () => number;
   requestTimeoutMs?: number;
+  newPage?: () => Promise<StagehandPage>;
 }
 
 function createBootstrapStatus(processRef?: ChildProcess, command?: string): BootstrapStatus {
@@ -86,7 +85,8 @@ function formatBootstrapFailure(summary: string, status?: BootstrapStatus): stri
 
 export function startBootstrapProcess(
   config: DramaturgeConfig,
-  spawnImpl: SpawnLike = spawn
+  spawnImpl: SpawnLike = spawn,
+  platform: NodeJS.Platform = process.platform
 ): BootstrapStatus | undefined {
   const command = config.bootstrap?.command;
   if (!command) {
@@ -96,6 +96,7 @@ export function startBootstrapProcess(
   console.log(`Starting bootstrap command: ${command}`);
   const processRef = spawnImpl(command, {
     cwd: config.bootstrap?.cwd,
+    detached: platform !== 'win32',
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -134,24 +135,33 @@ async function isReadyUrlReachable(
 }
 
 async function hasReadyIndicator(
-  page: StagehandPage,
+  newPage: () => Promise<StagehandPage>,
   pageUrl: string,
-  selector: string
+  selector: string,
+  navigationTimeoutMs: number
 ): Promise<boolean> {
+  let readinessPage: StagehandPage | undefined;
+
   try {
-    await page.goto(pageUrl);
-    const found = await page.evaluate(
+    readinessPage = await newPage();
+    await readinessPage.goto(pageUrl, {
+      waitUntil: 'domcontentloaded',
+      timeoutMs: navigationTimeoutMs,
+    });
+    const found = await readinessPage.evaluate(
       `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
     );
     return found === true;
   } catch {
     return false;
+  } finally {
+    await readinessPage?.close().catch(() => undefined);
   }
 }
 
 export async function waitForBootstrapReady(
   config: DramaturgeConfig,
-  page: StagehandPage,
+  _page: StagehandPage,
   status?: BootstrapStatus,
   deps: WaitForBootstrapReadyDeps = {}
 ): Promise<void> {
@@ -173,6 +183,11 @@ export async function waitForBootstrapReady(
   const sleep = deps.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const now = deps.now ?? (() => Date.now());
   const requestTimeoutMs = deps.requestTimeoutMs ?? DEFAULT_READY_REQUEST_TIMEOUT_MS;
+  const newPage = deps.newPage;
+
+  if (readyIndicator && !newPage) {
+    throw new Error('Bootstrap readyIndicator checks require a newPage factory in dependencies.');
+  }
 
   const deadline = now() + config.bootstrap.timeoutSeconds * 1000;
   while (now() < deadline) {
@@ -182,9 +197,20 @@ export async function waitForBootstrapReady(
 
     const urlReady =
       !config.bootstrap.readyUrl ||
-      (await isReadyUrlReachable(readyUrl, fetchImpl, requestTimeoutMs));
+      (await isReadyUrlReachable(
+        readyUrl,
+        fetchImpl,
+        Math.max(1, Math.min(requestTimeoutMs, deadline - now()))
+      ));
     const indicatorReady =
-      !readyIndicator || (await hasReadyIndicator(page, readyIndicatorUrl, readyIndicator));
+      !readyIndicator ||
+      !newPage ||
+      (await hasReadyIndicator(
+        newPage,
+        readyIndicatorUrl,
+        readyIndicator,
+        Math.max(1, Math.min(requestTimeoutMs, deadline - now()))
+      ));
 
     if (urlReady && indicatorReady) {
       console.log('Bootstrap target is ready.');
@@ -205,18 +231,33 @@ export async function waitForBootstrapReady(
 export function stopBootstrapProcess(
   status?: BootstrapStatus,
   spawnImpl: SpawnLike = spawn,
-  platform = process.platform
+  platform: NodeJS.Platform = process.platform
 ): void {
+  if (status?.exited) {
+    return;
+  }
+
   const processRef = status?.process;
   if (!processRef?.pid) {
     return;
   }
 
-  if (platform === 'win32') {
+  const isWindows = platform === 'win32';
+  if (isWindows) {
     spawnImpl('taskkill', ['/pid', String(processRef.pid), '/t', '/f'], {
       stdio: 'ignore',
     });
     return;
+  }
+
+  try {
+    process.kill(-processRef.pid, 'SIGTERM');
+    return;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code !== 'ESRCH' && code !== 'EINVAL') {
+      throw error;
+    }
   }
 
   processRef.kill?.('SIGTERM');
