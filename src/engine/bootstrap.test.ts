@@ -120,11 +120,17 @@ describe('bootstrap supervision', () => {
     ).rejects.toThrow(/did not become ready within 1s/);
   });
 
-  it('checks DOM readiness on the app target page even when a health endpoint is configured', async () => {
+  it('checks DOM readiness on an isolated page even when a health endpoint is configured', async () => {
     let nowMs = 0;
-    const page = {
+    const readinessPage = {
       goto: vi.fn().mockResolvedValue(undefined),
       evaluate: vi.fn().mockResolvedValue(false),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    const newPage = vi.fn().mockResolvedValue(readinessPage);
+    const page = {
+      goto: vi.fn(),
+      evaluate: vi.fn(),
     };
 
     await expect(
@@ -141,6 +147,7 @@ describe('bootstrap supervision', () => {
         undefined,
         {
           fetchImpl: vi.fn().mockResolvedValue(createResponse(200, true)) as any,
+          newPage,
           sleep: async () => {
             nowMs += 1000;
           },
@@ -149,8 +156,15 @@ describe('bootstrap supervision', () => {
       )
     ).rejects.toThrow(/did not become ready within 1s/);
 
-    expect(page.goto).toHaveBeenCalledWith('https://example.com');
-    expect(page.evaluate).toHaveBeenCalled();
+    expect(page.goto).not.toHaveBeenCalled();
+    expect(page.evaluate).not.toHaveBeenCalled();
+    expect(newPage).toHaveBeenCalled();
+    expect(readinessPage.goto).toHaveBeenCalledWith('https://example.com', {
+      waitUntil: 'domcontentloaded',
+      timeoutMs: 1000,
+    });
+    expect(readinessPage.evaluate).toHaveBeenCalled();
+    expect(readinessPage.close).toHaveBeenCalled();
   });
 
   it('uses taskkill on Windows and kill on other platforms during cleanup', () => {
