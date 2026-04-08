@@ -1,5 +1,6 @@
 import type { Stagehand } from '@browserbasehq/stagehand';
 import type { DramaturgeConfig } from '../config.js';
+import { adaptStagehand } from '../browser/page-interface.js';
 import { authenticateNone } from './none.js';
 import { authenticateStoredState } from './stored-state.js';
 import { authenticateForm } from './form.js';
@@ -7,18 +8,19 @@ import { authenticateOAuthRedirect } from './oauth-redirect.js';
 import { authenticateInteractive } from './interactive.js';
 
 export async function authenticate(stagehand: Stagehand, config: DramaturgeConfig): Promise<void> {
-  const { auth, targetUrl, models } = config;
+  const { auth, targetUrl } = config;
+  const browser = adaptStagehand(stagehand);
 
   switch (auth.type) {
     case 'none':
-      return authenticateNone(stagehand, targetUrl);
+      return authenticateNone(browser, targetUrl);
 
     case 'stored-state':
-      return authenticateStoredState(stagehand, targetUrl, auth.stateFile, auth.successIndicator);
+      return authenticateStoredState(browser, targetUrl, auth.stateFile, auth.successIndicator);
 
     case 'form':
       return authenticateForm(
-        stagehand,
+        browser,
         targetUrl,
         auth.loginUrl,
         auth.fields,
@@ -28,7 +30,7 @@ export async function authenticate(stagehand: Stagehand, config: DramaturgeConfi
 
     case 'oauth-redirect':
       return authenticateOAuthRedirect(
-        stagehand,
+        browser,
         targetUrl,
         auth.loginUrl,
         auth.steps,
@@ -37,7 +39,7 @@ export async function authenticate(stagehand: Stagehand, config: DramaturgeConfi
 
     case 'interactive':
       return authenticateInteractive(
-        stagehand,
+        browser,
         targetUrl,
         auth.loginUrl,
         auth.successIndicator,

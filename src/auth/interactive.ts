@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Stagehand } from '@browserbasehq/stagehand';
+import type { BrowserSessionLike, StorageStatePage } from '../browser/page-interface.js';
+import { getPrimaryPage } from '../browser/page-interface.js';
 import { parseIndicator, waitForSuccess } from './success-indicator.js';
 import {
   applyStorageState,
@@ -21,7 +22,7 @@ import {
  *     reuse in future runs.
  */
 export async function authenticateInteractive(
-  stagehand: Stagehand,
+  browser: BrowserSessionLike<StorageStatePage>,
   targetUrl: string,
   loginUrl: string,
   successIndicator: string,
@@ -35,10 +36,10 @@ export async function authenticateInteractive(
     console.log('  Trying cached browser state…');
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as BrowserStorageState;
-      await applyStorageState(stagehand, targetUrl, state);
+      await applyStorageState(browser, targetUrl, state);
 
       // Quick check — 10 s timeout
-      const page = stagehand.context.pages()[0];
+      const page = getPrimaryPage(browser, 'interactive authentication');
       await waitForSuccess(page, indicator, 10_000);
       console.log('  Cached state is still valid.');
       return;
@@ -48,7 +49,7 @@ export async function authenticateInteractive(
   }
 
   // 2. Manual login: navigate and wait for the human to complete
-  const page = stagehand.context.pages()[0];
+  const page = getPrimaryPage(browser, 'interactive authentication');
   const fullLoginUrl = loginUrl.startsWith('http') ? loginUrl : new URL(loginUrl, targetUrl).href;
 
   await page.goto(fullLoginUrl, { waitUntil: 'domcontentloaded' });
@@ -61,7 +62,7 @@ export async function authenticateInteractive(
   console.log('  Manual login detected — saving state for reuse.');
 
   // 3. Persist storage state
-  const storageState = await captureStorageState(stagehand, targetUrl);
+  const storageState = await captureStorageState(browser, targetUrl);
   mkdirSync(dirname(stateFile), { recursive: true });
   writeFileSync(stateFile, JSON.stringify(storageState, null, 2));
 }
