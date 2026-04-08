@@ -405,7 +405,6 @@ describe('loadConfig', () => {
           ...process.env,
           INPUT_CONFIG: configPath,
           INPUT_REPORT_DIR: './ci-reports',
-          RUNNER_TEMP: dir,
           GITHUB_OUTPUT: githubOutputPath,
         },
         stdio: 'pipe',
@@ -417,11 +416,16 @@ describe('loadConfig', () => {
       .split('\n')
       .find((line) => line.startsWith('config-path='))
       ?.slice('config-path='.length);
+    const effectiveReportDir = githubOutput
+      .split('\n')
+      .find((line) => line.startsWith('report-dir='))
+      ?.slice('report-dir='.length);
 
     expect(preparedConfigPath).toBeTruthy();
     if (!preparedConfigPath) {
       throw new Error('prepare-config did not write config-path to GITHUB_OUTPUT');
     }
+    expect(preparedConfigPath.startsWith(join(dir, '.dramaturge-ci-config-'))).toBe(true);
 
     const preparedConfig = JSON.parse(readFileSync(preparedConfigPath, 'utf-8'));
 
@@ -435,6 +439,6 @@ describe('loadConfig', () => {
         headless: true,
       },
     });
-    expect(githubOutput).toContain('report-dir=./ci-reports');
+    expect(effectiveReportDir).toBe(resolve(dir, 'ci-reports'));
   });
 });
