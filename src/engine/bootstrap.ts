@@ -87,7 +87,7 @@ function formatBootstrapFailure(summary: string, status?: BootstrapStatus): stri
 export function startBootstrapProcess(
   config: DramaturgeConfig,
   spawnImpl: SpawnLike = spawn,
-  platform = process.platform
+  platform: NodeJS.Platform = process.platform
 ): BootstrapStatus | undefined {
   const command = config.bootstrap?.command;
   if (!command) {
@@ -207,8 +207,12 @@ export async function waitForBootstrapReady(
 export function stopBootstrapProcess(
   status?: BootstrapStatus,
   spawnImpl: SpawnLike = spawn,
-  platform = process.platform
+  platform: NodeJS.Platform = process.platform
 ): void {
+  if (status?.exited) {
+    return;
+  }
+
   const processRef = status?.process;
   if (!processRef?.pid) {
     return;
@@ -225,8 +229,11 @@ export function stopBootstrapProcess(
   try {
     process.kill(-processRef.pid, 'SIGTERM');
     return;
-  } catch {
-    // Fall through to direct child termination when process-group shutdown is unavailable.
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code !== 'ESRCH' && code !== 'EINVAL') {
+      throw error;
+    }
   }
 
   processRef.kill?.('SIGTERM');

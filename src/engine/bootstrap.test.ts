@@ -225,15 +225,45 @@ describe('bootstrap supervision', () => {
     killSpy.mockRestore();
   });
 
+  it('does not attempt cleanup after the bootstrap process has already exited', () => {
+    const processRef = createMockProcess();
+    const spawnImpl = vi.fn();
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+    stopBootstrapProcess({ exited: true, process: processRef } as any, spawnImpl as any, 'linux');
+
+    expect(killSpy).not.toHaveBeenCalled();
+    expect(spawnImpl).not.toHaveBeenCalled();
+    expect(processRef.kill).not.toHaveBeenCalled();
+    killSpy.mockRestore();
+  });
+
   it('falls back to killing the shell process when process-group termination fails', () => {
     const processRef = createMockProcess();
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
-      throw new Error('no such process group');
+      const error = new Error('no such process group') as NodeJS.ErrnoException;
+      error.code = 'ESRCH';
+      throw error;
     });
 
     stopBootstrapProcess({ process: processRef } as any, vi.fn() as any, 'linux');
 
     expect(processRef.kill).toHaveBeenCalledWith('SIGTERM');
+    killSpy.mockRestore();
+  });
+
+  it('rethrows unexpected Unix process-group termination errors', () => {
+    const processRef = createMockProcess();
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      const error = new Error('permission denied') as NodeJS.ErrnoException;
+      error.code = 'EPERM';
+      throw error;
+    });
+
+    expect(() =>
+      stopBootstrapProcess({ process: processRef } as any, vi.fn() as any, 'linux')
+    ).toThrow(/permission denied/);
+    expect(processRef.kill).not.toHaveBeenCalled();
     killSpy.mockRestore();
   });
 });
