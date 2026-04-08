@@ -15,7 +15,7 @@
  *   GITHUB_OUTPUT     – GitHub Actions output file
  */
 
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -181,8 +181,10 @@ export function prepareConfig({
   githubOutput = '',
 } = {}) {
   let config = {};
-  if (existsSync(configPath)) {
-    const raw = readFileSync(configPath, 'utf-8');
+  const resolvedConfigPath = resolve(configPath);
+
+  if (existsSync(resolvedConfigPath)) {
+    const raw = readFileSync(resolvedConfigPath, 'utf-8');
     config = JSON.parse(stripJsonComments(raw));
   }
 
@@ -193,9 +195,10 @@ export function prepareConfig({
     forceHeadless,
   });
 
-  const resolvedConfigPath = resolve(configPath);
   const configDir = dirname(resolvedConfigPath);
-  const tmpConfig = join(configDir, `dramaturge-ci-config-${process.pid}.json`);
+  mkdirSync(configDir, { recursive: true });
+
+  const tmpConfig = join(configDir, `.dramaturge-ci-config-${process.pid}.json`);
   writeFileSync(tmpConfig, JSON.stringify(preparedConfig, null, 2));
 
   const effectiveReportDir = resolve(configDir, preparedConfig.output?.dir || './dramaturge-reports');
