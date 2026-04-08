@@ -114,6 +114,26 @@ describe('ActionRecorder', () => {
     ]);
   });
 
+  it('redacts input values for sensitive selectors before persisting them', async () => {
+    const page = createMockPage();
+    const recorder = new ActionRecorder(page as any);
+    recorder.start();
+
+    await page.getByRole('textbox', { name: 'Password' }).fill('super-secret-password');
+
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({
+        kind: 'input',
+        selector: 'role=textbox[name=Password]',
+        value: undefined,
+        redacted: true,
+        status: 'worked',
+      }),
+    ]);
+    expect(JSON.stringify(recorder.getActions())).not.toContain('super-secret-password');
+    expect(JSON.stringify(recorder.getActions())).not.toContain('[REDACTED]');
+  });
+
   it('stops recording for already wrapped locators after stop is called', async () => {
     const page = createMockPage();
     const recorder = new ActionRecorder(page as any);
@@ -149,5 +169,30 @@ describe('ActionRecorder', () => {
       'capture screenshot create-button',
       'submit save-button -> worked',
     ]);
+  });
+
+  it('redacts worker-tool input actions for sensitive labels at the recording boundary', () => {
+    const recorder = new ActionRecorder();
+    const placeholder = 'example-secret';
+
+    const action = recorder.recordToolAction({
+      kind: 'input',
+      selector: 'label=API token',
+      value: placeholder,
+      summary: 'input label=API token -> worked',
+      status: 'worked',
+    });
+
+    expect(action).toMatchObject({
+      kind: 'input',
+      selector: 'label=API token',
+      redacted: true,
+    });
+    expect(action.value).toBeUndefined();
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({ value: undefined, redacted: true }),
+    ]);
+    expect(JSON.stringify(recorder.getActions())).not.toContain(placeholder);
+    expect(JSON.stringify(recorder.getActions())).not.toContain('[REDACTED]');
   });
 });
