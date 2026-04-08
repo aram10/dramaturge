@@ -180,7 +180,11 @@ export function hasEvaluate(page: unknown): page is {
 
 export function hasRequestContext(page: unknown): page is { request: ApiRequestContextLike } {
   const request = (page as BrowserPageLike | undefined)?.request;
-  return typeof request === 'object' && request != null && 'fetch' in request;
+  return (
+    typeof request === 'object' &&
+    request != null &&
+    typeof (request as { fetch?: unknown }).fetch === 'function'
+  );
 }
 
 export function hasScreenshot(page: unknown): page is {
