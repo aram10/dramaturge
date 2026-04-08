@@ -34,6 +34,9 @@ function renderAction(action: ReplayableAction): string | null {
         ? `await page.locator(${escapeString(action.selector)}).click();`
         : `// ${action.summary}`;
     case 'input':
+      if (action.redacted) {
+        return `// ${action.summary} (redacted value omitted)`;
+      }
       if (!action.selector) {
         return `// ${action.summary}`;
       }
