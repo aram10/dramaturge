@@ -4,7 +4,8 @@
  * Prepares a Dramaturge config for CI execution.
  *
  * Reads the user config (if present), applies explicit action overrides,
- * and writes a temporary config file.
+ * and writes a temporary config file next to the original so relative
+ * paths keep the same meaning.
  *
  * Environment variables:
  *   INPUT_CONFIG      – path to the user config file
@@ -232,6 +233,6 @@ function main() {
   console.log(`Report dir: ${result.reportDir}`);
 }
 
-if (resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main();
 }

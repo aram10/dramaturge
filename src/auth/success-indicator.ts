@@ -1,6 +1,4 @@
-import type { Stagehand } from '@browserbasehq/stagehand';
-
-type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
+import type { SuccessIndicatorPage } from '../browser/page-interface.js';
 
 export type IndicatorType = 'url' | 'selector' | 'text';
 export type UrlMatchMode = 'exact' | 'prefix';
@@ -58,7 +56,7 @@ export function matchesUrlIndicator(currentUrl: string, indicator: ParsedIndicat
 }
 
 export async function waitForSuccess(
-  page: StagehandPage,
+  page: SuccessIndicatorPage,
   indicator: ParsedIndicator,
   timeoutMs: number = 30_000
 ): Promise<void> {
@@ -72,7 +70,7 @@ export async function waitForSuccess(
       case 'selector': {
         try {
           const el = page.locator(indicator.value);
-          return (await el.count()) > 0;
+          return typeof el.count === 'function' ? (await el.count()) > 0 : false;
         } catch {
           return false;
         }
