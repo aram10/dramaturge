@@ -91,12 +91,8 @@ export function parseBooleanInput(value, defaultValue) {
     return defaultValue;
   }
 
-  const normalizedValue = value.trim();
-  if (normalizedValue === '') {
-    return defaultValue;
-  }
-
-  return normalizedValue.toLowerCase() === 'true';
+  const normalizedValue = value.trim().toLowerCase();
+  return normalizedValue === '' ? defaultValue : normalizedValue === 'true';
 }
 
 /**
