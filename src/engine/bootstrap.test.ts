@@ -159,7 +159,10 @@ describe('bootstrap supervision', () => {
     expect(page.goto).not.toHaveBeenCalled();
     expect(page.evaluate).not.toHaveBeenCalled();
     expect(newPage).toHaveBeenCalled();
-    expect(readinessPage.goto).toHaveBeenCalledWith('https://example.com');
+    expect(readinessPage.goto).toHaveBeenCalledWith('https://example.com', {
+      waitUntil: 'domcontentloaded',
+      timeoutMs: 1000,
+    });
     expect(readinessPage.evaluate).toHaveBeenCalled();
     expect(readinessPage.close).toHaveBeenCalled();
   });
