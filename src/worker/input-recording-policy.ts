@@ -32,20 +32,22 @@ export function setInputRecordingPolicy(
   selector: string,
   policy: InputRecordingPolicy
 ): void {
-  if (!selector || selector.trim() === '') {
+  const key = selector?.trim();
+  if (!key) {
     return;
   }
 
-  getPolicyStore(target, true)?.set(selector, policy);
+  getPolicyStore(target, true)?.set(key, policy);
 }
 
 export function getInputRecordingPolicy(
   target: object | undefined,
   selector: string
 ): InputRecordingPolicy | undefined {
-  if (!selector || selector.trim() === '') {
+  const key = selector?.trim();
+  if (!key) {
     return undefined;
   }
 
-  return getPolicyStore(target, false)?.get(selector);
+  return getPolicyStore(target, false)?.get(key);
 }
