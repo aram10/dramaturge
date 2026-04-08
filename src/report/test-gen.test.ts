@@ -363,4 +363,62 @@ describe('generatePlaywrightTests', () => {
     expect(generated[0]?.content).not.toContain('fill(');
     expect(generated[0]?.content).not.toContain('[REDACTED]');
   });
+
+  it('keeps the redacted omission message even when selector context is unavailable', () => {
+    const generated = generatePlaywrightTests(
+      makeResult({
+        areaResults: [
+          {
+            name: 'Account settings',
+            url: 'https://example.com/account/security',
+            steps: 1,
+            findings: [
+              {
+                ref: 'fid-password',
+                category: 'Bug',
+                severity: 'Major',
+                title: 'Password confirmation fails silently',
+                stepsToReproduce: ['Open security settings', 'Update password'],
+                expected: 'The password update succeeds with confirmation',
+                actual: 'Nothing happens after submitting the form',
+                meta: {
+                  source: 'agent',
+                  confidence: 'medium',
+                  repro: {
+                    objective: 'Reproduce password update flow',
+                    route: 'https://example.com/account/security',
+                    breadcrumbs: ['Open security settings', 'Update password'],
+                    actionIds: ['act-password'],
+                    evidenceIds: [],
+                  },
+                },
+              },
+            ],
+            replayableActions: [
+              {
+                id: 'act-password',
+                kind: 'input',
+                summary: 'input password field -> worked',
+                source: 'page',
+                status: 'worked',
+                timestamp: '2026-03-25T10:01:00Z',
+                redacted: true,
+              },
+            ],
+            screenshots: new Map(),
+            evidence: [],
+            coverage: { controlsDiscovered: 1, controlsExercised: 1, events: [] },
+            pageType: 'settings',
+            status: 'explored',
+          },
+        ],
+      })
+    );
+
+    expect(generated).toHaveLength(1);
+    expect(generated[0]?.content).toContain(
+      '// input password field -> worked (redacted value omitted)'
+    );
+    expect(generated[0]?.content).not.toContain('await page.locator(');
+  });
 });

@@ -34,11 +34,11 @@ function renderAction(action: ReplayableAction): string | null {
         ? `await page.locator(${escapeString(action.selector)}).click();`
         : `// ${action.summary}`;
     case 'input':
-      if (!action.selector) {
-        return `// ${action.summary}`;
-      }
       if (action.redacted) {
         return `// ${action.summary} (redacted value omitted)`;
+      }
+      if (!action.selector) {
+        return `// ${action.summary}`;
       }
       if (action.value != null) {
         return `await page.locator(${escapeString(action.selector)}).fill(${escapeString(action.value)});`;
