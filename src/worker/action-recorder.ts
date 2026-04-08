@@ -1,5 +1,6 @@
 import { shortId } from '../constants.js';
-import { REDACTED_VALUE } from '../redaction.js';
+import { isSensitiveKey } from '../redaction.js';
+import type { ActionRecorderPage } from '../browser/page-interface.js';
 import type {
   ControlAction,
   ControlOutcome,
@@ -49,6 +50,13 @@ const PAGE_ACTION_METHODS = new Set([
   'uncheck',
   'selectOption',
 ]);
+
+type PatchablePage = ActionRecorderPage &
+  Record<string, unknown> & {
+    keyboard?: {
+      press?: (...args: unknown[]) => Promise<unknown>;
+    };
+  };
 
 function summarizeAction(
   kind: ReplayableActionKind,
@@ -137,16 +145,34 @@ function normalizeActionValue(value: unknown): string | undefined {
   return String(value);
 }
 
+function sanitizeRecordedAction(
+  kind: ReplayableActionKind,
+  selector: string | undefined,
+  value: string | undefined,
+  redacted?: boolean
+): Pick<ReplayableAction, 'value' | 'redacted'> {
+  if (redacted) {
+    return { value: undefined, redacted: true };
+  }
+
+  if (kind === 'input' && value != null && selector && isSensitiveKey(selector)) {
+    return { value: undefined, redacted: true };
+  }
+
+  return { value };
+}
+
 export class ActionRecorder {
   private actions: ReplayableAction[] = [];
   private restores: Array<() => void> = [];
   private wrappedLocators = new WeakMap<object, unknown>();
   private started = false;
 
-  constructor(private page?: any) {}
+  constructor(private page?: unknown) {}
 
   start(): void {
-    if (this.started || !this.page) {
+    const page = this.page as PatchablePage | undefined;
+    if (this.started || !page) {
       return;
     }
     this.started = true;
@@ -161,14 +187,14 @@ export class ActionRecorder {
     }
 
     for (const method of QUERY_METHODS) {
-      this.patchQueryMethod(this.page, method);
+      this.patchQueryMethod(page, method);
     }
 
-    if (this.page.keyboard && typeof this.page.keyboard.press === 'function') {
-      const original = this.page.keyboard.press;
-      this.page.keyboard.press = async (...args: unknown[]) => {
+    if (page.keyboard && typeof page.keyboard.press === 'function') {
+      const original = page.keyboard.press;
+      page.keyboard.press = async (...args: unknown[]) => {
         try {
-          const result = await original.apply(this.page.keyboard, args);
+          const result = await original.apply(page.keyboard, args);
           if (this.started) {
             this.recordToolAction({
               kind: 'keydown',
@@ -193,7 +219,9 @@ export class ActionRecorder {
         }
       };
       this.restores.push(() => {
-        this.page.keyboard.press = original;
+        if (page.keyboard) {
+          page.keyboard.press = original;
+        }
       });
     }
   }
@@ -245,40 +273,49 @@ export class ActionRecorder {
   }
 
   private recordAction(action: Omit<ReplayableAction, 'id' | 'timestamp'>): ReplayableAction {
+    const sanitized = sanitizeRecordedAction(
+      action.kind,
+      action.selector,
+      action.value,
+      action.redacted
+    );
     const recorded: ReplayableAction = {
       id: `act-${shortId()}`,
       timestamp: new Date().toISOString(),
       ...action,
+      ...sanitized,
     };
     this.actions.push(recorded);
     return recorded;
   }
 
-  private getRecordedInputValue(selector: string, value: unknown): string | undefined {
+  private getRecordedInput(
+    selector: string,
+    value: unknown
+  ): Pick<ReplayableAction, 'value' | 'redacted'> {
     const normalized = normalizeActionValue(value);
     if (normalized == null) {
-      return undefined;
+      return { value: undefined };
     }
 
-    const policy = getInputRecordingPolicy(this.page, selector);
-    switch (policy) {
-      case 'safe':
-        return normalized;
-      case 'secret':
-      case undefined:
-        return REDACTED_VALUE;
+    const policy = getInputRecordingPolicy(this.page as object | undefined, selector);
+    if (policy === 'safe') {
+      return { value: normalized };
     }
+
+    return { value: undefined, redacted: true };
   }
 
   private patchPageNavigation(method: 'goto' | 'goBack' | 'goForward' | 'reload'): void {
-    if (typeof this.page?.[method] !== 'function') {
+    const page = this.page as PatchablePage | undefined;
+    if (typeof page?.[method] !== 'function') {
       return;
     }
 
-    const original = this.page[method];
-    this.page[method] = async (...args: unknown[]) => {
+    const original = page[method] as (...args: unknown[]) => Promise<unknown>;
+    page[method] = async (...args: unknown[]) => {
       try {
-        const result = await original.apply(this.page, args);
+        const result = await original.apply(page, args);
         const url = method === 'goto' ? String(args[0] ?? '') : undefined;
         if (this.started) {
           this.recordToolAction({
@@ -307,28 +344,28 @@ export class ActionRecorder {
       }
     };
     this.restores.push(() => {
-      this.page[method] = original;
+      page[method] = original;
     });
   }
 
   private patchPageAction(method: string): void {
-    if (typeof this.page?.[method] !== 'function') {
+    const page = this.page as PatchablePage | undefined;
+    if (typeof page?.[method] !== 'function') {
       return;
     }
 
-    const original = this.page[method];
-    this.page[method] = async (...args: unknown[]) => {
+    const original = page[method] as (...args: unknown[]) => Promise<unknown>;
+    page[method] = async (...args: unknown[]) => {
       const selector = String(args[0] ?? '');
       try {
-        const result = await original.apply(this.page, args);
+        const result = await original.apply(page, args);
         if (this.started) {
           this.recordToolAction({
             kind: mapActionMethodToKind(method),
             selector,
-            value:
-              method === 'fill' || method === 'type' || method === 'selectOption'
-                ? this.getRecordedInputValue(selector, args[1])
-                : undefined,
+            ...(method === 'fill' || method === 'type' || method === 'selectOption'
+              ? this.getRecordedInput(selector, args[1])
+              : {}),
             key: method === 'press' ? String(args[1] ?? '') : undefined,
             summary: summarizeAction(mapActionMethodToKind(method), selector, 'worked'),
             source: 'page',
@@ -350,16 +387,16 @@ export class ActionRecorder {
       }
     };
     this.restores.push(() => {
-      this.page[method] = original;
+      page[method] = original;
     });
   }
 
-  private patchQueryMethod(target: any, method: QueryMethod): void {
+  private patchQueryMethod(target: Record<string, unknown> | undefined, method: QueryMethod): void {
     if (!target || typeof target[method] !== 'function') {
       return;
     }
 
-    const original = target[method];
+    const original = target[method] as (...args: unknown[]) => unknown;
     target[method] = (...args: unknown[]) => {
       const locator = original.apply(target, args);
       const selectorHint = describeQuery(method, args);
@@ -370,17 +407,18 @@ export class ActionRecorder {
     });
   }
 
-  private wrapLocator(locator: any, selectorHint: string): any {
+  private wrapLocator(locator: unknown, selectorHint: string): unknown {
     if (!locator || typeof locator !== 'object') {
       return locator;
     }
 
-    const existing = this.wrappedLocators.get(locator);
+    const locatorObject = locator as Record<string, unknown>;
+    const existing = this.wrappedLocators.get(locatorObject);
     if (existing) {
       return existing;
     }
 
-    const proxy = new Proxy(locator, {
+    const proxy = new Proxy(locatorObject, {
       get: (target, prop, receiver) => {
         const value = Reflect.get(target, prop, receiver);
         if (typeof prop !== 'string' || typeof value !== 'function') {
@@ -407,10 +445,9 @@ export class ActionRecorder {
               this.recordToolAction({
                 kind,
                 selector: selectorHint,
-                value:
-                  prop === 'fill' || prop === 'type' || prop === 'selectOption'
-                    ? this.getRecordedInputValue(selectorHint, args[0])
-                    : undefined,
+                ...(prop === 'fill' || prop === 'type' || prop === 'selectOption'
+                  ? this.getRecordedInput(selectorHint, args[0])
+                  : {}),
                 key: prop === 'press' ? String(args[0] ?? '') : undefined,
                 summary: summarizeAction(kind, selectorHint, 'worked'),
                 source: 'page',
@@ -434,7 +471,7 @@ export class ActionRecorder {
       },
     });
 
-    this.wrappedLocators.set(locator, proxy);
+    this.wrappedLocators.set(locatorObject, proxy);
     return proxy;
   }
 }

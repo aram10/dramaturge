@@ -1,6 +1,5 @@
-import type { Stagehand } from '@browserbasehq/stagehand';
-
-type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
+import type { BrowserSessionLike, StorageStatePage } from '../browser/page-interface.js';
+import { getPrimaryPage } from '../browser/page-interface.js';
 
 export interface StorageStateOrigin {
   origin: string;
@@ -21,23 +20,18 @@ export interface BrowserStorageState {
   origins: StorageStateOrigin[];
 }
 
-function getPrimaryPage(stagehand: Stagehand): StagehandPage {
-  const page = stagehand.context.pages()[0];
-  if (!page) {
-    throw new Error('No browser page available for auth state operations.');
-  }
-  return page;
-}
-
 export async function applyStorageState(
-  stagehand: Stagehand,
+  browser: BrowserSessionLike<StorageStatePage>,
   targetUrl: string,
   state: BrowserStorageState
 ): Promise<void> {
-  const page = getPrimaryPage(stagehand);
+  const page = getPrimaryPage(browser, 'auth state operations');
 
   if (state.cookies?.length) {
-    await stagehand.context.addCookies(
+    if (typeof browser.context.addCookies !== 'function') {
+      throw new Error('Browser context does not support adding cookies.');
+    }
+    await browser.context.addCookies(
       state.cookies.map((cookie) => ({
         name: cookie.name,
         value: cookie.value,
@@ -70,11 +64,14 @@ export async function applyStorageState(
 }
 
 export async function captureStorageState(
-  stagehand: Stagehand,
+  browser: BrowserSessionLike<StorageStatePage>,
   targetUrl: string
 ): Promise<BrowserStorageState> {
-  const page = getPrimaryPage(stagehand);
-  const cookies = await stagehand.context.cookies();
+  const page = getPrimaryPage(browser, 'auth state capture');
+  if (typeof browser.context.cookies !== 'function') {
+    throw new Error('Browser context does not support reading cookies.');
+  }
+  const cookies = await browser.context.cookies();
   const localStorage = await page.evaluate(() => {
     const items: Array<{ name: string; value: string }> = [];
     for (let i = 0; i < window.localStorage.length; i++) {
