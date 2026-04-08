@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -109,5 +109,29 @@ describe('prepareConfigForCi', () => {
 
     expect(prepared.reportDir).toBe(resolve(configDir, 'ci-reports'));
     expect(loaded.output.dir).toBe(resolve(configDir, 'ci-reports'));
+  });
+
+  it('creates the config directory when no user config file exists yet', () => {
+    const repoDir = createTempDir();
+    const configPath = join(repoDir, 'missing', 'nested', 'dramaturge.config.json');
+
+    const prepared = prepareConfigForCi({
+      configPath,
+      targetUrl: 'https://example.com/app',
+    });
+    const preparedConfig = JSON.parse(readFileSync(prepared.configPath, 'utf-8'));
+
+    expect(dirname(prepared.configPath)).toBe(resolve(repoDir, 'missing', 'nested'));
+    expect(existsSync(prepared.configPath)).toBe(true);
+    expect(prepared.reportDir).toBe(resolve(repoDir, 'missing', 'nested', 'dramaturge-reports'));
+    expect(preparedConfig).toMatchObject({
+      targetUrl: 'https://example.com/app',
+      output: {
+        format: 'json',
+      },
+      browser: {
+        headless: true,
+      },
+    });
   });
 });
