@@ -124,7 +124,7 @@ describe('prepare-config', () => {
     expect(written.output).toEqual({ format: 'both', dir: './ci-reports' });
     expect(written.browser).toEqual({ headless: true });
     expect(result.configPath).toBe(
-      join(dirname(resolve(configPath)), `dramaturge-ci-config-${process.pid}.json`)
+      join(dirname(resolve(configPath)), `.dramaturge-ci-config-${process.pid}.json`)
     );
     expect(result.reportDir).toBe(resolve(configDir, './ci-reports'));
     expect(result.jsonOutputEnabled).toBe(true);
