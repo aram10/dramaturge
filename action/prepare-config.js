@@ -14,7 +14,7 @@
  *   GITHUB_OUTPUT     – GitHub Actions output file
  */
 
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,6 +107,8 @@ export function prepareConfigForCi({
   // Force headless mode in CI
   config.browser = config.browser || {};
   config.browser.headless = true;
+
+  mkdirSync(configDir, { recursive: true });
 
   const preparedConfigPath = join(configDir, `.dramaturge-ci-config-${process.pid}.json`);
   writeFileSync(preparedConfigPath, JSON.stringify(config, null, 2));
