@@ -85,7 +85,8 @@ function formatBootstrapFailure(summary: string, status?: BootstrapStatus): stri
 
 export function startBootstrapProcess(
   config: DramaturgeConfig,
-  spawnImpl: SpawnLike = spawn
+  spawnImpl: SpawnLike = spawn,
+  platform: NodeJS.Platform = process.platform
 ): BootstrapStatus | undefined {
   const command = config.bootstrap?.command;
   if (!command) {
@@ -95,6 +96,7 @@ export function startBootstrapProcess(
   console.log(`Starting bootstrap command: ${command}`);
   const processRef = spawnImpl(command, {
     cwd: config.bootstrap?.cwd,
+    detached: platform !== 'win32',
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -229,18 +231,33 @@ export async function waitForBootstrapReady(
 export function stopBootstrapProcess(
   status?: BootstrapStatus,
   spawnImpl: SpawnLike = spawn,
-  platform = process.platform
+  platform: NodeJS.Platform = process.platform
 ): void {
+  if (status?.exited) {
+    return;
+  }
+
   const processRef = status?.process;
   if (!processRef?.pid) {
     return;
   }
 
-  if (platform === 'win32') {
+  const isWindows = platform === 'win32';
+  if (isWindows) {
     spawnImpl('taskkill', ['/pid', String(processRef.pid), '/t', '/f'], {
       stdio: 'ignore',
     });
     return;
+  }
+
+  try {
+    process.kill(-processRef.pid, 'SIGTERM');
+    return;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code !== 'ESRCH' && code !== 'EINVAL') {
+      throw error;
+    }
   }
 
   processRef.kill?.('SIGTERM');
