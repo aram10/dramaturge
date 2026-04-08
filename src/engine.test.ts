@@ -1,67 +1,90 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { runEngine } from './engine.js';
-import {
-  startBootstrapProcess,
-  waitForBootstrapReady,
-  type BootstrapStatus,
-} from './engine/bootstrap.js';
-import { createStagehand } from './engine/worker-pool.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./engine/bootstrap.js', () => ({
+type BootstrapStatus = import('./engine/bootstrap.js').BootstrapStatus;
+
+const bootstrapMocks = vi.hoisted(() => ({
   startBootstrapProcess: vi.fn(),
   stopBootstrapProcess: vi.fn(),
   waitForBootstrapReady: vi.fn(),
 }));
 
-vi.mock('./engine/worker-pool.js', () => ({
+const workerPoolMocks = vi.hoisted(() => ({
   createStagehand: vi.fn(),
   initWorkerPool: vi.fn(),
   closeWorkerPool: vi.fn(),
 }));
 
+vi.mock('./engine/bootstrap.js', () => ({
+  startBootstrapProcess: bootstrapMocks.startBootstrapProcess,
+  stopBootstrapProcess: bootstrapMocks.stopBootstrapProcess,
+  waitForBootstrapReady: bootstrapMocks.waitForBootstrapReady,
+}));
+
+vi.mock('./engine/worker-pool.js', () => ({
+  createStagehand: workerPoolMocks.createStagehand,
+  initWorkerPool: workerPoolMocks.initWorkerPool,
+  closeWorkerPool: workerPoolMocks.closeWorkerPool,
+}));
+
 vi.mock('./browser-errors.js', () => ({
   BrowserErrorCollector: class {
     attach(): void {}
+    detach(): void {}
   },
 }));
 
 vi.mock('./network/traffic-observer.js', () => ({
   NetworkTrafficObserver: class {
     attach(): void {}
+    detach(): void {}
   },
 }));
 
+const { runEngine } = await import('./engine.js');
+
 describe('runEngine bootstrap readiness', () => {
+  let tempDir: string;
+
   beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'dramaturge-engine-test-'));
     vi.clearAllMocks();
   });
 
-  it('passes the bootstrap process status into readiness checks', async () => {
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('passes the bootstrap process status into readiness checks and cleans up on failure', async () => {
     const page = {};
+    const closeContext = vi.fn().mockResolvedValue(undefined);
     const stagehand = {
       init: vi.fn().mockResolvedValue(undefined),
       context: {
         pages: () => [page],
+        close: closeContext,
       },
     };
     const bootstrapStatus: BootstrapStatus = {
       process: { pid: 1234 } as never,
-      stdout: '',
-      stderr: 'server crashed',
+      recentStdout: [],
+      recentStderr: ['server crashed'],
       exited: true,
       exitCode: 1,
-      signal: null,
+      exitSignal: null,
     };
 
-    vi.mocked(createStagehand).mockReturnValue(stagehand as never);
-    vi.mocked(startBootstrapProcess).mockReturnValue(bootstrapStatus);
-    vi.mocked(waitForBootstrapReady).mockRejectedValue(
+    workerPoolMocks.createStagehand.mockReturnValue(stagehand as never);
+    bootstrapMocks.startBootstrapProcess.mockReturnValue(bootstrapStatus);
+    bootstrapMocks.waitForBootstrapReady.mockRejectedValue(
       new Error('Bootstrap process exited before ready')
     );
 
     const config = {
       targetUrl: 'https://example.com',
-      output: { dir: '/tmp/dramaturge-engine-test-output' },
+      output: { dir: join(tempDir, 'output') },
       budget: {},
       exploration: {
         totalTimeout: 60,
@@ -86,7 +109,7 @@ describe('runEngine bootstrap readiness', () => {
       },
       memory: {
         enabled: false,
-        dir: '/tmp/dramaturge-memory-test',
+        dir: join(tempDir, 'memory'),
         warmStart: false,
       },
       autoCapture: {
@@ -103,6 +126,12 @@ describe('runEngine bootstrap readiness', () => {
 
     await expect(runEngine(config)).rejects.toThrow('Bootstrap process exited before ready');
 
-    expect(waitForBootstrapReady).toHaveBeenCalledWith(config, page, bootstrapStatus);
+    expect(bootstrapMocks.waitForBootstrapReady).toHaveBeenCalledWith(
+      config,
+      page,
+      bootstrapStatus
+    );
+    expect(closeContext).toHaveBeenCalled();
+    expect(bootstrapMocks.stopBootstrapProcess).toHaveBeenCalledWith(bootstrapStatus);
   });
 });
