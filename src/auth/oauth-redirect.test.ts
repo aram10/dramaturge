@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { REDACTED_VALUE } from '../redaction.js';
+import type { AuthBrowserPage, BrowserSessionLike } from '../browser/page-interface.js';
 import { ActionRecorder } from '../worker/action-recorder.js';
 
 vi.mock('./success-indicator.js', () => ({
@@ -10,7 +10,7 @@ vi.mock('./success-indicator.js', () => ({
 import { authenticateOAuthRedirect } from './oauth-redirect.js';
 import { waitForSuccess } from './success-indicator.js';
 
-function createMockStagehand() {
+function createMockBrowser() {
   const goto = vi.fn().mockResolvedValue(undefined);
   const fill = vi.fn().mockResolvedValue(undefined);
   const click = vi.fn().mockResolvedValue(undefined);
@@ -20,16 +20,17 @@ function createMockStagehand() {
     fill,
     click,
     waitForSelector,
+    locator: vi.fn(),
+    url: vi.fn().mockReturnValue('https://example.com/login'),
+    evaluate: vi.fn(),
   };
 
   return {
-    stagehand: {
-      act: vi.fn(),
-      agent: vi.fn(),
+    browser: {
       context: {
         pages: () => [page],
       },
-    },
+    } satisfies BrowserSessionLike<AuthBrowserPage>,
     page,
     spies: { goto, fill, click, waitForSelector },
   };
@@ -37,12 +38,12 @@ function createMockStagehand() {
 
 describe('authenticateOAuthRedirect', () => {
   it('runs scripted OAuth steps without creating a model agent', async () => {
-    const { stagehand, page, spies } = createMockStagehand();
-    const recorder = new ActionRecorder(page as any);
+    const { browser, page, spies } = createMockBrowser();
+    const recorder = new ActionRecorder(page);
     recorder.start();
 
     await authenticateOAuthRedirect(
-      stagehand as any,
+      browser,
       'https://example.com/app',
       '/login',
       [
@@ -56,8 +57,6 @@ describe('authenticateOAuthRedirect', () => {
       "selector:[data-testid='user-nav-button']"
     );
 
-    expect(stagehand.agent).not.toHaveBeenCalled();
-    expect(stagehand.act).not.toHaveBeenCalled();
     expect(spies.goto).toHaveBeenCalledWith('https://example.com/login');
     expect(spies.click).toHaveBeenNthCalledWith(1, "button[data-provider='microsoft']");
     expect(spies.waitForSelector).toHaveBeenNthCalledWith(1, "input[type='email']");
@@ -65,7 +64,15 @@ describe('authenticateOAuthRedirect', () => {
     expect(spies.click).toHaveBeenNthCalledWith(2, "button[type='submit']");
     expect(spies.waitForSelector).toHaveBeenNthCalledWith(2, "input[type='password']");
     expect(spies.fill).toHaveBeenNthCalledWith(2, "input[type='password']", 'super-secret');
-    expect(waitForSuccess).toHaveBeenCalledWith(page, "selector:[data-testid='user-nav-button']");
+    expect(waitForSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goto: expect.any(Function),
+        fill: expect.any(Function),
+        click: expect.any(Function),
+        waitForSelector: expect.any(Function),
+      }),
+      "selector:[data-testid='user-nav-button']"
+    );
     expect(recorder.getActions()).toEqual([
       expect.objectContaining({
         kind: 'navigate',
@@ -87,8 +94,39 @@ describe('authenticateOAuthRedirect', () => {
       expect.objectContaining({
         kind: 'input',
         selector: "input[type='password']",
-        value: REDACTED_VALUE,
+        value: undefined,
+        redacted: true,
       }),
     ]);
+  });
+
+  it('falls back to locator.waitFor when waitForSelector is unavailable', async () => {
+    const locator = {
+      click: vi.fn().mockResolvedValue(undefined),
+      fill: vi.fn().mockResolvedValue(undefined),
+      waitFor: vi.fn().mockResolvedValue(undefined),
+    };
+    const page = {
+      goto: vi.fn().mockResolvedValue(undefined),
+      locator: vi.fn().mockReturnValue(locator),
+      url: vi.fn().mockReturnValue('https://example.com/login'),
+      evaluate: vi.fn(),
+    };
+    const browser = {
+      context: {
+        pages: () => [page],
+      },
+    } satisfies BrowserSessionLike<AuthBrowserPage>;
+
+    await authenticateOAuthRedirect(
+      browser,
+      'https://example.com/app',
+      '/login',
+      [{ type: 'wait-for-selector', selector: "input[type='email']" }],
+      "selector:[data-testid='user-nav-button']"
+    );
+
+    expect(page.locator).toHaveBeenCalledWith("input[type='email']");
+    expect(locator.waitFor).toHaveBeenCalled();
   });
 });

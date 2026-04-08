@@ -1,7 +1,7 @@
-import type { Stagehand } from '@browserbasehq/stagehand';
 import { z } from 'zod';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import type { WorkerToolPage } from '../browser/page-interface.js';
 import type { Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from '../types.js';
 import { shortId, MAX_BREADCRUMBS } from '../constants.js';
 import type { CoverageTracker } from '../coverage/tracker.js';
@@ -10,8 +10,6 @@ import type { ActionRecorder } from './action-recorder.js';
 import type { Observation } from '../judge/types.js';
 import type { Blackboard } from '../a2a/blackboard.js';
 import type { BlackboardEntryKind } from '../a2a/types.js';
-
-type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
 const FindingCategorySchema = z.enum([
   'Bug',
@@ -94,7 +92,7 @@ export function createWorkerTools(
   screenshots: Map<string, Buffer>,
   evidence: Evidence[],
   coverageTracker: CoverageTracker,
-  page: StagehandPage,
+  page: WorkerToolPage,
   screenshotDir: string,
   areaName: string,
   followupRequests: FollowupRequest[] = [],

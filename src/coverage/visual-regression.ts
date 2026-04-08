@@ -4,6 +4,7 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import { buildConfirmedFindingMeta } from "../repro/repro.js";
 import { shortId } from "../constants.js";
+import type { VisualRegressionPage } from "../browser/page-interface.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
 import type { MemoryStore } from "../memory/store.js";
 
@@ -82,21 +83,22 @@ function createBaselineFilename(fingerprintHash: string, width: number, height: 
 }
 
 async function capturePageScreenshot(
-  page: any,
+  page: VisualRegressionPage,
   fullPage: boolean,
   maskSelectors: string[]
 ): Promise<Buffer> {
-  const mask =
-    maskSelectors.length > 0 && typeof page.locator === "function"
-      ? maskSelectors.map((selector) => page.locator(selector))
-      : undefined;
+  const locator = typeof page.locator === "function" ? page.locator.bind(page) : undefined;
+  const mask = maskSelectors.length > 0 && locator ? maskSelectors.map((selector) => locator(selector)) : undefined;
   return page.screenshot({
     fullPage,
     mask,
   });
 }
 
-async function getViewport(page: any, buffer: Buffer): Promise<{ width: number; height: number }> {
+async function getViewport(
+  page: VisualRegressionPage,
+  buffer: Buffer
+): Promise<{ width: number; height: number }> {
   const viewport = typeof page.viewportSize === "function" ? page.viewportSize() : undefined;
   if (viewport?.width && viewport?.height) {
     return viewport;
@@ -110,7 +112,7 @@ async function getViewport(page: any, buffer: Buffer): Promise<{ width: number; 
 }
 
 export async function runVisualRegressionScan(
-  page: any,
+  page: VisualRegressionPage,
   options: VisualRegressionScanOptions
 ): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
   const screenshot = await capturePageScreenshot(page, options.fullPage, options.maskSelectors);

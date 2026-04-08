@@ -1,6 +1,10 @@
-import type { Stagehand } from '@browserbasehq/stagehand';
+import type { BrowserSessionLike, StorageStatePage } from '../browser/page-interface.js';
+import { getPrimaryPage } from '../browser/page-interface.js';
 
-export async function authenticateNone(stagehand: Stagehand, targetUrl: string): Promise<void> {
-  const page = stagehand.context.pages()[0];
+export async function authenticateNone(
+  browser: BrowserSessionLike<StorageStatePage>,
+  targetUrl: string
+): Promise<void> {
+  const page = getPrimaryPage(browser, 'unauthenticated navigation');
   await page.goto(targetUrl);
 }
