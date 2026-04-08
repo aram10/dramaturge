@@ -145,7 +145,7 @@ function sanitizeRecordedAction(
     return { value: undefined, redacted: true };
   }
 
-  return { value, redacted: undefined };
+  return { value };
 }
 
 export class ActionRecorder {
