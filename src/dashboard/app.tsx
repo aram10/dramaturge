@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import type { EngineEventEmitter } from '../engine/event-stream.js';

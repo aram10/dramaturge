@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { StateSignature } from '../types.js';
 
 const TRACKING_QUERY_PARAM_PATTERNS = [

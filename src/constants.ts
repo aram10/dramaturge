@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { randomUUID } from 'node:crypto';
 
 /** Generate a short 8-character UUID prefix for human-readable IDs. */

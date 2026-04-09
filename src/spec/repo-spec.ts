@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { ApiEndpointHint, RepoHints } from '../adaptation/types.js';
 import { addOperation, createEmptyNormalizedSpec } from './normalized-spec.js';
 import type {

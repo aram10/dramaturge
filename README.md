@@ -77,27 +77,11 @@ Traditional QA approaches require upfront investment in test suites, selectors, 
 ### Package Installation
 
 ```bash
-# Install from GitHub Packages
-pnpm add @aram10/dramaturge
-
-# Install Playwright browser
+pnpm add dramaturge
 pnpm exec playwright install chromium
 ```
 
-### GitHub Packages Setup
-
-Dramaturge is published to GitHub Packages. Configure an `.npmrc` in your project root:
-
-```text
-@aram10:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-```
-
-Generate a GitHub token with `read:packages` scope at [https://github.com/settings/tokens](https://github.com/settings/tokens).
-
-## Quick Start
-
-### 1. Create a Configuration File
+## Run
 
 Copy the example config and customize for your application:
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { Stagehand } from '@browserbasehq/stagehand';
 import { resolveBrowserOpsModel, type DramaturgeConfig } from '../config.js';
 import { authenticate } from '../auth/authenticator.js';

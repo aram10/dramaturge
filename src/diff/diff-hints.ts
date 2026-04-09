@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { RepoHints, ApiEndpointHint } from '../adaptation/types.js';
 import type { DiffContext, DiffFileEntry } from './types.js';
 import { getChangedFiles } from './diff-parser.js';

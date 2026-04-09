@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { buildAutoCaptureFindingMeta } from "../repro/repro.js";
 import { shortId } from "../constants.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";

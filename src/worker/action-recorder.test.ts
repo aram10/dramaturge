@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, expect, it } from 'vitest';
 import { ActionRecorder } from './action-recorder.js';
 import { setInputRecordingPolicy } from './input-recording-policy.js';

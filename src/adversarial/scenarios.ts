@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { AdversarialConfig } from '../config.js';
 import { listClickPathScenarios } from './click-path.js';
 import { listConcurrencyScenarios } from './concurrency.js';

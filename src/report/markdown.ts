@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { RunResult } from '../types.js';
 import { collectFindings } from './collector.js';
 import { isNodeAffectedByDiff } from '../diff/diff-hints.js';

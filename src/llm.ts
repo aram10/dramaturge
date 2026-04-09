@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { LLMTaskProposal, WorkerType } from './types.js';
 import type { JudgeDecision } from './judge/types.js';
 import { TRUNCATE_GROUP_KEY, DEFAULT_LLM_TIMEOUT_MS, JUDGE_LLM_TIMEOUT_MS } from './constants.js';

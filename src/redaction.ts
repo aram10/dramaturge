@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import {
   DEFAULT_REDACT_TRUNCATE_LENGTH,
   SHORT_REDACT_TRUNCATE_LENGTH,

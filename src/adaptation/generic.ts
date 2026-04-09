@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { RepoHints } from './types.js';

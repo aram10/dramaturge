@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { JudgeConfig as RuntimeJudgeConfig } from '../config.js';
 import type {
   Evidence,

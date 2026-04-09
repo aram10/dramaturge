@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Stagehand } from '@browserbasehq/stagehand';
 import type { DramaturgeConfig } from '../config.js';

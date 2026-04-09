@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { FrontierItem } from '../types.js';
 import { REQUEUE_PRIORITY_DECAY } from '../constants.js';
 

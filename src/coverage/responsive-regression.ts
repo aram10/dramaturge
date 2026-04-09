@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { Evidence, RawFinding } from "../types.js";
 import type { MemoryStore } from "../memory/store.js";
 import { runVisualRegressionScan } from "./visual-regression.js";

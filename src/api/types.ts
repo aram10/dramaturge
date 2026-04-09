@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { DramaturgeConfig } from '../config.js';
 import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/traffic-observer.js';
 import type { ContractIndex } from '../spec/contract-index.js';
