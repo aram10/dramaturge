@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Parses a Dramaturge JSON report and sets GitHub Actions outputs.
  *
@@ -205,6 +203,6 @@ function main() {
 }
 
 // Run main when executed directly (not imported for testing)
-if (resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main();
 }

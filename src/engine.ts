@@ -277,11 +277,6 @@ export async function runEngine(
   errorCollector.attach(stagehand.context.pages()[0], 'primary');
   trafficObserver.attach(stagehand.context.pages()[0], 'primary');
 
-  bootstrapProcess = startBootstrapProcess(config);
-  await waitForBootstrapReady(config, stagehand.context.pages()[0], bootstrapProcess, {
-    newPage: () => stagehand.context.newPage(),
-  });
-
   let workerPool: WorkerSession[] = [];
 
   // CostTracker is always instantiated for tracking; budget enforcement is only

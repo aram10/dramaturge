@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Prepares a Dramaturge config for CI execution.
  *

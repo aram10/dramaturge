@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { saveCheckpoint, loadCheckpoint, hydrateFromCheckpoint } from './checkpoint.js';
@@ -113,8 +113,29 @@ describe('Checkpoint', () => {
 
     const loaded = loadCheckpoint(tmpDir);
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(1);
-    expect(loaded!.graphSnapshot.nodes).toHaveLength(1);
+    if (!loaded) {
+      throw new Error('Expected checkpoint to load');
+    }
+    expect(loaded.version).toBe(1);
+    expect(loaded.graphSnapshot.nodes).toHaveLength(1);
+  });
+
+  it('loadCheckpoint rejects structurally invalid checkpoint files', () => {
+    const cpPath = join(tmpDir, 'checkpoint.json');
+    const invalidCheckpoint = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      tasksExecuted: 1,
+      frontierSnapshot: [],
+      findingsByNode: {},
+      evidenceByNode: {},
+      blindSpots: [],
+      completedTaskIds: [],
+    };
+
+    writeFileSync(cpPath, JSON.stringify(invalidCheckpoint), 'utf-8');
+
+    expect(() => loadCheckpoint(tmpDir)).toThrow(/Failed to parse or validate checkpoint JSON/);
   });
 
   it('hydrateFromCheckpoint restores graph, frontier, and findings', () => {
@@ -189,7 +210,10 @@ describe('Checkpoint', () => {
     );
 
     // Load and hydrate into fresh structures
-    const checkpoint = loadCheckpoint(tmpDir)!;
+    const checkpoint = loadCheckpoint(tmpDir);
+    if (!checkpoint) {
+      throw new Error('Expected checkpoint to load');
+    }
     const newGraph = new StateGraph();
     const newFrontier = new FrontierQueue();
     const newCoverage = new CoverageTracker();
@@ -264,7 +288,10 @@ describe('Checkpoint', () => {
       { frontierSnapshot: resumableFrontierSnapshot }
     );
 
-    const loaded = loadCheckpoint(tmpDir)!;
+    const loaded = loadCheckpoint(tmpDir);
+    if (!loaded) {
+      throw new Error('Expected checkpoint to load');
+    }
     const restoredFrontier = new FrontierQueue();
     hydrateFromCheckpoint(loaded, new StateGraph(), restoredFrontier, new CoverageTracker());
 

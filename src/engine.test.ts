@@ -128,6 +128,8 @@ describe('runEngine bootstrap readiness', () => {
 
     await expect(runEngine(config)).rejects.toThrow('Bootstrap process exited before ready');
 
+    expect(bootstrapMocks.startBootstrapProcess).toHaveBeenCalledTimes(1);
+    expect(bootstrapMocks.waitForBootstrapReady).toHaveBeenCalledTimes(1);
     expect(bootstrapMocks.waitForBootstrapReady).toHaveBeenCalledWith(
       config,
       page,

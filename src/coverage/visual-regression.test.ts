@@ -25,12 +25,13 @@ function makeSolidPng(
 }
 
 function createMockPage(buffer: Buffer): VisualRegressionPage {
+  const png = PNG.sync.read(buffer);
   return {
     async screenshot() {
       return buffer;
     },
     viewportSize() {
-      return { width: 4, height: 4 };
+      return { width: png.width, height: png.height };
     },
     locator(selector: string) {
       return {
@@ -136,5 +137,49 @@ describe("runVisualRegressionScan", () => {
       type: "visual-diff",
     });
     expect(result.evidence[0].path).toContain("visual-diffs");
+  });
+
+  it("emits a finding when the current screenshot dimensions differ from the stored baseline", async () => {
+    const baselineDir = join(tempDir, "baselines");
+    const outputDir = join(tempDir, "run");
+
+    await runVisualRegressionScan(createMockPage(makeSolidPng([0, 100, 200, 255], 4, 4)), {
+      areaName: "Dashboard",
+      route: "https://example.com/dashboard",
+      fingerprintHash: "dashboard-hash",
+      baselineDir,
+      outputDir,
+      diffPixelRatioThreshold: 0.05,
+      includeAA: false,
+      fullPage: true,
+      maskSelectors: [],
+    });
+
+    const result = await runVisualRegressionScan(
+      createMockPage(makeSolidPng([0, 100, 200, 255], 6, 4)),
+      {
+        areaName: "Dashboard",
+        route: "https://example.com/dashboard",
+        fingerprintHash: "dashboard-hash",
+        baselineDir,
+        outputDir,
+        diffPixelRatioThreshold: 0.05,
+        includeAA: false,
+        fullPage: true,
+        maskSelectors: [],
+      }
+    );
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({
+      category: "Visual Glitch",
+      severity: "Major",
+      title: "Visual regression dimensions changed",
+    });
+    expect(result.findings[0].expected).toContain("4x4");
+    expect(result.findings[0].actual).toContain("6x4");
+    expect(result.evidence).toHaveLength(1);
+    expect(result.evidence[0].path).toContain("visual-diffs");
+    expect(existsSync(join(baselineDir, "dashboard-hash-6x4.png"))).toBe(false);
   });
 });

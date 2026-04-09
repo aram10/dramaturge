@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
@@ -82,6 +82,110 @@ function createBaselineFilename(fingerprintHash: string, width: number, height: 
   return `${fingerprintHash}-${width}x${height}.png`;
 }
 
+function findExistingBaseline(
+  baselineDir: string,
+  fingerprintHash: string,
+  expectedFileName: string
+): { path: string; fileName: string; exactMatch: boolean } | null {
+  const expectedPath = join(baselineDir, expectedFileName);
+  try {
+    const files = readdirSync(baselineDir)
+      .filter((name) => name === expectedFileName || name.startsWith(`${fingerprintHash}-`))
+      .sort();
+    if (files.length === 0) {
+      return null;
+    }
+
+    const exactMatch = files.includes(expectedFileName);
+    const fileName = exactMatch ? expectedFileName : files[0];
+    return {
+      path: exactMatch ? expectedPath : join(baselineDir, fileName),
+      fileName,
+      exactMatch,
+    };
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function createDimensionMismatchResult(input: {
+  screenshot: Buffer;
+  options: VisualRegressionScanOptions;
+  baselineFileName: string;
+  baselineWidth: number;
+  baselineHeight: number;
+  currentWidth: number;
+  currentHeight: number;
+}): { findings: RawFinding[]; evidence: Evidence[] } {
+  const {
+    screenshot,
+    options,
+    baselineFileName,
+    baselineWidth,
+    baselineHeight,
+    currentWidth,
+    currentHeight,
+  } = input;
+  const evidenceId = `ev-${shortId()}`;
+  const findingRef = `fid-${shortId()}`;
+  const screenshotFileName = `${options.fingerprintHash}-dimension-mismatch-${shortId()}.png`;
+  const relativeScreenshotPath = `visual-diffs/${screenshotFileName}`;
+  writeFileSync(join(options.outputDir, relativeScreenshotPath), screenshot);
+
+  return {
+    findings: [
+      {
+        ref: findingRef,
+        category: "Visual Glitch",
+        severity: "Major",
+        title: "Visual regression dimensions changed",
+        stepsToReproduce: [`Navigate to ${options.route}`],
+        expected: `The page should match the stored baseline dimensions (${baselineWidth}x${baselineHeight}).`,
+        actual: `The current screenshot dimensions changed to ${currentWidth}x${currentHeight}.`,
+        evidenceIds: [evidenceId],
+        verdict: {
+          hypothesis: "The page dimensions should remain visually consistent with the saved baseline.",
+          observation: `The saved baseline uses ${baselineWidth}x${baselineHeight}, but the current screenshot is ${currentWidth}x${currentHeight}.`,
+          evidenceChain: [
+            `baseline=${baselineFileName}`,
+            `current=${relativeScreenshotPath}`,
+            `baselineDimensions=${baselineWidth}x${baselineHeight}`,
+            `currentDimensions=${currentWidth}x${currentHeight}`,
+          ],
+          alternativesConsidered: [
+            "A viewport or rendering configuration change may have altered the screenshot size.",
+          ],
+          suggestedVerification: [
+            `Inspect ${relativeScreenshotPath} alongside ${baselineFileName}.`,
+            "Confirm whether the viewport, layout container, or responsive breakpoint changed intentionally.",
+          ],
+        },
+        meta: buildConfirmedFindingMeta({
+          route: options.route,
+          objective: "Compare the rendered page dimensions against a stored visual baseline",
+          breadcrumbs: [`visual baseline comparison for ${options.fingerprintHash}`],
+          evidenceIds: [evidenceId],
+        }),
+      },
+    ],
+    evidence: [
+      {
+        id: evidenceId,
+        type: "visual-diff",
+        summary: `Visual baseline dimensions changed for ${options.areaName} (${baselineWidth}x${baselineHeight} -> ${currentWidth}x${currentHeight})`,
+        path: relativeScreenshotPath,
+        areaName: options.areaName,
+        timestamp: new Date().toISOString(),
+        relatedFindingIds: [findingRef],
+      },
+    ],
+  };
+}
+
 async function capturePageScreenshot(
   page: VisualRegressionPage,
   fullPage: boolean,
@@ -123,8 +227,31 @@ export async function runVisualRegressionScan(
   mkdirSync(options.baselineDir, { recursive: true });
   mkdirSync(join(options.outputDir, "visual-diffs"), { recursive: true });
 
+  const existingBaseline = findExistingBaseline(
+    options.baselineDir,
+    options.fingerprintHash,
+    baselineFileName
+  );
+  if (!existingBaseline) {
+    writeFileSync(baselinePath, screenshot);
+    return { findings: [], evidence: [] };
+  }
+
+  const baseline = readFileSync(existingBaseline.path);
+  const baselinePng = readPng(baseline);
+  if (baselinePng.width !== width || baselinePng.height !== height) {
+    return createDimensionMismatchResult({
+      screenshot,
+      options,
+      baselineFileName: existingBaseline.fileName,
+      baselineWidth: baselinePng.width,
+      baselineHeight: baselinePng.height,
+      currentWidth: width,
+      currentHeight: height,
+    });
+  }
+
   try {
-    const baseline = readFileSync(baselinePath);
     const diff = comparePngBuffers(baseline, screenshot, options.includeAA);
     if (diff.diffPixelRatio < options.diffPixelRatioThreshold) {
       if (diff.diffPixelCount > 0) {
@@ -190,8 +317,12 @@ export async function runVisualRegressionScan(
         },
       ],
     };
-  } catch {
-    writeFileSync(baselinePath, screenshot);
-    return { findings: [], evidence: [] };
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code === "ENOENT") {
+      writeFileSync(baselinePath, screenshot);
+      return { findings: [], evidence: [] };
+    }
+    throw error;
   }
 }
