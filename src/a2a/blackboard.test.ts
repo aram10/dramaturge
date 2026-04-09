@@ -157,4 +157,15 @@ describe('Blackboard', () => {
     expect(bb.query('finding')[0].data.title).toBe('original');
     expect(bb.query('finding')[0].tags).toEqual(['tag1']);
   });
+
+  it('evicts oldest entries when the blackboard exceeds its maxEntries limit', () => {
+    const bb = new Blackboard({ maxEntries: 2 });
+
+    bb.post('finding', 'agent-a', { title: 'Bug 1' });
+    bb.post('finding', 'agent-b', { title: 'Bug 2' });
+    bb.post('finding', 'agent-c', { title: 'Bug 3' });
+
+    expect(bb.size()).toBe(2);
+    expect(bb.all().map((entry) => entry.data.title)).toEqual(['Bug 2', 'Bug 3']);
+  });
 });

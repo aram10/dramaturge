@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const ASTRO_PAGE_RE = /\.(?:astro|md|mdx)$/;
 const JS_TS_FILE_RE = /\.(?:ts|js|mjs|cjs)$/;
@@ -156,7 +157,7 @@ export function scanAstroRepo(root: string): RepoHints {
 
   for (const filePath of apiFiles) {
     const route = routeFromFile(pagesDir, filePath);
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const methods = extractRouteMethods(content);
     const statuses = extractStatusCodes(content);
     const authRequired = AUTH_RE.test(content);
@@ -199,7 +200,9 @@ export function scanAstroRepo(root: string): RepoHints {
 
   // Extract selectors from all .astro files (pages + components)
   const stableSelectors = uniqueSorted(
-    astroFiles.flatMap((filePath) => extractStableSelectors(readFileSync(filePath, 'utf-8')))
+    astroFiles.flatMap((filePath) =>
+      extractStableSelectors(readTextFileWithinLimit(filePath) ?? '')
+    )
   );
 
   // Auth hints
@@ -209,7 +212,7 @@ export function scanAstroRepo(root: string): RepoHints {
   // Expected HTTP noise from API files with 401/403
   const expectedHttpNoise: ExpectedHttpNoise[] = [];
   for (const filePath of apiFiles) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const statuses = extractStatusCodes(content).filter(
       (status) => status === 401 || status === 403
     );

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { scanRepository } from './repo-scan.js';
 
 const nextFixture = fileURLToPath(new URL('./fixtures/next-app', import.meta.url));
@@ -135,5 +138,26 @@ describe('scanRepository', () => {
       const hints = scanRepository({ root: genericFixture, framework: 'auto' });
       expect(hints.routes.length).toBeGreaterThan(0);
     });
+  });
+
+  it('ignores oversized source files while still scanning smaller files', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dramaturge-scan-repo-'));
+    try {
+      mkdirSync(join(root, 'src'));
+      writeFileSync(
+        join(root, 'src', 'small.ts'),
+        'export const route = "/login"; export const selector = "data-testid=\\"safe\\"";'
+      );
+      writeFileSync(
+        join(root, 'src', 'large.ts'),
+        `export const ignored = "${'/oversized-route '.repeat(70_000)}";`
+      );
+
+      const hints = scanRepository({ root, framework: 'generic' });
+      expect(hints.routes).toContain('/login');
+      expect(hints.routes.some((route) => route.includes('oversized-route'))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

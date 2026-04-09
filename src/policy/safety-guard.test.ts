@@ -118,5 +118,21 @@ describe('SafetyGuard', () => {
       expect(entry.reason).toBeTruthy();
       expect(entry.blocked).toBe(true);
     });
+
+    it('evicts oldest audit entries when maxAuditEntries is exceeded', () => {
+      const guard = new SafetyGuard({
+        ...createDefaultSafetyConfig(false),
+        maxAuditEntries: 2,
+      });
+
+      guard.checkUrl('http://example.com/page-a');
+      guard.checkRequest('DELETE', '/api/item-a');
+      guard.checkActionLabel('Delete item', '/items/1');
+
+      const log = guard.getAuditLog();
+      expect(log).toHaveLength(2);
+      expect(log[0]?.url).toBe('/api/item-a');
+      expect(log[1]?.url).toBe('/items/1');
+    });
   });
 });

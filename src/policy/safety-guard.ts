@@ -18,6 +18,8 @@ export interface SafetyGuardConfig {
   blockDestructiveRequests: boolean;
   /** Patterns in button/link text that indicate destructive actions. */
   destructiveActionKeywords: string[];
+  /** Maximum audit log entries retained in memory. */
+  maxAuditEntries: number;
 }
 
 export interface SafetyAuditEntry {
@@ -41,6 +43,7 @@ const DEFAULT_DESTRUCTIVE_KEYWORDS = [
   'deactivate account',
   'close account',
 ];
+const DEFAULT_AUDIT_LOG_LIMIT = 500;
 
 export function createDefaultSafetyConfig(destructiveActionsAllowed: boolean): SafetyGuardConfig {
   return {
@@ -48,6 +51,7 @@ export function createDefaultSafetyConfig(destructiveActionsAllowed: boolean): S
     blockedUrlPatterns: [],
     blockDestructiveRequests: !destructiveActionsAllowed,
     destructiveActionKeywords: DEFAULT_DESTRUCTIVE_KEYWORDS,
+    maxAuditEntries: DEFAULT_AUDIT_LOG_LIMIT,
   };
 }
 
@@ -147,6 +151,9 @@ export class SafetyGuard {
       reason,
       blocked,
     });
+    if (this.auditLog.length > this.config.maxAuditEntries) {
+      this.auditLog.splice(0, this.auditLog.length - this.config.maxAuditEntries);
+    }
   }
 }
 

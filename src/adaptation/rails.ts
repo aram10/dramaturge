@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const IGNORED_DIRECTORY_NAMES = new Set([
   'node_modules',
@@ -234,7 +235,7 @@ export function canScanRailsRepo(root: string): boolean {
   if (existsSync(join(root, 'config', 'routes.rb'))) return true;
   const gemfilePath = join(root, 'Gemfile');
   if (existsSync(gemfilePath)) {
-    const content = readFileSync(gemfilePath, 'utf-8');
+    const content = readTextFileWithinLimit(gemfilePath) ?? '';
     if (/gem\s+["']rails["']/.test(content)) return true;
   }
   if (existsSync(join(root, 'bin', 'rails'))) return true;
@@ -261,7 +262,7 @@ export function scanRailsRepo(root: string): RepoHints {
   // Phase 1: Parse routes from config/routes.rb
   const routesPath = join(root, 'config', 'routes.rb');
   if (existsSync(routesPath)) {
-    const routesContent = readFileSync(routesPath, 'utf-8');
+    const routesContent = readTextFileWithinLimit(routesPath) ?? '';
     const parsedRoutes = parseRoutesFile(routesContent);
 
     for (const parsed of parsedRoutes) {
@@ -295,7 +296,7 @@ export function scanRailsRepo(root: string): RepoHints {
   const controllersDir = join(root, 'app', 'controllers');
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
 
     // Controller analysis
     const relToControllers = relative(controllersDir, filePath);

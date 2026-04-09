@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const ROUTE_FILE_RE = /\.(?:tsx?|jsx?)$/;
 const SELECTOR_RE = /\b(id|data-testid)\s*=\s*["'`]([^"'`]+)["'`]/g;
@@ -145,7 +146,7 @@ export function canScanRemixRepo(root: string): boolean {
     const files = walkFiles(appDir);
     for (const filePath of files) {
       if (!ROUTE_FILE_RE.test(filePath)) continue;
-      const content = readFileSync(filePath, 'utf-8');
+      const content = readTextFileWithinLimit(filePath) ?? '';
       if (content.includes('@remix-run/')) return true;
     }
   } catch {
@@ -188,7 +189,7 @@ export function scanRemixRepo(root: string): RepoHints {
 
   for (const filePath of routeFiles) {
     const fileName = toPosix(relative(routesDir, filePath));
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const route = routeFromFileName(fileName);
     const isPage = DEFAULT_EXPORT_RE.test(content);
     const hasLoader = LOADER_RE.test(content);
@@ -249,7 +250,9 @@ export function scanRemixRepo(root: string): RepoHints {
 
   // Extract selectors from all app source files
   const stableSelectors = uniqueSorted(
-    allSourceFiles.flatMap((filePath) => extractStableSelectors(readFileSync(filePath, 'utf-8')))
+    allSourceFiles.flatMap((filePath) =>
+      extractStableSelectors(readTextFileWithinLimit(filePath) ?? '')
+    )
   );
 
   // Auth hints
@@ -259,7 +262,7 @@ export function scanRemixRepo(root: string): RepoHints {
   // Expected HTTP noise from route files with 401/403
   const expectedHttpNoise: ExpectedHttpNoise[] = [];
   for (const filePath of routeFiles) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const statuses = extractStatusCodes(content).filter(
       (status) => status === 401 || status === 403
     );

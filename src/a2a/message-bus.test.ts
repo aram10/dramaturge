@@ -159,4 +159,18 @@ describe('MessageBus', () => {
     const toReviewer = bus.getMessagesTo('agent-reviewer');
     expect(toReviewer).toHaveLength(2); // direct + broadcast
   });
+
+  it('evicts oldest history entries when maxHistory is exceeded', () => {
+    const bus = new MessageBus({ maxHistory: 2 });
+
+    bus.sendText('agent-a', 'agent-b', 'msg1');
+    bus.sendText('agent-a', 'agent-b', 'msg2');
+    bus.sendText('agent-a', 'agent-b', 'msg3');
+
+    expect(bus.size()).toBe(2);
+    expect(bus.getHistory().map((message) => message.parts[0])).toEqual([
+      { kind: 'text', text: 'msg2' },
+      { kind: 'text', text: 'msg3' },
+    ]);
+  });
 });

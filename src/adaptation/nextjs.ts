@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const PAGE_FILE_RE = /(?:^|\/)app(?:\/.*)?\/page\.(?:ts|tsx|js|jsx|mdx)$/;
 const ROUTE_FILE_RE = /(?:^|\/)app(?:\/.*)?\/route\.(?:ts|tsx|js|jsx)$/;
@@ -106,7 +107,7 @@ function extractExpectedHttpNoise(root: string, routeFiles: string[]): ExpectedH
   const noise: ExpectedHttpNoise[] = [];
 
   for (const filePath of routeFiles) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const statuses = uniqueSorted([...content.matchAll(STATUS_RE)].map((match) => match[1]))
       .map((status) => Number.parseInt(status, 10))
       .filter((status) => status === 401 || status === 403);
@@ -141,7 +142,7 @@ function extractRouteMethods(content: string): string[] {
 function extractApiEndpoints(root: string, routeFiles: string[]): ApiEndpointHint[] {
   return routeFiles
     .map((filePath) => {
-      const content = readFileSync(filePath, 'utf-8');
+      const content = readTextFileWithinLimit(filePath) ?? '';
       return {
         route: routeFromRouteFile(root, filePath),
         methods: extractRouteMethods(content),
@@ -175,12 +176,16 @@ export function scanNextJsRepo(root: string): RepoHints {
 
   const routes = uniqueSorted([
     ...pageFiles.map((filePath) => routeFromPageFile(resolvedRoot, filePath)),
-    ...pageFiles.flatMap((filePath) => extractQueryRoutes(readFileSync(filePath, 'utf-8'))),
-    ...selectorFiles.flatMap((filePath) => extractQueryRoutes(readFileSync(filePath, 'utf-8'))),
+    ...pageFiles.flatMap((filePath) => extractQueryRoutes(readTextFileWithinLimit(filePath) ?? '')),
+    ...selectorFiles.flatMap((filePath) =>
+      extractQueryRoutes(readTextFileWithinLimit(filePath) ?? '')
+    ),
   ]);
 
   const stableSelectors = uniqueSorted(
-    selectorFiles.flatMap((filePath) => extractStableSelectors(readFileSync(filePath, 'utf-8')))
+    selectorFiles.flatMap((filePath) =>
+      extractStableSelectors(readTextFileWithinLimit(filePath) ?? '')
+    )
   );
   const routeFamilies = uniqueSorted(routes.map(routeFamilyFromRoute));
   const apiEndpoints = extractApiEndpoints(resolvedRoot, routeFiles);

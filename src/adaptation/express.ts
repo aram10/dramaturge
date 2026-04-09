@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -136,7 +137,7 @@ export function canScanExpressRepo(root: string): boolean {
   for (const filePath of walkFiles(root)) {
     if (!isSourceFile(filePath)) continue;
 
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     if (EXPRESS_IMPORT_RE.test(content)) {
       return true;
     }
@@ -162,7 +163,7 @@ export function scanExpressRepo(root: string): RepoHints {
   const noiseMap = new Map<string, { method?: string; pathPrefix: string; statuses: number[] }>();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
 
     const handlers = extractRouteHandlers(content);
 

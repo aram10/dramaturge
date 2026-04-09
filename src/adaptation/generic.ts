@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const TEXT_FILE_EXTENSIONS = new Set([
   '.ts',
@@ -122,7 +123,7 @@ export function scanGenericRepo(root: string): RepoHints {
   >();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
 
     const routes = collectMatches(content, /["'`](\/(?!api\/)(?!\/)[^"'`\s]*)["'`]/g).filter(
       (route) => !/\.(css|js|png|jpg|svg|ico)$/.test(route)

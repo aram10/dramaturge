@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const PAGE_FILE_RE = /(?:^|\/)src\/routes(?:\/.*)?\/\+page\.(?:svelte|ts|js)$/;
 const SERVER_FILE_RE = /(?:^|\/)src\/routes(?:\/.*)?\/\+server\.(?:ts|js)$/;
@@ -143,7 +144,7 @@ function extractRouteMethods(content: string): string[] {
 function extractApiEndpoints(root: string, serverFiles: string[]): ApiEndpointHint[] {
   return serverFiles
     .map((filePath) => {
-      const content = readFileSync(filePath, 'utf-8');
+      const content = readTextFileWithinLimit(filePath) ?? '';
       return {
         route: routeFromFile(root, filePath),
         methods: extractRouteMethods(content),
@@ -161,7 +162,7 @@ function extractExpectedHttpNoise(root: string, serverFiles: string[]): Expected
   const noise: ExpectedHttpNoise[] = [];
 
   for (const filePath of serverFiles) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const statuses = extractStatusCodes(content).filter(
       (status) => status === 401 || status === 403
     );
@@ -186,7 +187,7 @@ export function canScanSvelteKitRepo(root: string): boolean {
     return true;
   }
   try {
-    const pkg = readFileSync(join(resolvedRoot, 'package.json'), 'utf-8');
+    const pkg = readTextFileWithinLimit(join(resolvedRoot, 'package.json')) ?? '';
     return pkg.includes('@sveltejs/kit');
   } catch {
     return false;
@@ -214,12 +215,16 @@ export function scanSvelteKitRepo(root: string): RepoHints {
   const routes = uniqueSorted([
     ...pageFiles.map((filePath) => routeFromFile(resolvedRoot, filePath)),
     ...serverFiles.map((filePath) => routeFromFile(resolvedRoot, filePath)),
-    ...pageFiles.flatMap((filePath) => extractQueryRoutes(readFileSync(filePath, 'utf-8'))),
-    ...svelteFiles.flatMap((filePath) => extractQueryRoutes(readFileSync(filePath, 'utf-8'))),
+    ...pageFiles.flatMap((filePath) => extractQueryRoutes(readTextFileWithinLimit(filePath) ?? '')),
+    ...svelteFiles.flatMap((filePath) =>
+      extractQueryRoutes(readTextFileWithinLimit(filePath) ?? '')
+    ),
   ]);
 
   const stableSelectors = uniqueSorted(
-    svelteFiles.flatMap((filePath) => extractStableSelectors(readFileSync(filePath, 'utf-8')))
+    svelteFiles.flatMap((filePath) =>
+      extractStableSelectors(readTextFileWithinLimit(filePath) ?? '')
+    )
   );
   const routeFamilies = uniqueSorted(routes.map(routeFamily));
   const apiEndpoints = extractApiEndpoints(resolvedRoot, serverFiles);

@@ -29,22 +29,22 @@ export async function initWorkerPool(
   sharedState?: BrowserStorageState
 ): Promise<WorkerSession[]> {
   if (count <= 0) return [];
-  const pool: WorkerSession[] = [];
-  for (let i = 0; i < count; i++) {
-    const sh = createStagehand(config);
-    await sh.init();
-    if (sharedState) {
-      await applyStorageState(adaptStagehand(sh), config.targetUrl, sharedState);
-    } else {
-      await authenticate(sh, config);
-    }
-    const key = `worker-${i + 1}`;
-    const page = sh.context.pages()[0];
-    errorCollector.attach(page, key);
-    trafficObserver?.attach(page, key);
-    pool.push({ key, stagehand: sh, page });
-  }
-  return pool;
+  return Promise.all(
+    Array.from({ length: count }, async (_, index) => {
+      const sh = createStagehand(config);
+      await sh.init();
+      if (sharedState) {
+        await applyStorageState(adaptStagehand(sh), config.targetUrl, sharedState);
+      } else {
+        await authenticate(sh, config);
+      }
+      const key = `worker-${index + 1}`;
+      const page = sh.context.pages()[0];
+      errorCollector.attach(page, key);
+      trafficObserver?.attach(page, key);
+      return { key, stagehand: sh, page };
+    })
+  );
 }
 
 export async function closeWorkerPool(pool: WorkerSession[]): Promise<void> {

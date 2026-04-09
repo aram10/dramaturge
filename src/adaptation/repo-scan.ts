@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { parseJsoncObject } from '../utils/jsonc.js';
@@ -16,6 +16,11 @@ import { canScanSvelteKitRepo, scanSvelteKitRepo } from './sveltekit.js';
 import { scanTanStackRouterRepo } from './tanstack-router.js';
 import { scanVueRouterRepo } from './vue-router.js';
 import type { RepoFramework, RepoHints, RepoHintsOverride, RepoScanOptions } from './types.js';
+import {
+  DEFAULT_SCAN_FILE_SIZE_LIMIT_BYTES,
+  formatScanSizeLimit,
+  readTextFileWithinLimit,
+} from './file-utils.js';
 
 const ExpectedHttpNoiseSchema = z.object({
   method: z.string().optional(),
@@ -122,7 +127,12 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
     throw new Error(`Repo hints file not found: ${resolvedHintsPath}`);
   }
 
-  const raw = readFileSync(resolvedHintsPath, 'utf-8');
+  const raw = readTextFileWithinLimit(resolvedHintsPath);
+  if (raw === null) {
+    throw new Error(
+      `Repo hints file exceeds scan size limit (${formatScanSizeLimit(DEFAULT_SCAN_FILE_SIZE_LIMIT_BYTES)}): ${resolvedHintsPath}`
+    );
+  }
   return RepoHintsOverrideSchema.parse(parseJsoncObject(raw));
 }
 
@@ -215,7 +225,7 @@ function detectFramework(root: string): RepoFramework {
         // Python framework detection
         if (isPy) {
           if (!signatures.fastapi) {
-            const content = readFileSync(fullPath, 'utf-8');
+            const content = readTextFileWithinLimit(fullPath) ?? '';
             if (FASTAPI_IMPORT_RE.test(content)) {
               signatures.fastapi = true;
             }
@@ -223,7 +233,7 @@ function detectFramework(root: string): RepoFramework {
           if (name === 'urls.py') {
             signatures.django = true;
           } else if (name === 'settings.py') {
-            const content = readFileSync(fullPath, 'utf-8');
+            const content = readTextFileWithinLimit(fullPath) ?? '';
             if (DJANGO_SETTINGS_RE.test(content)) {
               signatures.django = true;
             }
@@ -232,7 +242,7 @@ function detectFramework(root: string): RepoFramework {
         }
 
         // JS/TS framework detection
-        const content = readFileSync(fullPath, 'utf-8');
+        const content = readTextFileWithinLimit(fullPath) ?? '';
         if (!signatures.tanstackRouter && TANSTACK_RE.test(content)) {
           signatures.tanstackRouter = true;
         }

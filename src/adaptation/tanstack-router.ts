@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { basename, join, relative, sep } from 'node:path';
 import type { ApiEndpointHint, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -233,7 +234,7 @@ export function canScanTanStackRouterRepo(root: string): boolean {
   for (const filePath of walkFiles(root)) {
     if (!isSourceFile(filePath)) continue;
 
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     if (TANSTACK_ROUTER_IMPORT_RE.test(content)) {
       return true;
     }
@@ -252,7 +253,7 @@ export function scanTanStackRouterRepo(root: string): RepoHints {
   const callbackRoutes: string[] = [];
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
 
     // Extract routes from route config objects (path: "/...")
     routes.push(...extractRouteConfigPaths(content));

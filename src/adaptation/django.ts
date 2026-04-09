@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const SOURCE_EXTENSIONS = new Set(['.py', '.html']);
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -173,7 +174,7 @@ export function canScanDjangoRepo(root: string): boolean {
 
     // Check for settings.py containing Django markers
     if (name === 'settings.py') {
-      const content = readFileSync(filePath, 'utf-8');
+      const content = readTextFileWithinLimit(filePath) ?? '';
       if (DJANGO_SETTINGS_RE.test(content)) {
         return true;
       }
@@ -201,7 +202,7 @@ export function scanDjangoRepo(root: string): RepoHints {
   const noiseMap = new Map<string, { method?: string; pathPrefix: string; statuses: number[] }>();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const name = basename(filePath);
 
     // Extract routes from urls.py files
@@ -258,7 +259,7 @@ export function scanDjangoRepo(root: string): RepoHints {
       if (allMethods.length > 0 && name === 'views.py') {
         const siblingUrls = join(dirname(filePath), 'urls.py');
         if (existsSync(siblingUrls)) {
-          const urlsContent = readFileSync(siblingUrls, 'utf-8');
+          const urlsContent = readTextFileWithinLimit(siblingUrls) ?? '';
           const fileRoutes = extractDjangoRoutes(urlsContent);
           for (const route of fileRoutes) {
             if (!/^\/api\//i.test(route)) continue;
@@ -282,7 +283,7 @@ export function scanDjangoRepo(root: string): RepoHints {
         if (hasAuthMiddleware) {
           const siblingUrls = join(dirname(filePath), 'urls.py');
           if (existsSync(siblingUrls)) {
-            const urlsContent = readFileSync(siblingUrls, 'utf-8');
+            const urlsContent = readTextFileWithinLimit(siblingUrls) ?? '';
             const appRoutes = extractDjangoRoutes(urlsContent).map(normalizeRoute);
             for (const route of appRoutes) {
               if (!/^\/api\//i.test(route)) continue;

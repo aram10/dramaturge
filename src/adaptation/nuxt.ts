@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const VUE_FILE_RE = /\.vue$/;
 const JS_TS_FILE_RE = /\.(?:ts|js|mjs|cjs)$/;
@@ -169,7 +170,7 @@ export function scanNuxtRepo(root: string): RepoHints {
 
   for (const filePath of apiFiles) {
     const route = apiRouteFromFile(apiDir, filePath);
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const methodFromName = extractMethodFromFilename(filePath);
     const methods = methodFromName ? [methodFromName] : ['GET'];
     const statuses = extractStatusCodes(content);
@@ -214,7 +215,7 @@ export function scanNuxtRepo(root: string): RepoHints {
 
   // Extract selectors from all vue files
   const stableSelectors = uniqueSorted(
-    vueFiles.flatMap((filePath) => extractStableSelectors(readFileSync(filePath, 'utf-8')))
+    vueFiles.flatMap((filePath) => extractStableSelectors(readTextFileWithinLimit(filePath) ?? ''))
   );
 
   // Auth hints
@@ -224,7 +225,7 @@ export function scanNuxtRepo(root: string): RepoHints {
   // Expected HTTP noise from API files with 401/403
   const expectedHttpNoise: ExpectedHttpNoise[] = [];
   for (const filePath of apiFiles) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     const statuses = extractStatusCodes(content).filter(
       (status) => status === 401 || status === 403
     );

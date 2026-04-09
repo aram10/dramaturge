@@ -11,10 +11,21 @@ import { shortId } from '../constants.js';
 
 type MessageHandler = (message: A2AMessage) => void;
 
+const DEFAULT_MESSAGE_HISTORY_LIMIT = 500;
+
+export interface MessageBusOptions {
+  maxHistory?: number;
+}
+
 export class MessageBus {
   private handlers = new Map<string, MessageHandler[]>();
   private broadcastHandlers: MessageHandler[] = [];
   private history: A2AMessage[] = [];
+  private readonly maxHistory: number;
+
+  constructor(options: MessageBusOptions = {}) {
+    this.maxHistory = Math.max(1, options.maxHistory ?? DEFAULT_MESSAGE_HISTORY_LIMIT);
+  }
 
   /**
    * Send a message from one agent to another (or broadcast with toAgent="*").
@@ -41,6 +52,7 @@ export class MessageBus {
     };
 
     this.history.push(message);
+    this.trimHistory();
 
     if (toAgent === '*') {
       // Broadcast
@@ -122,5 +134,11 @@ export class MessageBus {
   /** Total messages sent. */
   size(): number {
     return this.history.length;
+  }
+
+  private trimHistory(): void {
+    if (this.history.length > this.maxHistory) {
+      this.history.splice(0, this.history.length - this.maxHistory);
+    }
   }
 }

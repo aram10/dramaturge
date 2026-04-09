@@ -106,4 +106,56 @@ describe('worker-pool', () => {
     expect(authenticateMock).toHaveBeenCalledTimes(1);
     expect(applyStorageStateMock).not.toHaveBeenCalled();
   });
+
+  it('initializes worker sessions in parallel', async () => {
+    let firstInitReleased = false;
+    let releaseFirstInit: (() => void) | undefined;
+
+    stagehandCtor.mockReset();
+    stagehandCtor
+      .mockImplementationOnce(function StagehandMock(this: any) {
+        this.init = vi.fn(
+          () =>
+            new Promise<void>((resolve) => {
+              releaseFirstInit = () => {
+                firstInitReleased = true;
+                resolve();
+              };
+            })
+        );
+        this.context = {
+          pages: () => [{ name: 'page-1' }],
+          close: vi.fn().mockResolvedValue(undefined),
+        };
+      } as any)
+      .mockImplementationOnce(function StagehandMock(this: any) {
+        this.init = vi.fn().mockResolvedValue(undefined);
+        this.context = {
+          pages: () => [{ name: 'page-2' }],
+          close: vi.fn().mockResolvedValue(undefined),
+        };
+      } as any);
+
+    const errorCollector = { attach: vi.fn() };
+    const initPromise = initWorkerPool(
+      {
+        targetUrl: 'https://example.com/app',
+        models: { planner: 'anthropic/claude-sonnet-4-6' },
+        browser: { headless: false },
+      } as any,
+      2,
+      errorCollector as any
+    );
+
+    await Promise.resolve();
+
+    expect(stagehandCtor).toHaveBeenCalledTimes(2);
+    expect(authenticateMock).toHaveBeenCalledTimes(1);
+    expect(firstInitReleased).toBe(false);
+
+    releaseFirstInit?.();
+    const pool = await initPromise;
+    expect(pool).toHaveLength(2);
+    expect(authenticateMock).toHaveBeenCalledTimes(2);
+  });
 });

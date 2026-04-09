@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
+import { readTextFileWithinLimit } from './file-utils.js';
 
 const SOURCE_EXTENSIONS = new Set(['.py', '.html']);
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -162,7 +163,7 @@ function extractPydanticModels(content: string): string[] {
 export function canScanFastApiRepo(root: string): boolean {
   for (const filePath of walkFiles(root)) {
     if (!filePath.endsWith('.py')) continue;
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
     if (FASTAPI_IMPORT_RE.test(content)) {
       return true;
     }
@@ -188,7 +189,7 @@ export function scanFastApiRepo(root: string): RepoHints {
   const noiseMap = new Map<string, { method?: string; pathPrefix: string; statuses: number[] }>();
 
   for (const filePath of walkFiles(root)) {
-    const content = readFileSync(filePath, 'utf-8');
+    const content = readTextFileWithinLimit(filePath) ?? '';
 
     // Extract routes from FastAPI decorators in .py files
     if (filePath.endsWith('.py')) {

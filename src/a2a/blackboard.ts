@@ -12,6 +12,12 @@
 import type { BlackboardEntry, BlackboardEntryKind } from './types.js';
 import { shortId } from '../constants.js';
 
+const DEFAULT_BLACKBOARD_ENTRY_LIMIT = 500;
+
+export interface BlackboardOptions {
+  maxEntries?: number;
+}
+
 /**
  * A typed blackboard for inter-agent coordination.
  *
@@ -25,6 +31,11 @@ export class Blackboard {
     BlackboardEntryKind | '*',
     Array<(entry: BlackboardEntry) => void>
   >();
+  private readonly maxEntries: number;
+
+  constructor(options: BlackboardOptions = {}) {
+    this.maxEntries = Math.max(1, options.maxEntries ?? DEFAULT_BLACKBOARD_ENTRY_LIMIT);
+  }
 
   /** Post an entry to the blackboard. Notifies matching subscribers. */
   post(
@@ -42,6 +53,7 @@ export class Blackboard {
       tags: [...tags],
     };
     this.entries.push(entry);
+    this.trimEntries();
 
     // Notify kind-specific subscribers
     const kindSubs = this.subscribers.get(kind);
@@ -118,5 +130,11 @@ export class Blackboard {
     });
 
     return `Blackboard (${this.entries.length} entries, showing last ${recent.length}):\n${lines.join('\n')}`;
+  }
+
+  private trimEntries(): void {
+    if (this.entries.length > this.maxEntries) {
+      this.entries.splice(0, this.entries.length - this.maxEntries);
+    }
   }
 }
