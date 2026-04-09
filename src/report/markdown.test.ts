@@ -252,7 +252,7 @@ describe('renderMarkdown', () => {
                 category: 'Bug',
                 severity: 'Major',
                 title: 'Breaks [link](x) @ops',
-                stepsToReproduce: ['Open page'],
+                stepsToReproduce: ['Open [billing](x) @team'],
                 expected: 'Show *safe* text',
                 actual: 'Rendered `raw` mention @staff',
               },
@@ -269,6 +269,7 @@ describe('renderMarkdown', () => {
 
     expect(md).toContain('https://example.com/@\u200Bteam?tab=\\[prod\\]');
     expect(md).toContain('Breaks \\[link\\]\\(x\\) @\u200Bops');
+    expect(md).toContain('1. Open \\[billing\\]\\(x\\) @\u200Bteam');
     expect(md).toContain('Show \\*safe\\* text');
     expect(md).toContain('Rendered \\`raw\\` mention @\u200Bstaff');
   });

@@ -87,7 +87,9 @@ export function renderMarkdown(result: RunResult): string {
     lines.push('## Findings');
     lines.push('');
     for (const f of findings) {
-      const steps = f.stepsToReproduce.map((s, i) => `  ${i + 1}. ${s}`).join('\n');
+      const steps = f.stepsToReproduce
+        .map((s, i) => `  ${i + 1}. ${escapeMarkdownInline(s)}`)
+        .join('\n');
       lines.push(
         `### [${escapeMarkdownInline(f.id)}] ${escapeMarkdownInline(f.severity)}: ${escapeMarkdownInline(f.title)}`
       );
