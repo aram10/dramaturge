@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { shortId } from "../constants.js";
 import { hasLLMApiKey } from "../llm.js";
 import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from "../prompt-safety.js";

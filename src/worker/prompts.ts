@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { AdversarialConfig } from '../config.js';
 import type { MissionConfig, PageType, WorkerType, AgentRole } from '../types.js';
 import type { RepoHints } from '../adaptation/types.js';

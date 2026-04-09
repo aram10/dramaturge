@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { createRequire } from 'node:module';
 import type { ErrorObject, ValidateFunction } from 'ajv';
 import type { JsonSchema } from './types.js';

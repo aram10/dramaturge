@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { analyzeScreenshot, parseVisionResponse } from "./vision-analysis.js";
 import type { VisionAnalysisOptions } from "./vision-analysis.js";

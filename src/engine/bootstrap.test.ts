@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { PassThrough } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';

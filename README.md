@@ -7,15 +7,8 @@ It combines agentic browser exploration with deterministic auth flows, API contr
 ## Install
 
 ```bash
-pnpm add @aram10/dramaturge
+pnpm add dramaturge
 pnpm exec playwright install chromium
-```
-
-For GitHub Packages, configure an `.npmrc` like:
-
-```text
-@aram10:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
 ## Run

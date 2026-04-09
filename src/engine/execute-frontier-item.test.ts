@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { executeFrontierItem } from './execute-frontier-item.js';
 import { executeWorkerTask } from '../worker/worker.js';

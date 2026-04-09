@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { MissionConfig } from '../types.js';
 import type { RepoHints } from '../adaptation/types.js';
 import { FrontierQueue } from '../graph/frontier.js';

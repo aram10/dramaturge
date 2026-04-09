@@ -3,7 +3,7 @@
   "release-type": "node",
   "packages": {
     ".": {
-      "package-name": "@aram10/dramaturge",
+      "package-name": "dramaturge",
       "changelog-path": "CHANGELOG.md"
     }
   }

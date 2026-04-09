@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { readFileSync } from 'node:fs';
 import { extname } from 'node:path';
 import { parse as parseYaml } from 'yaml';

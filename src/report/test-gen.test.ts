@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, expect, it } from 'vitest';
 import { generatePlaywrightTests } from './test-gen.js';
 import type { RunResult } from '../types.js';

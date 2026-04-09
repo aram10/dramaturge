@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { pathToFileURL } from 'node:url';
 import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from './config.js';
 import { resolveResumeDir } from './config-paths.js';

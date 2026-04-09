@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { StateNode, WorkerType } from '../types.js';
 import type { PlannerMemorySignals } from '../memory/types.js';
 import type { DiffContext } from '../diff/types.js';
