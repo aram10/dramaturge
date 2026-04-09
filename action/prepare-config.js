@@ -144,7 +144,10 @@ export function prepareConfig({
   const tmpConfig = join(configDir, `.dramaturge-ci-config-${process.pid}.json`);
   writeFileSync(tmpConfig, JSON.stringify(preparedConfig, null, 2));
 
-  const effectiveReportDir = resolve(configDir, preparedConfig.output?.dir || './dramaturge-reports');
+  const effectiveReportDir = resolve(
+    configDir,
+    preparedConfig.output?.dir || './dramaturge-reports'
+  );
   const jsonOutputEnabled = isJsonOutputEnabled(preparedConfig);
 
   if (githubOutput) {
@@ -175,6 +178,9 @@ function main() {
   console.log(`Report dir: ${result.reportDir}`);
 }
 
-if (typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  typeof process.argv[1] === 'string' &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   main();
 }

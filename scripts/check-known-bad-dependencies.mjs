@@ -54,8 +54,7 @@ function violatesRule(version, rule) {
   }
 
   return (
-    compareSemver(version, rule.minInclusive) >= 0 &&
-    compareSemver(version, rule.maxExclusive) < 0
+    compareSemver(version, rule.minInclusive) >= 0 && compareSemver(version, rule.maxExclusive) < 0
   );
 }
 
@@ -72,9 +71,7 @@ for (const rule of DENYLIST) {
     }
 
     if (violatesRule(entry.version, rule)) {
-      violations.push(
-        `${entry.packageName}@${entry.version} is denied: ${rule.reason}`
-      );
+      violations.push(`${entry.packageName}@${entry.version} is denied: ${rule.reason}`);
     }
   }
 }
