@@ -1,6 +1,7 @@
 import type { LLMTaskProposal, WorkerType } from './types.js';
 import type { JudgeDecision } from './judge/types.js';
 import { TRUNCATE_GROUP_KEY, DEFAULT_LLM_TIMEOUT_MS, JUDGE_LLM_TIMEOUT_MS } from './constants.js';
+import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from './prompt-safety.js';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -169,11 +170,15 @@ Respond with a JSON array of task proposals. Each task must have:
 Return ONLY the JSON array, no markdown fencing, no explanation.
 Propose 1-4 tasks. Focus on the highest-value testing activities for this specific page type.`;
 
-  const userPrompt = `## Current State Graph
-${graphSummary}
+  const trustBoundaryInstruction = UNTRUSTED_PROMPT_INSTRUCTION;
+
+  const userPrompt = `${trustBoundaryInstruction}
+
+## Current State Graph
+${wrapUntrustedPromptContent('STATE GRAPH SUMMARY', graphSummary)}
 
 ## Page to Plan For
-${nodeDescription}
+${wrapUntrustedPromptContent('PAGE DESCRIPTION', nodeDescription)}
 
 Propose testing tasks for this page.`;
 
@@ -244,10 +249,14 @@ Return a single JSON object with exactly these keys:
 
 Return ONLY JSON. No markdown fences, no explanation.`;
 
+  const safePrompt = `${UNTRUSTED_PROMPT_INSTRUCTION}
+
+${wrapUntrustedPromptContent('JUDGE INPUT', prompt)}`;
+
   const raw = await callLLM(
     model,
     system,
-    [{ role: 'user', content: prompt }],
+    [{ role: 'user', content: safePrompt }],
     512,
     requestTimeoutMs
   );

@@ -1,5 +1,6 @@
 import { shortId } from "../constants.js";
 import { hasLLMApiKey } from "../llm.js";
+import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from "../prompt-safety.js";
 import type { Evidence, RawFinding, FindingSeverity, FindingCategory, PageType } from "../types.js";
 
 export interface VisionAnalysisOptions {
@@ -306,7 +307,12 @@ export async function analyzeScreenshot(
   });
   const base64Image = screenshotBuffer.toString("base64");
 
-  const pageContext = `Page URL: ${options.route}\nPage type: ${options.pageType}\nArea: ${options.areaName}\n\nAnalyze this screenshot for layout structure and visual anomalies.`;
+  const pageContext = `${UNTRUSTED_PROMPT_INSTRUCTION}
+
+${wrapUntrustedPromptContent(
+  "VISION PAGE CONTEXT",
+  `Page URL: ${options.route}\nPage type: ${options.pageType}\nArea: ${options.areaName}\n\nAnalyze this screenshot for layout structure and visual anomalies.`
+)}`;
 
   const raw = await callVisionLLM(
     options.model,
