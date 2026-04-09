@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { shortId } from '../constants.js';
 import type { Evidence, ReplayableAction } from '../types.js';
 import type { Observation, TraceBundle } from './types.js';

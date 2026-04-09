@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, expect, it } from 'vitest';
 import { join, resolve } from 'node:path';
 import { getConfigFileContext, normalizeConfigPaths, resolveResumeDir } from './config-paths.js';

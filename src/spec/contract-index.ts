@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { validateJsonSchema } from './ajv.js';
 import type { NormalizedOperationSpec, NormalizedSpecArtifact } from './types.js';
 import { buildOperationKey } from './validators.js';

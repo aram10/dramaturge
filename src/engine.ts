@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { request as playwrightRequest } from 'playwright';

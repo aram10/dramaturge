@@ -1,5 +1,5 @@
 {
-  "name": "@aram10/dramaturge",
+  "name": "dramaturge",
   "version": "0.2.0",
   "description": "Exploratory QA engine for web applications with UI, API, and evidence-backed replay",
   "repository": {
@@ -47,7 +47,7 @@
   },
   "packageManager": "pnpm@9.12.3",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",

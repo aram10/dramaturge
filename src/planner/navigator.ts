@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { Stagehand } from '@browserbasehq/stagehand';
 import type { NavigationHint, StateNode } from '../types.js';
 import type { StateGraph } from '../graph/state-graph.js';

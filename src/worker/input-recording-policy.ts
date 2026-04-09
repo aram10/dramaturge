@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 export type InputRecordingPolicy = 'safe' | 'secret';
 
 const INPUT_RECORDING_POLICY = Symbol('dramaturge.input-recording-policy');

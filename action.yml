@@ -88,14 +88,11 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
-        registry-url: 'https://npm.pkg.github.com'
-        scope: '@aram10'
+        registry-url: 'https://registry.npmjs.org'
 
     - name: Install Dramaturge
       shell: bash
-      env:
-        NODE_AUTH_TOKEN: ${{ github.token }}
-      run: npm install -g @aram10/dramaturge@${{ inputs.dramaturge-version }}
+      run: npm install -g dramaturge@${{ inputs.dramaturge-version }}
 
     - name: Install Playwright browsers
       shell: bash

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import type { BrowserConsoleError, BrowserNetworkError, BrowserPageError } from '../types.js';
 import type { RepoHints } from '../adaptation/types.js';
 import type { PolicyConfig } from './types.js';

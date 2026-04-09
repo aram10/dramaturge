@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { z } from 'zod';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';

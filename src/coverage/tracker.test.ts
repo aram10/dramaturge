@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, it, expect } from "vitest";
 import { CoverageTracker } from "./tracker.js";
 import type { CoverageEvent, BlindSpot } from "../types.js";

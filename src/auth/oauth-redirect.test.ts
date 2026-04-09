@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, expect, it, vi } from 'vitest';
 import type { AuthBrowserPage, BrowserSessionLike } from '../browser/page-interface.js';
 import { ActionRecorder } from '../worker/action-recorder.js';

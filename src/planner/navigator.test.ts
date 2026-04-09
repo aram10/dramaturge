@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Navigator } from './navigator.js';
 import { captureFingerprint } from '../graph/fingerprint.js';

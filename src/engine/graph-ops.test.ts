@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { describe, expect, it, vi } from 'vitest';
 import { StateGraph } from '../graph/state-graph.js';
 import { assignPageNodeOwner, expandGraph, flushOwnedBrowserErrors } from './graph-ops.js';

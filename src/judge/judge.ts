@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { shortId } from '../constants.js';
 import { buildAgentFindingMeta } from '../repro/repro.js';
 import type { RawFinding } from '../types.js';

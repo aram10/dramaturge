@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (c) 2026 Alex Rambasek
+
 import { readFileSync, statSync } from 'node:fs';
 
 export const DEFAULT_SCAN_FILE_SIZE_LIMIT_BYTES = 1024 * 1024;
