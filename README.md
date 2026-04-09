@@ -45,7 +45,7 @@ Traditional QA approaches require upfront investment in test suites, selectors, 
 - **Accessibility testing** — powered by axe-core via Playwright
 - **Visual regression** — deterministic baselines with pixelmatch diff detection
 - **API contract validation** — replay traffic against OpenAPI specs or discovered contracts
-- **Web vitals** — performance metrics (CLS, LCP, FID)
+- **Web vitals** — performance metrics (CLS, LCP, INP)
 - **Cost tracking** — LLM token usage per worker type
 
 ### 📊 Intelligent Reporting
