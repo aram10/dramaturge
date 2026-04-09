@@ -237,4 +237,39 @@ describe('renderMarkdown', () => {
     expect(md).toContain('**Occurrences:** 2');
     expect(md).toContain('**Impacted areas:** Knowledge bases, Settings');
   });
+
+  it('escapes untrusted markdown and neutralizes mentions in finding output', () => {
+    const md = renderMarkdown(
+      makeResult({
+        targetUrl: 'https://example.com/@team?tab=[prod]',
+        areaResults: [
+          {
+            name: 'Billing [Admin]',
+            steps: 1,
+            findings: [
+              {
+                ref: 'fid-billing',
+                category: 'Bug',
+                severity: 'Major',
+                title: 'Breaks [link](x) @ops',
+                stepsToReproduce: ['Open page'],
+                expected: 'Show *safe* text',
+                actual: 'Rendered `raw` mention @staff',
+              },
+            ],
+            screenshots: new Map(),
+            evidence: [],
+            coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+            pageType: 'settings',
+            status: 'explored',
+          },
+        ],
+      })
+    );
+
+    expect(md).toContain('https://example.com/@\u200Bteam?tab=\\[prod\\]');
+    expect(md).toContain('Breaks \\[link\\]\\(x\\) @\u200Bops');
+    expect(md).toContain('Show \\*safe\\* text');
+    expect(md).toContain('Rendered \\`raw\\` mention @\u200Bstaff');
+  });
 });

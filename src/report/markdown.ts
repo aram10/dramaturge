@@ -10,6 +10,14 @@ function escapeTableCell(text: string): string {
     .replace(/[\r\n]+/g, ' ');
 }
 
+function escapeMarkdownInline(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/[[\]`*_{}()#+!|>]/g, '\\$&')
+    .replace(/@/g, '@\u200B')
+    .replace(/[\r\n]+/g, ' ');
+}
+
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -49,7 +57,7 @@ export function renderMarkdown(result: RunResult): string {
     lines.push('> **Warning:** This run was incomplete. Some areas may not have been explored.');
     lines.push('');
   }
-  lines.push(`**Target:** ${result.targetUrl}`);
+  lines.push(`**Target:** ${escapeMarkdownInline(result.targetUrl)}`);
   lines.push(
     `**Duration:** ${formatDuration(duration)} | **Areas explored:** ${exploredAreas.length} | **Total steps:** ${totalSteps}`
   );
@@ -80,69 +88,81 @@ export function renderMarkdown(result: RunResult): string {
     lines.push('');
     for (const f of findings) {
       const steps = f.stepsToReproduce.map((s, i) => `  ${i + 1}. ${s}`).join('\n');
-      lines.push(`### [${f.id}] ${f.severity}: ${f.title}`);
-      lines.push(`- **Area:** ${f.area}`);
+      lines.push(
+        `### [${escapeMarkdownInline(f.id)}] ${escapeMarkdownInline(f.severity)}: ${escapeMarkdownInline(f.title)}`
+      );
+      lines.push(`- **Area:** ${escapeMarkdownInline(f.area)}`);
       if (diffScope) {
         const scope = diffScope.get(f.area) ?? 'unchanged';
-        lines.push(`- **Diff scope:** ${scope}`);
+        lines.push(`- **Diff scope:** ${escapeMarkdownInline(scope)}`);
       }
-      lines.push(`- **Category:** ${f.category}`);
-      lines.push(`- **Severity:** ${f.severity}`);
+      lines.push(`- **Category:** ${escapeMarkdownInline(f.category)}`);
+      lines.push(`- **Severity:** ${escapeMarkdownInline(f.severity)}`);
       lines.push(`- **Steps to reproduce:**`);
       lines.push(steps);
-      lines.push(`- **Expected:** ${f.expected}`);
-      lines.push(`- **Actual:** ${f.actual}`);
+      lines.push(`- **Expected:** ${escapeMarkdownInline(f.expected)}`);
+      lines.push(`- **Actual:** ${escapeMarkdownInline(f.actual)}`);
       if (f.verdict) {
-        lines.push(`- **Hypothesis:** ${f.verdict.hypothesis}`);
-        lines.push(`- **Observation:** ${f.verdict.observation}`);
+        lines.push(`- **Hypothesis:** ${escapeMarkdownInline(f.verdict.hypothesis)}`);
+        lines.push(`- **Observation:** ${escapeMarkdownInline(f.verdict.observation)}`);
         if (f.verdict.evidenceChain.length > 0) {
-          lines.push(`- **Evidence chain:** ${f.verdict.evidenceChain.join(' | ')}`);
+          lines.push(
+            `- **Evidence chain:** ${f.verdict.evidenceChain.map((entry) => escapeMarkdownInline(entry)).join(' | ')}`
+          );
         }
         if (f.verdict.alternativesConsidered.length > 0) {
           lines.push(
-            `- **Alternative explanations:** ${f.verdict.alternativesConsidered.join(' | ')}`
+            `- **Alternative explanations:** ${f.verdict.alternativesConsidered.map((entry) => escapeMarkdownInline(entry)).join(' | ')}`
           );
         }
         if (f.verdict.suggestedVerification.length > 0) {
           lines.push(
-            `- **Suggested verification:** ${f.verdict.suggestedVerification.join(' | ')}`
+            `- **Suggested verification:** ${f.verdict.suggestedVerification.map((entry) => escapeMarkdownInline(entry)).join(' | ')}`
           );
         }
       }
       if (f.occurrenceCount > 1) {
         lines.push(`- **Occurrences:** ${f.occurrenceCount}`);
-        lines.push(`- **Impacted areas:** ${f.impactedAreas.join(', ')}`);
+        lines.push(
+          `- **Impacted areas:** ${f.impactedAreas.map((area) => escapeMarkdownInline(area)).join(', ')}`
+        );
       }
       if (f.screenshot) {
-        lines.push(`- **Screenshot:** ${f.screenshot}`);
+        lines.push(`- **Screenshot:** ${escapeMarkdownInline(f.screenshot)}`);
       }
       if (f.meta) {
-        lines.push(`- **Source:** ${f.meta.source}`);
-        lines.push(`- **Confidence:** ${f.meta.confidence}`);
+        lines.push(`- **Source:** ${escapeMarkdownInline(f.meta.source)}`);
+        lines.push(`- **Confidence:** ${escapeMarkdownInline(f.meta.confidence)}`);
         if (f.meta.repro?.stateId) {
-          lines.push(`- **Repro state:** ${f.meta.repro.stateId}`);
+          lines.push(`- **Repro state:** ${escapeMarkdownInline(f.meta.repro.stateId)}`);
         }
         if (f.meta.repro?.route) {
-          lines.push(`- **Repro route:** ${f.meta.repro.route}`);
+          lines.push(`- **Repro route:** ${escapeMarkdownInline(f.meta.repro.route)}`);
         }
         if (f.meta.repro?.objective) {
-          lines.push(`- **Repro objective:** ${f.meta.repro.objective}`);
+          lines.push(`- **Repro objective:** ${escapeMarkdownInline(f.meta.repro.objective)}`);
         }
         if ((f.meta.repro?.breadcrumbs?.length ?? 0) > 0) {
-          lines.push(`- **Repro breadcrumbs:** ${f.meta.repro?.breadcrumbs.join(' | ')}`);
+          lines.push(
+            `- **Repro breadcrumbs:** ${f.meta.repro?.breadcrumbs.map((crumb) => escapeMarkdownInline(crumb)).join(' | ')}`
+          );
         }
         if ((f.meta.repro?.actionIds?.length ?? 0) > 0) {
-          lines.push(`- **Repro action ids:** ${f.meta.repro?.actionIds?.join(', ')}`);
+          lines.push(
+            `- **Repro action ids:** ${f.meta.repro?.actionIds?.map((id) => escapeMarkdownInline(id)).join(', ')}`
+          );
         }
         if ((f.meta.repro?.evidenceIds?.length ?? 0) > 0) {
-          lines.push(`- **Repro evidence:** ${f.meta.repro?.evidenceIds.join(', ')}`);
+          lines.push(
+            `- **Repro evidence:** ${f.meta.repro?.evidenceIds.map((id) => escapeMarkdownInline(id)).join(', ')}`
+          );
         }
         if (
           (f.meta.repro?.actionIds?.length ?? 0) > 0 ||
           (f.meta.repro?.evidenceIds?.length ?? 0) > 0
         ) {
           lines.push(
-            `- **Trace bundle:** actions=${f.meta.repro?.actionIds?.join(', ') || 'none'} | evidence=${f.meta.repro?.evidenceIds?.join(', ') || 'none'}`
+            `- **Trace bundle:** actions=${f.meta.repro?.actionIds?.map((id) => escapeMarkdownInline(id)).join(', ') || 'none'} | evidence=${f.meta.repro?.evidenceIds?.map((id) => escapeMarkdownInline(id)).join(', ') || 'none'}`
           );
         }
       }
@@ -221,7 +241,7 @@ export function renderMarkdown(result: RunResult): string {
   if (result.unexploredAreas.length > 0) {
     lines.push('## Areas Not Explored');
     for (const area of result.unexploredAreas) {
-      lines.push(`- ${area.name} (${area.reason})`);
+      lines.push(`- ${escapeMarkdownInline(area.name)} (${escapeMarkdownInline(area.reason)})`);
     }
     lines.push('');
   }
@@ -255,13 +275,13 @@ export function renderMarkdown(result: RunResult): string {
   if (result.diffSummary) {
     const ds = result.diffSummary;
     lines.push('## Diff Summary');
-    lines.push(`- **Base ref:** ${ds.baseRef}`);
+    lines.push(`- **Base ref:** ${escapeMarkdownInline(ds.baseRef)}`);
     lines.push(`- **Changed files:** ${ds.changedFileCount}`);
     lines.push(
-      `- **Affected routes:** ${ds.affectedRoutes.length > 0 ? ds.affectedRoutes.join(', ') : 'none detected'}`
+      `- **Affected routes:** ${ds.affectedRoutes.length > 0 ? ds.affectedRoutes.map((route) => escapeMarkdownInline(route)).join(', ') : 'none detected'}`
     );
     lines.push(
-      `- **Affected API endpoints:** ${ds.affectedApiEndpoints.length > 0 ? ds.affectedApiEndpoints.join(', ') : 'none detected'}`
+      `- **Affected API endpoints:** ${ds.affectedApiEndpoints.length > 0 ? ds.affectedApiEndpoints.map((endpoint) => escapeMarkdownInline(endpoint)).join(', ') : 'none detected'}`
     );
     if (diffScope) {
       const changedCount = [...diffScope.values()].filter((v) => v === 'changed').length;
@@ -290,12 +310,12 @@ export function renderMarkdown(result: RunResult): string {
     const rc = result.runConfig;
     const ckpt = rc.checkpointInterval === 0 ? 'disabled' : `every ${rc.checkpointInterval} tasks`;
     lines.push(`## Run Configuration
-- **App:** ${rc.appDescription}
-- **Planner model:** ${rc.models.planner}
-- **Worker model:** ${rc.models.worker}
+- **App:** ${escapeMarkdownInline(rc.appDescription)}
+- **Planner model:** ${escapeMarkdownInline(rc.models.planner)}
+- **Worker model:** ${escapeMarkdownInline(rc.models.worker)}
 - **Concurrency:** ${rc.concurrency} worker(s)
 - **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states
-- **Checkpoint interval:** ${ckpt}
+- **Checkpoint interval:** ${escapeMarkdownInline(ckpt)}
 - **Auto-capture:** ${rc.autoCaptureEnabled ? 'enabled' : 'disabled'}
 - **LLM planner:** ${rc.llmPlannerEnabled ? 'enabled' : 'disabled'}
 - **Memory:** ${rc.memoryEnabled ? 'enabled' : 'disabled'}

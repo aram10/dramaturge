@@ -248,4 +248,45 @@ describe('proposeLLMTasks', () => {
     expect(result).toBeNull();
     vi.useRealTimers();
   });
+
+  it('sends Google API keys via header instead of embedding them in the request URL', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-google-key';
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify([
+                    {
+                      workerType: 'navigation',
+                      objective: 'Inspect dashboard',
+                      reason: 'Entry page',
+                      priority: 0.5,
+                    },
+                  ]),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    }) as any;
+
+    const result = await proposeLLMTasks('google/gemini-2.0-flash', 'graph', 'desc', [
+      'navigation',
+    ]);
+
+    expect(result).toHaveLength(1);
+    const [requestUrl, requestInit] = (globalThis.fetch as any).mock.calls[0];
+    expect(requestUrl).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+    );
+    expect(requestUrl).not.toContain('test-google-key');
+    expect(requestInit.headers['x-goog-api-key']).toBe('test-google-key');
+  });
 });

@@ -357,7 +357,12 @@ describe("analyzeScreenshot", () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const requestUrl = fetchSpy.mock.calls[0][0] as string;
+    const requestInit = fetchSpy.mock.calls[0][1] as RequestInit & {
+      headers: Record<string, string>;
+    };
     expect(requestUrl).toContain("generativelanguage.googleapis.com");
+    expect(requestUrl).not.toContain("test-google-key");
+    expect(requestInit.headers["x-goog-api-key"]).toBe("test-google-key");
   });
 
   it("includes verdict with evidence chain in findings", async () => {

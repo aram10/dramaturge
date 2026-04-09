@@ -62,6 +62,14 @@ export function formatDuration(ms) {
   return `${seconds}s`;
 }
 
+function escapeMarkdownInline(text) {
+  return String(text)
+    .replace(/\\/g, '\\\\')
+    .replace(/[[\]`*_{}()#+!|>]/g, '\\$&')
+    .replace(/@/g, '@\u200B')
+    .replace(/[\r\n]+/g, ' ');
+}
+
 /**
  * Builds a markdown summary and extracts key metrics from a parsed report.
  *
@@ -99,7 +107,7 @@ export function buildSummary(report) {
   const duration = meta.durationMs ? formatDuration(meta.durationMs) : 'unknown';
 
   let md = `## \u{1F3AD} Dramaturge QA Report\n\n`;
-  md += `**Target:** ${meta.targetUrl || 'unknown'}  \n`;
+  md += `**Target:** ${escapeMarkdownInline(meta.targetUrl || 'unknown')}  \n`;
   md += `**Duration:** ${duration}  \n`;
 
   if (totalFindings === 0) {
@@ -118,7 +126,7 @@ export function buildSummary(report) {
   if (topFindings.length > 0) {
     md += `\n### Top Findings\n\n`;
     for (const f of topFindings) {
-      md += `- **${f.id}** (${f.severity}) \u2014 ${f.title}\n`;
+      md += `- **${escapeMarkdownInline(f.id)}** (${escapeMarkdownInline(f.severity)}) \u2014 ${escapeMarkdownInline(f.title)}\n`;
     }
   }
 

@@ -76,7 +76,7 @@ function stripProvider(model: string): string {
 interface ProviderVisionSpec {
   envKey: string;
   envName: string;
-  url: (model: string, apiKey: string) => string;
+  url: (model: string) => string;
   headers: (apiKey: string) => Record<string, string>;
   body: (model: string, system: string, base64Image: string, pageContext: string, maxTokens: number) => unknown;
   extract: (data: unknown) => string;
@@ -149,9 +149,9 @@ const VISION_PROVIDERS: Record<Provider, ProviderVisionSpec> = {
   google: {
     envKey: "GOOGLE_GENERATIVE_AI_API_KEY",
     envName: "Google",
-    url: (model, key) =>
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    headers: () => ({ "content-type": "application/json" }),
+    url: (model) =>
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    headers: (key) => ({ "content-type": "application/json", "x-goog-api-key": key }),
     body: (_, system, base64Image, pageContext, maxTokens) => ({
       systemInstruction: { parts: [{ text: system }] },
       contents: [
@@ -179,6 +179,10 @@ const VISION_PROVIDERS: Record<Provider, ProviderVisionSpec> = {
   },
 };
 
+function redactApiKey(text: string, apiKey: string): string {
+  return text.replaceAll(apiKey, "[REDACTED]");
+}
+
 async function callVisionLLM(
   model: string,
   system: string,
@@ -202,7 +206,7 @@ async function callVisionLLM(
   let response: Response;
 
   try {
-    response = await fetch(spec.url(modelId, apiKey), {
+    response = await fetch(spec.url(modelId), {
       method: "POST",
       headers: spec.headers(apiKey),
       body: JSON.stringify(
@@ -217,7 +221,7 @@ async function callVisionLLM(
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     throw new Error(
-      `${spec.envName} Vision API error ${response.status}: ${body.slice(0, 200)}`,
+      `${spec.envName} Vision API error ${response.status}: ${redactApiKey(body, apiKey).slice(0, 200)}`,
     );
   }
 

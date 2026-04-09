@@ -37,7 +37,7 @@ export function hasLLMApiKey(model?: string): boolean {
 interface ProviderSpec {
   envKey: string;
   envName: string;
-  url: (model: string, apiKey: string) => string;
+  url: (model: string) => string;
   headers: (apiKey: string) => Record<string, string>;
   body: (model: string, system: string, messages: ChatMessage[], maxTokens: number) => unknown;
   extract: (data: unknown) => string;
@@ -87,9 +87,9 @@ const PROVIDERS: Record<Provider, ProviderSpec> = {
   google: {
     envKey: 'GOOGLE_GENERATIVE_AI_API_KEY',
     envName: 'Google',
-    url: (model, key) =>
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    headers: () => ({ 'content-type': 'application/json' }),
+    url: (model) =>
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    headers: (key) => ({ 'content-type': 'application/json', 'x-goog-api-key': key }),
     body: (_, system, messages, maxTokens) => ({
       systemInstruction: { parts: [{ text: system }] },
       contents: messages.map((m) => ({
@@ -107,6 +107,10 @@ const PROVIDERS: Record<Provider, ProviderSpec> = {
         .join('') ?? '',
   },
 };
+
+function redactApiKey(text: string, apiKey: string): string {
+  return text.replaceAll(apiKey, '[REDACTED]');
+}
 
 async function callLLM(
   model: string,
@@ -126,7 +130,7 @@ async function callLLM(
   let response: Response;
 
   try {
-    response = await fetch(spec.url(modelId, apiKey), {
+    response = await fetch(spec.url(modelId), {
       method: 'POST',
       headers: spec.headers(apiKey),
       body: JSON.stringify(spec.body(modelId, system, messages, maxTokens)),
@@ -139,7 +143,7 @@ async function callLLM(
   if (!response.ok) {
     const body = await response.text().catch(() => '');
     throw new Error(
-      `${spec.envName} API error ${response.status}: ${body.slice(0, TRUNCATE_GROUP_KEY)}`
+      `${spec.envName} API error ${response.status}: ${redactApiKey(body, apiKey).slice(0, TRUNCATE_GROUP_KEY)}`
     );
   }
 

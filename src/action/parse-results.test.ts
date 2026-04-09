@@ -272,6 +272,21 @@ describe('parse-results', () => {
         Trivial: 0,
       });
     });
+
+    it('escapes markdown-sensitive finding content in the generated summary', () => {
+      const report = {
+        meta: { targetUrl: 'https://example.com/@team?tab=[prod]' },
+        summary: {
+          totalFindings: 1,
+          bySeverity: { Critical: 1, Major: 0, Minor: 0, Trivial: 0 },
+        },
+        findings: [{ id: 'BUG-001', severity: 'Critical', title: 'Breaks [link](x) @ops' }],
+      };
+
+      const result = buildSummary(report);
+      expect(result.markdown).toContain('https://example.com/@\u200Bteam?tab=\\[prod\\]');
+      expect(result.markdown).toContain('Breaks \\[link\\]\\(x\\) @\u200Bops');
+    });
   });
 
   // ---------------------------------------------------------------------------
