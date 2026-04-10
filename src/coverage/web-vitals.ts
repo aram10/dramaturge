@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
+import type { Page } from '@playwright/test';
 import { shortId } from "../constants.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
 import { buildConfirmedFindingMeta } from "../repro/repro.js";
@@ -41,12 +42,22 @@ const DEFAULT_THRESHOLDS: WebVitalsThresholds = {
 };
 
 /**
+ * Severity multipliers for threshold calculations.
+ * - MINOR_THRESHOLD: 1.5x threshold for minor severity
+ * - MAJOR_THRESHOLD: 2.0x threshold for major severity
+ * - POOR_THRESHOLD: 2.5x threshold for critical/poor severity
+ */
+const MINOR_THRESHOLD_MULTIPLIER = 1.5;
+const MAJOR_THRESHOLD_MULTIPLIER = 2.0;
+const POOR_THRESHOLD_MULTIPLIER = 2.5;
+
+/**
  * Collect Core Web Vitals from a live Playwright page.
  *
  * Uses the browser's PerformanceObserver API to read LCP and CLS entries.
  * INP is approximated from the `first-input` entry or longest event timing.
  */
-export async function collectWebVitals(page: any): Promise<WebVitalsResult> {
+export async function collectWebVitals(page: Page): Promise<WebVitalsResult> {
   try {
     const metrics = await page.evaluate(() => {
       const result: { lcp: number | null; cls: number | null; inp: number | null } = {
@@ -99,7 +110,8 @@ export async function collectWebVitals(page: any): Promise<WebVitalsResult> {
       return result;
     });
     return metrics as WebVitalsResult;
-  } catch {
+  } catch (error) {
+    // Best-effort collection; page may not support Performance API
     return { lcp: null, cls: null, inp: null };
   }
 }
@@ -110,7 +122,7 @@ function mapVitalToSeverity(
   poor: number
 ): FindingSeverity {
   if (value >= poor) return "Critical";
-  if (value >= good * 1.5) return "Major";
+  if (value >= good * MINOR_THRESHOLD_MULTIPLIER) return "Major";
   if (value >= good) return "Minor";
   return "Trivial";
 }
@@ -153,7 +165,7 @@ export function evaluateWebVitals(
     findings.push({
       ref: findingRef,
       category: "Performance Issue",
-      severity: mapVitalToSeverity(vitals.lcp, thresholds.lcpMs, thresholds.lcpMs * 2),
+      severity: mapVitalToSeverity(vitals.lcp, thresholds.lcpMs, thresholds.lcpMs * MAJOR_THRESHOLD_MULTIPLIER),
       title: "Largest Contentful Paint exceeds threshold",
       stepsToReproduce: [`Navigate to ${route}`, "Wait for page to fully load"],
       expected: `LCP should be under ${thresholds.lcpMs}ms`,
@@ -188,7 +200,7 @@ export function evaluateWebVitals(
     findings.push({
       ref: findingRef,
       category: "Performance Issue",
-      severity: mapVitalToSeverity(vitals.cls, thresholds.cls, thresholds.cls * 2.5),
+      severity: mapVitalToSeverity(vitals.cls, thresholds.cls, thresholds.cls * POOR_THRESHOLD_MULTIPLIER),
       title: "Cumulative Layout Shift exceeds threshold",
       stepsToReproduce: [`Navigate to ${route}`, "Observe layout stability during load"],
       expected: `CLS should be under ${thresholds.cls}`,
@@ -223,7 +235,7 @@ export function evaluateWebVitals(
     findings.push({
       ref: findingRef,
       category: "Performance Issue",
-      severity: mapVitalToSeverity(vitals.inp, thresholds.inpMs, thresholds.inpMs * 2.5),
+      severity: mapVitalToSeverity(vitals.inp, thresholds.inpMs, thresholds.inpMs * POOR_THRESHOLD_MULTIPLIER),
       title: "Interaction to Next Paint exceeds threshold",
       stepsToReproduce: [`Navigate to ${route}`, "Interact with the page (click, type)"],
       expected: `INP should be under ${thresholds.inpMs}ms`,

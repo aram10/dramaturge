@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
+import type { Page } from '@playwright/test';
 import type { Evidence, RawFinding } from "../types.js";
 import type { MemoryStore } from "../memory/store.js";
 import { runVisualRegressionScan } from "./visual-regression.js";
@@ -22,6 +23,9 @@ export const DEFAULT_BREAKPOINTS: ResponsiveBreakpoint[] = [
   { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1440, height: 900 },
 ];
+
+/** Time in milliseconds to wait for layout to settle after viewport resize. */
+const LAYOUT_SETTLE_DELAY_MS = 300;
 
 export interface MultiViewportOptions {
   areaName: string;
@@ -46,7 +50,7 @@ export interface MultiViewportOptions {
  * Results from all breakpoints are merged into a single findings + evidence array.
  */
 export async function runMultiViewportVisualRegression(
-  page: any,
+  page: Page,
   options: MultiViewportOptions
 ): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
   const breakpoints = options.breakpoints ?? DEFAULT_BREAKPOINTS;
@@ -65,7 +69,7 @@ export async function runMultiViewportVisualRegression(
       }
 
       // Wait for layout to settle after resize
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, LAYOUT_SETTLE_DELAY_MS));
 
       // Use a breakpoint-specific fingerprint so baselines are stored per-viewport
       const bpFingerprintHash = `${options.fingerprintHash}-${bp.name}`;
@@ -90,8 +94,8 @@ export async function runMultiViewportVisualRegression(
 
       allFindings.push(...result.findings);
       allEvidence.push(...result.evidence);
-    } catch {
-      // If a breakpoint fails (e.g. viewport resize not supported), skip it
+    } catch (error) {
+      // Viewport resize or visual regression may fail; continue with remaining breakpoints
     }
   }
 
@@ -99,8 +103,8 @@ export async function runMultiViewportVisualRegression(
   if (originalViewport && typeof page.setViewportSize === "function") {
     try {
       await page.setViewportSize(originalViewport);
-    } catch {
-      // Best-effort restore
+    } catch (error) {
+      // Best-effort restore; page may have been closed or navigated
     }
   }
 

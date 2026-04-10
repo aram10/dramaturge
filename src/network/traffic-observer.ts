@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
+import type { Page } from '@playwright/test';
 import { redactSensitiveValue, sanitizeHeaders, truncateString } from '../redaction.js';
 
 export interface ObservedApiRequestSample {
@@ -51,7 +52,7 @@ export class NetworkTrafficObserver {
   private pageEndpoints = new Map<string, Map<string, ObservedApiEndpoint>>();
   private teardownFns = new Map<string, Array<() => void>>();
 
-  attach(page: any, pageKey = 'default'): void {
+  attach(page: Page, pageKey = 'default'): void {
     if (this.teardownFns.has(pageKey)) {
       this.detach(pageKey);
     }
@@ -307,7 +308,8 @@ async function readResponseText(response: { text?: () => Promise<string> }): Pro
 
   try {
     return await response.text();
-  } catch {
+  } catch (error) {
+    // Response text may fail if the response body was already consumed or destroyed
     return '';
   }
 }

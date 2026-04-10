@@ -122,9 +122,9 @@ export function inferAssertions(input: AssertionInferenceInput): InferredAsserti
   } else if (hasApiContractEvidence) {
     assertions.push({
       code:
-        '// TODO: Validate API response body against the expected contract schema.\n' +
-        '  // The linked api-contract evidence indicates a schema mismatch that may occur\n' +
-        '  // even on 2xx responses. Add a runtime schema check or snapshot assertion here.',
+        '// NOTE: This finding has linked API-contract evidence indicating a schema mismatch.\n' +
+        '  // Consider adding runtime schema validation or snapshot assertion here to catch\n' +
+        '  // contract deviations that may occur even on 2xx responses.',
       reason:
         'API-contract evidence linked; schema validation cannot be inferred at test-gen time.',
     });

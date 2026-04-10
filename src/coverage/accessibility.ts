@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
+import type { Page } from '@playwright/test';
 import { buildAutoCaptureFindingMeta } from "../repro/repro.js";
 import { shortId } from "../constants.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
@@ -100,7 +101,7 @@ export function buildAccessibilityArtifacts(input: {
   return { findings, evidence };
 }
 
-async function analyzeAccessibilityPage(page: any): Promise<AccessibilityScanResults> {
+async function analyzeAccessibilityPage(page: Page): Promise<AccessibilityScanResults> {
   const module = await import("@axe-core/playwright");
   const AxeBuilder = module.AxeBuilder;
   const results = await new AxeBuilder({ page }).analyze();
@@ -110,10 +111,10 @@ async function analyzeAccessibilityPage(page: any): Promise<AccessibilityScanRes
 }
 
 export async function runAccessibilityScan(
-  page: any,
+  page: Page,
   areaName: string,
   route: string,
-  analyze: (page: any) => Promise<AccessibilityScanResults> = analyzeAccessibilityPage
+  analyze: (page: Page) => Promise<AccessibilityScanResults> = analyzeAccessibilityPage
 ): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
   try {
     const results = await analyze(page);
@@ -123,9 +124,7 @@ export async function runAccessibilityScan(
       violations: results.violations,
     });
   } catch (error) {
-    console.warn(
-      `Accessibility scan skipped: ${error instanceof Error ? error.message : String(error)}`
-    );
+    // Accessibility scan is best-effort; axe-core may not be available or may fail
     return { findings: [], evidence: [] };
   }
 }
