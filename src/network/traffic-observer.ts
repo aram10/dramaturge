@@ -312,7 +312,7 @@ async function readResponseText(response: { text?: () => Promise<string> }): Pro
 
   try {
     return await response.text();
-  } catch (error) {
+  } catch {
     // Response text may fail if the response body was already consumed or destroyed
     return '';
   }

@@ -229,7 +229,7 @@ Propose testing tasks for this page.`;
     }
 
     return proposals.length > 0 ? proposals : null;
-  } catch (error) {
+  } catch {
     // LLM planner failed; caller will fall back to deterministic planner
     return null;
   }

@@ -183,7 +183,7 @@ export async function exploreArea(
   let fingerprint;
   try {
     [pageType, fingerprint] = await Promise.all([classifyPage(page), captureFingerprint(page)]);
-  } catch (error) {
+  } catch {
     // Page classification or fingerprinting failed; continue with defaults
   }
 
@@ -248,7 +248,7 @@ export async function exploreArea(
         judgeConfig,
         judgeModel: model,
       });
-    } catch (judgeError) {
+    } catch {
       // Judge failed to materialize findings; return empty findings array
     }
 
@@ -356,7 +356,7 @@ export async function executeWorkerTask(
         judgeConfig,
         judgeModel: model,
       });
-    } catch (judgeError) {
+    } catch {
       // Judge failed to materialize findings; return empty findings array
     }
 
