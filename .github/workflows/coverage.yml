@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,10 +28,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Vitest coverage provider
+        run: pnpm add -D @vitest/coverage-v8 --no-frozen-lockfile
+
       - name: Run tests with coverage
         run: pnpm test -- --coverage
 
       - name: Upload coverage reports to Codecov
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
