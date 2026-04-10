@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.3.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.2.0...dramaturge-v0.3.0) (2026-04-10)
+
+
+### Features
+
+* add CLI subcommands (run, setup, doctor, init), .env support, config-less runs ([ec83451](https://github.com/aram10/dramaturge/commit/ec83451532b50ff3e02f942a4d038bcf339f3dc3))
+* add CLI subcommands, .env support, and config-less runs ([b756b08](https://github.com/aram10/dramaturge/commit/b756b08c6401361b179a5037e4341c6dc6534082))
+* add code quality tools and clean up anti-patterns ([32c3ac5](https://github.com/aram10/dramaturge/commit/32c3ac547bc6f3b3de51eaa39e7bff0d4c3234bc))
+* add coverage and workflow status badges ([7fa74e4](https://github.com/aram10/dramaturge/commit/7fa74e4797d5d8385c04b0fadbd7ceb6f8e13bcd))
+* add coverage and workflow status badges ([ca986e9](https://github.com/aram10/dramaturge/commit/ca986e904ec8f94198841b960925c87604cfef34))
+
+
+### Bug Fixes
+
+* address action review followups ([92d1544](https://github.com/aram10/dramaturge/commit/92d1544c97f5bd15c115297a3656d066dbbaa246))
+* address bootstrap readiness review feedback ([e31507a](https://github.com/aram10/dramaturge/commit/e31507a950824d8e63932b4c64e14d80dd7a3cf1))
+* address bootstrap review feedback ([5e10a3c](https://github.com/aram10/dramaturge/commit/5e10a3cbcd21623769bf213245f221817537c7ad))
+* address coverage workflow review feedback ([c083010](https://github.com/aram10/dramaturge/commit/c08301089b4fc5edd80d5b3181b145d706523e7e))
+* address high-priority code quality issues ([7e99d3c](https://github.com/aram10/dramaturge/commit/7e99d3c430543de8c4093045dd52e54100269872))
+* address PR review comments and format codebase with prettier ([1a9332a](https://github.com/aram10/dramaturge/commit/1a9332a0084c76b7d037b6e4fb3482e1f51f1d60))
+* address review feedback on config-inline, doctor, and test portability ([8cb41a8](https://github.com/aram10/dramaturge/commit/8cb41a87378a49198947e546b2ed9e28301b3a95))
+* align temp config path with source ([e161c10](https://github.com/aram10/dramaturge/commit/e161c107edf0d78b18e232a7df4f0f4d983b693b))
+* create missing config dirs in action prep ([50ad4ba](https://github.com/aram10/dramaturge/commit/50ad4ba643b7c856c147da61914ba351fb6dab51))
+* improve type safety and remove console statements from production code ([1cde81b](https://github.com/aram10/dramaturge/commit/1cde81b258648e6a60e10219c983d1e7091e4a5f))
+* isolate bootstrap readiness page checks ([8a98a03](https://github.com/aram10/dramaturge/commit/8a98a03b1d1bae8e929c688dfcfb2bf7564fce0c))
+* make action config overrides explicit ([31c0c39](https://github.com/aram10/dramaturge/commit/31c0c393d1ba9c37b8a3c64e5e9ae0d391937f6e))
+* normalize input recording policy selectors ([30bc070](https://github.com/aram10/dramaturge/commit/30bc0709a681ca1010d4142e5e6a08f1073a396f))
+* override vulnerable langsmith transitive dependency ([87b05d7](https://github.com/aram10/dramaturge/commit/87b05d77b0d95f37b52b9dc5d02fab51e22dd516))
+* pass bootstrap status to readiness checks ([1db64f0](https://github.com/aram10/dramaturge/commit/1db64f04fc184f8050be98304eeb1de1ed515a22))
+* preserve config-relative paths in action config prep ([45d02be](https://github.com/aram10/dramaturge/commit/45d02bec854b5520d0fe6b1369a80c4e412bfe42))
+* redact recorded secret form inputs ([7c810d9](https://github.com/aram10/dramaturge/commit/7c810d911f2fa43298b8cdc3d4e5dd31d53c34d6))
+* replace page: any with Playwright types, extract magic numbers, improve error handling ([5c7076d](https://github.com/aram10/dramaturge/commit/5c7076d86d94fceaf6592306c594ac5b062b54d9))
+* scope code conventions to exclude src/adaptation/fixtures ([fff60cb](https://github.com/aram10/dramaturge/commit/fff60cbfc8faa28d3a8a8779cf2b5b9c3aea40fe))
+* scope langsmith override to vulnerable versions ([4eef251](https://github.com/aram10/dramaturge/commit/4eef251807a9f6fcc7bbb2d7f852b3753881017a))
+* share jsonc parser with github action ([a76ea2e](https://github.com/aram10/dramaturge/commit/a76ea2e5ed9f1987fa3ac86f90de3257312ca4c4))
+* stop bootstrap process groups on unix ([23a8765](https://github.com/aram10/dramaturge/commit/23a87650375a051373559e349c0329e47e980b02))
+* tighten bootstrap shutdown fallback ([368926a](https://github.com/aram10/dramaturge/commit/368926a79f6a7dac582d6bd48ce03d595b285873))
+* tighten request context guard ([057bb2f](https://github.com/aram10/dramaturge/commit/057bb2f0a983a5e89101d4c4513e4a6c626b5155))
+* use optional catch binding to remove unused error variables ([f93a1e3](https://github.com/aram10/dramaturge/commit/f93a1e31f7115171347e2ee0136074959bbe14a9))
+
 ## [0.2.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.1.0...dramaturge-v0.2.0) (2026-04-07)
 
 
