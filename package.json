@@ -40,7 +40,8 @@
   "files": [
     "dist",
     "README.md",
-    "dramaturge.config.example.json"
+    "dramaturge.config.example.json",
+    "dramaturge.config.minimal.json"
   ],
   "engines": {
     "node": ">=20"
