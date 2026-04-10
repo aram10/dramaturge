@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import type { Page } from '@playwright/test';
 import { buildAutoCaptureFindingMeta } from "../repro/repro.js";
 import { shortId } from "../constants.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
@@ -101,7 +100,11 @@ export function buildAccessibilityArtifacts(input: {
   return { findings, evidence };
 }
 
-async function analyzeAccessibilityPage(page: Page): Promise<AccessibilityScanResults> {
+/**
+ * Analyze accessibility using axe-core.
+ * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ */
+async function analyzeAccessibilityPage(page: any): Promise<AccessibilityScanResults> {
   const module = await import("@axe-core/playwright");
   const AxeBuilder = module.AxeBuilder;
   const results = await new AxeBuilder({ page }).analyze();
@@ -110,11 +113,18 @@ async function analyzeAccessibilityPage(page: Page): Promise<AccessibilityScanRe
   };
 }
 
+/**
+ * Run accessibility scan and produce findings + evidence.
+ * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param areaName - Name of the area being scanned
+ * @param route - Route being scanned
+ * @param analyze - Optional custom analyzer function
+ */
 export async function runAccessibilityScan(
-  page: Page,
+  page: any,
   areaName: string,
   route: string,
-  analyze: (page: Page) => Promise<AccessibilityScanResults> = analyzeAccessibilityPage
+  analyze: (page: any) => Promise<AccessibilityScanResults> = analyzeAccessibilityPage
 ): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
   try {
     const results = await analyze(page);

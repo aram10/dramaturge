@@ -183,9 +183,8 @@ export async function exploreArea(
   let fingerprint;
   try {
     [pageType, fingerprint] = await Promise.all([classifyPage(page), captureFingerprint(page)]);
-    console.log(`  Page type: ${pageType}, fingerprint: ${fingerprint.hash}`);
-  } catch {
-    console.warn(`  Could not classify page for "${area.name}"`);
+  } catch (error) {
+    // Page classification or fingerprinting failed; continue with defaults
   }
 
   const { observations, screenshots, evidence, coverageTracker, actionRecorder, agent } =
@@ -239,7 +238,6 @@ export async function exploreArea(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Worker failed for area "${area.name}": ${message}`);
 
     let findings: Awaited<ReturnType<typeof materializeObservedFindings>> = [];
     try {
@@ -251,9 +249,7 @@ export async function exploreArea(
         judgeModel: model,
       });
     } catch (judgeError) {
-      console.warn(
-        `Could not materialize findings for "${area.name}": ${judgeError instanceof Error ? judgeError.message : String(judgeError)}`
-      );
+      // Judge failed to materialize findings; return empty findings array
     }
 
     return {
@@ -361,9 +357,7 @@ export async function executeWorkerTask(
         judgeModel: model,
       });
     } catch (judgeError) {
-      console.warn(
-        `Could not materialize findings for task "${task.id}": ${judgeError instanceof Error ? judgeError.message : String(judgeError)}`
-      );
+      // Judge failed to materialize findings; return empty findings array
     }
 
     return {

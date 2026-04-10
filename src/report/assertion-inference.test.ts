@@ -142,7 +142,7 @@ describe('inferAssertions', () => {
     expect(preamble?.preamble).toContain('resp.status() >= 400');
   });
 
-  it('infers a TODO comment for api-contract evidence without text match', () => {
+  it('infers a NOTE comment for api-contract evidence without text match', () => {
     const assertions = inferAssertions({
       title: 'Response shape changed',
       expected: 'Valid shape',
@@ -151,7 +151,9 @@ describe('inferAssertions', () => {
     });
 
     const codes = assertions.map((a) => a.code);
-    expect(codes.some((c) => c.includes('TODO: Validate API response body'))).toBe(true);
+    expect(
+      codes.some((c) => c.includes('NOTE: This finding has linked API-contract evidence'))
+    ).toBe(true);
     expect(codes).not.toContain('expect(apiErrors, "No API errors expected").toHaveLength(0);');
   });
 

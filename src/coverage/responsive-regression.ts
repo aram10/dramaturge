@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import type { Page } from '@playwright/test';
 import type { Evidence, RawFinding } from "../types.js";
 import type { MemoryStore } from "../memory/store.js";
 import { runVisualRegressionScan } from "./visual-regression.js";
@@ -48,9 +47,12 @@ export interface MultiViewportOptions {
  * runs the visual regression scan, then restores the original viewport.
  *
  * Results from all breakpoints are merged into a single findings + evidence array.
+ *
+ * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param options - Configuration for multi-viewport testing
  */
 export async function runMultiViewportVisualRegression(
-  page: Page,
+  page: any,
   options: MultiViewportOptions
 ): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
   const breakpoints = options.breakpoints ?? DEFAULT_BREAKPOINTS;

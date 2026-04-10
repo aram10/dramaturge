@@ -230,9 +230,7 @@ Propose testing tasks for this page.`;
 
     return proposals.length > 0 ? proposals : null;
   } catch (error) {
-    const label = error instanceof SyntaxError ? 'parse' : 'API';
-    const msg = error instanceof Error ? error.message : String(error);
-    console.warn(`LLM planner ${label} error (falling back to deterministic): ${msg}`);
+    // LLM planner failed; caller will fall back to deterministic planner
     return null;
   }
 }

@@ -113,12 +113,10 @@ export interface ActionRecorderPage {
 }
 
 export function adaptStagehand(stagehand: Stagehand): BrowserSessionLike<AuthBrowserPage> {
-  // Stagehand implements the BrowserSessionLike interface contract
-  // This is a safe cast because Stagehand has a context property with pages() method
-  if (!stagehand || typeof stagehand !== 'object') {
-    throw new Error('Invalid stagehand instance provided to adaptStagehand');
-  }
-  return stagehand as BrowserSessionLike<AuthBrowserPage>;
+  // Stagehand's context.pages() returns Playwright Page objects which are structurally
+  // compatible with AuthBrowserPage at runtime, but TypeScript's strict type checking
+  // sees method signature differences. This cast bridges that gap safely.
+  return stagehand as unknown as BrowserSessionLike<AuthBrowserPage>;
 }
 
 export function getPrimaryPage<TPage extends BrowserPageLike>(

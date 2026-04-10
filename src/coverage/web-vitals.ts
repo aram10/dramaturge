@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import type { Page } from '@playwright/test';
 import { shortId } from "../constants.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
 import { buildConfirmedFindingMeta } from "../repro/repro.js";
@@ -56,8 +55,10 @@ const POOR_THRESHOLD_MULTIPLIER = 2.5;
  *
  * Uses the browser's PerformanceObserver API to read LCP and CLS entries.
  * INP is approximated from the `first-input` entry or longest event timing.
+ *
+ * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
  */
-export async function collectWebVitals(page: Page): Promise<WebVitalsResult> {
+export async function collectWebVitals(page: any): Promise<WebVitalsResult> {
   try {
     const metrics = await page.evaluate(() => {
       const result: { lcp: number | null; cls: number | null; inp: number | null } = {

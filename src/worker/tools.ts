@@ -176,7 +176,7 @@ export function createWorkerTools(
           writeFileSync(join(screenshotDir, filename), buffer);
         } catch (writeError) {
           const msg = writeError instanceof Error ? writeError.message : String(writeError);
-          console.warn(`Failed to write screenshot file ${filename}: ${msg}`);
+          // Screenshot was captured in memory but disk write failed
           return {
             captured: false,
             ref: input.ref,

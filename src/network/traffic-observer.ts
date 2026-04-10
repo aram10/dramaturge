@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import type { Page } from '@playwright/test';
 import { redactSensitiveValue, sanitizeHeaders, truncateString } from '../redaction.js';
 
 export interface ObservedApiRequestSample {
@@ -52,7 +51,12 @@ export class NetworkTrafficObserver {
   private pageEndpoints = new Map<string, Map<string, ObservedApiEndpoint>>();
   private teardownFns = new Map<string, Array<() => void>>();
 
-  attach(page: Page, pageKey = 'default'): void {
+  /**
+   * Attach network observers to a page.
+   * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+   * @param pageKey - Unique key for tracking this page's endpoints separately
+   */
+  attach(page: any, pageKey = 'default'): void {
     if (this.teardownFns.has(pageKey)) {
       this.detach(pageKey);
     }
