@@ -1,0 +1,24 @@
+{
+  "targetUrl": "https://your-app.example.com",
+  "appDescription": "Describe your app: what it does and its main features.",
+
+  "auth": {
+    "type": "none"
+  },
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "cua"
+  },
+
+  "output": {
+    "dir": "./dramaturge-reports",
+    "format": "markdown",
+    "screenshots": true
+  },
+
+  "browser": {
+    "headless": false
+  }
+}

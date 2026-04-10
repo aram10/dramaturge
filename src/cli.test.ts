@@ -7,13 +7,41 @@ import { buildHelpText, parseCliArgs, runCli, attachCliListeners } from './cli.j
 import { EngineEventEmitter } from './engine/event-stream.js';
 
 describe('parseCliArgs', () => {
-  it('parses config and resume arguments', () => {
+  it('parses run command with config and resume arguments', () => {
+    expect(parseCliArgs(['run', '--config', 'custom.json', '--resume', './reports/run-1'])).toEqual(
+      {
+        command: 'run',
+        configPath: 'custom.json',
+        resumeDir: './reports/run-1',
+        diffRef: undefined,
+        dashboard: false,
+        showHelp: false,
+        url: undefined,
+        login: undefined,
+        headless: undefined,
+        provider: undefined,
+        preset: undefined,
+        initTemplate: undefined,
+        initOutput: undefined,
+      }
+    );
+  });
+
+  it('parses legacy config and resume arguments without subcommand', () => {
     expect(parseCliArgs(['--config', 'custom.json', '--resume', './reports/run-1'])).toEqual({
+      command: 'run',
       configPath: 'custom.json',
       resumeDir: './reports/run-1',
       diffRef: undefined,
       dashboard: false,
       showHelp: false,
+      url: undefined,
+      login: undefined,
+      headless: undefined,
+      provider: undefined,
+      preset: undefined,
+      initTemplate: undefined,
+      initOutput: undefined,
     });
   });
 
@@ -54,16 +82,77 @@ describe('parseCliArgs', () => {
     const result = parseCliArgs([]);
     expect(result.dashboard).toBe(false);
   });
+
+  it('parses run with positional URL', () => {
+    const result = parseCliArgs(['run', 'https://example.com']);
+    expect(result.command).toBe('run');
+    expect(result.url).toBe('https://example.com');
+  });
+
+  it('parses run with URL and --login flag', () => {
+    const result = parseCliArgs(['run', 'https://example.com', '--login']);
+    expect(result.command).toBe('run');
+    expect(result.url).toBe('https://example.com');
+    expect(result.login).toBe(true);
+  });
+
+  it('parses run with --headless flag', () => {
+    const result = parseCliArgs(['run', 'https://example.com', '--headless']);
+    expect(result.headless).toBe(true);
+  });
+
+  it('parses --provider flag', () => {
+    const result = parseCliArgs(['run', 'https://example.com', '--provider', 'openai']);
+    expect(result.provider).toBe('openai');
+  });
+
+  it('throws for invalid --provider', () => {
+    expect(() => parseCliArgs(['run', '--provider', 'invalid'])).toThrow('Invalid provider');
+  });
+
+  it('parses --preset flag', () => {
+    const result = parseCliArgs(['run', 'https://example.com', '--preset', 'smoke']);
+    expect(result.preset).toBe('smoke');
+  });
+
+  it('throws for invalid --preset', () => {
+    expect(() => parseCliArgs(['run', '--preset', 'invalid'])).toThrow('Invalid preset');
+  });
+
+  it('parses doctor command', () => {
+    const result = parseCliArgs(['doctor']);
+    expect(result.command).toBe('doctor');
+  });
+
+  it('parses init command with --template', () => {
+    const result = parseCliArgs(['init', '--template', 'full']);
+    expect(result.command).toBe('init');
+    expect(result.initTemplate).toBe('full');
+  });
+
+  it('throws for invalid --template', () => {
+    expect(() => parseCliArgs(['init', '--template', 'bad'])).toThrow('Invalid template');
+  });
+
+  it('parses setup command', () => {
+    const result = parseCliArgs(['setup']);
+    expect(result.command).toBe('setup');
+  });
 });
 
 describe('buildHelpText', () => {
-  it('mentions config and resume usage', () => {
+  it('mentions commands and run usage', () => {
     const helpText = buildHelpText();
 
     expect(helpText).toContain('Usage: dramaturge');
+    expect(helpText).toContain('run [url]');
     expect(helpText).toContain('--config <path>');
     expect(helpText).toContain('--resume <run-dir>');
     expect(helpText).toContain('--dashboard');
+    expect(helpText).toContain('doctor');
+    expect(helpText).toContain('setup');
+    expect(helpText).toContain('init');
+    expect(helpText).toContain('.env');
   });
 });
 
@@ -96,7 +185,7 @@ describe('runCli', () => {
     const loadConfig = vi.fn().mockReturnValue(config);
     const runEngineMock = vi.fn().mockResolvedValue(undefined);
 
-    const exitCode = await runCli(['--config', 'custom.json', '--resume', './run'], {
+    const exitCode = await runCli(['run', '--config', 'custom.json', '--resume', './run'], {
       loadConfig,
       runEngine: runEngineMock,
       log: vi.fn(),
@@ -111,15 +200,67 @@ describe('runCli', () => {
         resumeDir: resolve('C:/tmp/dramaturge/configs/run'),
       })
     );
-    // Event stream should be wired up
     const passedOptions = runEngineMock.mock.calls[0][1];
     expect(passedOptions.eventStream).toBeDefined();
+  });
+
+  it('loads config with legacy args (no subcommand)', async () => {
+    const config = {
+      targetUrl: 'https://example.com',
+      _meta: {
+        configDir: resolve('C:/tmp/dramaturge/configs'),
+      },
+    } as never;
+    const loadConfig = vi.fn().mockReturnValue(config);
+    const runEngineMock = vi.fn().mockResolvedValue(undefined);
+
+    const exitCode = await runCli(['--config', 'custom.json', '--resume', './run'], {
+      loadConfig,
+      runEngine: runEngineMock,
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(loadConfig).toHaveBeenCalledWith('custom.json');
+  });
+
+  it('builds config from inline URL when no config file', async () => {
+    const runEngineMock = vi.fn().mockResolvedValue(undefined);
+
+    const exitCode = await runCli(['run', 'https://example.com'], {
+      loadConfig: vi.fn(),
+      runEngine: runEngineMock,
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(runEngineMock).toHaveBeenCalledTimes(1);
+    const passedConfig = runEngineMock.mock.calls[0][0];
+    expect(passedConfig.targetUrl).toBe('https://example.com');
+    expect(passedConfig.auth.type).toBe('none');
+  });
+
+  it('builds config with login flag', async () => {
+    const runEngineMock = vi.fn().mockResolvedValue(undefined);
+
+    const exitCode = await runCli(['run', 'https://example.com', '--login'], {
+      loadConfig: vi.fn(),
+      runEngine: runEngineMock,
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    expect(exitCode).toBe(0);
+    const passedConfig = runEngineMock.mock.calls[0][0];
+    expect(passedConfig.auth.type).toBe('interactive');
   });
 
   it('reports errors and returns a failing exit code', async () => {
     const errors: string[] = [];
 
-    const exitCode = await runCli([], {
+    const exitCode = await runCli(['run'], {
       loadConfig: vi.fn(() => {
         throw new Error('missing config');
       }),
@@ -132,6 +273,23 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(1);
     expect(errors).toEqual(['Error: missing config']);
+  });
+
+  it('runs doctor command', async () => {
+    const output: string[] = [];
+
+    const exitCode = await runCli(['doctor'], {
+      loadConfig: vi.fn(),
+      runEngine: vi.fn(),
+      log: (message) => {
+        output.push(message);
+      },
+      error: vi.fn(),
+    });
+
+    // Doctor should run and return a code
+    expect(typeof exitCode).toBe('number');
+    expect(output.some((m) => m.includes('Dramaturge Doctor'))).toBe(true);
   });
 });
 
