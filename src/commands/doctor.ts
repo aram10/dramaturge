@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import { existsSync } from 'node:fs';
+import { accessSync, constants, existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
 export interface DoctorCheckResult {
@@ -29,8 +30,7 @@ function checkNodeVersion(): DoctorCheckResult {
 
 function checkPlaywrightBrowser(): DoctorCheckResult {
   const browsersPath =
-    process.env.PLAYWRIGHT_BROWSERS_PATH ??
-    resolve(process.env.HOME ?? '~', '.cache', 'ms-playwright');
+    process.env.PLAYWRIGHT_BROWSERS_PATH ?? resolve(homedir(), '.cache', 'ms-playwright');
   const exists = existsSync(browsersPath);
   return {
     label: 'Playwright browsers',
@@ -92,13 +92,22 @@ function checkAnyApiKey(): DoctorCheckResult {
 }
 
 function checkOutputDir(cwd: string): DoctorCheckResult {
-  const parentExists = existsSync(cwd);
   const dir = resolve(cwd, 'dramaturge-reports');
-  return {
-    label: 'Output directory',
-    ok: parentExists,
-    message: parentExists ? `${dir} (writable)` : 'Parent directory not accessible',
-  };
+  try {
+    accessSync(cwd, constants.W_OK);
+    return {
+      label: 'Output directory',
+      ok: true,
+      message: `${dir} (writable)`,
+    };
+  } catch {
+    return {
+      label: 'Output directory',
+      ok: false,
+      message: `${dir} (not writable)`,
+      fix: `Ensure you have write access to ${cwd}`,
+    };
+  }
 }
 
 /**

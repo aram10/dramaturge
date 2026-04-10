@@ -54,6 +54,24 @@ function buildSmokePreset(): Partial<DramaturgeConfig> {
   };
 }
 
+function buildThoroughPreset(): Partial<DramaturgeConfig> {
+  return {
+    budget: {
+      globalTimeLimitSeconds: 1800,
+      maxStepsPerTask: 60,
+      maxFrontierSize: 300,
+      maxStateNodes: 80,
+      stagnationThreshold: 8,
+      costLimitUsd: 0,
+    },
+    exploration: {
+      maxAreasToExplore: 20,
+      stepsPerArea: 60,
+      totalTimeout: 1800,
+    },
+  };
+}
+
 /**
  * Build a valid `DramaturgeConfig` from inline CLI arguments with sensible
  * defaults. This enables `dramaturge run <url>` without a config file.
@@ -91,6 +109,8 @@ export function buildConfigFromArgs(args: InlineRunArgs): ConfigWithMeta<Dramatu
 
   if (args.preset === 'smoke') {
     Object.assign(raw, buildSmokePreset());
+  } else if (args.preset === 'thorough') {
+    Object.assign(raw, buildThoroughPreset());
   }
 
   const validated = ConfigSchema.parse(raw);

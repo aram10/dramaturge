@@ -45,6 +45,12 @@ describe('buildConfigFromArgs', () => {
     expect(config.exploration.maxAreasToExplore).toBe(3);
   });
 
+  it('applies thorough preset', () => {
+    const config = buildConfigFromArgs({ url: 'https://example.com', preset: 'thorough' });
+    expect(config.budget.globalTimeLimitSeconds).toBe(1800);
+    expect(config.exploration.maxAreasToExplore).toBe(20);
+  });
+
   it('uses custom description', () => {
     const config = buildConfigFromArgs({
       url: 'https://example.com',

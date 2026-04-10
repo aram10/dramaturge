@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, unlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parseDotenv, loadDotenv } from './env.js';
 
 describe('parseDotenv', () => {
@@ -51,8 +53,7 @@ BAZ=qux
 });
 
 describe('loadDotenv', () => {
-  const tmpDir = '/tmp/dramaturge-dotenv-test';
-  const envPath = `${tmpDir}/.env`;
+  let testDir: string;
   const testKeys = ['DRAMATURGE_TEST_DOTENV_LOAD_KEY', 'DRAMATURGE_TEST_NO_OVERWRITE_KEY'];
 
   afterEach(() => {
@@ -60,40 +61,36 @@ describe('loadDotenv', () => {
       delete process.env[key];
     }
     try {
-      unlinkSync(envPath);
-    } catch {
-      /* ignore */
-    }
-    try {
-      rmSync(tmpDir, { recursive: true });
+      rmSync(testDir, { recursive: true });
     } catch {
       /* ignore */
     }
   });
 
   it('returns 0 when .env does not exist', () => {
-    const result = loadDotenv('/tmp/nonexistent-dir-for-dotenv-test');
+    testDir = mkdtempSync(join(tmpdir(), 'dramaturge-dotenv-'));
+    const result = loadDotenv(join(testDir, 'nonexistent'));
     expect(result).toBe(0);
   });
 
   it('loads variables from an existing .env file', () => {
-    mkdirSync(tmpDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), 'dramaturge-dotenv-'));
     const testKey = 'DRAMATURGE_TEST_DOTENV_LOAD_KEY';
-    writeFileSync(envPath, `${testKey}=test-value-123\n`);
+    writeFileSync(join(testDir, '.env'), `${testKey}=test-value-123\n`);
     delete process.env[testKey];
 
-    const result = loadDotenv(tmpDir);
+    const result = loadDotenv(testDir);
     expect(result).toBeGreaterThanOrEqual(1);
     expect(process.env[testKey]).toBe('test-value-123');
   });
 
   it('does not overwrite existing env vars', () => {
-    mkdirSync(tmpDir, { recursive: true });
+    testDir = mkdtempSync(join(tmpdir(), 'dramaturge-dotenv-'));
     const testKey = 'DRAMATURGE_TEST_NO_OVERWRITE_KEY';
-    writeFileSync(envPath, `${testKey}=new-value\n`);
+    writeFileSync(join(testDir, '.env'), `${testKey}=new-value\n`);
     process.env[testKey] = 'original-value';
 
-    loadDotenv(tmpDir);
+    loadDotenv(testDir);
     expect(process.env[testKey]).toBe('original-value');
   });
 });
