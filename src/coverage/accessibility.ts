@@ -100,6 +100,10 @@ export function buildAccessibilityArtifacts(input: {
   return { findings, evidence };
 }
 
+/**
+ * Analyze accessibility using axe-core.
+ * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ */
 async function analyzeAccessibilityPage(page: any): Promise<AccessibilityScanResults> {
   const module = await import("@axe-core/playwright");
   const AxeBuilder = module.AxeBuilder;
@@ -109,6 +113,13 @@ async function analyzeAccessibilityPage(page: any): Promise<AccessibilityScanRes
   };
 }
 
+/**
+ * Run accessibility scan and produce findings + evidence.
+ * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param areaName - Name of the area being scanned
+ * @param route - Route being scanned
+ * @param analyze - Optional custom analyzer function
+ */
 export async function runAccessibilityScan(
   page: any,
   areaName: string,
@@ -123,9 +134,7 @@ export async function runAccessibilityScan(
       violations: results.violations,
     });
   } catch (error) {
-    console.warn(
-      `Accessibility scan skipped: ${error instanceof Error ? error.message : String(error)}`
-    );
+    // Accessibility scan is best-effort; axe-core may not be available or may fail
     return { findings: [], evidence: [] };
   }
 }

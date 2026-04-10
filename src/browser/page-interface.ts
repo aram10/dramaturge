@@ -113,6 +113,9 @@ export interface ActionRecorderPage {
 }
 
 export function adaptStagehand(stagehand: Stagehand): BrowserSessionLike<AuthBrowserPage> {
+  // Stagehand's context.pages() returns Playwright Page objects which are structurally
+  // compatible with AuthBrowserPage at runtime, but TypeScript's strict type checking
+  // sees method signature differences. This cast bridges that gap safely.
   return stagehand as unknown as BrowserSessionLike<AuthBrowserPage>;
 }
 

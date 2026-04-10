@@ -23,6 +23,9 @@ export const DEFAULT_BREAKPOINTS: ResponsiveBreakpoint[] = [
   { name: "desktop", width: 1440, height: 900 },
 ];
 
+/** Time in milliseconds to wait for layout to settle after viewport resize. */
+const LAYOUT_SETTLE_DELAY_MS = 300;
+
 export interface MultiViewportOptions {
   areaName: string;
   route: string;
@@ -44,6 +47,9 @@ export interface MultiViewportOptions {
  * runs the visual regression scan, then restores the original viewport.
  *
  * Results from all breakpoints are merged into a single findings + evidence array.
+ *
+ * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param options - Configuration for multi-viewport testing
  */
 export async function runMultiViewportVisualRegression(
   page: any,
@@ -65,7 +71,7 @@ export async function runMultiViewportVisualRegression(
       }
 
       // Wait for layout to settle after resize
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, LAYOUT_SETTLE_DELAY_MS));
 
       // Use a breakpoint-specific fingerprint so baselines are stored per-viewport
       const bpFingerprintHash = `${options.fingerprintHash}-${bp.name}`;
@@ -90,8 +96,8 @@ export async function runMultiViewportVisualRegression(
 
       allFindings.push(...result.findings);
       allEvidence.push(...result.evidence);
-    } catch {
-      // If a breakpoint fails (e.g. viewport resize not supported), skip it
+    } catch (error) {
+      // Viewport resize or visual regression may fail; continue with remaining breakpoints
     }
   }
 
@@ -99,8 +105,8 @@ export async function runMultiViewportVisualRegression(
   if (originalViewport && typeof page.setViewportSize === "function") {
     try {
       await page.setViewportSize(originalViewport);
-    } catch {
-      // Best-effort restore
+    } catch (error) {
+      // Best-effort restore; page may have been closed or navigated
     }
   }
 

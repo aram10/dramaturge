@@ -287,7 +287,14 @@ export function applyA2ATask(
     currentStatus: isCompletion ? 'completed' : 'working',
   };
 
-  const statusLabel = evt.status === 'submitted' ? '→' : evt.status === 'completed' ? '✓' : '●';
+  let statusLabel: string;
+  if (evt.status === 'submitted') {
+    statusLabel = '→';
+  } else if (evt.status === 'completed') {
+    statusLabel = '✓';
+  } else {
+    statusLabel = '●';
+  }
   const text = `${statusLabel} [${evt.agentRole}] ${evt.objective}`;
 
   return {

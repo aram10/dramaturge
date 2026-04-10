@@ -42,8 +42,10 @@ function tokenizeRoute(route: string): string[] {
 function computeRouteScore(pageTokens: string[], route: string, observedBoost: number): number {
   const routeTokens = tokenizeRoute(route);
   const overlap = routeTokens.filter((token) => pageTokens.includes(token)).length;
-  const prefixBoost =
-    pageTokens.length > 0 && normalizeRoutePath(route).includes(pageTokens[0] ?? '') ? 0.25 : 0;
+
+  const normalizedRoute = normalizeRoutePath(route);
+  const firstToken = pageTokens[0] ?? '';
+  const prefixBoost = pageTokens.length > 0 && normalizedRoute.includes(firstToken) ? 0.25 : 0;
 
   return overlap + observedBoost + prefixBoost;
 }

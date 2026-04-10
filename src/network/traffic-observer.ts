@@ -51,6 +51,11 @@ export class NetworkTrafficObserver {
   private pageEndpoints = new Map<string, Map<string, ObservedApiEndpoint>>();
   private teardownFns = new Map<string, Array<() => void>>();
 
+  /**
+   * Attach network observers to a page.
+   * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+   * @param pageKey - Unique key for tracking this page's endpoints separately
+   */
   attach(page: any, pageKey = 'default'): void {
     if (this.teardownFns.has(pageKey)) {
       this.detach(pageKey);
@@ -308,6 +313,7 @@ async function readResponseText(response: { text?: () => Promise<string> }): Pro
   try {
     return await response.text();
   } catch {
+    // Response text may fail if the response body was already consumed or destroyed
     return '';
   }
 }
