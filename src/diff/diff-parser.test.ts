@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { describe, it, expect } from 'vitest';
-import { parseDiffNameStatus } from './diff-parser.js';
+import { getChangedFiles, parseDiffNameStatus } from './diff-parser.js';
 
 describe('parseDiffNameStatus', () => {
   it('parses added, modified, and deleted files', () => {
@@ -53,5 +53,19 @@ describe('parseDiffNameStatus', () => {
 
     expect(entries).toHaveLength(1);
     expect(entries[0].path).toBe('valid.ts');
+  });
+
+  it('defaults unrecognized status letters to modified', () => {
+    const raw = 'X\tsrc/unknown-status.ts';
+    const entries = parseDiffNameStatus(raw);
+
+    expect(entries).toEqual([{ path: 'src/unknown-status.ts', status: 'modified' }]);
+  });
+});
+
+describe('getChangedFiles', () => {
+  it('returns an empty array for invalid git ref', () => {
+    const result = getChangedFiles('non-existent-ref-abc123', '/tmp');
+    expect(result).toEqual([]);
   });
 });
