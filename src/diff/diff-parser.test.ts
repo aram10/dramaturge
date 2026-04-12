@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
+import { tmpdir } from 'node:os';
 import { describe, it, expect } from 'vitest';
 import { getChangedFiles, parseDiffNameStatus } from './diff-parser.js';
 
@@ -65,7 +66,7 @@ describe('parseDiffNameStatus', () => {
 
 describe('getChangedFiles', () => {
   it('returns an empty array for invalid git ref', () => {
-    const result = getChangedFiles('non-existent-ref-abc123', '/tmp');
+    const result = getChangedFiles('non-existent-ref-abc123', tmpdir());
     expect(result).toEqual([]);
   });
 });

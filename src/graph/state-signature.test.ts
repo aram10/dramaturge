@@ -50,8 +50,8 @@ describe('buildStateSignatureFromUrl', () => {
   });
 
   it('falls back to pathname parsing for invalid URLs', () => {
-    const sig = buildStateSignatureFromUrl('/relative/path');
-    expect(sig.pathname).toBe('/relative/path');
+    const sig = buildStateSignatureFromUrl('http://[invalid');
+    expect(sig.pathname).toBe('http://[invalid');
     expect(sig.query).toEqual([]);
   });
 

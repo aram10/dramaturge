@@ -13,7 +13,6 @@ coverage:
 
 ignore:
   # ── Pure type-definition files (no runtime code) ──────────────────────
-  - 'src/types.ts' # only exports types + one const record
   - 'src/adaptation/types.ts'
   - 'src/api/types.ts'
   - 'src/a2a/types.ts'
