@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.1](https://github.com/aram10/dramaturge/compare/dramaturge-v0.3.0...dramaturge-v0.3.1) (2026-04-12)
+
+
+### Bug Fixes
+
+* fix coverage workflow and configure vitest coverage ([0bd7f47](https://github.com/aram10/dramaturge/commit/0bd7f4793cb907910dc3a74370f0a8280f1c2c3a))
+* format dependabot.yml and add @vitest/coverage-v8 as dev dependency ([96dd58e](https://github.com/aram10/dramaturge/commit/96dd58e66f6a6b20e3fa2f2733ee987d01eaeaa6))
+* make lint CI pass and fix code coverage workflow ([1f66aad](https://github.com/aram10/dramaturge/commit/1f66aad97387f3b4eae25dca523d3b95a810588c))
+* remove @codecov/vite-plugin (incompatible with vite@8), make shortId test deterministic ([1174a72](https://github.com/aram10/dramaturge/commit/1174a723aa8e01736f0b8965f999ddc569ce8770))
+
 ## [0.3.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.2.0...dramaturge-v0.3.0) (2026-04-10)
 
 
