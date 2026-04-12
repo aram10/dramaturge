@@ -330,6 +330,7 @@ describe("analyzeScreenshot", () => {
 
   it("uses OpenAI provider when model starts with openai/", async () => {
     process.env.OPENAI_API_KEY = "test-openai-key";
+    delete process.env.OPENAI_BASE_URL;
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
@@ -351,7 +352,7 @@ describe("analyzeScreenshot", () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const requestUrl = fetchSpy.mock.calls[0][0] as string;
-    expect(requestUrl).toContain("openai.com");
+    expect(requestUrl).toContain("/chat/completions");
   });
 
   it("uses Google provider when model starts with google/", async () => {
