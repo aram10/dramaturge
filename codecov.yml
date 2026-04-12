@@ -31,7 +31,6 @@ ignore:
   - 'src/auth/none.ts'
   - 'src/auth/stored-state.ts'
   - 'src/auth/storage-state.ts'
-  - 'src/auth/wait-indicator.ts'
   - 'src/graph/fingerprint.ts'
   - 'src/worker/page-stability.ts'
   - 'src/worker/worker.ts'
