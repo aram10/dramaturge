@@ -21,15 +21,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Install Vitest coverage provider
-        run: pnpm add -D @vitest/coverage-v8 --no-frozen-lockfile
 
       - name: Run tests with coverage
         run: pnpm test -- --coverage
