@@ -20,6 +20,32 @@ describe('parseIndicator', () => {
       match: 'prefix',
     });
   });
+
+  it('parses selector indicator', () => {
+    expect(parseIndicator('selector:#welcome-banner')).toMatchObject({
+      type: 'selector',
+      value: '#welcome-banner',
+    });
+  });
+
+  it('parses text indicator', () => {
+    expect(parseIndicator('text:Welcome back')).toMatchObject({
+      type: 'text',
+      value: 'Welcome back',
+    });
+  });
+
+  it('throws for missing colon separator', () => {
+    expect(() => parseIndicator('just-a-string')).toThrow('Invalid successIndicator format');
+  });
+
+  it('throws for unknown indicator type', () => {
+    expect(() => parseIndicator('cookie:session_id')).toThrow('Unknown successIndicator type');
+  });
+
+  it('throws for empty value after colon', () => {
+    expect(() => parseIndicator('url:')).toThrow('Empty value');
+  });
 });
 
 describe('matchesUrlIndicator', () => {
@@ -61,5 +87,44 @@ describe('matchesUrlIndicator', () => {
         match: 'prefix',
       })
     ).toBe(true);
+  });
+
+  it('returns false for non-url indicator types', () => {
+    expect(
+      matchesUrlIndicator('https://example.com/', {
+        type: 'selector',
+        value: '#banner',
+      })
+    ).toBe(false);
+  });
+
+  it('falls back to string comparison for invalid URLs with exact match', () => {
+    expect(
+      matchesUrlIndicator('not-a-url', {
+        type: 'url',
+        value: 'not-a-url',
+        match: 'exact',
+      })
+    ).toBe(true);
+  });
+
+  it('falls back to string includes for invalid URLs with prefix match', () => {
+    expect(
+      matchesUrlIndicator('not-a-url/path', {
+        type: 'url',
+        value: 'not-a-url',
+        match: 'prefix',
+      })
+    ).toBe(true);
+  });
+
+  it('returns false for non-matching invalid URL with exact match', () => {
+    expect(
+      matchesUrlIndicator('not-a-url', {
+        type: 'url',
+        value: 'different',
+        match: 'exact',
+      })
+    ).toBe(false);
   });
 });

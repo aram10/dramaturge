@@ -1,0 +1,44 @@
+# Codecov configuration
+# See https://docs.codecov.io/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: 80%
+
+ignore:
+  # ── Pure type-definition files (no runtime code) ──────────────────────
+  - 'src/adaptation/types.ts'
+  - 'src/api/types.ts'
+  - 'src/a2a/types.ts'
+  - 'src/diff/types.ts'
+  - 'src/judge/types.ts'
+  - 'src/memory/types.ts'
+  - 'src/policy/types.ts'
+  - 'src/spec/types.ts'
+  - 'src/engine/context.ts' # single interface, zero runtime code
+
+  # ── Browser-dependent code (requires live Playwright/Stagehand) ───────
+  # These modules call page.evaluate(), page.goto(), or Stagehand agent
+  # APIs that cannot be meaningfully unit-tested without a real browser.
+  - 'src/auth/authenticator.ts'
+  - 'src/auth/none.ts'
+  - 'src/auth/stored-state.ts'
+  - 'src/auth/storage-state.ts'
+  - 'src/graph/fingerprint.ts'
+  - 'src/worker/page-stability.ts'
+  - 'src/worker/worker.ts'
+  - 'src/planner/navigator.ts'
+  - 'src/planner/page-classifier.ts'
+
+  # ── Terminal UI (requires Ink rendering environment) ───────────────────
+  - 'src/dashboard/app.tsx'
+  - 'src/dashboard/render.tsx'
+
+  # ── Barrel re-export file ─────────────────────────────────────────────
+  - 'src/index.ts'
