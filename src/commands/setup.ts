@@ -8,7 +8,7 @@ export interface SetupAnswers {
   targetUrl: string;
   appDescription: string;
   requiresLogin: boolean;
-  provider: 'anthropic' | 'openai' | 'google';
+  provider: 'anthropic' | 'openai' | 'google' | 'azure' | 'openrouter' | 'github';
   apiKey: string;
   headless: boolean;
   saveConfig: boolean;
@@ -27,6 +27,9 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
   google: 'GOOGLE_GENERATIVE_AI_API_KEY',
+  azure: 'AZURE_AI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  github: 'GITHUB_TOKEN',
 };
 
 const PROVIDER_MODELS: Record<string, { planner: string; worker: string }> = {
@@ -41,6 +44,18 @@ const PROVIDER_MODELS: Record<string, { planner: string; worker: string }> = {
   google: {
     planner: 'google/gemini-2.5-pro',
     worker: 'google/gemini-2.5-flash',
+  },
+  azure: {
+    planner: 'azure/gpt-4.1',
+    worker: 'azure/gpt-4.1-mini',
+  },
+  openrouter: {
+    planner: 'openrouter/anthropic/claude-sonnet-4-6',
+    worker: 'openrouter/anthropic/claude-haiku-4-5',
+  },
+  github: {
+    planner: 'github/openai/gpt-4.1',
+    worker: 'github/openai/gpt-4.1-mini',
   },
 };
 
@@ -79,8 +94,19 @@ export async function runSetup(deps: SetupDependencies): Promise<number> {
     'Anthropic',
     'OpenAI',
     'Google',
+    'Azure AI Foundry',
+    'OpenRouter',
+    'GitHub Models',
   ]);
-  const providerKey = provider.toLowerCase() as 'anthropic' | 'openai' | 'google';
+  const providerKeyMap: Record<string, string> = {
+    anthropic: 'anthropic',
+    openai: 'openai',
+    google: 'google',
+    'azure ai foundry': 'azure',
+    openrouter: 'openrouter',
+    'github models': 'github',
+  };
+  const providerKey = providerKeyMap[provider.toLowerCase()] ?? 'anthropic';
 
   // 5. API key
   const envKey = PROVIDER_ENV_KEYS[providerKey];

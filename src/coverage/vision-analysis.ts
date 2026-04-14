@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import { shortId } from "../constants.js";
-import { hasLLMApiKey } from "../llm.js";
-import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from "../prompt-safety.js";
-import type { Evidence, RawFinding, FindingSeverity, FindingCategory, PageType } from "../types.js";
+import { shortId } from '../constants.js';
+import { hasLLMApiKey } from '../llm.js';
+import { sendVisionCompletion } from '../llm/index.js';
+import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from '../prompt-safety.js';
+import type { Evidence, RawFinding, FindingSeverity, FindingCategory, PageType } from '../types.js';
 
 export interface VisionAnalysisOptions {
   areaName: string;
@@ -62,175 +63,6 @@ Respond with ONLY a JSON object (no markdown fences, no explanation) with these 
 
 If the page looks correct with no issues, return an empty anomalies array.
 Be conservative — only report clear visual problems, not stylistic preferences.`;
-
-type Provider = "anthropic" | "openai" | "google";
-
-function detectProvider(model: string): Provider {
-  const lower = model.toLowerCase();
-  if (lower.startsWith("openai/")) return "openai";
-  if (lower.startsWith("google/")) return "google";
-  return "anthropic";
-}
-
-function stripProvider(model: string): string {
-  const slash = model.indexOf("/");
-  return slash >= 0 ? model.slice(slash + 1) : model;
-}
-
-interface ProviderVisionSpec {
-  envKey: string;
-  envName: string;
-  url: (model: string) => string;
-  headers: (apiKey: string) => Record<string, string>;
-  body: (model: string, system: string, base64Image: string, pageContext: string, maxTokens: number) => unknown;
-  extract: (data: unknown) => string;
-}
-
-const VISION_PROVIDERS: Record<Provider, ProviderVisionSpec> = {
-  anthropic: {
-    envKey: "ANTHROPIC_API_KEY",
-    envName: "Anthropic",
-    url: () => "https://api.anthropic.com/v1/messages",
-    headers: (key) => ({
-      "content-type": "application/json",
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-    }),
-    body: (model, system, base64Image, pageContext, maxTokens) => ({
-      model,
-      max_tokens: maxTokens,
-      system,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: "image/png", data: base64Image },
-            },
-            { type: "text", text: pageContext },
-          ],
-        },
-      ],
-    }),
-    extract: (data) =>
-      (data as { content?: Array<{ type: string; text: string }> }).content
-        ?.filter((c) => c.type === "text")
-        .map((c) => c.text)
-        .join("") ?? "",
-  },
-  openai: {
-    envKey: "OPENAI_API_KEY",
-    envName: "OpenAI",
-    url: () =>
-      `${process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1"}/chat/completions`,
-    headers: (key) => ({
-      "content-type": "application/json",
-      authorization: `Bearer ${key}`,
-    }),
-    body: (model, system, base64Image, pageContext, maxTokens) => ({
-      model,
-      max_tokens: maxTokens,
-      messages: [
-        { role: "system", content: system },
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: { url: `data:image/png;base64,${base64Image}` },
-            },
-            { type: "text", text: pageContext },
-          ],
-        },
-      ],
-    }),
-    extract: (data) =>
-      (
-        data as { choices: Array<{ message: { content: string } }> }
-      ).choices[0]?.message?.content ?? "",
-  },
-  google: {
-    envKey: "GOOGLE_GENERATIVE_AI_API_KEY",
-    envName: "Google",
-    url: (model) =>
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    headers: (key) => ({ "content-type": "application/json", "x-goog-api-key": key }),
-    body: (_, system, base64Image, pageContext, maxTokens) => ({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: "image/png", data: base64Image } },
-            { text: pageContext },
-          ],
-        },
-      ],
-      generationConfig: { maxOutputTokens: maxTokens },
-    }),
-    extract: (data) =>
-      (
-        data as {
-          candidates: Array<{
-            content: { parts: Array<{ text: string }> };
-          }>;
-        }
-      ).candidates?.[0]?.content?.parts
-        ?.filter((p) => p.text)
-        .map((p) => p.text)
-        .join("") ?? "",
-  },
-};
-
-function redactApiKey(text: string, apiKey: string): string {
-  return text.replaceAll(apiKey, "[REDACTED]");
-}
-
-async function callVisionLLM(
-  model: string,
-  system: string,
-  base64Image: string,
-  pageContext: string,
-  maxTokens: number,
-  requestTimeoutMs: number,
-): Promise<string> {
-  const provider = detectProvider(model);
-  const spec = VISION_PROVIDERS[provider];
-  const apiKey = process.env[spec.envKey];
-  if (!apiKey) {
-    throw new Error(
-      `${spec.envKey} not set — required for ${spec.envName} vision models`,
-    );
-  }
-
-  const modelId = stripProvider(model);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
-  let response: Response;
-
-  try {
-    response = await fetch(spec.url(modelId), {
-      method: "POST",
-      headers: spec.headers(apiKey),
-      body: JSON.stringify(
-        spec.body(modelId, system, base64Image, pageContext, maxTokens),
-      ),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `${spec.envName} Vision API error ${response.status}: ${redactApiKey(body, apiKey).slice(0, 200)}`,
-    );
-  }
-
-  return spec.extract(await response.json());
-}
 
 export function parseVisionResponse(raw: string): VisionPageAnalysis {
   const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
@@ -317,14 +149,14 @@ ${wrapUntrustedPromptContent(
   `Page URL: ${options.route}\nPage type: ${options.pageType}\nArea: ${options.areaName}\n\nAnalyze this screenshot for layout structure and visual anomalies.`
 )}`;
 
-  const raw = await callVisionLLM(
-    options.model,
-    VISION_SYSTEM_PROMPT,
+  const raw = await sendVisionCompletion({
+    model: options.model,
+    system: VISION_SYSTEM_PROMPT,
     base64Image,
     pageContext,
-    options.maxResponseTokens,
-    options.requestTimeoutMs,
-  );
+    maxTokens: options.maxResponseTokens,
+    requestTimeoutMs: options.requestTimeoutMs,
+  });
 
   const analysis = parseVisionResponse(raw);
 

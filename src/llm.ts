@@ -3,155 +3,26 @@
 
 import type { LLMTaskProposal, WorkerType } from './types.js';
 import type { JudgeDecision } from './judge/types.js';
-import { TRUNCATE_GROUP_KEY, DEFAULT_LLM_TIMEOUT_MS, JUDGE_LLM_TIMEOUT_MS } from './constants.js';
+import { DEFAULT_LLM_TIMEOUT_MS, JUDGE_LLM_TIMEOUT_MS } from './constants.js';
 import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from './prompt-safety.js';
+import { hasConfiguredProvider, sendChatCompletion } from './llm/index.js';
 
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-type Provider = 'anthropic' | 'openai' | 'google';
-
-function detectProvider(model: string): Provider {
-  const lower = model.toLowerCase();
-  if (lower.startsWith('openai/')) return 'openai';
-  if (lower.startsWith('google/')) return 'google';
-  return 'anthropic';
-}
-
-function stripProvider(model: string): string {
-  const slash = model.indexOf('/');
-  return slash >= 0 ? model.slice(slash + 1) : model;
-}
-
+/**
+ * Check whether the given model's provider (or any provider, if no model
+ * is supplied) has its required API key(s) configured.
+ */
 export function hasLLMApiKey(model?: string): boolean {
-  if (!model) {
-    return !!(
-      process.env.ANTHROPIC_API_KEY ||
-      process.env.OPENAI_API_KEY ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY
-    );
-  }
-
-  const provider = detectProvider(model);
-  return Boolean(process.env[PROVIDERS[provider].envKey]);
-}
-
-interface ProviderSpec {
-  envKey: string;
-  envName: string;
-  url: (model: string) => string;
-  headers: (apiKey: string) => Record<string, string>;
-  body: (model: string, system: string, messages: ChatMessage[], maxTokens: number) => unknown;
-  extract: (data: unknown) => string;
-}
-
-const PROVIDERS: Record<Provider, ProviderSpec> = {
-  anthropic: {
-    envKey: 'ANTHROPIC_API_KEY',
-    envName: 'Anthropic',
-    url: () => 'https://api.anthropic.com/v1/messages',
-    headers: (key) => ({
-      'content-type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-    }),
-    body: (model, system, messages, maxTokens) => ({
-      model,
-      max_tokens: maxTokens,
-      system,
-      messages: messages
-        .filter((m) => m.role !== 'system')
-        .map((m) => ({ role: m.role, content: m.content })),
-    }),
-    extract: (data) =>
-      (data as { content?: Array<{ type: string; text: string }> }).content
-        ?.filter((c) => c.type === 'text')
-        .map((c) => c.text)
-        .join('') ?? '',
-  },
-  openai: {
-    envKey: 'OPENAI_API_KEY',
-    envName: 'OpenAI',
-    url: () => `${process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1'}/chat/completions`,
-    headers: (key) => ({ 'content-type': 'application/json', authorization: `Bearer ${key}` }),
-    body: (model, system, messages, maxTokens) => ({
-      model,
-      max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: system },
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
-      ],
-    }),
-    extract: (data) =>
-      (data as { choices: Array<{ message: { content: string } }> }).choices[0]?.message?.content ??
-      '',
-  },
-  google: {
-    envKey: 'GOOGLE_GENERATIVE_AI_API_KEY',
-    envName: 'Google',
-    url: (model) =>
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    headers: (key) => ({ 'content-type': 'application/json', 'x-goog-api-key': key }),
-    body: (_, system, messages, maxTokens) => ({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: messages.map((m) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
-      })),
-      generationConfig: { maxOutputTokens: maxTokens },
-    }),
-    extract: (data) =>
-      (
-        data as { candidates: Array<{ content: { parts: Array<{ text: string }> } }> }
-      ).candidates?.[0]?.content?.parts
-        ?.filter((p) => p.text)
-        .map((p) => p.text)
-        .join('') ?? '',
-  },
-};
-
-function redactApiKey(text: string, apiKey: string): string {
-  return text.replaceAll(apiKey, '[REDACTED]');
+  return hasConfiguredProvider(model);
 }
 
 async function callLLM(
   model: string,
   system: string,
-  messages: ChatMessage[],
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
   maxTokens = 1024,
   requestTimeoutMs = DEFAULT_LLM_TIMEOUT_MS
 ): Promise<string> {
-  const provider = detectProvider(model);
-  const spec = PROVIDERS[provider];
-  const apiKey = process.env[spec.envKey];
-  if (!apiKey) throw new Error(`${spec.envKey} not set — required for ${spec.envName} models`);
-
-  const modelId = stripProvider(model);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
-  let response: Response;
-
-  try {
-    response = await fetch(spec.url(modelId), {
-      method: 'POST',
-      headers: spec.headers(apiKey),
-      body: JSON.stringify(spec.body(modelId, system, messages, maxTokens)),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(
-      `${spec.envName} API error ${response.status}: ${redactApiKey(body, apiKey).slice(0, TRUNCATE_GROUP_KEY)}`
-    );
-  }
-
-  return spec.extract(await response.json());
+  return sendChatCompletion({ model, system, messages, maxTokens, requestTimeoutMs });
 }
 
 export async function proposeLLMTasks(

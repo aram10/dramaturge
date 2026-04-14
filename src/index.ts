@@ -12,6 +12,17 @@ export type {
   DramaturgeConfig,
   LoadedDramaturgeConfig,
 } from './config.js';
+export {
+  resolveProvider,
+  stripProviderPrefix,
+  hasConfiguredProvider,
+  detectProviderFromEnv,
+  allProviders,
+  sendChatCompletion,
+  sendVisionCompletion,
+  createOpenAICompatibleProvider,
+} from './llm/index.js';
+export type { ChatMessage, ProviderId, LLMProviderAdapter, ProviderRequest } from './llm/index.js';
 export { runEngine } from './engine.js';
 export type { RunEngineOptions } from './engine.js';
 export { EngineEventEmitter, emitEngineEvent } from './engine/event-stream.js';
