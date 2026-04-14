@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
+import { TRUNCATE_GROUP_KEY } from '../constants.js';
 import type { ChatMessage, LLMProviderAdapter } from './types.js';
 import { resolveProvider, stripProviderPrefix } from './registry.js';
 
@@ -94,7 +95,9 @@ async function executeProviderRequest(
         safeBody = redactApiKey(safeBody, secret);
       }
     }
-    throw new Error(`${adapter.name} API error ${response.status}: ${safeBody.slice(0, 500)}`);
+    throw new Error(
+      `${adapter.name} API error ${response.status}: ${safeBody.slice(0, TRUNCATE_GROUP_KEY)}`
+    );
   }
 
   return response.json();

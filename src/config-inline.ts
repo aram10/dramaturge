@@ -16,7 +16,7 @@ export interface InlineRunArgs {
   description?: string;
 }
 
-const PROVIDER_DEFAULTS: Record<string, { planner: string; worker: string }> = {
+const PROVIDER_DEFAULTS: Record<ProviderId, { planner: string; worker: string }> = {
   anthropic: {
     planner: 'anthropic/claude-sonnet-4-6',
     worker: 'anthropic/claude-haiku-4-5',
@@ -85,7 +85,7 @@ function buildThoroughPreset(): Partial<DramaturgeConfig> {
  */
 export function buildConfigFromArgs(args: InlineRunArgs): ConfigWithMeta<DramaturgeConfig> {
   const provider = args.provider ?? detectProviderFromEnv();
-  const models = PROVIDER_DEFAULTS[provider] ?? PROVIDER_DEFAULTS.anthropic;
+  const models = PROVIDER_DEFAULTS[provider];
 
   const raw: Record<string, unknown> = {
     targetUrl: args.url,

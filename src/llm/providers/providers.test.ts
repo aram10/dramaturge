@@ -117,6 +117,12 @@ describe('provider adapters', () => {
       expect(openaiProvider.extractChatResponse(data)).toBe('Test response');
     });
 
+    it('returns empty string for unexpected response shape', () => {
+      expect(openaiProvider.extractChatResponse({})).toBe('');
+      expect(openaiProvider.extractChatResponse({ choices: [] })).toBe('');
+      expect(openaiProvider.extractChatResponse({ choices: [{}] })).toBe('');
+    });
+
     it('includes model in request body', () => {
       process.env.OPENAI_API_KEY = 'test';
       const req = openaiProvider.buildChatRequest({
@@ -188,6 +194,19 @@ describe('provider adapters', () => {
 
       process.env.AZURE_AI_ENDPOINT = 'https://my.services.ai.azure.com';
       expect(azureFoundryProvider.isConfigured()).toBe(true);
+    });
+
+    it('throws clear error when AZURE_AI_ENDPOINT is missing', () => {
+      process.env.AZURE_AI_API_KEY = 'test';
+      delete process.env.AZURE_AI_ENDPOINT;
+      expect(() =>
+        azureFoundryProvider.buildChatRequest({
+          model: 'gpt-4.1',
+          system: 'sys',
+          messages: [{ role: 'user', content: 'Hi' }],
+          maxTokens: 100,
+        })
+      ).toThrow('AZURE_AI_ENDPOINT not set');
     });
 
     it('builds URL from endpoint with api-version', () => {

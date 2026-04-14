@@ -94,6 +94,30 @@ function checkAnyApiKey(): DoctorCheckResult {
   };
 }
 
+function checkAzureEndpoint(): DoctorCheckResult {
+  const hasKey = !!process.env.AZURE_AI_API_KEY;
+  const hasEndpoint = !!process.env.AZURE_AI_ENDPOINT;
+
+  if (!hasKey) {
+    return {
+      label: 'Azure AI Foundry endpoint',
+      ok: true, // not relevant when key is not set
+      message: 'AZURE_AI_API_KEY not set (skipped)',
+    };
+  }
+
+  return {
+    label: 'Azure AI Foundry endpoint',
+    ok: hasEndpoint,
+    message: hasEndpoint
+      ? `AZURE_AI_ENDPOINT is set`
+      : 'AZURE_AI_ENDPOINT is not set (required when using Azure)',
+    fix: !hasEndpoint
+      ? 'Set AZURE_AI_ENDPOINT to your Azure AI Foundry resource URL (e.g. https://my-project.services.ai.azure.com)'
+      : undefined,
+  };
+}
+
 function checkOutputDir(cwd: string): DoctorCheckResult {
   const dir = resolve(cwd, 'dramaturge-reports');
   try {
@@ -126,6 +150,7 @@ export function runDoctorChecks(cwd: string): DoctorCheckResult[] {
     checkApiKey('OPENAI_API_KEY', 'OpenAI'),
     checkApiKey('GOOGLE_GENERATIVE_AI_API_KEY', 'Google'),
     checkApiKey('AZURE_AI_API_KEY', 'Azure AI Foundry'),
+    checkAzureEndpoint(),
     checkApiKey('OPENROUTER_API_KEY', 'OpenRouter'),
     checkApiKey('GITHUB_TOKEN', 'GitHub Models'),
     checkOutputDir(cwd),

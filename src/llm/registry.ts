@@ -39,12 +39,22 @@ export function resolveProvider(model: string): LLMProviderAdapter {
 /**
  * Extract the model ID portion from a prefixed model string.
  *
+ * Only strips when the string starts with a **known** provider prefix.
+ * For unrecognised prefixes (e.g. `"foo/bar"`), the string is returned
+ * as-is so the Anthropic default adapter gets the full model name.
+ *
  * `"openai/gpt-4.1"` → `"gpt-4.1"`
+ * `"openrouter/anthropic/claude-3.5-sonnet"` → `"anthropic/claude-3.5-sonnet"`
  * `"claude-haiku-4-5"` → `"claude-haiku-4-5"`
+ * `"foo/bar"` → `"foo/bar"` (unknown prefix — kept intact)
  */
 export function stripProviderPrefix(model: string): string {
-  const slash = model.indexOf('/');
-  return slash >= 0 ? model.slice(slash + 1) : model;
+  const prefix = detectPrefix(model);
+  const prefixWithSlash = `${prefix}/`;
+
+  return model.toLowerCase().startsWith(prefixWithSlash)
+    ? model.slice(prefixWithSlash.length)
+    : model;
 }
 
 /**

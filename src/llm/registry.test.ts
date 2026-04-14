@@ -90,6 +90,10 @@ describe('registry', () => {
     it('returns model as-is when there is no prefix', () => {
       expect(stripProviderPrefix('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
     });
+
+    it('returns model as-is for unknown prefix', () => {
+      expect(stripProviderPrefix('foo/bar')).toBe('foo/bar');
+    });
   });
 
   describe('hasConfiguredProvider', () => {

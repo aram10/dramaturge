@@ -24,8 +24,8 @@ export interface OpenAICompatibleConfig {
 
 function extractText(data: unknown): string {
   return (
-    (data as { choices: Array<{ message: { content: string } }> }).choices[0]?.message?.content ??
-    ''
+    (data as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message
+      ?.content ?? ''
   );
 }
 

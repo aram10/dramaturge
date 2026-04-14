@@ -22,17 +22,23 @@ import { createOpenAICompatibleProvider } from './openai-compatible.js';
 
 const API_VERSION = '2024-05-01-preview';
 
+function requireEndpoint(): string {
+  const endpoint = process.env.AZURE_AI_ENDPOINT;
+  if (!endpoint) {
+    throw new Error(
+      'AZURE_AI_ENDPOINT not set — required for Azure AI Foundry models. ' +
+        'Set it to your Foundry resource URL (e.g. https://my-project.services.ai.azure.com).'
+    );
+  }
+  return endpoint.replace(/\/+$/, '');
+}
+
 export const azureFoundryProvider = createOpenAICompatibleProvider({
   name: 'Azure AI Foundry',
   prefix: 'azure',
   envKeys: ['AZURE_AI_API_KEY', 'AZURE_AI_ENDPOINT'],
   getApiKey: () => process.env.AZURE_AI_API_KEY,
-  getBaseUrl: () => {
-    const endpoint = process.env.AZURE_AI_ENDPOINT ?? '';
-    // Strip trailing slash if present
-    const base = endpoint.replace(/\/+$/, '');
-    return `${base}/models`;
-  },
+  getBaseUrl: () => `${requireEndpoint()}/models`,
   buildAuthHeaders: (key) => ({
     'api-key': key,
     'extra-parameters': 'ignore',
