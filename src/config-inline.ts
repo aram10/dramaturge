@@ -4,12 +4,14 @@
 import { resolve } from 'node:path';
 import { ConfigSchema, type DramaturgeConfig } from './config.js';
 import { normalizeConfigPaths, type ConfigWithMeta } from './config-paths.js';
+import { detectProviderFromEnv } from './llm/index.js';
+import type { ProviderId } from './llm/index.js';
 
 export interface InlineRunArgs {
   url: string;
   login?: boolean;
   headless?: boolean;
-  provider?: 'anthropic' | 'openai' | 'google';
+  provider?: ProviderId;
   preset?: 'smoke' | 'thorough';
   description?: string;
 }
@@ -27,14 +29,19 @@ const PROVIDER_DEFAULTS: Record<string, { planner: string; worker: string }> = {
     planner: 'google/gemini-2.5-pro',
     worker: 'google/gemini-2.5-flash',
   },
+  azure: {
+    planner: 'azure/gpt-4.1',
+    worker: 'azure/gpt-4.1-mini',
+  },
+  openrouter: {
+    planner: 'openrouter/anthropic/claude-sonnet-4-6',
+    worker: 'openrouter/anthropic/claude-haiku-4-5',
+  },
+  github: {
+    planner: 'github/openai/gpt-4.1',
+    worker: 'github/openai/gpt-4.1-mini',
+  },
 };
-
-function detectProvider(): string {
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
-  if (process.env.OPENAI_API_KEY) return 'openai';
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) return 'google';
-  return 'anthropic';
-}
 
 function buildSmokePreset(): Partial<DramaturgeConfig> {
   return {
@@ -77,7 +84,7 @@ function buildThoroughPreset(): Partial<DramaturgeConfig> {
  * defaults. This enables `dramaturge run <url>` without a config file.
  */
 export function buildConfigFromArgs(args: InlineRunArgs): ConfigWithMeta<DramaturgeConfig> {
-  const provider = args.provider ?? detectProvider();
+  const provider = args.provider ?? detectProviderFromEnv();
   const models = PROVIDER_DEFAULTS[provider] ?? PROVIDER_DEFAULTS.anthropic;
 
   const raw: Record<string, unknown> = {

@@ -34,7 +34,7 @@ export interface ParsedCliArgs {
   /** --headless flag for inline runs */
   headless?: boolean;
   /** --provider flag for inline runs */
-  provider?: 'anthropic' | 'openai' | 'google';
+  provider?: 'anthropic' | 'openai' | 'google' | 'azure' | 'openrouter' | 'github';
   /** --preset flag for inline runs */
   preset?: 'smoke' | 'thorough';
   /** --template flag for init */
@@ -65,7 +65,7 @@ Run options:
   --dashboard          Show a real-time terminal dashboard (powered by Ink)
   --login              Enable interactive auth (opens browser for sign-in)
   --headless           Run browser in headless mode
-  --provider <name>    LLM provider: anthropic, openai, or google
+  --provider <name>    LLM provider: anthropic, openai, google, azure, openrouter, or github
   --preset <name>      Use a preset: smoke (quick scan) or thorough (full scan)
   --help, -h           Show this help message
 
@@ -107,7 +107,7 @@ export function buildHelpText(): string {
 }
 
 const KNOWN_COMMANDS = new Set(['run', 'doctor', 'init', 'setup', 'help']);
-const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google']);
+const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'openrouter', 'github']);
 const VALID_PRESETS = new Set(['smoke', 'thorough']);
 
 export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
@@ -186,7 +186,9 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       const value = args[i + 1];
       if (!value) throw new Error('Missing value for --provider');
       if (!VALID_PROVIDERS.has(value)) {
-        throw new Error(`Invalid provider: ${value}. Must be one of: anthropic, openai, google`);
+        throw new Error(
+          `Invalid provider: ${value}. Must be one of: anthropic, openai, google, azure, openrouter, github`
+        );
       }
       provider = value as ParsedCliArgs['provider'];
       i++;

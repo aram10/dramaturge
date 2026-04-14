@@ -74,6 +74,9 @@ function checkAnyApiKey(): DoctorCheckResult {
     { env: 'ANTHROPIC_API_KEY', name: 'Anthropic' },
     { env: 'OPENAI_API_KEY', name: 'OpenAI' },
     { env: 'GOOGLE_GENERATIVE_AI_API_KEY', name: 'Google' },
+    { env: 'AZURE_AI_API_KEY', name: 'Azure AI Foundry' },
+    { env: 'OPENROUTER_API_KEY', name: 'OpenRouter' },
+    { env: 'GITHUB_TOKEN', name: 'GitHub Models' },
   ];
   const found = keys.filter((k) => !!process.env[k.env]);
   if (found.length > 0) {
@@ -87,7 +90,7 @@ function checkAnyApiKey(): DoctorCheckResult {
     label: 'LLM API key',
     ok: false,
     message: 'No API key found',
-    fix: 'Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_GENERATIVE_AI_API_KEY in your environment or .env file',
+    fix: 'Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, AZURE_AI_API_KEY, OPENROUTER_API_KEY, or GITHUB_TOKEN in your environment or .env file',
   };
 }
 
@@ -122,6 +125,9 @@ export function runDoctorChecks(cwd: string): DoctorCheckResult[] {
     checkApiKey('ANTHROPIC_API_KEY', 'Anthropic'),
     checkApiKey('OPENAI_API_KEY', 'OpenAI'),
     checkApiKey('GOOGLE_GENERATIVE_AI_API_KEY', 'Google'),
+    checkApiKey('AZURE_AI_API_KEY', 'Azure AI Foundry'),
+    checkApiKey('OPENROUTER_API_KEY', 'OpenRouter'),
+    checkApiKey('GITHUB_TOKEN', 'GitHub Models'),
     checkOutputDir(cwd),
   ];
 }
