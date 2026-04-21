@@ -302,7 +302,9 @@ export function hydrateFromCheckpoint(
   return {
     findingsByNode: new Map(Object.entries(checkpoint.findingsByNode)),
     evidenceByNode: new Map(Object.entries(checkpoint.evidenceByNode)),
-    actionsByNode: new Map(Object.entries(checkpoint.actionsByNode ?? {})),
+    actionsByNode: checkpoint.actionsByNode
+      ? new Map<string, ReplayableAction[]>(Object.entries(checkpoint.actionsByNode))
+      : new Map<string, ReplayableAction[]>(),
     completedTaskIds: new Set(checkpoint.completedTaskIds),
     tasksExecuted: checkpoint.tasksExecuted,
     plannerState: checkpoint.plannerState ?? {},
