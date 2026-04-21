@@ -69,7 +69,7 @@ Run options:
   --headless           Run browser in headless mode
   --provider <name>    LLM provider: anthropic, openai, google, azure, openrouter, or github
   --preset <name>      Use a preset: smoke (quick scan) or thorough (full scan)
-  --format <list>      Report formats, comma-separated: markdown, json, junit, sarif (e.g. markdown,sarif)
+  --format <list>      Report formats, comma-separated: markdown, json, junit, sarif, or both (legacy alias) (e.g. markdown,sarif)
   --help, -h           Show this help message
 
 Init options:

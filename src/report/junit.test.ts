@@ -108,4 +108,26 @@ describe('renderJunit', () => {
     expect(xml).toContain('&quot;quotes&quot;');
     expect(xml).not.toContain('<script>');
   });
+
+  it('keeps XML-valid DEL characters and strips invalid control characters', () => {
+    const xml = renderJunit(
+      makeResult([
+        makeArea({
+          findings: [
+            {
+              category: 'Bug',
+              severity: 'Critical',
+              title: `Del:\u007f`,
+              stepsToReproduce: ['Step'],
+              expected: 'Works',
+              actual: 'Bad \u0001 output',
+            },
+          ],
+        }),
+      ])
+    );
+
+    expect(xml).toContain('Del:\u007f');
+    expect(xml).not.toContain('\u0001');
+  });
 });

@@ -148,6 +148,43 @@ describe('renderSarif', () => {
     );
   });
 
+  it('preserves relative route locations', () => {
+    const sarif = JSON.parse(
+      renderSarif(
+        makeResult([
+          makeArea({
+            findings: [
+              {
+                category: 'Bug',
+                severity: 'Major',
+                title: 'Broken dashboard link',
+                stepsToReproduce: ['Click dashboard'],
+                expected: 'Dashboard opens',
+                actual: '404 shown',
+                meta: {
+                  source: 'agent',
+                  confidence: 'medium',
+                  repro: {
+                    objective: 'Investigate',
+                    breadcrumbs: [],
+                    evidenceIds: [],
+                    route: '/dashboard',
+                  },
+                },
+              },
+            ],
+          }),
+        ])
+      )
+    );
+
+    const uris = sarif.runs[0].results[0].locations.map(
+      (loc: { physicalLocation: { artifactLocation: { uri: string } } }) =>
+        loc.physicalLocation.artifactLocation.uri
+    );
+    expect(uris).toContain('/dashboard');
+  });
+
   it('marks execution as unsuccessful for partial runs', () => {
     const sarif = JSON.parse(renderSarif(makeResult([makeArea()], true)));
     expect(sarif.runs[0].invocations[0].executionSuccessful).toBe(false);

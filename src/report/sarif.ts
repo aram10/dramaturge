@@ -58,10 +58,15 @@ interface SarifResult {
 }
 
 function toSafeUri(value: string): string | undefined {
-  try {
-    return new URL(value).toString();
-  } catch {
+  const trimmedValue = value.trim();
+  if (trimmedValue.length === 0) {
     return undefined;
+  }
+
+  try {
+    return new URL(trimmedValue).toString();
+  } catch {
+    return trimmedValue;
   }
 }
 

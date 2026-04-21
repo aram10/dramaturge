@@ -5,7 +5,15 @@ import type { Finding, FindingSeverity, RunResult } from '../types.js';
 import { collectFindings } from './collector.js';
 
 function escapeXml(value: string): string {
-  return value
+  let out = '';
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code === 0x09 || code === 0x0a || code === 0x0d || code >= 0x20) {
+      out += value[i];
+    }
+  }
+
+  return out
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -14,15 +22,7 @@ function escapeXml(value: string): string {
 }
 
 function escapeXmlAttr(value: string): string {
-  // Attribute values additionally strip control characters that are invalid in XML 1.0.
-  let out = '';
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
-    if (code === 0x09 || code === 0x0a || code === 0x0d || (code >= 0x20 && code !== 0x7f)) {
-      out += value[i];
-    }
-  }
-  return escapeXml(out);
+  return escapeXml(value);
 }
 
 function formatSeconds(ms: number): string {
