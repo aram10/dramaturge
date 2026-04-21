@@ -149,6 +149,7 @@ describe('buildHelpText', () => {
     expect(helpText).toContain('--config <path>');
     expect(helpText).toContain('--resume <run-dir>');
     expect(helpText).toContain('--dashboard');
+    expect(helpText).toContain('both (legacy alias)');
     expect(helpText).toContain('doctor');
     expect(helpText).toContain('setup');
     expect(helpText).toContain('init');

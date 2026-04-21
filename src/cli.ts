@@ -37,6 +37,8 @@ export interface ParsedCliArgs {
   provider?: 'anthropic' | 'openai' | 'google' | 'azure' | 'openrouter' | 'github';
   /** --preset flag for inline runs */
   preset?: 'smoke' | 'thorough';
+  /** --format flag — comma-separated list of report formats */
+  formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
   /** --template flag for init */
   initTemplate?: InitTemplate;
   /** --output flag for init */
@@ -67,6 +69,7 @@ Run options:
   --headless           Run browser in headless mode
   --provider <name>    LLM provider: anthropic, openai, google, azure, openrouter, or github
   --preset <name>      Use a preset: smoke (quick scan) or thorough (full scan)
+  --format <list>      Report formats, comma-separated: markdown, json, junit, sarif, or both (legacy alias) (e.g. markdown,sarif)
   --help, -h           Show this help message
 
 Init options:
@@ -109,6 +112,7 @@ export function buildHelpText(): string {
 const KNOWN_COMMANDS = new Set(['run', 'doctor', 'init', 'setup', 'help']);
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'openrouter', 'github']);
 const VALID_PRESETS = new Set(['smoke', 'thorough']);
+const VALID_FORMATS = new Set(['markdown', 'json', 'both', 'junit', 'sarif']);
 
 export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let command: ParsedCliArgs['command'] = 'run';
@@ -121,6 +125,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let headless: boolean | undefined;
   let provider: ParsedCliArgs['provider'];
   let preset: ParsedCliArgs['preset'];
+  let formats: ParsedCliArgs['formats'];
   let initTemplate: InitTemplate | undefined;
   let initOutput: string | undefined;
 
@@ -206,6 +211,26 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--format') {
+      const value = args[i + 1];
+      if (!value) throw new Error('Missing value for --format');
+      const parts = value
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+      if (parts.length === 0) throw new Error('Missing value for --format');
+      for (const part of parts) {
+        if (!VALID_FORMATS.has(part)) {
+          throw new Error(
+            `Invalid format: ${part}. Must be one of: markdown, json, both, junit, sarif`
+          );
+        }
+      }
+      formats = parts as NonNullable<ParsedCliArgs['formats']>;
+      i++;
+      continue;
+    }
+
     if (arg === '--template') {
       const value = args[i + 1];
       if (!value) throw new Error('Missing value for --template');
@@ -258,6 +283,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     headless,
     provider,
     preset,
+    formats,
     initTemplate,
     initOutput,
   };
@@ -378,11 +404,21 @@ async function runRunCommand(
       headless: parsedArgs.headless,
       provider: parsedArgs.provider,
       preset: parsedArgs.preset,
+      formats: parsedArgs.formats,
     };
     config = buildConfigFromArgs(inlineArgs);
   } else {
     // File mode: load config from file (existing behavior)
     config = dependencies.loadConfig(parsedArgs.configPath);
+    if (parsedArgs.formats && parsedArgs.formats.length > 0) {
+      config = {
+        ...config,
+        output: {
+          ...config.output,
+          format: parsedArgs.formats.length === 1 ? parsedArgs.formats[0] : [...parsedArgs.formats],
+        },
+      };
+    }
   }
 
   const eventStream = new EngineEventEmitter();

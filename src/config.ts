@@ -125,10 +125,18 @@ const ExplorationSchema = z
     totalTimeout: 900,
   });
 
+const OutputFormatValueSchema = z.enum(['markdown', 'json', 'both', 'junit', 'sarif']);
+export type OutputFormatValue = z.infer<typeof OutputFormatValueSchema>;
+
+const OutputFormatSchema = z.union([
+  OutputFormatValueSchema,
+  z.array(OutputFormatValueSchema).min(1),
+]);
+
 const OutputSchema = z
   .object({
     dir: z.string().default('./dramaturge-reports'),
-    format: z.enum(['markdown', 'json', 'both']).default('markdown'),
+    format: OutputFormatSchema.default('markdown'),
     screenshots: z.boolean().default(true),
   })
   .default({
@@ -136,6 +144,27 @@ const OutputSchema = z
     format: 'markdown',
     screenshots: true,
   });
+
+/**
+ * Normalize the output.format config value into a de-duplicated list of
+ * concrete renderer names. The legacy `'both'` alias expands to
+ * `['markdown', 'json']`.
+ */
+export function resolveOutputFormats(
+  format: OutputFormatValue | OutputFormatValue[]
+): Array<'markdown' | 'json' | 'junit' | 'sarif'> {
+  const list = Array.isArray(format) ? format : [format];
+  const resolved = new Set<'markdown' | 'json' | 'junit' | 'sarif'>();
+  for (const value of list) {
+    if (value === 'both') {
+      resolved.add('markdown');
+      resolved.add('json');
+    } else {
+      resolved.add(value);
+    }
+  }
+  return [...resolved];
+}
 
 const MemorySchema = z
   .object({

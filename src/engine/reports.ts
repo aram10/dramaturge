@@ -4,11 +4,14 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EngineContext } from './context.js';
-import type { AreaResult, FrontierItem } from '../types.js';
+import type { AreaResult, FrontierItem, RunResult } from '../types.js';
 import { buildRunResult } from '../report/collector.js';
 import { renderMarkdown } from '../report/markdown.js';
 import { renderJson } from '../report/json.js';
+import { renderJunit } from '../report/junit.js';
+import { renderSarif } from '../report/sarif.js';
 import { writeGeneratedPlaywrightTests } from '../report/test-gen.js';
+import { resolveOutputFormats } from '../config.js';
 import { hasLLMApiKey } from '../llm.js';
 import type { DiffSummary } from '../types.js';
 
@@ -103,20 +106,34 @@ export function writeReports(
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);
 
-  const format = config.output.format;
-  if (format === 'markdown' || format === 'both') {
-    const md = renderMarkdown(runResult);
-    writeFileSync(join(ctx.outputDir, 'report.md'), md, 'utf-8');
-    console.log(`\nMarkdown report: ${join(ctx.outputDir, 'report.md')}`);
-  }
-  if (format === 'json' || format === 'both') {
-    const json = renderJson(runResult);
-    writeFileSync(join(ctx.outputDir, 'report.json'), json, 'utf-8');
-    console.log(`JSON report: ${join(ctx.outputDir, 'report.json')}`);
+  const formats = resolveOutputFormats(config.output.format);
+  let firstFormatLogged = false;
+  for (const format of formats) {
+    const { filename, content, label } = renderForFormat(format, runResult);
+    const outPath = join(ctx.outputDir, filename);
+    writeFileSync(outPath, content, 'utf-8');
+    console.log(`${firstFormatLogged ? '' : '\n'}${label} report: ${outPath}`);
+    firstFormatLogged = true;
   }
   if (generatedTests.length > 0) {
     console.log(
       `Generated ${generatedTests.length} Playwright test file(s): ${join(ctx.outputDir, 'generated-tests')}`
     );
+  }
+}
+
+function renderForFormat(
+  format: 'markdown' | 'json' | 'junit' | 'sarif',
+  runResult: RunResult
+): { filename: string; content: string; label: string } {
+  switch (format) {
+    case 'markdown':
+      return { filename: 'report.md', content: renderMarkdown(runResult), label: 'Markdown' };
+    case 'json':
+      return { filename: 'report.json', content: renderJson(runResult), label: 'JSON' };
+    case 'junit':
+      return { filename: 'report.junit.xml', content: renderJunit(runResult), label: 'JUnit' };
+    case 'sarif':
+      return { filename: 'report.sarif', content: renderSarif(runResult), label: 'SARIF' };
   }
 }

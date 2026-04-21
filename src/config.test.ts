@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadConfig } from './config.js';
+import { loadConfig, resolveOutputFormats } from './config.js';
 import { parseJsoncObject } from './utils/jsonc.js';
 
 const tempDirs: string[] = [];
@@ -443,5 +443,41 @@ describe('loadConfig', () => {
       },
     });
     expect(effectiveReportDir).toBe(resolve(dir, 'ci-reports'));
+  });
+});
+
+describe('resolveOutputFormats', () => {
+  it('returns a single-entry list for a string format', () => {
+    expect(resolveOutputFormats('markdown')).toEqual(['markdown']);
+    expect(resolveOutputFormats('junit')).toEqual(['junit']);
+    expect(resolveOutputFormats('sarif')).toEqual(['sarif']);
+  });
+
+  it('expands the legacy "both" alias to markdown + json', () => {
+    expect(resolveOutputFormats('both')).toEqual(['markdown', 'json']);
+  });
+
+  it('de-duplicates entries in array form', () => {
+    expect(resolveOutputFormats(['markdown', 'markdown', 'sarif'])).toEqual(['markdown', 'sarif']);
+  });
+
+  it('expands "both" inside array form and merges with other entries', () => {
+    expect(resolveOutputFormats(['both', 'sarif'])).toEqual(['markdown', 'json', 'sarif']);
+  });
+
+  it('accepts arrays via the config loader', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        targetUrl: 'https://example.com',
+        appDescription: 'app',
+        auth: { type: 'none' },
+        output: { format: ['markdown', 'sarif'] },
+      })
+    );
+    const loaded = loadConfig(configPath);
+    expect(loaded.output.format).toEqual(['markdown', 'sarif']);
   });
 });

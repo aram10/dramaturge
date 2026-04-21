@@ -66,10 +66,17 @@ export function applyActionOverrides(
 
   // Ensure JSON output is available for result parsing when explicitly enabled.
   if (forceJsonOutput) {
-    if (nextConfig.output.format === 'markdown') {
-      nextConfig.output.format = 'both';
-    } else if (!nextConfig.output.format) {
+    if (!nextConfig.output.format) {
       nextConfig.output.format = 'json';
+    } else if (Array.isArray(nextConfig.output.format)) {
+      if (!nextConfig.output.format.some((f) => f === 'json' || f === 'both')) {
+        nextConfig.output.format = [...nextConfig.output.format, 'json'];
+      }
+    } else if (nextConfig.output.format === 'markdown') {
+      nextConfig.output.format = 'both';
+    } else if (nextConfig.output.format !== 'json' && nextConfig.output.format !== 'both') {
+      // junit, sarif, or any other — add json alongside as an array.
+      nextConfig.output.format = [nextConfig.output.format, 'json'];
     }
   }
 
@@ -93,6 +100,9 @@ export function applyActionOverrides(
  */
 export function isJsonOutputEnabled(config) {
   const format = config.output?.format;
+  if (Array.isArray(format)) {
+    return format.some((f) => f === 'json' || f === 'both');
+  }
   return format === 'json' || format === 'both';
 }
 
