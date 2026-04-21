@@ -299,26 +299,10 @@ export function hydrateFromCheckpoint(
     coverage.addBlindSpot(spot);
   }
 
-  // Restore findings + evidence maps
-  const findingsByNode = new Map<string, RawFinding[]>();
-  for (const [nodeId, findings] of Object.entries(checkpoint.findingsByNode)) {
-    findingsByNode.set(nodeId, findings);
-  }
-
-  const evidenceByNode = new Map<string, Evidence[]>();
-  for (const [nodeId, evidence] of Object.entries(checkpoint.evidenceByNode)) {
-    evidenceByNode.set(nodeId, evidence);
-  }
-
-  const actionsByNode = new Map<string, ReplayableAction[]>();
-  for (const [nodeId, actions] of Object.entries(checkpoint.actionsByNode ?? {})) {
-    actionsByNode.set(nodeId, actions);
-  }
-
   return {
-    findingsByNode,
-    evidenceByNode,
-    actionsByNode,
+    findingsByNode: new Map(Object.entries(checkpoint.findingsByNode)),
+    evidenceByNode: new Map(Object.entries(checkpoint.evidenceByNode)),
+    actionsByNode: new Map(Object.entries(checkpoint.actionsByNode ?? {})),
     completedTaskIds: new Set(checkpoint.completedTaskIds),
     tasksExecuted: checkpoint.tasksExecuted,
     plannerState: checkpoint.plannerState ?? {},

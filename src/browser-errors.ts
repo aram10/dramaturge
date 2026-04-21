@@ -131,6 +131,7 @@ export class BrowserErrorCollector {
       const teardowns = this.teardownFns.get(pageKey) ?? [];
       for (const fn of teardowns) fn();
       this.teardownFns.delete(pageKey);
+      this.buckets.delete(pageKey);
       return;
     }
 
@@ -138,6 +139,7 @@ export class BrowserErrorCollector {
       for (const fn of teardowns) fn();
     }
     this.teardownFns.clear();
+    this.buckets.clear();
   }
 
   /** Drain captured errors into findings + evidence, clearing internal buffers. */

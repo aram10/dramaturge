@@ -15,6 +15,12 @@ export function hasLLMApiKey(model?: string): boolean {
   return hasConfiguredProvider(model);
 }
 
+/** Strip markdown code fences from an LLM response and return the inner JSON string. */
+function extractJsonFromResponse(raw: string): string {
+  const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  return fenceMatch ? fenceMatch[1].trim() : raw.trim();
+}
+
 async function callLLM(
   model: string,
   system: string,
@@ -66,8 +72,7 @@ Propose testing tasks for this page.`;
     );
 
     // Extract JSON from response (handle possible markdown code fences)
-    const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-    const jsonStr = fenceMatch ? fenceMatch[1].trim() : raw.trim();
+    const jsonStr = extractJsonFromResponse(raw);
     const parsed = JSON.parse(jsonStr) as unknown[];
 
     if (!Array.isArray(parsed)) return null;
@@ -132,11 +137,8 @@ ${wrapUntrustedPromptContent('JUDGE INPUT', prompt)}`;
     512,
     requestTimeoutMs
   );
-  const fenceMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
-  const jsonStr = fenceMatch ? fenceMatch[1].trim() : raw.trim();
-  let parsed: Partial<JudgeDecision> & {
-    confidence?: 'low' | 'medium' | 'high';
-  };
+  const jsonStr = extractJsonFromResponse(raw);
+  let parsed: Partial<JudgeDecision> & { confidence?: 'low' | 'medium' | 'high' };
   try {
     parsed = JSON.parse(jsonStr) as Partial<JudgeDecision> & {
       confidence?: 'low' | 'medium' | 'high';
