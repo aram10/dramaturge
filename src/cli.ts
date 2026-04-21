@@ -11,6 +11,7 @@ import { loadDotenv } from './env.js';
 import { buildConfigFromArgs, type InlineRunArgs } from './config-inline.js';
 import { runDoctor } from './commands/doctor.js';
 import { runInit, type InitTemplate } from './commands/init.js';
+import { runTriageCommand } from './commands/triage.js';
 import type {
   ErrorEvent,
   FindingEvent,
@@ -21,7 +22,7 @@ import type {
 } from './engine/event-stream.js';
 
 export interface ParsedCliArgs {
-  command: 'run' | 'doctor' | 'init' | 'setup' | 'help';
+  command: 'run' | 'doctor' | 'init' | 'setup' | 'findings' | 'baselines' | 'memory' | 'help';
   configPath?: string;
   resumeDir?: string;
   diffRef?: string;
@@ -43,6 +44,16 @@ export interface ParsedCliArgs {
   initTemplate?: InitTemplate;
   /** --output flag for init */
   initOutput?: string;
+  /** Subcommand after findings/baselines/memory (e.g. "list", "suppress") */
+  triageSubcommand?: string;
+  /** Positional args for triage subcommands */
+  triagePositional?: string[];
+  /** --suppressed flag for findings list */
+  triageSuppressedOnly?: boolean;
+  /** --all flag for baselines approve */
+  triageAll?: boolean;
+  /** --reason <text> for findings suppress */
+  triageReason?: string;
 }
 
 export interface CliDependencies {
@@ -59,6 +70,9 @@ Commands:
   setup                Interactive first-run onboarding wizard
   init                 Generate a config file from a template
   doctor               Check environment and configuration
+  findings <sub>       Triage findings in memory (list | suppress | unsuppress)
+  baselines <sub>      Manage visual-regression baselines (list | approve)
+  memory stats         Show memory store statistics
 
 Run options:
   --config <path>      Path to config file (default: dramaturge.config.json)
@@ -77,6 +91,11 @@ Init options:
   --url <url>          Pre-fill target URL in generated config
   --output <path>      Output path for generated config file
 
+Triage options:
+  --suppressed         findings list: only show suppressed findings
+  --reason <text>      findings suppress: reason text recorded with the suppression
+  --all                baselines approve: approve every baseline (delete all)
+
 Examples:
   dramaturge run https://my-app.example.com           # Quick run, no config needed
   dramaturge run https://my-app.example.com --login    # Run with interactive auth
@@ -85,6 +104,10 @@ Examples:
   dramaturge setup                                     # Interactive onboarding
   dramaturge init --template minimal                   # Generate minimal config
   dramaturge doctor                                    # Check environment
+  dramaturge findings list                             # List findings in memory
+  dramaturge findings suppress abc123 --reason "known issue"
+  dramaturge baselines approve --all                   # Recapture all visual baselines
+  dramaturge memory stats                              # Summarize memory store
 
 Environment variables:
   ANTHROPIC_API_KEY              API key for Anthropic models
@@ -109,7 +132,17 @@ export function buildHelpText(): string {
   return HELP_TEXT;
 }
 
-const KNOWN_COMMANDS = new Set(['run', 'doctor', 'init', 'setup', 'help']);
+const KNOWN_COMMANDS = new Set([
+  'run',
+  'doctor',
+  'init',
+  'setup',
+  'help',
+  'findings',
+  'baselines',
+  'memory',
+]);
+const TRIAGE_COMMANDS = new Set(['findings', 'baselines', 'memory']);
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'openrouter', 'github']);
 const VALID_PRESETS = new Set(['smoke', 'thorough']);
 const VALID_FORMATS = new Set(['markdown', 'json', 'both', 'junit', 'sarif']);
@@ -128,6 +161,11 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let formats: ParsedCliArgs['formats'];
   let initTemplate: InitTemplate | undefined;
   let initOutput: string | undefined;
+  let triageSubcommand: string | undefined;
+  const triagePositional: string[] = [];
+  let triageSuppressedOnly: boolean | undefined;
+  let triageAll: boolean | undefined;
+  let triageReason: string | undefined;
 
   let i = 0;
 
@@ -135,6 +173,12 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   if (args.length > 0 && KNOWN_COMMANDS.has(args[0])) {
     command = args[0] as ParsedCliArgs['command'];
     i = 1;
+
+    // For triage commands, the next positional (if any) is the subcommand
+    if (TRIAGE_COMMANDS.has(command) && args.length > 1 && !args[1].startsWith('-')) {
+      triageSubcommand = args[1];
+      i = 2;
+    }
   }
 
   for (; i < args.length; i++) {
@@ -258,6 +302,24 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--suppressed') {
+      triageSuppressedOnly = true;
+      continue;
+    }
+
+    if (arg === '--all') {
+      triageAll = true;
+      continue;
+    }
+
+    if (arg === '--reason') {
+      const value = args[i + 1];
+      if (!value) throw new Error('Missing value for --reason');
+      triageReason = value;
+      i++;
+      continue;
+    }
+
     if (arg.startsWith('--')) {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -265,6 +327,12 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     // Positional argument: treat as URL for `run` command
     if (command === 'run' && !url) {
       url = arg;
+      continue;
+    }
+
+    // Positional arg for triage commands (signatures, baseline identifiers)
+    if (TRIAGE_COMMANDS.has(command)) {
+      triagePositional.push(arg);
       continue;
     }
 
@@ -286,6 +354,11 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     formats,
     initTemplate,
     initOutput,
+    triageSubcommand,
+    triagePositional: triagePositional.length > 0 ? triagePositional : undefined,
+    triageSuppressedOnly,
+    triageAll,
+    triageReason,
   };
 }
 
@@ -328,6 +401,25 @@ export async function runCli(
 
       case 'run':
         return await runRunCommand(parsedArgs, dependencies);
+
+      case 'findings':
+      case 'baselines':
+      case 'memory':
+        return runTriageCommand(
+          {
+            command: parsedArgs.command,
+            subcommand:
+              parsedArgs.triageSubcommand ?? (parsedArgs.command === 'memory' ? 'stats' : 'list'),
+            flags: {
+              suppressed: parsedArgs.triageSuppressedOnly,
+              all: parsedArgs.triageAll,
+              reason: parsedArgs.triageReason,
+            },
+            positional: parsedArgs.triagePositional ?? [],
+            configPath: parsedArgs.configPath,
+          },
+          { log: dependencies.log, error: dependencies.error, cwd: process.cwd() }
+        );
 
       default:
         dependencies.error(`Unknown command: ${parsedArgs.command}`);
