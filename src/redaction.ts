@@ -21,21 +21,11 @@ export function truncateString(value: string, max = DEFAULT_REDACT_TRUNCATE_LENG
   return value.length > max ? `${value.slice(0, max - 3)}...` : value;
 }
 
+const SENSITIVE_KEY_RE =
+  /(^|-)authorization($|-)|(^|-)auth($|-)|(^|-)cookies?($|-)|(^|-)password($|-)|(^|-)secret($|-)|(^|-)token($|-)|(^|-)session($|-)|(^|-)api-key($|-)|(^|-)apikey($|-)|(^|-)csrf($|-)|(^|-)xsrf($|-)/;
+
 export function isSensitiveKey(key: string): boolean {
-  const normalized = normalizeSensitiveKey(key);
-  return (
-    /(^|-)authorization($|-)/.test(normalized) ||
-    /(^|-)auth($|-)/.test(normalized) ||
-    /(^|-)cookie(s)?($|-)/.test(normalized) ||
-    /(^|-)password($|-)/.test(normalized) ||
-    /(^|-)secret($|-)/.test(normalized) ||
-    /(^|-)token($|-)/.test(normalized) ||
-    /(^|-)session($|-)/.test(normalized) ||
-    /(^|-)api-key($|-)/.test(normalized) ||
-    /(^|-)apikey($|-)/.test(normalized) ||
-    /(^|-)csrf($|-)/.test(normalized) ||
-    /(^|-)xsrf($|-)/.test(normalized)
-  );
+  return SENSITIVE_KEY_RE.test(normalizeSensitiveKey(key));
 }
 
 export function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {

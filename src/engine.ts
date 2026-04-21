@@ -12,6 +12,7 @@ import type {
   BudgetConfig,
   MissionConfig,
   WorkerType,
+  StateNode,
 } from './types.js';
 import { authenticate } from './auth/authenticator.js';
 import { captureStorageState } from './auth/storage-state.js';
@@ -167,7 +168,35 @@ function loadDiffContext(
   return buildDiffContext(baseRef, repoRoot, repoHints);
 }
 
-/** Run frontier items in parallel across the worker pool. */
+/** Propose seed tasks for a node, using the LLM planner if available. */
+async function proposeSeedTasks(
+  ctx: EngineContext,
+  node: StateNode,
+  useLLMPlanner: boolean
+): Promise<FrontierItem[]> {
+  const { config, mission } = ctx;
+  if (useLLMPlanner) {
+    return ctx.planner.proposeTasksWithLLM(
+      node,
+      ctx.graph,
+      config.models.planner,
+      mission,
+      ctx.repoHints,
+      config.llm.requestTimeoutMs,
+      ctx.memoryStore?.getPlannerSignals(node),
+      ctx.diffContext
+    );
+  }
+  return ctx.planner.proposeTasks(
+    node,
+    ctx.graph,
+    mission,
+    ctx.repoHints,
+    ctx.memoryStore?.getPlannerSignals(node),
+    ctx.diffContext
+  );
+}
+
 async function processTaskBatch(
   ctx: EngineContext,
   batchItems: FrontierItem[],
@@ -426,28 +455,7 @@ export async function runEngine(
       assignPageNodeOwner(ctx, 'primary', rootNode.id);
 
       // Seed initial tasks — use LLM planner if available
-      let seedTasks: FrontierItem[];
-      if (useLLMPlanner) {
-        seedTasks = await ctx.planner.proposeTasksWithLLM(
-          rootNode,
-          ctx.graph,
-          config.models.planner,
-          mission,
-          ctx.repoHints,
-          config.llm.requestTimeoutMs,
-          ctx.memoryStore?.getPlannerSignals(rootNode),
-          ctx.diffContext
-        );
-      } else {
-        seedTasks = ctx.planner.proposeTasks(
-          rootNode,
-          ctx.graph,
-          mission,
-          ctx.repoHints,
-          ctx.memoryStore?.getPlannerSignals(rootNode),
-          ctx.diffContext
-        );
-      }
+      const seedTasks = await proposeSeedTasks(ctx, rootNode, useLLMPlanner);
       ctx.frontier.enqueueMany(seedTasks);
       console.log(`Seeded frontier with ${seedTasks.length} tasks\n`);
     } else if (ctx.frontier.size() === 0) {
@@ -455,25 +463,7 @@ export async function runEngine(
         ctx.graph.getAllNodes().find((node) => node.depth === 0) ?? ctx.graph.getAllNodes()[0];
       if (rootNode) {
         assignPageNodeOwner(ctx, 'primary', rootNode.id);
-        const seedTasks = useLLMPlanner
-          ? await ctx.planner.proposeTasksWithLLM(
-              rootNode,
-              ctx.graph,
-              config.models.planner,
-              mission,
-              ctx.repoHints,
-              config.llm.requestTimeoutMs,
-              ctx.memoryStore?.getPlannerSignals(rootNode),
-              ctx.diffContext
-            )
-          : ctx.planner.proposeTasks(
-              rootNode,
-              ctx.graph,
-              mission,
-              ctx.repoHints,
-              ctx.memoryStore?.getPlannerSignals(rootNode),
-              ctx.diffContext
-            );
+        const seedTasks = await proposeSeedTasks(ctx, rootNode, useLLMPlanner);
         ctx.frontier.enqueueMany(seedTasks);
         console.log(`Seeded frontier with ${seedTasks.length} warm-start task(s)\n`);
       }
