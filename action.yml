@@ -69,6 +69,13 @@ inputs:
     description: 'Dramaturge package version to install (e.g. "0.1.0" or "latest")'
     required: false
     default: 'latest'
+  upload-sarif:
+    description: >
+      When true, upload the generated SARIF report to GitHub Code Scanning.
+      Requires the config output.format to include "sarif" and a file named
+      report.sarif to be present in the report directory.
+    required: false
+    default: 'false'
 
 outputs:
   report-path:
@@ -199,6 +206,13 @@ runs:
         name: dramaturge-report
         path: ${{ steps.parse.outputs.report-path || steps.config.outputs.report-dir }}
         if-no-files-found: warn
+
+    - name: Upload SARIF to Code Scanning
+      if: always() && inputs.upload-sarif == 'true' && steps.config.outcome == 'success' && hashFiles(format('{0}/report.sarif', steps.config.outputs.report-dir)) != ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.config.outputs.report-dir }}/report.sarif
+        category: dramaturge
 
     - name: Check severity threshold
       if: always() && inputs.fail-on-severity != '' && steps.config.outputs.json-output-enabled == 'true' && steps.parse.outputs.threshold-exceeded == 'true'

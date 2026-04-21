@@ -14,6 +14,7 @@ export interface InlineRunArgs {
   provider?: ProviderId;
   preset?: 'smoke' | 'thorough';
   description?: string;
+  formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
 }
 
 const PROVIDER_DEFAULTS: Record<ProviderId, { planner: string; worker: string }> = {
@@ -109,7 +110,12 @@ export function buildConfigFromArgs(args: InlineRunArgs): ConfigWithMeta<Dramatu
     },
     output: {
       dir: './dramaturge-reports',
-      format: 'markdown',
+      format:
+        args.formats && args.formats.length > 0
+          ? args.formats.length === 1
+            ? args.formats[0]
+            : [...args.formats]
+          : 'markdown',
       screenshots: true,
     },
   };

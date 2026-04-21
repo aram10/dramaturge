@@ -101,6 +101,35 @@ describe('prepare-config', () => {
     it('returns false for markdown-only output', () => {
       expect(isJsonOutputEnabled({ output: { format: 'markdown' } })).toBe(false);
     });
+
+    it('handles array formats', () => {
+      expect(isJsonOutputEnabled({ output: { format: ['markdown', 'sarif'] } })).toBe(false);
+      expect(isJsonOutputEnabled({ output: { format: ['markdown', 'json'] } })).toBe(true);
+      expect(isJsonOutputEnabled({ output: { format: ['both'] } })).toBe(true);
+    });
+  });
+
+  describe('applyActionOverrides with non-legacy formats', () => {
+    it('appends json to an array format when json is missing', () => {
+      const prepared = applyActionOverrides(
+        {
+          output: { format: ['markdown', 'sarif'], dir: './reports' },
+          browser: { headless: false },
+        },
+        { forceJsonOutput: true, forceHeadless: false }
+      );
+      expect(prepared.output.format).toEqual(['markdown', 'sarif', 'json']);
+    });
+
+    it('promotes a bare junit string to an array including json', () => {
+      const prepared = applyActionOverrides(
+        {
+          output: { format: 'junit', dir: './reports' },
+        },
+        { forceJsonOutput: true, forceHeadless: false }
+      );
+      expect(prepared.output.format).toEqual(['junit', 'json']);
+    });
   });
 
   it('writes the temporary config beside the source config and resolves the report dir', () => {
