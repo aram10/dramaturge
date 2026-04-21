@@ -62,7 +62,8 @@ export class FrontierQueue {
     const pending = this.items.filter((i) => i.status === 'pending');
     // items is sorted descending by priority; lowest-priority pending items are at the end
     const cutCount = Math.ceil(pending.length * fraction);
-    const toPrune = pending.slice(pending.length - cutCount);
+    const startIndex = Math.max(0, pending.length - cutCount);
+    const toPrune = pending.slice(startIndex);
     const pruneIds = new Set(toPrune.map((i) => i.id));
     this.items = this.items.filter((i) => !pruneIds.has(i.id));
     return toPrune;
