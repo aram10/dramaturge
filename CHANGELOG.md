@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.3.0...dramaturge-v0.4.0) (2026-04-21)
+
+
+### Features
+
+* add codecov.yml and increase test coverage for user-facing code ([d44c652](https://github.com/aram10/dramaturge/commit/d44c65265bff6005bd9687ab1a6fe408cdd03075))
+* add ports/adapters LLM provider abstraction with Azure, OpenRouter, GitHub Models support ([01a17f1](https://github.com/aram10/dramaturge/commit/01a17f1888ad3f3d02d42361815683d9e70a0d6a))
+* ports/adapters LLM provider abstraction with Azure Foundry, OpenRouter, GitHub Models ([014cd82](https://github.com/aram10/dramaturge/commit/014cd827e4af9e6983029a3c77164fa5d3df8ba4))
+
+
+### Bug Fixes
+
+* add defensive guard in frontier pruneLowest against out-of-bounds slice ([d96d5e9](https://github.com/aram10/dramaturge/commit/d96d5e98947b6916fab8d1347924d24ae3f2aece))
+* address all review comments on provider abstraction PR ([aad9cb3](https://github.com/aram10/dramaturge/commit/aad9cb356a9e7f883722ca9d1a2cb3cdafef47f1))
+* address PR review feedback on test portability, URL fallback, and types.ts ignore ([cb1b563](https://github.com/aram10/dramaturge/commit/cb1b563f8d3d39a3ddea574a9e48114e7cea0ec2))
+* fix coverage workflow and configure vitest coverage ([0bd7f47](https://github.com/aram10/dramaturge/commit/0bd7f4793cb907910dc3a74370f0a8280f1c2c3a))
+* format dependabot.yml and add @vitest/coverage-v8 as dev dependency ([96dd58e](https://github.com/aram10/dramaturge/commit/96dd58e66f6a6b20e3fa2f2733ee987d01eaeaa6))
+* make lint CI pass and fix code coverage workflow ([1f66aad](https://github.com/aram10/dramaturge/commit/1f66aad97387f3b4eae25dca523d3b95a810588c))
+* remove @codecov/vite-plugin (incompatible with vite@8), make shortId test deterministic ([1174a72](https://github.com/aram10/dramaturge/commit/1174a723aa8e01736f0b8965f999ddc569ce8770))
+
 ## [0.3.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.2.0...dramaturge-v0.3.0) (2026-04-10)
 
 
