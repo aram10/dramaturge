@@ -242,6 +242,54 @@ describe('bootstrap supervision', () => {
     killSpy.mockRestore();
   });
 
+  it('spawns safe-mode bootstrap commands without a shell and with structured args', () => {
+    const processRef = createMockProcess();
+    const spawnImpl = vi.fn().mockReturnValue(processRef);
+
+    startBootstrapProcess(
+      {
+        bootstrap: {
+          mode: 'safe',
+          command: 'pnpm',
+          args: ['dev', '--port', '3000'],
+          cwd: '/tmp/app',
+        },
+      } as any,
+      spawnImpl as any,
+      'linux'
+    );
+
+    expect(spawnImpl).toHaveBeenCalledWith('pnpm', ['dev', '--port', '3000'], {
+      cwd: '/tmp/app',
+      detached: true,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  });
+
+  it('defaults to trusted mode and continues to spawn via the shell', () => {
+    const processRef = createMockProcess();
+    const spawnImpl = vi.fn().mockReturnValue(processRef);
+
+    startBootstrapProcess(
+      {
+        bootstrap: {
+          command: 'pnpm dev && tail -f log',
+          cwd: '/tmp/app',
+        },
+      } as any,
+      spawnImpl as any,
+      'linux'
+    );
+
+    expect(spawnImpl).toHaveBeenCalledWith('pnpm dev && tail -f log', {
+      cwd: '/tmp/app',
+      detached: true,
+      shell: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  });
+
   it('does not attempt cleanup after the bootstrap process has already exited', () => {
     const processRef = createMockProcess();
     const spawnImpl = vi.fn();

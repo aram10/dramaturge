@@ -91,19 +91,36 @@ export function startBootstrapProcess(
   spawnImpl: SpawnLike = spawn,
   platform: NodeJS.Platform = process.platform
 ): BootstrapStatus | undefined {
-  const command = config.bootstrap?.command;
-  if (!command) {
+  const bootstrap = config.bootstrap;
+  const command = bootstrap?.command;
+  if (!bootstrap || !command) {
     return undefined;
   }
 
-  console.log(`Starting bootstrap command: ${command}`);
-  const processRef = spawnImpl(command, {
-    cwd: config.bootstrap?.cwd,
-    detached: platform !== 'win32',
-    shell: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const status = createBootstrapStatus(processRef, command);
+  const mode = bootstrap.mode ?? 'trusted';
+  const args = bootstrap.args ?? [];
+  const useShell = mode === 'trusted';
+  const displayCommand = useShell
+    ? command
+    : args.length > 0
+      ? `${command} ${args.join(' ')}`
+      : command;
+
+  console.log(`Starting bootstrap command (${mode} mode): ${displayCommand}`);
+  const processRef = useShell
+    ? spawnImpl(command, {
+        cwd: bootstrap.cwd,
+        detached: platform !== 'win32',
+        shell: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    : spawnImpl(command, args, {
+        cwd: bootstrap.cwd,
+        detached: platform !== 'win32',
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+  const status = createBootstrapStatus(processRef, displayCommand);
 
   attachLogStream(processRef.stdout, status.recentStdout);
   attachLogStream(processRef.stderr, status.recentStderr);

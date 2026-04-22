@@ -121,7 +121,143 @@ describe('loadConfig', () => {
       readyUrl: 'https://example.com/health',
       readyIndicator: "[data-testid='app-shell']",
       timeoutSeconds: 90,
+      mode: 'trusted',
+      args: [],
     });
+  });
+
+  it('accepts safe-mode bootstrap with structured command and args', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe",
+          "command": "pnpm",
+          "args": ["dev", "--port", "3000"]
+        }
+      }`,
+      'utf-8'
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.bootstrap).toMatchObject({
+      mode: 'safe',
+      command: 'pnpm',
+      args: ['dev', '--port', '3000'],
+    });
+  });
+
+  it('accepts safe-mode args that contain characters that would be unsafe under a shell', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe",
+          "command": "node",
+          "args": ["-e", "console.log('hi; rm -rf /')"]
+        }
+      }`,
+      'utf-8'
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.bootstrap).toMatchObject({
+      mode: 'safe',
+      command: 'node',
+      args: ['-e', "console.log('hi; rm -rf /')"],
+    });
+  });
+
+  it('rejects safe-mode commands that contain whitespace', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe",
+          "command": "pnpm dev"
+        }
+      }`,
+      'utf-8'
+    );
+
+    expect(() => loadConfig(configPath)).toThrow(/whitespace is not allowed/);
+  });
+
+  it('rejects safe-mode bootstrap commands that contain shell metacharacters', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe",
+          "command": "pnpm dev && tail log"
+        }
+      }`,
+      'utf-8'
+    );
+
+    expect(() => loadConfig(configPath)).toThrow(/shell metacharacters/);
+  });
+
+  it('rejects args when bootstrap mode is trusted', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "trusted",
+          "command": "pnpm dev",
+          "args": ["--port", "3000"]
+        }
+      }`,
+      'utf-8'
+    );
+
+    expect(() => loadConfig(configPath)).toThrow(/bootstrap\.args may only be set/);
+  });
+
+  it('requires bootstrap.command when mode is safe', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe"
+        }
+      }`,
+      'utf-8'
+    );
+
+    expect(() => loadConfig(configPath)).toThrow(/bootstrap\.command is required/);
   });
 
   it('accepts explicit policy controls', () => {
