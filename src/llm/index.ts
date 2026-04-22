@@ -25,4 +25,7 @@ export {
   azureFoundryProvider,
   openRouterProvider,
   githubModelsProvider,
+  ollamaProvider,
+  customOpenAICompatibleProvider,
+  DEFAULT_OLLAMA_BASE_URL,
 } from './providers/index.js';
