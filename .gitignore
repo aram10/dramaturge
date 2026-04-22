@@ -1,6 +1,6 @@
 node_modules/
 dist/
-coverage/
+/coverage/
 dramaturge-reports/
 dramaturge.config.json
 .dramaturge-state/

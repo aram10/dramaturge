@@ -275,6 +275,21 @@ export class MemoryStore {
     this.persist(snapshot);
   }
 
+  unsuppressFinding(signature: string): void {
+    const snapshot = this.getSnapshot();
+    const existing = snapshot.findingHistory[signature];
+    if (!existing) {
+      throw new Error(`Cannot unsuppress unknown finding signature: ${signature}`);
+    }
+
+    const { dismissedAt: _dismissedAt, dismissalReason: _dismissalReason, ...rest } = existing;
+    snapshot.findingHistory[signature] = {
+      ...rest,
+      suppressed: false,
+    };
+    this.persist(snapshot);
+  }
+
   recordFlakyPage(input: FlakyPageInput): void {
     const snapshot = this.getSnapshot();
     const route = normalizeRoute(input.route);
