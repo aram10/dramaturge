@@ -437,7 +437,7 @@ const RepoContextSchema = z
   })
   .optional();
 
-const SHELL_METACHARACTER_PATTERN = /[[|&;<>$`"'()*?{}\]!#~\n\r]/;
+const SHELL_METACHARACTER_PATTERN = /[\[|&;<>$`"'()*?{}\]!#~\n\r]/;
 
 function containsShellMetacharacters(command: string | undefined): boolean {
   if (!command) {
