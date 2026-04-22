@@ -7,3 +7,5 @@ export { googleProvider } from './google.js';
 export { azureFoundryProvider } from './azure-foundry.js';
 export { openRouterProvider } from './openrouter.js';
 export { githubModelsProvider } from './github-models.js';
+export { ollamaProvider, DEFAULT_OLLAMA_BASE_URL } from './ollama.js';
+export { customOpenAICompatibleProvider } from './custom-openai.js';

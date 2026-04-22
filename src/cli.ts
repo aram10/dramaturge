@@ -53,6 +53,10 @@ export interface ParsedCliArgs {
   initTemplate?: InitTemplate;
   /** --output flag for init */
   initOutput?: string;
+  /** --repo flag for setup: path to scan for repo-aware bootstrap */
+  repoPath?: string;
+  /** --no-scan flag for setup: disables repo scan entirely */
+  noScan?: true;
   /** Subcommand after findings/baselines/memory (e.g. "list", "suppress") */
   triageSubcommand?: string;
   /** Positional args for triage subcommands */
@@ -100,6 +104,10 @@ Init options:
   --template <name>    Template to use: minimal (default) or full
   --url <url>          Pre-fill target URL in generated config
   --output <path>      Output path for generated config file
+
+Setup options:
+  --repo <path>        Scan this repo path for routes, endpoints, and auth hints
+  --no-scan            Skip repo scanning (default is auto-scan when in a git repo)
 
 Triage options:
   --suppressed         findings list: only show suppressed findings
@@ -175,6 +183,8 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let formats: ParsedCliArgs['formats'];
   let initTemplate: InitTemplate | undefined;
   let initOutput: string | undefined;
+  let repoPath: string | undefined;
+  let noScan: true | undefined;
   let triageSubcommand: string | undefined;
   const triagePositional: string[] = [];
   let triageSuppressedOnly: boolean | undefined;
@@ -326,6 +336,19 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--repo') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('-')) throw new Error('Missing value for --repo');
+      repoPath = value;
+      i++;
+      continue;
+    }
+
+    if (arg === '--no-scan') {
+      noScan = true;
+      continue;
+    }
+
     if (arg === '--output') {
       const value = args[i + 1];
       if (!value) throw new Error('Missing value for --output');
@@ -375,6 +398,10 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     throw new Error(`Unknown argument: ${arg}`);
   }
 
+  if (noScan && repoPath) {
+    throw new Error('--no-scan and --repo cannot be used together');
+  }
+
   return {
     command,
     configPath,
@@ -391,6 +418,8 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     formats,
     initTemplate,
     initOutput,
+    repoPath,
+    noScan,
     ...(TRIAGE_COMMANDS.has(command)
       ? {
           triageSubcommand,
@@ -438,7 +467,7 @@ export async function runCli(
         );
 
       case 'setup':
-        return await runSetupCommand(dependencies);
+        return await runSetupCommand(dependencies, parsedArgs);
 
       case 'run':
         return await runRunCommand(parsedArgs, dependencies);
@@ -473,7 +502,10 @@ export async function runCli(
   }
 }
 
-async function runSetupCommand(dependencies: CliDependencies): Promise<number> {
+async function runSetupCommand(
+  dependencies: CliDependencies,
+  parsedArgs: ParsedCliArgs
+): Promise<number> {
   const { runSetup } = await import('./commands/setup.js');
   const readline = await import('node:readline');
 
@@ -510,14 +542,19 @@ async function runSetupCommand(dependencies: CliDependencies): Promise<number> {
     });
 
   try {
-    return await runSetup({
-      log: dependencies.log,
-      error: dependencies.error,
-      cwd: process.cwd(),
-      prompt,
-      confirm,
-      select,
-    });
+    return await runSetup(
+      {
+        log: dependencies.log,
+        error: dependencies.error,
+        cwd: process.cwd(),
+        prompt,
+        confirm,
+        select,
+      },
+      {
+        repoPath: parsedArgs.noScan ? false : parsedArgs.repoPath,
+      }
+    );
   } finally {
     rl.close();
   }

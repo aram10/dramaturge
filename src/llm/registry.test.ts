@@ -21,6 +21,10 @@ describe('registry', () => {
     savedEnv.AZURE_AI_ENDPOINT = process.env.AZURE_AI_ENDPOINT;
     savedEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
     savedEnv.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+    savedEnv.OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL;
+    savedEnv.OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
+    savedEnv.OPENAI_COMPATIBLE_BASE_URL = process.env.OPENAI_COMPATIBLE_BASE_URL;
+    savedEnv.OPENAI_COMPATIBLE_API_KEY = process.env.OPENAI_COMPATIBLE_API_KEY;
 
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
@@ -29,6 +33,10 @@ describe('registry', () => {
     delete process.env.AZURE_AI_ENDPOINT;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.GITHUB_TOKEN;
+    delete process.env.OLLAMA_BASE_URL;
+    delete process.env.OLLAMA_API_KEY;
+    delete process.env.OPENAI_COMPATIBLE_BASE_URL;
+    delete process.env.OPENAI_COMPATIBLE_API_KEY;
   });
 
   afterEach(() => {
@@ -64,6 +72,14 @@ describe('registry', () => {
 
     it('returns GitHub Models for github/ prefix', () => {
       expect(resolveProvider('github/openai/gpt-4.1').name).toBe('GitHub Models');
+    });
+
+    it('returns Ollama for ollama/ prefix', () => {
+      expect(resolveProvider('ollama/llama3').name).toBe('Ollama');
+    });
+
+    it('returns the generic OpenAI-compatible provider for custom/ prefix', () => {
+      expect(resolveProvider('custom/my-llm').name).toBe('OpenAI-compatible');
     });
 
     it('defaults to Anthropic for unprefixed model', () => {
@@ -129,6 +145,23 @@ describe('registry', () => {
       process.env.GITHUB_TOKEN = 'gho_test';
       expect(hasConfiguredProvider('github/openai/gpt-4.1')).toBe(true);
     });
+
+    it('treats Ollama as configured only when OLLAMA_BASE_URL is explicitly set', () => {
+      expect(hasConfiguredProvider('ollama/llama3')).toBe(false);
+      process.env.OLLAMA_BASE_URL = 'http://localhost:11434/v1';
+      expect(hasConfiguredProvider('ollama/llama3')).toBe(true);
+    });
+
+    it('treats blank OLLAMA_BASE_URL as unconfigured', () => {
+      process.env.OLLAMA_BASE_URL = '   ';
+      expect(hasConfiguredProvider('ollama/llama3')).toBe(false);
+    });
+
+    it('treats custom provider as configured when OPENAI_COMPATIBLE_BASE_URL is set', () => {
+      expect(hasConfiguredProvider('custom/my-model')).toBe(false);
+      process.env.OPENAI_COMPATIBLE_BASE_URL = 'http://localhost:8080/v1';
+      expect(hasConfiguredProvider('custom/my-model')).toBe(true);
+    });
   });
 
   describe('detectProviderFromEnv', () => {
@@ -156,12 +189,28 @@ describe('registry', () => {
       process.env.GITHUB_TOKEN = 'gho_test';
       expect(detectProviderFromEnv()).toBe('github');
     });
+
+    it('detects ollama only when OLLAMA_BASE_URL is set', () => {
+      process.env.OLLAMA_BASE_URL = 'http://localhost:11434/v1';
+      expect(detectProviderFromEnv()).toBe('ollama');
+    });
+
+    it('prefers hosted providers over local Ollama when both are configured', () => {
+      process.env.OLLAMA_BASE_URL = 'http://localhost:11434/v1';
+      process.env.ANTHROPIC_API_KEY = 'test';
+      expect(detectProviderFromEnv()).toBe('anthropic');
+    });
+
+    it('detects custom provider only when OPENAI_COMPATIBLE_BASE_URL is set', () => {
+      process.env.OPENAI_COMPATIBLE_BASE_URL = 'http://vllm.internal/v1';
+      expect(detectProviderFromEnv()).toBe('custom');
+    });
   });
 
   describe('allProviders', () => {
-    it('returns a map with all 6 providers', () => {
+    it('returns a map with all registered providers including ollama and custom', () => {
       const providers = allProviders();
-      expect(providers.size).toBe(6);
+      expect(providers.size).toBe(8);
       expect([...providers.keys()]).toEqual([
         'anthropic',
         'openai',
@@ -169,6 +218,8 @@ describe('registry', () => {
         'azure',
         'openrouter',
         'github',
+        'ollama',
+        'custom',
       ]);
     });
   });
