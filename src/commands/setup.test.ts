@@ -38,7 +38,7 @@ function makeHarness(
     prompts?: string[];
     confirms?: boolean[];
     selects?: string[];
-    scan?: () => RepoScanResult;
+    scan?: (root: string) => RepoScanResult;
   } = {}
 ): Harness {
   const messages: string[] = [];
@@ -267,6 +267,42 @@ describe('runSetup', () => {
     const code = await runSetup(subHarness.deps);
     expect(code).toBe(0);
     expect(scannedRoot).toBe(testDir);
+  });
+
+  it('preserves parent-relative repo roots in generated config', async () => {
+    mkdirSync(resolve(testDir, '.git'));
+    const subDir = resolve(testDir, 'packages', 'web');
+    mkdirSync(subDir, { recursive: true });
+
+    const subHarness = makeHarness(subDir, {
+      prompts: ['https://example.com', 'App'],
+      confirms: [/* requiresLogin */ false, /* headless */ false, /* saveConfig */ true],
+      selects: ['Anthropic'],
+      scan: (root) => ({ root, framework: 'nextjs', hints: makeHints() }),
+    });
+
+    const code = await runSetup(subHarness.deps);
+    expect(code).toBe(0);
+
+    const config = JSON.parse(readFileSync(resolve(subDir, 'dramaturge.config.json'), 'utf8'));
+    expect(config.repoContext).toEqual({ root: '../..', framework: 'nextjs' });
+  });
+
+  it('reports a clear error when explicit --repo points to a file', async () => {
+    const filePath = resolve(testDir, 'README.md');
+    writeFileSync(filePath, '# not a directory\n');
+    const h = makeHarness(testDir, {
+      prompts: ['https://example.com', 'App'],
+      confirms: [/* requiresLogin */ false, /* headless */ false, /* saveConfig */ true],
+      selects: ['Anthropic'],
+      scan: () => {
+        throw new Error('scanner should not run when --repo points to a file');
+      },
+    });
+
+    const code = await runSetup(h.deps, { repoPath: filePath });
+    expect(code).toBe(0);
+    expect(h.errors.some((e) => e.includes('Repo path is not a directory'))).toBe(true);
   });
 
   it('does not overwrite existing config when user declines', async () => {
