@@ -119,6 +119,50 @@ describe('parseCliArgs', () => {
     expect(() => parseCliArgs(['run', '--preset', 'invalid'])).toThrow('Invalid preset');
   });
 
+  it('parses new preset names', () => {
+    for (const name of ['security', 'accessibility', 'api-contract', 'visual', 'pre-release']) {
+      const result = parseCliArgs(['run', 'https://example.com', '--preset', name]);
+      expect(result.preset).toBe(name);
+    }
+  });
+
+  it('parses repeated --focus flags', () => {
+    const result = parseCliArgs([
+      'run',
+      'https://example.com',
+      '--focus',
+      'api',
+      '--focus',
+      'adversarial',
+    ]);
+    expect(result.focusModes).toEqual(['api', 'adversarial']);
+  });
+
+  it('parses comma-separated --focus values', () => {
+    const result = parseCliArgs(['run', 'https://example.com', '--focus', 'form,crud']);
+    expect(result.focusModes).toEqual(['form', 'crud']);
+  });
+
+  it('de-duplicates --focus values', () => {
+    const result = parseCliArgs([
+      'run',
+      'https://example.com',
+      '--focus',
+      'api',
+      '--focus',
+      'api,form',
+    ]);
+    expect(result.focusModes).toEqual(['api', 'form']);
+  });
+
+  it('throws for invalid --focus value', () => {
+    expect(() => parseCliArgs(['run', '--focus', 'bogus'])).toThrow('Invalid focus mode');
+  });
+
+  it('throws when --focus has no value', () => {
+    expect(() => parseCliArgs(['run', '--focus'])).toThrow('Missing value for --focus');
+  });
+
   it('parses doctor command', () => {
     const result = parseCliArgs(['doctor']);
     expect(result.command).toBe('doctor');

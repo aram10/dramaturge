@@ -8,7 +8,14 @@ import { resolveResumeDir } from './config-paths.js';
 import { runEngine, type RunEngineOptions } from './engine.js';
 import { EngineEventEmitter } from './engine/event-stream.js';
 import { loadDotenv } from './env.js';
-import { buildConfigFromArgs, type InlineRunArgs } from './config-inline.js';
+import {
+  buildConfigFromArgs,
+  FOCUS_MODES,
+  PRESET_NAMES,
+  type FocusMode,
+  type InlineRunArgs,
+  type PresetName,
+} from './config-inline.js';
 import { runDoctor } from './commands/doctor.js';
 import { runInit, type InitTemplate } from './commands/init.js';
 import { runTriageCommand } from './commands/triage.js';
@@ -37,7 +44,9 @@ export interface ParsedCliArgs {
   /** --provider flag for inline runs */
   provider?: 'anthropic' | 'openai' | 'google' | 'azure' | 'openrouter' | 'github';
   /** --preset flag for inline runs */
-  preset?: 'smoke' | 'thorough';
+  preset?: PresetName;
+  /** --focus flags for inline runs (repeatable, comma-separated values allowed) */
+  focusModes?: FocusMode[];
   /** --format flag — comma-separated list of report formats */
   formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
   /** --template flag for init */
@@ -82,7 +91,8 @@ Run options:
   --login              Enable interactive auth (opens browser for sign-in)
   --headless           Run browser in headless mode
   --provider <name>    LLM provider: anthropic, openai, google, azure, openrouter, or github
-  --preset <name>      Use a preset: smoke (quick scan) or thorough (full scan)
+  --preset <name>      Preset: smoke, thorough, security, accessibility, api-contract, visual, pre-release
+  --focus <modes>      Focus modes (repeatable / comma-separated): navigation, form, crud, api, adversarial
   --format <list>      Report formats, comma-separated: markdown, json, junit, sarif, or both (legacy alias) (e.g. markdown,sarif)
   --help, -h           Show this help message
 
@@ -101,6 +111,8 @@ Examples:
   dramaturge run https://my-app.example.com --login    # Run with interactive auth
   dramaturge run --config custom.json                  # Run with config file
   dramaturge run https://app.example.com --preset smoke  # Quick smoke test
+  dramaturge run https://app.example.com --preset security  # Security-focused scan
+  dramaturge run https://app.example.com --focus api --focus adversarial  # Ad-hoc focus mix
   dramaturge setup                                     # Interactive onboarding
   dramaturge init --template minimal                   # Generate minimal config
   dramaturge doctor                                    # Check environment
@@ -144,7 +156,8 @@ const KNOWN_COMMANDS = new Set([
 ]);
 const TRIAGE_COMMANDS = new Set(['findings', 'baselines', 'memory']);
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'openrouter', 'github']);
-const VALID_PRESETS = new Set(['smoke', 'thorough']);
+const VALID_PRESETS = new Set<string>(PRESET_NAMES);
+const VALID_FOCUS_MODES = new Set<string>(FOCUS_MODES);
 const VALID_FORMATS = new Set(['markdown', 'json', 'both', 'junit', 'sarif']);
 
 export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
@@ -158,6 +171,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let headless: boolean | undefined;
   let provider: ParsedCliArgs['provider'];
   let preset: ParsedCliArgs['preset'];
+  const focusModes: FocusMode[] = [];
   let formats: ParsedCliArgs['formats'];
   let initTemplate: InitTemplate | undefined;
   let initOutput: string | undefined;
@@ -248,9 +262,33 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       const value = args[i + 1];
       if (!value) throw new Error('Missing value for --preset');
       if (!VALID_PRESETS.has(value)) {
-        throw new Error(`Invalid preset: ${value}. Must be one of: smoke, thorough`);
+        throw new Error(
+          `Invalid preset: ${value}. Must be one of: ${[...VALID_PRESETS].join(', ')}`
+        );
       }
       preset = value as ParsedCliArgs['preset'];
+      i++;
+      continue;
+    }
+
+    if (arg === '--focus') {
+      const value = args[i + 1];
+      if (!value) throw new Error('Missing value for --focus');
+      const parts = value
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+      if (parts.length === 0) throw new Error('Missing value for --focus');
+      for (const part of parts) {
+        if (!VALID_FOCUS_MODES.has(part)) {
+          throw new Error(
+            `Invalid focus mode: ${part}. Must be one of: ${[...VALID_FOCUS_MODES].join(', ')}`
+          );
+        }
+        if (!focusModes.includes(part as FocusMode)) {
+          focusModes.push(part as FocusMode);
+        }
+      }
       i++;
       continue;
     }
@@ -351,6 +389,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     headless,
     provider,
     preset,
+    focusModes: focusModes.length > 0 ? focusModes : undefined,
     formats,
     initTemplate,
     initOutput,
@@ -496,6 +535,7 @@ async function runRunCommand(
       headless: parsedArgs.headless,
       provider: parsedArgs.provider,
       preset: parsedArgs.preset,
+      focusModes: parsedArgs.focusModes,
       formats: parsedArgs.formats,
     };
     config = buildConfigFromArgs(inlineArgs);
