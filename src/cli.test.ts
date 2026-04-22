@@ -23,6 +23,8 @@ describe('parseCliArgs', () => {
         preset: undefined,
         initTemplate: undefined,
         initOutput: undefined,
+        repoPath: undefined,
+        noScan: undefined,
       }
     );
   });
@@ -42,6 +44,8 @@ describe('parseCliArgs', () => {
       preset: undefined,
       initTemplate: undefined,
       initOutput: undefined,
+      repoPath: undefined,
+      noScan: undefined,
     });
   });
 
@@ -137,6 +141,34 @@ describe('parseCliArgs', () => {
   it('parses setup command', () => {
     const result = parseCliArgs(['setup']);
     expect(result.command).toBe('setup');
+  });
+
+  it('parses setup --repo flag', () => {
+    const result = parseCliArgs(['setup', '--repo', './app']);
+    expect(result.command).toBe('setup');
+    expect(result.repoPath).toBe('./app');
+  });
+
+  it('parses setup --no-scan flag', () => {
+    const result = parseCliArgs(['setup', '--no-scan']);
+    expect(result.command).toBe('setup');
+    expect(result.noScan).toBe(true);
+  });
+
+  it('throws when --repo has no value', () => {
+    expect(() => parseCliArgs(['setup', '--repo'])).toThrow('Missing value for --repo');
+  });
+
+  it('throws when --repo is followed by another flag (missing path)', () => {
+    expect(() => parseCliArgs(['setup', '--repo', '--no-scan'])).toThrow(
+      'Missing value for --repo'
+    );
+  });
+
+  it('throws when --repo and --no-scan are both passed', () => {
+    expect(() => parseCliArgs(['setup', '--repo', '.', '--no-scan'])).toThrow(
+      '--no-scan and --repo cannot be used together'
+    );
   });
 
   it('parses findings list --suppressed', () => {

@@ -139,7 +139,7 @@ function loadHintsOverride(root: string, hintsFile?: string): RepoHintsOverride 
   return RepoHintsOverrideSchema.parse(parseJsoncObject(raw));
 }
 
-function detectFramework(root: string): RepoFramework {
+export function detectFramework(root: string): RepoFramework {
   // Check framework-specific markers first (no full file walk needed)
   if (canScanNuxtRepo(root)) return 'nuxt';
   if (canScanSvelteKitRepo(root)) return 'sveltekit';

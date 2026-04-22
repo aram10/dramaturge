@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, relative, dirname, isAbsolute } from 'node:path';
+import { detectFramework, scanRepository } from '../adaptation/repo-scan.js';
+import type { RepoFramework, RepoHints } from '../adaptation/types.js';
 
 export interface SetupAnswers {
   targetUrl: string;
@@ -14,6 +16,21 @@ export interface SetupAnswers {
   saveConfig: boolean;
 }
 
+export interface SetupArgs {
+  /**
+   * Path to scan for repo-aware bootstrap. Relative paths resolve against cwd.
+   * When omitted, runSetup auto-detects by looking for `.git` in cwd.
+   * Pass `false` to disable scanning entirely.
+   */
+  repoPath?: string | false;
+}
+
+export interface RepoScanResult {
+  root: string;
+  framework: RepoFramework;
+  hints: RepoHints;
+}
+
 export interface SetupDependencies {
   log: (message: string) => void;
   error: (message: string) => void;
@@ -21,6 +38,8 @@ export interface SetupDependencies {
   prompt: (question: string) => Promise<string>;
   confirm: (question: string, defaultValue?: boolean) => Promise<boolean>;
   select: (question: string, options: string[]) => Promise<string>;
+  /** Scanner override for tests. Defaults to calling scanRepository(). */
+  scanRepo?: (root: string) => RepoScanResult;
 }
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
@@ -59,13 +78,65 @@ const PROVIDER_MODELS: Record<string, { planner: string; worker: string }> = {
   },
 };
 
+const FRAMEWORK_LABELS: Record<RepoFramework, string> = {
+  auto: 'auto-detect',
+  nextjs: 'Next.js',
+  nuxt: 'Nuxt',
+  sveltekit: 'SvelteKit',
+  remix: 'Remix',
+  astro: 'Astro',
+  'react-router': 'React Router',
+  express: 'Express',
+  'vue-router': 'Vue Router',
+  django: 'Django',
+  fastapi: 'FastAPI',
+  rails: 'Rails',
+  'tanstack-router': 'TanStack Router',
+  generic: 'generic',
+};
+
+function defaultScan(root: string): RepoScanResult {
+  const framework = detectFramework(root);
+  const hints = scanRepository({ root, framework });
+  return { root, framework, hints };
+}
+
+/**
+ * Walk upward from `dir` looking for a `.git` marker. Returns the directory that
+ * contains `.git`, or null if none is found before reaching the filesystem root.
+ */
+function findGitRoot(dir: string): string | null {
+  let current = resolve(dir);
+  while (true) {
+    if (existsSync(resolve(current, '.git'))) return current;
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+function hintsAreMeaningful(hints: RepoHints): boolean {
+  return (
+    hints.routes.length > 0 ||
+    hints.routeFamilies.length > 0 ||
+    hints.stableSelectors.length > 0 ||
+    hints.apiEndpoints.length > 0 ||
+    hints.authHints.loginRoutes.length > 0 ||
+    hints.authHints.callbackRoutes.length > 0 ||
+    hints.expectedHttpNoise.length > 0
+  );
+}
+
 /**
  * Run the interactive setup wizard.
  * Collects user answers and writes config + optional .env.
  */
-export async function runSetup(deps: SetupDependencies): Promise<number> {
+export async function runSetup(deps: SetupDependencies, args: SetupArgs = {}): Promise<number> {
   deps.log('Welcome to Dramaturge Setup!\n');
   deps.log('This wizard will create a config file and get you ready to run.\n');
+
+  // 0. Repo scan (optional, auto-detects when inside a git repo)
+  const scan = await maybeRunRepoScan(deps, args);
 
   // 1. Target URL
   const targetUrl = await deps.prompt('What URL should I test?');
@@ -87,52 +158,57 @@ export async function runSetup(deps: SetupDependencies): Promise<number> {
   );
 
   // 3. Auth
-  const requiresLogin = await deps.confirm('Does the app require login?', false);
-
-  // 4. Provider
-  const provider = await deps.select('Which LLM provider do you want to use?', [
-    'Anthropic',
-    'OpenAI',
-    'Google',
-    'Azure AI Foundry',
-    'OpenRouter',
-    'GitHub Models',
-  ]);
-  const providerKeyMap: Record<string, string> = {
-    anthropic: 'anthropic',
-    openai: 'openai',
-    google: 'google',
-    'azure ai foundry': 'azure',
-    openrouter: 'openrouter',
-    'github models': 'github',
-  };
-  const providerKey = providerKeyMap[provider.toLowerCase()] ?? 'anthropic';
-
-  // 5. API key
-  const envKey = PROVIDER_ENV_KEYS[providerKey];
-  let apiKey = '';
-  if (!process.env[envKey]) {
-    apiKey = await deps.prompt(`Paste your ${provider} API key (${envKey})`);
-  } else {
-    deps.log(`  ${envKey} is already set in your environment.`);
+  const detectedLoginRoute = scan?.hints.authHints.loginRoutes[0];
+  if (detectedLoginRoute) {
+    deps.log(`  (Detected possible login route: ${detectedLoginRoute})`);
   }
+  const requiresLogin = await deps.confirm(
+    'Does the app require login?',
+    Boolean(detectedLoginRoute)
+  );
+
+  // 4-5. Provider + API key
+  const { providerKey, envKey, apiKey } = await selectProvider(deps);
 
   // 6. Headless
   const headless = await deps.confirm('Run browser in headless mode?', false);
 
-  // 7. Save config
+  // 7. Feature toggles suggested by the repo scan
+  let enableApiTesting = false;
+  let enableAdversarial = false;
+  if (scan !== null) {
+    if (scan.hints.apiEndpoints.length > 0) {
+      enableApiTesting = await deps.confirm(
+        `Enable API contract testing? (${scan.hints.apiEndpoints.length} endpoint(s) detected)`,
+        true
+      );
+      enableAdversarial = await deps.confirm(
+        'Enable adversarial security probes against detected API endpoints?',
+        false
+      );
+    }
+  }
+
+  // 8. Save config
   const saveConfig = await deps.confirm('Save config to dramaturge.config.json?', true);
 
   // Build config
   const models = PROVIDER_MODELS[providerKey];
+  const detectedLoginPath = scan?.hints.authHints.loginRoutes[0];
+  const loginUrl =
+    requiresLogin && detectedLoginPath
+      ? new URL(detectedLoginPath, targetUrl).toString()
+      : targetUrl;
+  const successIndicator = `url:${new URL(targetUrl).origin}`;
+
   const config: Record<string, unknown> = {
     targetUrl,
     appDescription: appDescription || `Web application at ${new URL(targetUrl).hostname}`,
     auth: requiresLogin
       ? {
           type: 'interactive',
-          loginUrl: targetUrl,
-          successIndicator: `url:${new URL(targetUrl).origin}`,
+          loginUrl,
+          successIndicator,
           stateFile: './.dramaturge-state/user.json',
           manualTimeoutSeconds: 120,
         }
@@ -152,42 +228,26 @@ export async function runSetup(deps: SetupDependencies): Promise<number> {
     },
   };
 
-  // Write config
-  if (saveConfig) {
-    const configPath = resolve(deps.cwd, 'dramaturge.config.json');
-    if (existsSync(configPath)) {
-      const overwrite = await deps.confirm(
-        'dramaturge.config.json already exists. Overwrite?',
-        false
-      );
-      if (!overwrite) {
-        deps.log('Skipping config write.');
-      } else {
-        writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
-        deps.log(`\nWrote ${configPath}`);
-      }
-    } else {
-      writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
-      deps.log(`\nWrote ${configPath}`);
-    }
+  if (scan !== null) {
+    const relRoot = toRelativeRoot(deps.cwd, scan.root);
+    config.repoContext = {
+      root: relRoot,
+      framework: scan.framework,
+    };
   }
 
-  // Write .env if API key was provided
-  if (apiKey) {
-    const envPath = resolve(deps.cwd, '.env');
-    const envLine = `${envKey}=${apiKey}\n`;
+  if (enableApiTesting) {
+    config.apiTesting = { enabled: true };
+  }
+  if (enableAdversarial) {
+    config.adversarial = { enabled: true };
+  }
 
-    if (existsSync(envPath)) {
-      deps.log(`\nAdd this to your .env:\n  ${envKey}=<your-key>`);
-    } else {
-      const saveEnv = await deps.confirm('Save API key to .env file?', true);
-      if (saveEnv) {
-        mkdirSync(dirname(envPath), { recursive: true });
-        writeFileSync(envPath, envLine);
-        deps.log(`Wrote ${envPath}`);
-        deps.log('  (Add .env to your .gitignore!)');
-      }
-    }
+  if (saveConfig) {
+    await writeConfigFile(deps, config);
+  }
+  if (apiKey) {
+    await writeEnvFile(deps, envKey, apiKey);
   }
 
   // Next steps
@@ -205,4 +265,148 @@ export async function runSetup(deps: SetupDependencies): Promise<number> {
   deps.log('');
 
   return 0;
+}
+
+interface ProviderChoice {
+  provider: string;
+  providerKey: string;
+  envKey: string;
+  apiKey: string;
+}
+
+async function selectProvider(deps: SetupDependencies): Promise<ProviderChoice> {
+  const provider = await deps.select('Which LLM provider do you want to use?', [
+    'Anthropic',
+    'OpenAI',
+    'Google',
+    'Azure AI Foundry',
+    'OpenRouter',
+    'GitHub Models',
+  ]);
+  const providerKeyMap: Record<string, string> = {
+    anthropic: 'anthropic',
+    openai: 'openai',
+    google: 'google',
+    'azure ai foundry': 'azure',
+    openrouter: 'openrouter',
+    'github models': 'github',
+  };
+  const providerKey = providerKeyMap[provider.toLowerCase()] ?? 'anthropic';
+  const envKey = PROVIDER_ENV_KEYS[providerKey];
+
+  let apiKey = '';
+  if (!process.env[envKey]) {
+    apiKey = await deps.prompt(`Paste your ${provider} API key (${envKey})`);
+  } else {
+    deps.log(`  ${envKey} is already set in your environment.`);
+  }
+
+  return { provider, providerKey, envKey, apiKey };
+}
+
+async function writeConfigFile(
+  deps: SetupDependencies,
+  config: Record<string, unknown>
+): Promise<void> {
+  const configPath = resolve(deps.cwd, 'dramaturge.config.json');
+  if (existsSync(configPath)) {
+    const overwrite = await deps.confirm(
+      'dramaturge.config.json already exists. Overwrite?',
+      false
+    );
+    if (!overwrite) {
+      deps.log('Skipping config write.');
+      return;
+    }
+  }
+  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  deps.log(`\nWrote ${configPath}`);
+}
+
+async function writeEnvFile(
+  deps: SetupDependencies,
+  envKey: string,
+  apiKey: string
+): Promise<void> {
+  const envPath = resolve(deps.cwd, '.env');
+  const envLine = `${envKey}=${apiKey}\n`;
+
+  if (existsSync(envPath)) {
+    deps.log(`\nAdd this to your .env:\n  ${envKey}=<your-key>`);
+    return;
+  }
+  const saveEnv = await deps.confirm('Save API key to .env file?', true);
+  if (!saveEnv) return;
+  mkdirSync(dirname(envPath), { recursive: true });
+  writeFileSync(envPath, envLine);
+  deps.log(`Wrote ${envPath}`);
+  deps.log('  (Add .env to your .gitignore!)');
+}
+
+async function maybeRunRepoScan(
+  deps: SetupDependencies,
+  args: SetupArgs
+): Promise<RepoScanResult | null> {
+  // Explicit opt-out
+  if (args.repoPath === false) return null;
+
+  let root: string | undefined;
+  if (typeof args.repoPath === 'string' && args.repoPath.length > 0) {
+    root = isAbsolute(args.repoPath) ? args.repoPath : resolve(deps.cwd, args.repoPath);
+  } else {
+    const gitRoot = findGitRoot(deps.cwd);
+    if (gitRoot) root = gitRoot;
+  }
+
+  if (!root) return null;
+  if (!existsSync(root)) {
+    deps.error(`Repo path not found: ${root}`);
+    return null;
+  }
+
+  const scanFn = deps.scanRepo ?? defaultScan;
+  let result: RepoScanResult;
+  try {
+    result = scanFn(root);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    deps.error(`Repo scan failed: ${message}`);
+    return null;
+  }
+
+  reportScan(deps.log, result);
+
+  // When no hints were extracted we still keep the result if a concrete framework was detected,
+  // so the generated config preserves `repoContext.framework` for the engine to use at runtime.
+  if (!hintsAreMeaningful(result.hints)) {
+    if (result.framework === 'generic') {
+      deps.log('  (No routes or endpoints detected — proceeding with a generic config.)\n');
+      return null;
+    }
+    deps.log(`  (No routes extracted, but framework detected — recording framework only.)\n`);
+    return result;
+  }
+
+  const useScan = await deps.confirm('Use these detected hints in the generated config?', true);
+  if (!useScan) return null;
+
+  return result;
+}
+
+function reportScan(log: (message: string) => void, scan: RepoScanResult): void {
+  log(`\nScanning repo at ${scan.root}`);
+  log(`  framework: ${FRAMEWORK_LABELS[scan.framework]}`);
+  log(`  routes detected: ${scan.hints.routes.length}`);
+  log(`  route families: ${scan.hints.routeFamilies.length}`);
+  log(`  API endpoints: ${scan.hints.apiEndpoints.length}`);
+  log(`  login routes: ${scan.hints.authHints.loginRoutes.length}`);
+  log(`  callback routes: ${scan.hints.authHints.callbackRoutes.length}`);
+  log('');
+}
+
+function toRelativeRoot(cwd: string, root: string): string {
+  if (root === cwd) return '.';
+  const rel = relative(cwd, root);
+  if (!rel || rel.startsWith('..')) return root;
+  return rel;
 }
