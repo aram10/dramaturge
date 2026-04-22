@@ -437,7 +437,7 @@ const RepoContextSchema = z
   })
   .optional();
 
-const SHELL_METACHARACTER_PATTERN = /[|&;<>$`\\"'()*?{}[\]!#~\n\r]/;
+const SHELL_METACHARACTER_PATTERN = /[[|&;<>$`"'()*?{}\]!#~\n\r]/;
 
 function containsShellMetacharacters(command: string | undefined): boolean {
   if (!command) {
@@ -461,10 +461,14 @@ const BootstrapSchema = z
       "bootstrap.args may only be set when bootstrap.mode is 'safe'; in 'trusted' mode, embed arguments in the shell command string instead.",
     path: ['args'],
   })
-  .refine((value) => value.mode !== 'safe' || typeof value.command === 'string', {
-    message: "bootstrap.command is required when bootstrap.mode is 'safe'.",
-    path: ['command'],
-  })
+  .refine(
+    (value) =>
+      value.mode !== 'safe' || (typeof value.command === 'string' && value.command.length > 0),
+    {
+      message: "bootstrap.command is required when bootstrap.mode is 'safe'.",
+      path: ['command'],
+    }
+  )
   .refine((value) => value.mode !== 'safe' || !containsShellMetacharacters(value.command), {
     message:
       "bootstrap.command in 'safe' mode must be a plain executable path — shell metacharacters are not allowed. Move flags into bootstrap.args, or switch to 'trusted' mode if a shell is required.",
