@@ -425,8 +425,11 @@ async function resolveAppDescription(
   inferred: InferredAutoConfig,
   targetUrl: string
 ): Promise<string> {
-  if (isConfident(inferred.appDescription?.confidence)) {
-    return inferred.appDescription!.value;
+  const confidentDescription = isConfident(inferred.appDescription?.confidence)
+    ? inferred.appDescription?.value
+    : undefined;
+  if (confidentDescription) {
+    return confidentDescription;
   }
   const description = await promptWithSuggestion(
     deps,
@@ -441,8 +444,11 @@ async function resolveRequiresLogin(
   inferred: InferredAutoConfig,
   scan: RepoScanResult | null
 ): Promise<boolean> {
-  if (isConfident(inferred.requiresLogin?.confidence)) {
-    return inferred.requiresLogin!.value;
+  const confidentRequiresLogin = isConfident(inferred.requiresLogin?.confidence)
+    ? inferred.requiresLogin?.value
+    : undefined;
+  if (confidentRequiresLogin !== undefined) {
+    return confidentRequiresLogin;
   }
   const defaultValue =
     getSuggestedBoolean(inferred.requiresLogin) ?? Boolean(scan?.hints.authHints.loginRoutes[0]);
@@ -466,11 +472,11 @@ async function resolveLoginUrl(
   const confidentLoginPath = isConfident(inferred.loginPath?.confidence)
     ? inferred.loginPath?.value
     : undefined;
+  if (confidentLoginPath) {
+    return normalizeLoginUrl(targetUrl, confidentLoginPath);
+  }
   const suggestedPath =
-    confidentLoginPath ??
-    getSuggestedString(inferred.loginPath) ??
-    scan?.hints.authHints.loginRoutes[0] ??
-    '/login';
+    getSuggestedString(inferred.loginPath) ?? scan?.hints.authHints.loginRoutes[0] ?? '/login';
   const loginPath = await promptWithSuggestion(
     deps,
     'What login path or URL should Dramaturge use?',
@@ -490,8 +496,11 @@ async function resolveCriticalFlows(
   deps: AutoConfigDependencies,
   inferred: InferredAutoConfig
 ): Promise<string[]> {
-  if (isConfident(inferred.criticalFlows?.confidence)) {
-    return inferred.criticalFlows!.value;
+  const confidentCriticalFlows = isConfident(inferred.criticalFlows?.confidence)
+    ? inferred.criticalFlows?.value
+    : undefined;
+  if (confidentCriticalFlows) {
+    return confidentCriticalFlows;
   }
   const suggestion = getSuggestedStringList(inferred.criticalFlows).join(', ');
   const answer = await promptWithSuggestion(
@@ -516,8 +525,11 @@ async function resolveFocusModes(
   deps: AutoConfigDependencies,
   inferred: InferredAutoConfig
 ): Promise<FocusMode[]> {
-  if (isConfident(inferred.focusModes?.confidence)) {
-    return inferred.focusModes!.value;
+  const confidentFocusModes = isConfident(inferred.focusModes?.confidence)
+    ? inferred.focusModes?.value
+    : undefined;
+  if (confidentFocusModes) {
+    return confidentFocusModes;
   }
 
   const suggested = getSuggestedStringList(inferred.focusModes);
@@ -540,8 +552,11 @@ async function resolveApiTesting(
   inferred: InferredAutoConfig,
   scan: RepoScanResult | null
 ): Promise<boolean> {
-  if (isConfident(inferred.enableApiTesting?.confidence)) {
-    return inferred.enableApiTesting!.value;
+  const confidentApiTesting = isConfident(inferred.enableApiTesting?.confidence)
+    ? inferred.enableApiTesting?.value
+    : undefined;
+  if (confidentApiTesting !== undefined) {
+    return confidentApiTesting;
   }
   const defaultValue =
     getSuggestedBoolean(inferred.enableApiTesting) ?? Boolean(scan?.hints.apiEndpoints.length);
@@ -552,8 +567,11 @@ async function resolveAdversarial(
   deps: AutoConfigDependencies,
   inferred: InferredAutoConfig
 ): Promise<boolean> {
-  if (isConfident(inferred.enableAdversarial?.confidence)) {
-    return inferred.enableAdversarial!.value;
+  const confidentAdversarial = isConfident(inferred.enableAdversarial?.confidence)
+    ? inferred.enableAdversarial?.value
+    : undefined;
+  if (confidentAdversarial !== undefined) {
+    return confidentAdversarial;
   }
   return deps.confirm(
     'Enable adversarial security probes?',
@@ -644,9 +662,10 @@ function buildConfig(
   }
 
   if (shouldRecordRepoContext(scan)) {
+    const repoScan = scan;
     config.repoContext = {
-      root: toRelativeRoot(deps.cwd, scan!.root),
-      framework: scan!.framework,
+      root: toRelativeRoot(deps.cwd, repoScan?.root ?? deps.cwd),
+      framework: repoScan?.framework ?? 'generic',
     };
   }
 

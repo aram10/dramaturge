@@ -76,12 +76,31 @@ function makeHarness(
 
 describe('runAutoConfig', () => {
   let testDir: string;
-  let savedAnthropicApiKey: string | undefined;
+  let savedEnv: Record<string, string | undefined>;
+  const providerEnvKeys = [
+    'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+    'AZURE_AI_API_KEY',
+    'OPENROUTER_API_KEY',
+    'GITHUB_TOKEN',
+    'OLLAMA_HOST',
+    'OPENAI_COMPATIBLE_BASE_URL',
+    'OPENAI_COMPATIBLE_API_KEY',
+    'OPENAI_COMPATIBLE_PLANNER_MODEL',
+    'OPENAI_COMPATIBLE_WORKER_MODEL',
+  ] as const;
 
   beforeEach(() => {
     vi.clearAllMocks();
     testDir = mkdtempSync(join(tmpdir(), 'dramaturge-auto-config-'));
-    savedAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    savedEnv = Object.fromEntries(providerEnvKeys.map((key) => [key, process.env[key]])) as Record<
+      string,
+      string | undefined
+    >;
+    for (const key of providerEnvKeys) {
+      delete process.env[key];
+    }
     process.env.ANTHROPIC_API_KEY = 'test-key';
   });
 
@@ -91,10 +110,12 @@ describe('runAutoConfig', () => {
     } catch {
       // ignore
     }
-    if (savedAnthropicApiKey === undefined) {
-      delete process.env.ANTHROPIC_API_KEY;
-    } else {
-      process.env.ANTHROPIC_API_KEY = savedAnthropicApiKey;
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
     }
   });
 
@@ -196,7 +217,9 @@ describe('runAutoConfig', () => {
   });
 
   it('reports an error when no provider API key is configured', async () => {
-    delete process.env.ANTHROPIC_API_KEY;
+    for (const key of providerEnvKeys) {
+      delete process.env[key];
+    }
     const harness = makeHarness(testDir);
 
     const code = await runAutoConfig(harness.deps, {});
@@ -219,8 +242,7 @@ describe('runAutoConfig', () => {
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(resolve(testDir, 'config/generated.json'), 'utf8')).toContain(
-      '"targetUrl": "https://example.com"'
-    );
+    const config = JSON.parse(readFileSync(resolve(testDir, 'config/generated.json'), 'utf8'));
+    expect(config.targetUrl).toBe('https://example.com/');
   });
 });
