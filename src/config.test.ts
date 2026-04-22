@@ -180,6 +180,32 @@ describe('loadConfig', () => {
     });
   });
 
+  it('accepts safe-mode bootstrap commands with Windows path separators', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe",
+          "command": ".\\\\scripts\\\\start.cmd"
+        }
+      }`,
+      'utf-8'
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.bootstrap).toMatchObject({
+      mode: 'safe',
+      command: '.\\scripts\\start.cmd',
+      args: [],
+    });
+  });
+
   it('rejects safe-mode commands that contain whitespace', () => {
     const dir = createTempDir();
     const configPath = join(dir, 'dramaturge.config.json');
@@ -258,6 +284,47 @@ describe('loadConfig', () => {
     );
 
     expect(() => loadConfig(configPath)).toThrow(/bootstrap\.command is required/);
+  });
+
+  it('rejects empty bootstrap.command when mode is safe', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe",
+          "command": ""
+        }
+      }`,
+      'utf-8'
+    );
+
+    expect(() => loadConfig(configPath)).toThrow(/bootstrap\.command is required/);
+  });
+
+  it('rejects null bytes in safe-mode bootstrap args', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "bootstrap": {
+          "mode": "safe",
+          "command": "node",
+          "args": ["-e", "ok\\u0000bad"]
+        }
+      }`,
+      'utf-8'
+    );
+
+    expect(() => loadConfig(configPath)).toThrow(/must not contain null bytes/);
   });
 
   it('accepts explicit policy controls', () => {
