@@ -39,6 +39,8 @@ import {
   flushOwnedBrowserErrors,
 } from './engine/graph-ops.js';
 import { buildAreaResults, writeReports } from './engine/reports.js';
+import { classifyFindings } from './report/cross-run-classification.js';
+import { collectFindings } from './report/collector.js';
 import { executeFrontierItem } from './engine/execute-frontier-item.js';
 import type { WorkerSession } from './engine/worker-pool.js';
 import { scanRepository } from './adaptation/repo-scan.js';
@@ -641,10 +643,20 @@ export async function runEngine(
     // Generate reports with per-node attribution
     const areaResults = buildAreaResults(ctx);
     if (memoryStore) {
+      // Capture pre-run history so classification reflects state before this run's findings are recorded.
+      const preRunSnapshot = memoryStore.getSnapshot();
+      const preRunFindingHistory = structuredClone(preRunSnapshot.findingHistory);
+      const preRunFlakyPages = structuredClone(preRunSnapshot.flakyPages);
+
       memoryStore.recordRunFindings(startTime.toISOString(), areaResults);
       memoryStore.recordObservedApiTraffic(startTime.toISOString(), trafficObserver.snapshot());
       memoryStore.recordNavigationSnapshot(config.targetUrl, ctx.graph);
       ctx.runMemory = memoryStore.getSummary(warmStartApplied, warmStartRestoredStateCount);
+      ctx.crossRunClassification = classifyFindings(
+        collectFindings(areaResults),
+        preRunFindingHistory,
+        preRunFlakyPages
+      );
     }
     writeReports(ctx, startTime, areaResults, remaining);
 

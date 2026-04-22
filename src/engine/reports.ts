@@ -102,7 +102,8 @@ export function writeReports(
       warmStartEnabled: config.memory.enabled && config.memory.warmStart,
     },
     ctx.runMemory,
-    diffSummary
+    diffSummary,
+    ctx.crossRunClassification
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);
 

@@ -4,6 +4,7 @@
 import type {
   AreaResult,
   BlindSpot,
+  CrossRunClassification,
   DiffSummary,
   Finding,
   FindingSeverity,
@@ -140,7 +141,8 @@ export function buildRunResult(
   stateGraphMermaid?: string,
   runConfig?: RunConfigMeta,
   runMemory?: RunMemoryMeta,
-  diffSummary?: DiffSummary
+  diffSummary?: DiffSummary,
+  crossRunClassification?: CrossRunClassification
 ): RunResult {
   return {
     targetUrl,
@@ -154,5 +156,6 @@ export function buildRunResult(
     runConfig,
     runMemory,
     diffSummary,
+    crossRunClassification,
   };
 }

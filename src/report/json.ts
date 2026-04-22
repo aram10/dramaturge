@@ -68,7 +68,14 @@ export function renderJson(result: RunResult): string {
       impactedAreas: f.impactedAreas,
       occurrences: f.occurrences,
       meta: f.meta ?? null,
+      crossRunStatus: result.crossRunClassification?.byFindingId[f.id] ?? null,
     })),
+    crossRunSummary: result.crossRunClassification
+      ? {
+          ...result.crossRunClassification.summary,
+          resolvedFindings: result.crossRunClassification.resolved,
+        }
+      : null,
     coverage: result.areaResults.map((a) => ({
       name: a.name,
       url: a.url ?? null,

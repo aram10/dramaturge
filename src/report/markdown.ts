@@ -66,6 +66,25 @@ export function renderMarkdown(result: RunResult): string {
   );
   lines.push('');
 
+  // Changes Since Last Run (cross-run classification)
+  if (result.crossRunClassification) {
+    const { summary, resolved } = result.crossRunClassification;
+    lines.push('## Changes Since Last Run');
+    lines.push(
+      `- ${summary.new} new, ${summary.recurring} recurring, ${summary.resolved} resolved, ${summary.flaky} flaky, ${summary.suppressed} suppressed`
+    );
+    if (resolved.length > 0) {
+      lines.push('');
+      lines.push('**Resolved findings (present in prior runs, absent now):**');
+      for (const entry of resolved) {
+        lines.push(
+          `- ${escapeMarkdownInline(entry.severity)} ${escapeMarkdownInline(entry.category)}: ${escapeMarkdownInline(entry.title)} (last seen ${escapeMarkdownInline(entry.lastSeenAt)}, ${entry.runCount} prior run(s))`
+        );
+      }
+    }
+    lines.push('');
+  }
+
   // Summary
   lines.push('## Summary');
   if (findings.length === 0) {
@@ -97,6 +116,20 @@ export function renderMarkdown(result: RunResult): string {
         `### [${escapeMarkdownInline(f.id)}] ${escapeMarkdownInline(f.severity)}: ${escapeMarkdownInline(f.title)}`
       );
       lines.push(`- **Area:** ${escapeMarkdownInline(f.area)}`);
+      const crossRunStatus = result.crossRunClassification?.byFindingId[f.id];
+      if (crossRunStatus) {
+        const parts = [`status: ${crossRunStatus.status}`];
+        if (crossRunStatus.firstSeenAt) {
+          parts.push(`first seen ${crossRunStatus.firstSeenAt}`);
+        }
+        if (crossRunStatus.runCount !== undefined) {
+          parts.push(`${crossRunStatus.runCount} prior run(s)`);
+        }
+        if (crossRunStatus.dismissalReason) {
+          parts.push(`reason: ${crossRunStatus.dismissalReason}`);
+        }
+        lines.push(`- **Cross-run:** ${escapeMarkdownInline(parts.join(' | '))}`);
+      }
       if (diffScope) {
         const scope = diffScope.get(f.area) ?? 'unchanged';
         lines.push(`- **Diff scope:** ${escapeMarkdownInline(scope)}`);
