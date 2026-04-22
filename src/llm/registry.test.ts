@@ -152,6 +152,11 @@ describe('registry', () => {
       expect(hasConfiguredProvider('ollama/llama3')).toBe(true);
     });
 
+    it('treats blank OLLAMA_BASE_URL as unconfigured', () => {
+      process.env.OLLAMA_BASE_URL = '   ';
+      expect(hasConfiguredProvider('ollama/llama3')).toBe(false);
+    });
+
     it('treats custom provider as configured when OPENAI_COMPATIBLE_BASE_URL is set', () => {
       expect(hasConfiguredProvider('custom/my-model')).toBe(false);
       process.env.OPENAI_COMPATIBLE_BASE_URL = 'http://localhost:8080/v1';

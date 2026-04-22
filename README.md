@@ -140,6 +140,11 @@ export OLLAMA_BASE_URL="http://localhost:11434/v1"
 export OPENAI_COMPATIBLE_BASE_URL="https://your-endpoint/v1"
 export OPENAI_COMPATIBLE_API_KEY="optional-token"
 # …then reference models with the `custom/` prefix, e.g. `custom/llama-3-70b`.
+# For inline mode (`dramaturge run <url>`), also set explicit planner/worker model names
+# so Dramaturge does not fall back to a placeholder model.
+export OPENAI_COMPATIBLE_PLANNER_MODEL="llama-3-70b"
+export OPENAI_COMPATIBLE_WORKER_MODEL="llama-3-70b"
+# If you use a config file instead, `models.planner` / `models.worker` can override these.
 ```
 
 ### 3. Run Dramaturge

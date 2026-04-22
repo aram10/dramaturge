@@ -4,8 +4,7 @@
 /**
  * Ollama inference adapter.
  *
- * Endpoint: POST ${OLLAMA_BASE_URL}/chat/completions (defaults to
- * http://localhost:11434/v1)
+ * Endpoint: POST ${OLLAMA_BASE_URL}/chat/completions
  *
  * Ollama exposes an OpenAI-compatible `/v1/chat/completions` API. A running
  * Ollama server typically requires no authentication; when it does (reverse
@@ -18,8 +17,8 @@
  * Model strings use the `ollama/` prefix, e.g. `ollama/llama3`, `ollama/mistral`.
  *
  * Environment variables:
- *   OLLAMA_BASE_URL — endpoint URL (defaults to http://localhost:11434/v1).
- *                     Presence is what marks the provider as configured.
+ *   OLLAMA_BASE_URL — endpoint URL (required). Set this explicitly, even to
+ *                     http://localhost:11434/v1, to opt in.
  *   OLLAMA_API_KEY  — optional bearer token if the server requires auth.
  */
 
@@ -32,8 +31,8 @@ export const ollamaProvider = createOpenAICompatibleProvider({
   prefix: 'ollama',
   envKeys: ['OLLAMA_BASE_URL', 'OLLAMA_API_KEY'],
   getApiKey: () => process.env.OLLAMA_API_KEY,
-  getBaseUrl: () => process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL,
+  getBaseUrl: () => process.env.OLLAMA_BASE_URL,
   buildAuthHeaders: (key) => ({ authorization: `Bearer ${key}` }),
   requiresApiKey: false,
-  isConfigured: () => process.env.OLLAMA_BASE_URL !== undefined,
+  isConfigured: () => Boolean(process.env.OLLAMA_BASE_URL?.trim()),
 });

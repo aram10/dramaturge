@@ -74,7 +74,7 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
         `${config.name} base URL not set — set ${config.envKeys[0]} to the endpoint URL`
       );
     }
-    return baseUrl;
+    return baseUrl.trim().replace(/\/+$/, '');
   }
 
   return {

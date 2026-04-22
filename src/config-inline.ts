@@ -69,15 +69,22 @@ function resolveProviderDefaults(provider: ProviderId): { planner: string; worke
           ? `ollama/${process.env.OLLAMA_WORKER_MODEL}`
           : 'ollama/llama3.1:8b',
       };
-    case 'custom':
+    case 'custom': {
+      const plannerModel = process.env.OPENAI_COMPATIBLE_PLANNER_MODEL?.trim();
+      const workerModel = process.env.OPENAI_COMPATIBLE_WORKER_MODEL?.trim();
+
+      if (!plannerModel || !workerModel) {
+        throw new Error(
+          'Custom provider requires OPENAI_COMPATIBLE_PLANNER_MODEL and ' +
+            'OPENAI_COMPATIBLE_WORKER_MODEL to be set for inline mode.'
+        );
+      }
+
       return {
-        planner: process.env.OPENAI_COMPATIBLE_PLANNER_MODEL
-          ? `custom/${process.env.OPENAI_COMPATIBLE_PLANNER_MODEL}`
-          : 'custom/default',
-        worker: process.env.OPENAI_COMPATIBLE_WORKER_MODEL
-          ? `custom/${process.env.OPENAI_COMPATIBLE_WORKER_MODEL}`
-          : 'custom/default',
+        planner: `custom/${plannerModel}`,
+        worker: `custom/${workerModel}`,
       };
+    }
   }
 }
 

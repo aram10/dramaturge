@@ -48,6 +48,37 @@ describe('buildConfigFromArgs', () => {
     expect(config.models.worker).toContain('google');
   });
 
+  it('throws when provider is custom and inline planner/worker models are unset', () => {
+    delete process.env.OPENAI_COMPATIBLE_PLANNER_MODEL;
+    delete process.env.OPENAI_COMPATIBLE_WORKER_MODEL;
+
+    expect(() => buildConfigFromArgs({ url: 'https://example.com', provider: 'custom' })).toThrow(
+      /OPENAI_COMPATIBLE_PLANNER_MODEL and OPENAI_COMPATIBLE_WORKER_MODEL/
+    );
+  });
+
+  it('uses explicit custom inline planner/worker models when set', () => {
+    const savedPlanner = process.env.OPENAI_COMPATIBLE_PLANNER_MODEL;
+    const savedWorker = process.env.OPENAI_COMPATIBLE_WORKER_MODEL;
+    process.env.OPENAI_COMPATIBLE_PLANNER_MODEL = 'llama-3-70b';
+    process.env.OPENAI_COMPATIBLE_WORKER_MODEL = 'llama-3-8b';
+
+    const config = buildConfigFromArgs({ url: 'https://example.com', provider: 'custom' });
+    expect(config.models.planner).toBe('custom/llama-3-70b');
+    expect(config.models.worker).toBe('custom/llama-3-8b');
+
+    if (savedPlanner === undefined) {
+      delete process.env.OPENAI_COMPATIBLE_PLANNER_MODEL;
+    } else {
+      process.env.OPENAI_COMPATIBLE_PLANNER_MODEL = savedPlanner;
+    }
+    if (savedWorker === undefined) {
+      delete process.env.OPENAI_COMPATIBLE_WORKER_MODEL;
+    } else {
+      process.env.OPENAI_COMPATIBLE_WORKER_MODEL = savedWorker;
+    }
+  });
+
   it('applies smoke preset', () => {
     const config = buildConfigFromArgs({ url: 'https://example.com', preset: 'smoke' });
     expect(config.budget.globalTimeLimitSeconds).toBe(180);

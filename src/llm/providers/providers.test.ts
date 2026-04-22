@@ -340,6 +340,11 @@ describe('provider adapters', () => {
       expect(ollamaProvider.isConfigured()).toBe(true);
     });
 
+    it('treats empty OLLAMA_BASE_URL as unconfigured', () => {
+      process.env.OLLAMA_BASE_URL = '   ';
+      expect(ollamaProvider.isConfigured()).toBe(false);
+    });
+
     it('builds chat request against the default local endpoint without auth headers', () => {
       process.env.OLLAMA_BASE_URL = DEFAULT_OLLAMA_BASE_URL;
       const req = ollamaProvider.buildChatRequest({
@@ -427,6 +432,17 @@ describe('provider adapters', () => {
       });
       expect(req.url).toBe('https://llm.corp.internal/v1/chat/completions');
       expect(req.headers.authorization).toBe('Bearer token');
+    });
+
+    it('normalizes custom base URL by trimming whitespace and trailing slashes', () => {
+      process.env.OPENAI_COMPATIBLE_BASE_URL = '  https://llm.corp.internal/v1/  ';
+      const req = customOpenAICompatibleProvider.buildChatRequest({
+        model: 'my-model',
+        system: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+      });
+      expect(req.url).toBe('https://llm.corp.internal/v1/chat/completions');
     });
 
     it('omits auth header when keyless but base URL is configured', () => {
