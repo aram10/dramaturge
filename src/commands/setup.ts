@@ -366,8 +366,14 @@ async function maybeRunRepoScan(
     deps.error(`Repo path not found: ${root}`);
     return null;
   }
-  if (!statSync(root).isDirectory()) {
-    deps.error(`Repo path is not a directory: ${root}`);
+  try {
+    if (!statSync(root).isDirectory()) {
+      deps.error(`Repo path is not a directory: ${root}`);
+      return null;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    deps.error(`Invalid repo path: ${root} (${message})`);
     return null;
   }
 
