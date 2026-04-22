@@ -137,13 +137,24 @@ export function buildRunResult(
   areaResults: AreaResult[],
   unexploredAreas: Array<{ name: string; reason: string }>,
   partial: boolean,
-  blindSpots: BlindSpot[] = [],
-  stateGraphMermaid?: string,
-  runConfig?: RunConfigMeta,
-  runMemory?: RunMemoryMeta,
-  diffSummary?: DiffSummary,
-  crossRunClassification?: CrossRunClassification
+  options: {
+    blindSpots?: BlindSpot[];
+    stateGraphMermaid?: string;
+    runConfig?: RunConfigMeta;
+    runMemory?: RunMemoryMeta;
+    diffSummary?: DiffSummary;
+    crossRunClassification?: CrossRunClassification;
+  } = {}
 ): RunResult {
+  const {
+    blindSpots = [],
+    stateGraphMermaid,
+    runConfig,
+    runMemory,
+    diffSummary,
+    crossRunClassification,
+  } = options;
+
   return {
     targetUrl,
     startTime,

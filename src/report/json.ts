@@ -68,12 +68,22 @@ export function renderJson(result: RunResult): string {
       impactedAreas: f.impactedAreas,
       occurrences: f.occurrences,
       meta: f.meta ?? null,
-      crossRunStatus: result.crossRunClassification?.byFindingId[f.id] ?? null,
+      crossRunStatus: (() => {
+        const status = result.crossRunClassification?.byFindingId[f.id];
+        if (!status) {
+          return null;
+        }
+        const { signature: _signature, ...sanitizedStatus } = status;
+        return sanitizedStatus;
+      })(),
     })),
     crossRunSummary: result.crossRunClassification
       ? {
           ...result.crossRunClassification.summary,
-          resolvedFindings: result.crossRunClassification.resolved,
+          resolvedFindings: result.crossRunClassification.resolved.map((resolvedFinding) => {
+            const { signature: _signature, ...safeResolvedFinding } = resolvedFinding;
+            return safeResolvedFinding;
+          }),
         }
       : null,
     coverage: result.areaResults.map((a) => ({

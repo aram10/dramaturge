@@ -217,4 +217,61 @@ describe('renderJson', () => {
     expect(JSON.stringify(report)).not.toContain(secret);
     expect(JSON.stringify(report)).not.toContain('[REDACTED]');
   });
+
+  it('omits cross-run signatures from serialized finding and resolved payloads', () => {
+    const report = JSON.parse(
+      renderJson({
+        ...makeResult([
+          {
+            name: 'Area',
+            steps: 1,
+            findings: [
+              {
+                ref: 'fid-1',
+                category: 'Bug',
+                severity: 'Major',
+                title: 'Issue',
+                stepsToReproduce: ['Step'],
+                expected: 'Expected',
+                actual: 'Actual',
+              },
+            ],
+            screenshots: new Map(),
+            evidence: [],
+            coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+            pageType: 'unknown',
+            status: 'explored',
+          },
+        ]),
+        crossRunClassification: {
+          byFindingId: {
+            'BUG-001': {
+              signature: 'secret-signature',
+              status: 'recurring',
+              firstSeenAt: '2026-01-01T00:00:00.000Z',
+            },
+          },
+          resolved: [
+            {
+              signature: 'resolved-signature',
+              title: 'Resolved title',
+              category: 'Bug',
+              severity: 'Major',
+              firstSeenAt: '2026-01-01T00:00:00.000Z',
+              lastSeenAt: '2026-02-01T00:00:00.000Z',
+              runCount: 2,
+            },
+          ],
+          summary: { new: 0, recurring: 1, resolved: 1, flaky: 0, suppressed: 0 },
+        },
+      })
+    );
+
+    expect(report.findings[0].crossRunStatus).toMatchObject({
+      status: 'recurring',
+      firstSeenAt: '2026-01-01T00:00:00.000Z',
+    });
+    expect(report.findings[0].crossRunStatus).not.toHaveProperty('signature');
+    expect(report.crossRunSummary.resolvedFindings[0]).not.toHaveProperty('signature');
+  });
 });

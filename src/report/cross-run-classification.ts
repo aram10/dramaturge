@@ -53,8 +53,23 @@ function normalizeRoute(urlOrPath?: string): string | undefined {
   }
 }
 
-function findingIsFlaky(finding: Finding, flakyPages: HistoricalFlakyPageRecord[]): boolean {
-  if (flakyPages.length === 0) {
+function isSuppressedRecord(record?: HistoricalFindingRecord): boolean {
+  return Boolean(record?.suppressed || record?.dismissedAt);
+}
+
+function buildFlakyRouteSet(flakyPages: HistoricalFlakyPageRecord[]): Set<string> {
+  const flakyRoutes = new Set<string>();
+  for (const page of flakyPages) {
+    const route = normalizeRoute(page.route);
+    if (route) {
+      flakyRoutes.add(route);
+    }
+  }
+  return flakyRoutes;
+}
+
+function findingIsFlaky(finding: Finding, flakyRoutes: Set<string>): boolean {
+  if (flakyRoutes.size === 0) {
     return false;
   }
   const candidateRoutes = new Set<string>();
@@ -67,19 +82,21 @@ function findingIsFlaky(finding: Finding, flakyPages: HistoricalFlakyPageRecord[
   if (candidateRoutes.size === 0) {
     return false;
   }
-  return flakyPages.some((page) => {
-    const pageRoute = normalizeRoute(page.route);
-    return Boolean(pageRoute && candidateRoutes.has(pageRoute));
-  });
+  return [...candidateRoutes].some((route) => flakyRoutes.has(route));
 }
 
 export function classifyFindings(
   findings: Finding[],
   findingHistory: Record<string, HistoricalFindingRecord>,
-  flakyPages: HistoricalFlakyPageRecord[] = []
+  flakyPages: HistoricalFlakyPageRecord[] = [],
+  options: {
+    includeResolved?: boolean;
+  } = {}
 ): CrossRunClassification {
+  const includeResolved = options.includeResolved ?? true;
   const byFindingId: Record<string, CrossRunFindingStatus> = {};
   const currentSignatures = new Set<string>();
+  const flakyRoutes = buildFlakyRouteSet(flakyPages);
   const summary: CrossRunSummary = {
     new: 0,
     recurring: 0,
@@ -94,9 +111,9 @@ export function classifyFindings(
     const record = findingHistory[signature];
 
     let status: CrossRunStatus;
-    if (record?.suppressed) {
+    if (isSuppressedRecord(record)) {
       status = 'suppressed';
-    } else if (findingIsFlaky(finding, flakyPages)) {
+    } else if (findingIsFlaky(finding, flakyRoutes)) {
       status = 'flaky';
     } else if (record) {
       status = 'recurring';
@@ -117,18 +134,20 @@ export function classifyFindings(
   }
 
   const resolved: ResolvedFindingRecord[] = [];
-  for (const record of Object.values(findingHistory)) {
-    if (currentSignatures.has(record.signature)) continue;
-    if (record.suppressed) continue;
-    resolved.push({
-      signature: record.signature,
-      title: record.title,
-      category: record.category,
-      severity: record.severity,
-      firstSeenAt: record.firstSeenAt,
-      lastSeenAt: record.lastSeenAt,
-      runCount: record.runCount,
-    });
+  if (includeResolved) {
+    for (const record of Object.values(findingHistory)) {
+      if (currentSignatures.has(record.signature)) continue;
+      if (isSuppressedRecord(record)) continue;
+      resolved.push({
+        signature: record.signature,
+        title: record.title,
+        category: record.category,
+        severity: record.severity,
+        firstSeenAt: record.firstSeenAt,
+        lastSeenAt: record.lastSeenAt,
+        runCount: record.runCount,
+      });
+    }
   }
   summary.resolved = resolved.length;
 

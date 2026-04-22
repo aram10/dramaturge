@@ -154,4 +154,33 @@ describe('classifyFindings', () => {
     expect(result.summary.resolved).toBe(0);
     expect(result.resolved).toEqual([]);
   });
+
+  it('does not count dismissed prior findings as resolved', () => {
+    const currentFinding = makeFinding();
+    const dismissedFinding = makeFinding({ title: 'Dismissed and gone' });
+    const dismissedRecord = makeRecord(dismissedFinding, {
+      dismissedAt: '2026-03-15T00:00:00.000Z',
+      suppressed: false,
+    });
+
+    const result = classifyFindings([currentFinding], {
+      [dismissedRecord.signature]: dismissedRecord,
+    });
+
+    expect(result.summary.resolved).toBe(0);
+    expect(result.resolved).toEqual([]);
+  });
+
+  it('skips resolved classification when includeResolved is false', () => {
+    const currentFinding = makeFinding();
+    const goneFinding = makeFinding({ title: 'Not revisited yet' });
+    const goneRecord = makeRecord(goneFinding);
+
+    const result = classifyFindings([currentFinding], { [goneRecord.signature]: goneRecord }, [], {
+      includeResolved: false,
+    });
+
+    expect(result.summary.resolved).toBe(0);
+    expect(result.resolved).toEqual([]);
+  });
 });

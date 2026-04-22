@@ -643,20 +643,21 @@ export async function runEngine(
     // Generate reports with per-node attribution
     const areaResults = buildAreaResults(ctx);
     if (memoryStore) {
-      // Capture pre-run history so classification reflects state before this run's findings are recorded.
+      // Classify against the pre-run snapshot before this run mutates memory history.
       const preRunSnapshot = memoryStore.getSnapshot();
-      const preRunFindingHistory = structuredClone(preRunSnapshot.findingHistory);
-      const preRunFlakyPages = structuredClone(preRunSnapshot.flakyPages);
+      const findings = collectFindings(areaResults);
+      const includeResolved = remaining.length === 0;
+      ctx.crossRunClassification = classifyFindings(
+        findings,
+        preRunSnapshot.findingHistory,
+        preRunSnapshot.flakyPages,
+        { includeResolved }
+      );
 
       memoryStore.recordRunFindings(startTime.toISOString(), areaResults);
       memoryStore.recordObservedApiTraffic(startTime.toISOString(), trafficObserver.snapshot());
       memoryStore.recordNavigationSnapshot(config.targetUrl, ctx.graph);
       ctx.runMemory = memoryStore.getSummary(warmStartApplied, warmStartRestoredStateCount);
-      ctx.crossRunClassification = classifyFindings(
-        collectFindings(areaResults),
-        preRunFindingHistory,
-        preRunFlakyPages
-      );
     }
     writeReports(ctx, startTime, areaResults, remaining);
 
