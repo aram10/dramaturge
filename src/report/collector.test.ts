@@ -139,36 +139,32 @@ describe('buildRunResult', () => {
     const blindSpots: BlindSpot[] = [
       { summary: 'Unreachable modal', reason: 'state-unreachable', severity: 'medium' },
     ];
-    const result = buildRunResult('https://example.com', new Date(), [], [], false, blindSpots);
+    const result = buildRunResult('https://example.com', new Date(), [], [], false, { blindSpots });
     expect(result.blindSpots).toHaveLength(1);
     expect(result.blindSpots[0].summary).toBe('Unreachable modal');
   });
 
   it('includes stateGraphMermaid when provided', () => {
-    const result = buildRunResult(
-      'https://example.com',
-      new Date(),
-      [],
-      [],
-      false,
-      [],
-      'graph TD\n  A --> B'
-    );
+    const result = buildRunResult('https://example.com', new Date(), [], [], false, {
+      stateGraphMermaid: 'graph TD\n  A --> B',
+    });
     expect(result.stateGraphMermaid).toBe('graph TD\n  A --> B');
   });
 
   it('includes runConfig when provided', () => {
-    const result = buildRunResult('https://example.com', new Date(), [], [], false, [], undefined, {
-      appDescription: 'Test app',
-      models: { planner: 'claude-sonnet', worker: 'claude-haiku' },
-      concurrency: 2,
-      budget: { timeLimitSeconds: 900, maxStepsPerTask: 40, maxStateNodes: 50 },
-      checkpointInterval: 5,
-      autoCaptureEnabled: true,
-      llmPlannerEnabled: false,
-      memoryEnabled: true,
-      visualRegressionEnabled: true,
-      warmStartEnabled: true,
+    const result = buildRunResult('https://example.com', new Date(), [], [], false, {
+      runConfig: {
+        appDescription: 'Test app',
+        models: { planner: 'claude-sonnet', worker: 'claude-haiku' },
+        concurrency: 2,
+        budget: { timeLimitSeconds: 900, maxStepsPerTask: 40, maxStateNodes: 50 },
+        checkpointInterval: 5,
+        autoCaptureEnabled: true,
+        llmPlannerEnabled: false,
+        memoryEnabled: true,
+        visualRegressionEnabled: true,
+        warmStartEnabled: true,
+      },
     });
     expect(result.runConfig?.concurrency).toBe(2);
     expect(result.runConfig?.llmPlannerEnabled).toBe(false);

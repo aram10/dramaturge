@@ -80,29 +80,32 @@ export function writeReports(
       reason: `Not reached (priority: ${r.priority.toFixed(2)})`,
     })),
     remaining.length > 0,
-    blindSpots,
-    stateGraphMermaid,
     {
-      appDescription: config.appDescription,
-      models: { planner: config.models.planner, worker: config.models.worker },
-      concurrency: config.concurrency.workers,
-      budget: {
-        timeLimitSeconds: ctx.budget.globalTimeLimitSeconds,
-        maxStepsPerTask: ctx.budget.maxStepsPerTask,
-        maxStateNodes: ctx.budget.maxStateNodes,
+      blindSpots,
+      stateGraphMermaid,
+      runConfig: {
+        appDescription: config.appDescription,
+        models: { planner: config.models.planner, worker: config.models.worker },
+        concurrency: config.concurrency.workers,
+        budget: {
+          timeLimitSeconds: ctx.budget.globalTimeLimitSeconds,
+          maxStepsPerTask: ctx.budget.maxStepsPerTask,
+          maxStateNodes: ctx.budget.maxStateNodes,
+        },
+        checkpointInterval: config.checkpoint.intervalTasks,
+        autoCaptureEnabled:
+          config.autoCapture.consoleErrors ||
+          config.autoCapture.consoleWarnings ||
+          config.autoCapture.networkErrors,
+        llmPlannerEnabled: hasLLMApiKey(config.models.planner),
+        memoryEnabled: config.memory.enabled,
+        visualRegressionEnabled: config.visualRegression.enabled,
+        warmStartEnabled: config.memory.enabled && config.memory.warmStart,
       },
-      checkpointInterval: config.checkpoint.intervalTasks,
-      autoCaptureEnabled:
-        config.autoCapture.consoleErrors ||
-        config.autoCapture.consoleWarnings ||
-        config.autoCapture.networkErrors,
-      llmPlannerEnabled: hasLLMApiKey(config.models.planner),
-      memoryEnabled: config.memory.enabled,
-      visualRegressionEnabled: config.visualRegression.enabled,
-      warmStartEnabled: config.memory.enabled && config.memory.warmStart,
-    },
-    ctx.runMemory,
-    diffSummary
+      runMemory: ctx.runMemory,
+      diffSummary,
+      crossRunClassification: ctx.crossRunClassification,
+    }
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);
 

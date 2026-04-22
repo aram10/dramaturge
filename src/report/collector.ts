@@ -4,6 +4,7 @@
 import type {
   AreaResult,
   BlindSpot,
+  CrossRunClassification,
   DiffSummary,
   Finding,
   FindingSeverity,
@@ -136,12 +137,24 @@ export function buildRunResult(
   areaResults: AreaResult[],
   unexploredAreas: Array<{ name: string; reason: string }>,
   partial: boolean,
-  blindSpots: BlindSpot[] = [],
-  stateGraphMermaid?: string,
-  runConfig?: RunConfigMeta,
-  runMemory?: RunMemoryMeta,
-  diffSummary?: DiffSummary
+  options: {
+    blindSpots?: BlindSpot[];
+    stateGraphMermaid?: string;
+    runConfig?: RunConfigMeta;
+    runMemory?: RunMemoryMeta;
+    diffSummary?: DiffSummary;
+    crossRunClassification?: CrossRunClassification;
+  } = {}
 ): RunResult {
+  const {
+    blindSpots = [],
+    stateGraphMermaid,
+    runConfig,
+    runMemory,
+    diffSummary,
+    crossRunClassification,
+  } = options;
+
   return {
     targetUrl,
     startTime,
@@ -154,5 +167,6 @@ export function buildRunResult(
     runConfig,
     runMemory,
     diffSummary,
+    crossRunClassification,
   };
 }

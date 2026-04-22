@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
+import type { CrossRunClassification } from './report/cross-run-classification.js';
+export type { CrossRunClassification };
+
 export type FindingCategory =
   | 'Bug'
   | 'UX Concern'
@@ -196,6 +199,8 @@ export interface RunResult {
   runMemory?: RunMemoryMeta;
   /** Diff-aware exploration summary, present when diff-aware mode is enabled. */
   diffSummary?: DiffSummary;
+  /** Cross-run classification of findings, present when run memory is enabled. */
+  crossRunClassification?: CrossRunClassification;
 }
 
 export interface RunConfigMeta {

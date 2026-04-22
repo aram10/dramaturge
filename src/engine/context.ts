@@ -20,7 +20,7 @@ import type { BrowserErrorCollector } from '../browser-errors.js';
 import type { WorkerSession } from './worker-pool.js';
 import type { RepoHints } from '../adaptation/types.js';
 import type { MemoryStore } from '../memory/store.js';
-import type { RunMemoryMeta } from '../types.js';
+import type { CrossRunClassification, RunMemoryMeta } from '../types.js';
 import type { NetworkTrafficObserver } from '../network/traffic-observer.js';
 import type { ContractIndex } from '../spec/contract-index.js';
 import type { ApiRequestContextLike } from '../api/types.js';
@@ -58,6 +58,7 @@ export interface EngineContext {
   trafficObserver?: NetworkTrafficObserver;
   memoryStore?: MemoryStore;
   runMemory?: RunMemoryMeta;
+  crossRunClassification?: CrossRunClassification;
   createIsolatedApiRequestContext?: () => Promise<ApiRequestContextLike>;
   safetyGuard?: SafetyGuard;
   eventStream?: EngineEventEmitter;
