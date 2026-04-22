@@ -130,6 +130,16 @@ export ANTHROPIC_API_KEY="your-key-here"
 export OPENAI_API_KEY="your-key-here"
 # OR
 export GOOGLE_GENERATIVE_AI_API_KEY="your-key-here"
+
+# Local / free alternatives:
+# Ollama (run `ollama serve`, then opt in by exporting the base URL)
+export OLLAMA_BASE_URL="http://localhost:11434/v1"
+# …then reference models with the `ollama/` prefix, e.g. `ollama/llama3.1:8b`.
+
+# Any OpenAI-compatible endpoint (llama.cpp, vLLM, LocalAI, corporate gateways)
+export OPENAI_COMPATIBLE_BASE_URL="https://your-endpoint/v1"
+export OPENAI_COMPATIBLE_API_KEY="optional-token"
+# …then reference models with the `custom/` prefix, e.g. `custom/llama-3-70b`.
 ```
 
 ### 3. Run Dramaturge

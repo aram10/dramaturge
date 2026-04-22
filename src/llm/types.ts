@@ -14,7 +14,15 @@ export interface ChatMessage {
 }
 
 /** Provider identifiers used as model-string prefixes. */
-export type ProviderId = 'anthropic' | 'openai' | 'google' | 'azure' | 'openrouter' | 'github';
+export type ProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'google'
+  | 'azure'
+  | 'openrouter'
+  | 'github'
+  | 'ollama'
+  | 'custom';
 
 /** Materialised HTTP request ready to be sent by the shared client. */
 export interface ProviderRequest {

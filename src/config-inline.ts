@@ -40,32 +40,46 @@ export interface InlineRunArgs {
   formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
 }
 
-const PROVIDER_DEFAULTS: Record<ProviderId, { planner: string; worker: string }> = {
-  anthropic: {
-    planner: 'anthropic/claude-sonnet-4-6',
-    worker: 'anthropic/claude-haiku-4-5',
-  },
-  openai: {
-    planner: 'openai/gpt-4.1',
-    worker: 'openai/gpt-4.1-mini',
-  },
-  google: {
-    planner: 'google/gemini-2.5-pro',
-    worker: 'google/gemini-2.5-flash',
-  },
-  azure: {
-    planner: 'azure/gpt-4.1',
-    worker: 'azure/gpt-4.1-mini',
-  },
-  openrouter: {
-    planner: 'openrouter/anthropic/claude-sonnet-4-6',
-    worker: 'openrouter/anthropic/claude-haiku-4-5',
-  },
-  github: {
-    planner: 'github/openai/gpt-4.1',
-    worker: 'github/openai/gpt-4.1-mini',
-  },
-};
+function resolveProviderDefaults(provider: ProviderId): { planner: string; worker: string } {
+  switch (provider) {
+    case 'anthropic':
+      return {
+        planner: 'anthropic/claude-sonnet-4-6',
+        worker: 'anthropic/claude-haiku-4-5',
+      };
+    case 'openai':
+      return { planner: 'openai/gpt-4.1', worker: 'openai/gpt-4.1-mini' };
+    case 'google':
+      return { planner: 'google/gemini-2.5-pro', worker: 'google/gemini-2.5-flash' };
+    case 'azure':
+      return { planner: 'azure/gpt-4.1', worker: 'azure/gpt-4.1-mini' };
+    case 'openrouter':
+      return {
+        planner: 'openrouter/anthropic/claude-sonnet-4-6',
+        worker: 'openrouter/anthropic/claude-haiku-4-5',
+      };
+    case 'github':
+      return { planner: 'github/openai/gpt-4.1', worker: 'github/openai/gpt-4.1-mini' };
+    case 'ollama':
+      return {
+        planner: process.env.OLLAMA_PLANNER_MODEL
+          ? `ollama/${process.env.OLLAMA_PLANNER_MODEL}`
+          : 'ollama/llama3.1:70b',
+        worker: process.env.OLLAMA_WORKER_MODEL
+          ? `ollama/${process.env.OLLAMA_WORKER_MODEL}`
+          : 'ollama/llama3.1:8b',
+      };
+    case 'custom':
+      return {
+        planner: process.env.OPENAI_COMPATIBLE_PLANNER_MODEL
+          ? `custom/${process.env.OPENAI_COMPATIBLE_PLANNER_MODEL}`
+          : 'custom/default',
+        worker: process.env.OPENAI_COMPATIBLE_WORKER_MODEL
+          ? `custom/${process.env.OPENAI_COMPATIBLE_WORKER_MODEL}`
+          : 'custom/default',
+      };
+  }
+}
 
 const SMOKE_BUDGET = {
   globalTimeLimitSeconds: 180,
@@ -279,7 +293,7 @@ export function buildPreset(name: PresetName): Partial<DramaturgeConfig> {
  */
 export function buildConfigFromArgs(args: InlineRunArgs): ConfigWithMeta<DramaturgeConfig> {
   const provider = args.provider ?? detectProviderFromEnv();
-  const models = PROVIDER_DEFAULTS[provider];
+  const models = resolveProviderDefaults(provider);
 
   const raw: Record<string, unknown> = {
     targetUrl: args.url,

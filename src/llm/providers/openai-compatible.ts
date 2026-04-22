@@ -16,10 +16,28 @@ export interface OpenAICompatibleConfig {
   prefix: ProviderId;
   envKeys: string[];
   getApiKey: () => string | undefined;
-  getBaseUrl: () => string;
+  /**
+   * Returns the base URL for the provider, or `undefined` when the URL has
+   * not been configured. The factory throws a descriptive error at
+   * request-build time if the URL is missing.
+   */
+  getBaseUrl: () => string | undefined;
   buildAuthHeaders: (apiKey: string) => Record<string, string>;
   /** If true, include the model name in the request body (default: true). */
   includeModelInBody?: boolean;
+  /**
+   * If false, the adapter may build requests even when `getApiKey()` returns
+   * undefined. Used for local backends such as Ollama where authentication is
+   * optional. When the key is absent, no auth headers are attached.
+   * Defaults to true (API key required).
+   */
+  requiresApiKey?: boolean;
+  /**
+   * Override the default `isConfigured()` behaviour. The default checks only
+   * for API key presence; providers whose configuration is signalled by a
+   * base-URL env var (e.g. Ollama) can supply a custom predicate here.
+   */
+  isConfigured?: () => boolean;
 }
 
 function extractText(data: unknown): string {
@@ -34,6 +52,30 @@ function extractText(data: unknown): string {
  */
 export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): LLMProviderAdapter {
   const includeModel = config.includeModelInBody !== false;
+  const requiresApiKey = config.requiresApiKey !== false;
+
+  function resolveAuthHeaders(requestKind: 'models' | 'vision models'): Record<string, string> {
+    const key = config.getApiKey();
+    if (!key) {
+      if (requiresApiKey) {
+        throw new Error(
+          `${config.envKeys[0]} not set — required for ${config.name} ${requestKind}`
+        );
+      }
+      return {};
+    }
+    return config.buildAuthHeaders(key);
+  }
+
+  function resolveBaseUrl(): string {
+    const baseUrl = config.getBaseUrl();
+    if (!baseUrl) {
+      throw new Error(
+        `${config.name} base URL not set — set ${config.envKeys[0]} to the endpoint URL`
+      );
+    }
+    return baseUrl;
+  }
 
   return {
     name: config.name,
@@ -41,6 +83,9 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
     envKeys: config.envKeys,
 
     isConfigured(): boolean {
+      if (config.isConfigured) {
+        return config.isConfigured();
+      }
       return !!config.getApiKey();
     },
 
@@ -50,10 +95,8 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
       messages: ChatMessage[];
       maxTokens: number;
     }): ProviderRequest {
-      const key = config.getApiKey();
-      if (!key) {
-        throw new Error(`${config.envKeys[0]} not set — required for ${config.name} models`);
-      }
+      const authHeaders = resolveAuthHeaders('models');
+      const baseUrl = resolveBaseUrl();
 
       const body: Record<string, unknown> = {
         max_tokens: options.maxTokens,
@@ -67,10 +110,10 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
       }
 
       return {
-        url: `${config.getBaseUrl()}/chat/completions`,
+        url: `${baseUrl}/chat/completions`,
         headers: {
           'content-type': 'application/json',
-          ...config.buildAuthHeaders(key),
+          ...authHeaders,
         },
         body,
       };
@@ -85,10 +128,8 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
       pageContext: string;
       maxTokens: number;
     }): ProviderRequest {
-      const key = config.getApiKey();
-      if (!key) {
-        throw new Error(`${config.envKeys[0]} not set — required for ${config.name} vision models`);
-      }
+      const authHeaders = resolveAuthHeaders('vision models');
+      const baseUrl = resolveBaseUrl();
 
       const body: Record<string, unknown> = {
         max_tokens: options.maxTokens,
@@ -111,10 +152,10 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
       }
 
       return {
-        url: `${config.getBaseUrl()}/chat/completions`,
+        url: `${baseUrl}/chat/completions`,
         headers: {
           'content-type': 'application/json',
-          ...config.buildAuthHeaders(key),
+          ...authHeaders,
         },
         body,
       };

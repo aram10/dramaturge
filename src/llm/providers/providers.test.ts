@@ -8,6 +8,8 @@ import { googleProvider } from './google.js';
 import { azureFoundryProvider } from './azure-foundry.js';
 import { openRouterProvider } from './openrouter.js';
 import { githubModelsProvider } from './github-models.js';
+import { ollamaProvider, DEFAULT_OLLAMA_BASE_URL } from './ollama.js';
+import { customOpenAICompatibleProvider } from './custom-openai.js';
 
 describe('provider adapters', () => {
   const savedEnv: Record<string, string | undefined> = {};
@@ -21,6 +23,15 @@ describe('provider adapters', () => {
     savedEnv.AZURE_AI_ENDPOINT = process.env.AZURE_AI_ENDPOINT;
     savedEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
     savedEnv.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+    savedEnv.OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL;
+    savedEnv.OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
+    savedEnv.OPENAI_COMPATIBLE_BASE_URL = process.env.OPENAI_COMPATIBLE_BASE_URL;
+    savedEnv.OPENAI_COMPATIBLE_API_KEY = process.env.OPENAI_COMPATIBLE_API_KEY;
+
+    delete process.env.OLLAMA_BASE_URL;
+    delete process.env.OLLAMA_API_KEY;
+    delete process.env.OPENAI_COMPATIBLE_BASE_URL;
+    delete process.env.OPENAI_COMPATIBLE_API_KEY;
   });
 
   afterEach(() => {
@@ -305,6 +316,128 @@ describe('provider adapters', () => {
         maxTokens: 100,
       });
       expect(req.headers.authorization).toBe('Bearer gho_test-token');
+    });
+  });
+
+  describe('ollamaProvider', () => {
+    beforeEach(() => {
+      delete process.env.OLLAMA_BASE_URL;
+      delete process.env.OLLAMA_API_KEY;
+    });
+
+    it('has correct metadata', () => {
+      expect(ollamaProvider.prefix).toBe('ollama');
+      expect(ollamaProvider.name).toBe('Ollama');
+      expect(ollamaProvider.envKeys).toEqual(['OLLAMA_BASE_URL', 'OLLAMA_API_KEY']);
+    });
+
+    it('is not configured when OLLAMA_BASE_URL is unset, even when Ollama is running locally', () => {
+      expect(ollamaProvider.isConfigured()).toBe(false);
+    });
+
+    it('is configured when OLLAMA_BASE_URL is explicitly set', () => {
+      process.env.OLLAMA_BASE_URL = DEFAULT_OLLAMA_BASE_URL;
+      expect(ollamaProvider.isConfigured()).toBe(true);
+    });
+
+    it('builds chat request against the default local endpoint without auth headers', () => {
+      process.env.OLLAMA_BASE_URL = DEFAULT_OLLAMA_BASE_URL;
+      const req = ollamaProvider.buildChatRequest({
+        model: 'llama3',
+        system: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+      });
+      expect(req.url).toBe('http://localhost:11434/v1/chat/completions');
+      expect(req.headers.authorization).toBeUndefined();
+      const body = req.body as Record<string, unknown>;
+      expect(body.model).toBe('llama3');
+    });
+
+    it('attaches bearer auth when OLLAMA_API_KEY is set (for proxied deployments)', () => {
+      process.env.OLLAMA_BASE_URL = 'https://ollama.internal/v1';
+      process.env.OLLAMA_API_KEY = 'secret';
+      const req = ollamaProvider.buildChatRequest({
+        model: 'llama3',
+        system: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+      });
+      expect(req.url).toBe('https://ollama.internal/v1/chat/completions');
+      expect(req.headers.authorization).toBe('Bearer secret');
+    });
+
+    it('builds vision request without auth headers when keyless', () => {
+      process.env.OLLAMA_BASE_URL = DEFAULT_OLLAMA_BASE_URL;
+      const req = ollamaProvider.buildVisionRequest({
+        model: 'llava',
+        system: 'analyze',
+        base64Image: 'aW1n',
+        pageContext: 'page',
+        maxTokens: 256,
+      });
+      expect(req.headers.authorization).toBeUndefined();
+      expect(req.url).toBe('http://localhost:11434/v1/chat/completions');
+    });
+  });
+
+  describe('customOpenAICompatibleProvider', () => {
+    beforeEach(() => {
+      delete process.env.OPENAI_COMPATIBLE_BASE_URL;
+      delete process.env.OPENAI_COMPATIBLE_API_KEY;
+    });
+
+    it('has correct metadata', () => {
+      expect(customOpenAICompatibleProvider.prefix).toBe('custom');
+      expect(customOpenAICompatibleProvider.name).toBe('OpenAI-compatible');
+      expect(customOpenAICompatibleProvider.envKeys).toEqual([
+        'OPENAI_COMPATIBLE_BASE_URL',
+        'OPENAI_COMPATIBLE_API_KEY',
+      ]);
+    });
+
+    it('is not configured when OPENAI_COMPATIBLE_BASE_URL is unset', () => {
+      expect(customOpenAICompatibleProvider.isConfigured()).toBe(false);
+    });
+
+    it('is configured as soon as the base URL is set, key optional', () => {
+      process.env.OPENAI_COMPATIBLE_BASE_URL = 'https://llm.corp.internal/v1';
+      expect(customOpenAICompatibleProvider.isConfigured()).toBe(true);
+    });
+
+    it('throws a helpful error when asked to build a request with no base URL', () => {
+      expect(() =>
+        customOpenAICompatibleProvider.buildChatRequest({
+          model: 'anything',
+          system: 'sys',
+          messages: [{ role: 'user', content: 'Hi' }],
+          maxTokens: 100,
+        })
+      ).toThrow(/base URL not set/);
+    });
+
+    it('builds request against the configured base URL', () => {
+      process.env.OPENAI_COMPATIBLE_BASE_URL = 'https://llm.corp.internal/v1';
+      process.env.OPENAI_COMPATIBLE_API_KEY = 'token';
+      const req = customOpenAICompatibleProvider.buildChatRequest({
+        model: 'my-model',
+        system: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+      });
+      expect(req.url).toBe('https://llm.corp.internal/v1/chat/completions');
+      expect(req.headers.authorization).toBe('Bearer token');
+    });
+
+    it('omits auth header when keyless but base URL is configured', () => {
+      process.env.OPENAI_COMPATIBLE_BASE_URL = 'http://llama-cpp.local:8080/v1';
+      const req = customOpenAICompatibleProvider.buildChatRequest({
+        model: 'llama',
+        system: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+      });
+      expect(req.headers.authorization).toBeUndefined();
     });
   });
 });

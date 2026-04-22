@@ -9,12 +9,17 @@ import {
   azureFoundryProvider,
   openRouterProvider,
   githubModelsProvider,
+  ollamaProvider,
+  customOpenAICompatibleProvider,
 } from './providers/index.js';
 
 /**
  * All built-in provider adapters, keyed by their prefix.
  *
  * Order matters only for `detectProviderFromEnv` — first match wins.
+ * Local / self-hosted providers (Ollama, custom) are listed last so they
+ * only auto-select when the user has explicitly configured them and no
+ * hosted-provider credentials are present.
  */
 const PROVIDERS: Map<ProviderId, LLMProviderAdapter> = new Map([
   ['anthropic', anthropicProvider],
@@ -23,6 +28,8 @@ const PROVIDERS: Map<ProviderId, LLMProviderAdapter> = new Map([
   ['azure', azureFoundryProvider],
   ['openrouter', openRouterProvider],
   ['github', githubModelsProvider],
+  ['ollama', ollamaProvider],
+  ['custom', customOpenAICompatibleProvider],
 ]);
 
 /**
