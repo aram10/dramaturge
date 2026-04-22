@@ -122,6 +122,12 @@ describe('runTriageCommand', () => {
       writeSnapshot(h.memoryDir, [
         makeRecord({ signature: 'a0000000000000', title: 'Kept', suppressed: false }),
         makeRecord({ signature: 'b0000000000000', title: 'Hidden', suppressed: true }),
+        makeRecord({
+          signature: 'c0000000000000',
+          title: 'Hidden via dismissedAt',
+          suppressed: false,
+          dismissedAt: '2026-03-22T00:00:00Z',
+        }),
       ]);
       const code = runTriageCommand(
         { command: 'findings', subcommand: 'list', flags: { suppressed: true }, positional: [] },
@@ -130,6 +136,7 @@ describe('runTriageCommand', () => {
       expect(code).toBe(0);
       const output = h.logs.join('\n');
       expect(output).toContain('Hidden');
+      expect(output).toContain('Hidden via dismissedAt');
       expect(output).not.toContain('Kept');
     });
   });
@@ -223,6 +230,33 @@ describe('runTriageCommand', () => {
       expect(code).toBe(0);
       expect(h.logs.join('\n')).toContain('was not suppressed');
     });
+
+    it('unsuppresses records marked only by dismissedAt', () => {
+      writeSnapshot(h.memoryDir, [
+        makeRecord({
+          signature: 'dismissed123xx',
+          suppressed: false,
+          dismissalReason: 'legacy suppress state',
+          dismissedAt: '2026-03-01T00:00:00Z',
+        }),
+      ]);
+      const code = runTriageCommand(
+        {
+          command: 'findings',
+          subcommand: 'unsuppress',
+          flags: {},
+          positional: ['dismissed123'],
+        },
+        h.deps
+      );
+      expect(code).toBe(0);
+      const snapshot = JSON.parse(
+        readFileSync(join(h.memoryDir, 'memory.json'), 'utf-8')
+      ) as MemorySnapshot;
+      expect(snapshot.findingHistory['dismissed123xx'].suppressed).toBe(false);
+      expect(snapshot.findingHistory['dismissed123xx'].dismissedAt).toBeUndefined();
+      expect(snapshot.findingHistory['dismissed123xx'].dismissalReason).toBeUndefined();
+    });
   });
 
   describe('baselines list / approve', () => {
@@ -288,6 +322,11 @@ describe('runTriageCommand', () => {
       writeSnapshot(h.memoryDir, [
         makeRecord({ signature: 's1xxxxxxxxxxxx' }),
         makeRecord({ signature: 's2xxxxxxxxxxxx', suppressed: true }),
+        makeRecord({
+          signature: 's3xxxxxxxxxxxx',
+          suppressed: false,
+          dismissedAt: '2026-03-01T00:00:00Z',
+        }),
       ]);
       const code = runTriageCommand(
         { command: 'memory', subcommand: 'stats', flags: {}, positional: [] },
@@ -295,8 +334,8 @@ describe('runTriageCommand', () => {
       );
       expect(code).toBe(0);
       const out = h.logs.join('\n');
-      expect(out).toContain('total history entries: 2');
-      expect(out).toContain('suppressed:            1');
+      expect(out).toContain('total history entries: 3');
+      expect(out).toContain('suppressed:            2');
     });
   });
 

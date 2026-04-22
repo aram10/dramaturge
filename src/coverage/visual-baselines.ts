@@ -14,7 +14,7 @@ export interface BaselineFile {
   modifiedAt: string;
 }
 
-const BASELINE_NAME_PATTERN = /^([^-]+)-(\d+)x(\d+)\.png$/;
+const BASELINE_NAME_PATTERN = /^(.+)-(\d+)x(\d+)\.png$/;
 
 export function listBaselineFiles(baselineDir: string): BaselineFile[] {
   if (!existsSync(baselineDir)) {
@@ -71,6 +71,7 @@ export function approveBaselines(
 
   const removed: BaselineFile[] = [];
   const notFound: string[] = [];
+  const removedPaths = new Set<string>();
   for (const identifier of target) {
     const matches = files.filter(
       (file) => file.fingerprintHash === identifier || file.fileName === identifier
@@ -80,8 +81,12 @@ export function approveBaselines(
       continue;
     }
     for (const match of matches) {
+      if (removedPaths.has(match.path)) {
+        continue;
+      }
       unlinkSync(match.path);
       removed.push(match);
+      removedPaths.add(match.path);
     }
   }
   return { removed, notFound };

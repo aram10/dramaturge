@@ -138,6 +138,44 @@ describe('parseCliArgs', () => {
     const result = parseCliArgs(['setup']);
     expect(result.command).toBe('setup');
   });
+
+  it('parses findings list --suppressed', () => {
+    const result = parseCliArgs(['findings', 'list', '--suppressed']);
+    expect(result).toMatchObject({
+      command: 'findings',
+      triageSubcommand: 'list',
+      triageSuppressedOnly: true,
+    });
+  });
+
+  it('parses findings suppress with reason and positional signature', () => {
+    const result = parseCliArgs(['findings', 'suppress', 'abc123', '--reason', 'known issue']);
+    expect(result).toMatchObject({
+      command: 'findings',
+      triageSubcommand: 'suppress',
+      triagePositional: ['abc123'],
+      triageReason: 'known issue',
+    });
+  });
+
+  it('parses baselines approve --all', () => {
+    const result = parseCliArgs(['baselines', 'approve', '--all']);
+    expect(result).toMatchObject({
+      command: 'baselines',
+      triageSubcommand: 'approve',
+      triageAll: true,
+    });
+  });
+
+  it('parses triage subcommand when global flags appear first', () => {
+    const result = parseCliArgs(['findings', '--config', 'custom.json', 'suppress', 'abc123']);
+    expect(result).toMatchObject({
+      command: 'findings',
+      configPath: 'custom.json',
+      triageSubcommand: 'suppress',
+      triagePositional: ['abc123'],
+    });
+  });
 });
 
 describe('buildHelpText', () => {

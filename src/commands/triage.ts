@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { loadConfig } from '../config.js';
 import { MemoryStore } from '../memory/store.js';
 import type { HistoricalFindingRecord } from '../memory/types.js';
@@ -62,7 +62,9 @@ function listFindings(
   const store = new MemoryStore(paths.memoryDir);
   const snapshot = store.getSnapshot();
   const records = Object.values(snapshot.findingHistory)
-    .filter((record) => (options.suppressedOnly ? (record.suppressed ?? false) : true))
+    .filter((record) =>
+      options.suppressedOnly ? Boolean(record.suppressed || record.dismissedAt) : true
+    )
     .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
 
   if (records.length === 0) {
@@ -87,7 +89,7 @@ function listFindings(
 
   for (const record of records) {
     const shortSig = record.signature.slice(0, 12) + '..';
-    const suppressedMark = record.suppressed ? 'yes' : 'no';
+    const suppressedMark = record.suppressed || record.dismissedAt ? 'yes' : 'no';
     deps.log(
       shortSig.padEnd(14) +
         '  ' +
@@ -145,7 +147,7 @@ function unsuppressFinding(
     deps.error(`No finding matching signature: ${identifier}`);
     return 1;
   }
-  if (!record.suppressed) {
+  if (!record.suppressed && !record.dismissedAt) {
     deps.log(`Finding was not suppressed: ${record.title}`);
     return 0;
   }
@@ -204,11 +206,11 @@ function memoryStats(deps: TriageDependencies, paths: ResolvedTriagePaths): numb
   const store = new MemoryStore(paths.memoryDir);
   const snapshot = store.getSnapshot();
   const findings = Object.values(snapshot.findingHistory);
-  const suppressed = findings.filter((record) => record.suppressed).length;
+  const suppressed = findings.filter((record) => record.suppressed || record.dismissedAt).length;
   const baselines = listBaselineFiles(paths.baselineDir);
 
   deps.log(`Memory store: ${paths.memoryDir}`);
-  if (!existsSync(`${paths.memoryDir}/memory.json`)) {
+  if (!existsSync(join(paths.memoryDir, 'memory.json'))) {
     deps.log('  (no memory.json present — has dramaturge been run with memory enabled?)');
   } else {
     deps.log(`  updated: ${snapshot.updatedAt}`);

@@ -173,12 +173,6 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   if (args.length > 0 && KNOWN_COMMANDS.has(args[0])) {
     command = args[0] as ParsedCliArgs['command'];
     i = 1;
-
-    // For triage commands, the next positional (if any) is the subcommand
-    if (TRIAGE_COMMANDS.has(command) && args.length > 1 && !args[1].startsWith('-')) {
-      triageSubcommand = args[1];
-      i = 2;
-    }
   }
 
   for (; i < args.length; i++) {
@@ -332,7 +326,11 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
 
     // Positional arg for triage commands (signatures, baseline identifiers)
     if (TRIAGE_COMMANDS.has(command)) {
-      triagePositional.push(arg);
+      if (!triageSubcommand) {
+        triageSubcommand = arg;
+      } else {
+        triagePositional.push(arg);
+      }
       continue;
     }
 
@@ -354,11 +352,15 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     formats,
     initTemplate,
     initOutput,
-    triageSubcommand,
-    triagePositional: triagePositional.length > 0 ? triagePositional : undefined,
-    triageSuppressedOnly,
-    triageAll,
-    triageReason,
+    ...(TRIAGE_COMMANDS.has(command)
+      ? {
+          triageSubcommand,
+          triagePositional: triagePositional.length > 0 ? triagePositional : undefined,
+          triageSuppressedOnly,
+          triageAll,
+          triageReason,
+        }
+      : {}),
   };
 }
 

@@ -45,6 +45,15 @@ describe('visual-baselines', () => {
     expect(files[0].height).toBeUndefined();
   });
 
+  it('parses hyphenated fingerprint hashes', () => {
+    writeFileSync(join(dir, 'abc-mobile-1280x720.png'), 'fake');
+    const files = listBaselineFiles(dir);
+    expect(files).toHaveLength(1);
+    expect(files[0].fingerprintHash).toBe('abc-mobile');
+    expect(files[0].width).toBe(1280);
+    expect(files[0].height).toBe(720);
+  });
+
   it('removes all baselines when target is "all"', () => {
     writeFileSync(join(dir, 'a-100x200.png'), 'fake');
     writeFileSync(join(dir, 'b-100x200.png'), 'fake');
@@ -77,5 +86,13 @@ describe('visual-baselines', () => {
     const result = approveBaselines(dir, ['abc-100x200.png']);
     expect(result.removed).toHaveLength(1);
     expect(result.notFound).toEqual([]);
+  });
+
+  it('deduplicates matching files across overlapping identifiers', () => {
+    writeFileSync(join(dir, 'abc-100x200.png'), 'fake');
+    const result = approveBaselines(dir, ['abc', 'abc-100x200.png', 'abc']);
+    expect(result.removed).toHaveLength(1);
+    expect(result.notFound).toEqual([]);
+    expect(existsSync(join(dir, 'abc-100x200.png'))).toBe(false);
   });
 });
