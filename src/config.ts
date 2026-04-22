@@ -437,15 +437,57 @@ const RepoContextSchema = z
   })
   .optional();
 
+const SHELL_METACHARACTER_PATTERN = /[|&;<>$`\\"'()*?{}[\]!#~\n\r]/;
+
+function containsShellMetacharacters(command: string | undefined): boolean {
+  if (!command) {
+    return false;
+  }
+  return SHELL_METACHARACTER_PATTERN.test(command);
+}
+
 const BootstrapSchema = z
   .object({
+    mode: z.enum(['trusted', 'safe']).default('trusted'),
     command: z.string().optional(),
+    args: z.array(z.string()).default([]),
     cwd: z.string().optional(),
     readyUrl: z.string().optional(),
     readyIndicator: z.string().optional(),
     timeoutSeconds: z.number().int().min(5).default(120),
   })
+  .refine((value) => value.mode !== 'trusted' || value.args.length === 0, {
+    message:
+      "bootstrap.args may only be set when bootstrap.mode is 'safe'; in 'trusted' mode, embed arguments in the shell command string instead.",
+    path: ['args'],
+  })
+  .refine((value) => value.mode !== 'safe' || typeof value.command === 'string', {
+    message: "bootstrap.command is required when bootstrap.mode is 'safe'.",
+    path: ['command'],
+  })
+  .refine((value) => value.mode !== 'safe' || !containsShellMetacharacters(value.command), {
+    message:
+      "bootstrap.command in 'safe' mode must be a plain executable path — shell metacharacters are not allowed. Move flags into bootstrap.args, or switch to 'trusted' mode if a shell is required.",
+    path: ['command'],
+  })
+  .refine((value) => value.mode !== 'safe' || !containsWhitespace(value.command), {
+    message:
+      "bootstrap.command in 'safe' mode must be a single executable — whitespace is not allowed. Split the command so that the executable is in bootstrap.command and arguments are in bootstrap.args.",
+    path: ['command'],
+  })
+  .refine((value) => value.mode !== 'safe' || !argsContainNullBytes(value.args), {
+    message: "bootstrap.args in 'safe' mode must not contain null bytes.",
+    path: ['args'],
+  })
   .optional();
+
+function containsWhitespace(command: string | undefined): boolean {
+  return typeof command === 'string' && /\s/.test(command);
+}
+
+function argsContainNullBytes(args: string[] | undefined): boolean {
+  return Array.isArray(args) && args.some((arg) => arg.includes('\0'));
+}
 
 const PolicySchema = z
   .object({
