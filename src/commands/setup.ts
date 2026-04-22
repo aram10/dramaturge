@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { resolve, relative, dirname, isAbsolute } from 'node:path';
 import { detectFramework, scanRepository } from '../adaptation/repo-scan.js';
 import type { RepoFramework, RepoHints } from '../adaptation/types.js';
@@ -19,7 +19,7 @@ export interface SetupAnswers {
 export interface SetupArgs {
   /**
    * Path to scan for repo-aware bootstrap. Relative paths resolve against cwd.
-   * When omitted, runSetup auto-detects by looking for `.git` in cwd.
+   * When omitted, runSetup auto-detects by walking upward from cwd to find a `.git` marker.
    * Pass `false` to disable scanning entirely.
    */
   repoPath?: string | false;
@@ -38,7 +38,10 @@ export interface SetupDependencies {
   prompt: (question: string) => Promise<string>;
   confirm: (question: string, defaultValue?: boolean) => Promise<boolean>;
   select: (question: string, options: string[]) => Promise<string>;
-  /** Scanner override for tests. Defaults to calling scanRepository(). */
+  /**
+   * Scanner override for tests. Defaults to detecting the framework for the
+   * provided root and then calling scanRepository({ root, framework }).
+   */
   scanRepo?: (root: string) => RepoScanResult;
 }
 
@@ -363,6 +366,10 @@ async function maybeRunRepoScan(
     deps.error(`Repo path not found: ${root}`);
     return null;
   }
+  if (!statSync(root).isDirectory()) {
+    deps.error(`Repo path is not a directory: ${root}`);
+    return null;
+  }
 
   const scanFn = deps.scanRepo ?? defaultScan;
   let result: RepoScanResult;
@@ -407,6 +414,6 @@ function reportScan(log: (message: string) => void, scan: RepoScanResult): void 
 function toRelativeRoot(cwd: string, root: string): string {
   if (root === cwd) return '.';
   const rel = relative(cwd, root);
-  if (!rel || rel.startsWith('..')) return root;
+  if (!rel) return '.';
   return rel;
 }
