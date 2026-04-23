@@ -88,7 +88,7 @@ export function finalizeRun(ctx: EngineContext, options: FinalizeRunOptions): vo
     (sum, findings) => sum + findings.length,
     0
   );
-  ctx.logger.info('Run complete', {
+  ctx.logger?.info('Run complete', {
     tasksExecuted,
     totalFindings,
     statesDiscovered: ctx.graph.nodeCount(),

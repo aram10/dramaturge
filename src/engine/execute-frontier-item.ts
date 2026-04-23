@@ -38,7 +38,7 @@ export async function executeFrontierItem(
   if (ctx.safetyGuard) {
     const blocked = ctx.safetyGuard.checkUrl(nodeUrl);
     if (blocked) {
-      ctx.logger.warn('Blocked by safety guard', {
+      ctx.logger?.warn('Blocked by safety guard', {
         ...(logPrefix ? { logPrefix } : {}),
         taskNumber,
         nodeUrl,
@@ -48,7 +48,7 @@ export async function executeFrontierItem(
     }
   }
 
-  ctx.logger.info('Dispatching task', {
+  ctx.logger?.info('Dispatching task', {
     ...(logPrefix ? { logPrefix } : {}),
     taskNumber,
     taskId: item.id,
@@ -175,7 +175,7 @@ export async function executeFrontierItem(
         visionContext = visionResult.pageDescription;
       }
     } catch (err) {
-      ctx.logger.warn('Vision analysis failed', {
+      ctx.logger?.warn('Vision analysis failed', {
         areaName: node.title ?? node.id,
         error: err instanceof Error ? err.message : String(err),
       });

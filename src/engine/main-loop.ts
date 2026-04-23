@@ -40,7 +40,7 @@ export interface RunPlannerLoopResult {
 }
 
 function handleNavFailure(ctx: EngineContext, item: FrontierItem, logPrefix = ''): void {
-  ctx.logger.warn('Navigation failed', {
+  ctx.logger?.warn('Navigation failed', {
     ...(logPrefix ? { logPrefix } : {}),
     taskId: item.id,
     objective: item.objective,
@@ -117,7 +117,7 @@ export async function runPlannerLoop(
   while (ctx.frontier.hasItems()) {
     const elapsedMs = Date.now() - startMs;
     if (elapsedMs > ctx.budget.globalTimeLimitSeconds * 1000) {
-      ctx.logger.warn('Time budget exhausted', {
+      ctx.logger?.warn('Time budget exhausted', {
         elapsedMs,
         timeLimitMs: ctx.budget.globalTimeLimitSeconds * 1000,
       });
@@ -161,7 +161,7 @@ export async function runPlannerLoop(
               coverageDiscovered: result.coverageSnapshot.controlsDiscovered,
             }
           : undefined;
-      ctx.logger.info('Completed task', {
+      ctx.logger?.info('Completed task', {
         taskId: item.id,
         outcome: result.outcome,
         findings: result.findings.length,
@@ -225,7 +225,7 @@ export async function runPlannerLoop(
         plannerState: ctx.planner.snapshotDispatchState(),
       });
       tasksSinceCheckpoint = 0;
-      ctx.logger.info('Saved checkpoint', {
+      ctx.logger?.info('Saved checkpoint', {
         tasksExecuted,
         outputDir: ctx.outputDir,
       });
@@ -242,7 +242,7 @@ export async function runPlannerLoop(
       }
       await ctx.page.goto(ctx.config.targetUrl);
     } catch {
-      ctx.logger.warn('Failed to navigate back to root URL', {
+      ctx.logger?.warn('Failed to navigate back to root URL', {
         targetUrl: ctx.config.targetUrl,
       });
     }

@@ -115,7 +115,7 @@ export function writeReports(
     const { filename, content, label } = renderForFormat(format, runResult);
     const outPath = join(ctx.outputDir, filename);
     writeFileSync(outPath, content, 'utf-8');
-    ctx.logger.info('Wrote report artifact', {
+    ctx.logger?.info('Wrote report artifact', {
       format: label,
       path: outPath,
       firstFormat: !firstFormatLogged,
@@ -123,7 +123,7 @@ export function writeReports(
     firstFormatLogged = true;
   }
   if (generatedTests.length > 0) {
-    ctx.logger.info('Generated Playwright tests', {
+    ctx.logger?.info('Generated Playwright tests', {
       count: generatedTests.length,
       path: join(ctx.outputDir, 'generated-tests'),
     });

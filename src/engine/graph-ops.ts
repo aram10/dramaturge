@@ -105,7 +105,7 @@ export async function expandGraph(
             ctx.diffContext
           );
       ctx.frontier.enqueueMany(newTasks);
-      ctx.logger.info('Discovered new state', {
+      ctx.logger?.info('Discovered new state', {
         nodeId: newNode.id,
         pageType: newNode.pageType,
         tasksAdded: newTasks.length,
@@ -141,7 +141,7 @@ async function resolveEdgeFingerprint(
       ctx.config.targetUrl
     );
     if (!navigation.success) {
-      ctx.logger.warn('Could not resolve discovered edge', {
+      ctx.logger?.warn('Could not resolve discovered edge', {
         reason: navigation.reason ?? 'navigation failed',
       });
       return null;
@@ -153,7 +153,7 @@ async function resolveEdgeFingerprint(
       url: typeof ctx.page.url === 'function' ? ctx.page.url() : undefined,
     };
   } catch (error) {
-    ctx.logger.warn('Could not resolve discovered edge', {
+    ctx.logger?.warn('Could not resolve discovered edge', {
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -181,7 +181,7 @@ export function maintainFrontier(ctx: EngineContext): void {
         severity: 'low',
       });
     }
-    ctx.logger.info('Pruned low-priority frontier items', {
+    ctx.logger?.info('Pruned low-priority frontier items', {
       count: pruned.length,
     });
   }
@@ -195,7 +195,7 @@ export function flushBrowserErrors(ctx: EngineContext, nodeId: string, pageKey: 
   appendToNodeMap(ctx.findingsByNode, nodeId, findings);
   appendToNodeMap(ctx.evidenceByNode, nodeId, evidence);
 
-  ctx.logger.info('Auto-captured browser errors', {
+  ctx.logger?.info('Auto-captured browser errors', {
     nodeId,
     count: findings.length,
   });

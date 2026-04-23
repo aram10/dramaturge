@@ -31,7 +31,7 @@ export function restoreCheckpointState(ctx: EngineContext, resumeDir: string | u
   ctx.completedTaskIds = hydrated.completedTaskIds;
   ctx.planner.restoreDispatchState(hydrated.plannerState);
 
-  ctx.logger.info('Resumed from checkpoint', {
+  ctx.logger?.info('Resumed from checkpoint', {
     tasksExecuted: hydrated.tasksExecuted,
     states: ctx.graph.nodeCount(),
     pendingTasks: ctx.frontier.size(),
@@ -64,7 +64,7 @@ export function applyWarmStart(ctx: EngineContext, resumeDir?: string): WarmStar
     repoHints: ctx.repoHints,
     memoryStore: ctx.memoryStore,
   });
-  ctx.logger.info('Applied warm start snapshot', {
+  ctx.logger?.info('Applied warm start snapshot', {
     restoredNodes: warmStart.restoredNodeCount,
     restoredEdges: warmStart.restoredEdgeCount,
     seededTasks: warmStart.seededTaskCount,
@@ -122,7 +122,7 @@ export async function seedFrontierIfNeeded(
 
     const seedTasks = await proposeSeedTasks(ctx, rootNode, useLLMPlanner);
     ctx.frontier.enqueueMany(seedTasks);
-    ctx.logger.info('Seeded frontier from root state', {
+    ctx.logger?.info('Seeded frontier from root state', {
       pageType: rootPageType,
       fingerprint: rootFingerprint.hash,
       tasks: seedTasks.length,
@@ -134,7 +134,7 @@ export async function seedFrontierIfNeeded(
       assignPageNodeOwner(ctx, 'primary', rootNode.id);
       const seedTasks = await proposeSeedTasks(ctx, rootNode, useLLMPlanner);
       ctx.frontier.enqueueMany(seedTasks);
-      ctx.logger.info('Seeded frontier from existing root state', {
+      ctx.logger?.info('Seeded frontier from existing root state', {
         nodeId: rootNode.id,
         tasks: seedTasks.length,
       });
