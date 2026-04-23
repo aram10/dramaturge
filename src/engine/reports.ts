@@ -115,13 +115,18 @@ export function writeReports(
     const { filename, content, label } = renderForFormat(format, runResult);
     const outPath = join(ctx.outputDir, filename);
     writeFileSync(outPath, content, 'utf-8');
-    console.log(`${firstFormatLogged ? '' : '\n'}${label} report: ${outPath}`);
+    ctx.logger.info('Wrote report artifact', {
+      format: label,
+      path: outPath,
+      firstFormat: !firstFormatLogged,
+    });
     firstFormatLogged = true;
   }
   if (generatedTests.length > 0) {
-    console.log(
-      `Generated ${generatedTests.length} Playwright test file(s): ${join(ctx.outputDir, 'generated-tests')}`
-    );
+    ctx.logger.info('Generated Playwright tests', {
+      count: generatedTests.length,
+      path: join(ctx.outputDir, 'generated-tests'),
+    });
   }
 }
 

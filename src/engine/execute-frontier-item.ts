@@ -38,14 +38,25 @@ export async function executeFrontierItem(
   if (ctx.safetyGuard) {
     const blocked = ctx.safetyGuard.checkUrl(nodeUrl);
     if (blocked) {
-      console.log(`${logPrefix}[${taskNumber}] Blocked by safety guard: ${blocked}`);
+      ctx.logger.warn('Blocked by safety guard', {
+        ...(logPrefix ? { logPrefix } : {}),
+        taskNumber,
+        nodeUrl,
+        reason: blocked,
+      });
       return { item, result: null };
     }
   }
 
-  console.log(
-    `${logPrefix}[${taskNumber}] ${item.workerType} task on ${node.pageType} (${node.url ?? node.id}): ${item.objective}`
-  );
+  ctx.logger.info('Dispatching task', {
+    ...(logPrefix ? { logPrefix } : {}),
+    taskNumber,
+    taskId: item.id,
+    workerType: item.workerType,
+    pageType: node.pageType,
+    node: node.url ?? node.id,
+    objective: item.objective,
+  });
 
   ctx.trafficObserver?.resetPage(pageKey);
   const navResult = await ctx.navigator.navigateTo(
@@ -164,9 +175,10 @@ export async function executeFrontierItem(
         visionContext = visionResult.pageDescription;
       }
     } catch (err) {
-      console.warn(
-        `Vision analysis failed for "${node.title ?? node.id}": ${err instanceof Error ? err.message : String(err)}`
-      );
+      ctx.logger.warn('Vision analysis failed', {
+        areaName: node.title ?? node.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

@@ -81,6 +81,15 @@ export interface ErrorEvent {
   phase: string;
 }
 
+export type LogLevel = 'info' | 'warn' | 'error';
+
+export interface LogEvent {
+  level: LogLevel;
+  scope: string;
+  message: string;
+  context?: Record<string, unknown>;
+}
+
 // --- Event map ---
 
 export interface EngineEventMap {
@@ -93,6 +102,7 @@ export interface EngineEventMap {
   progress: [ProgressEvent];
   checkpoint: [CheckpointEvent];
   'run:error': [ErrorEvent];
+  log: [LogEvent];
 }
 
 export type EngineEventName = keyof EngineEventMap;

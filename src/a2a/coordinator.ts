@@ -10,13 +10,23 @@
  * communication via the Blackboard and MessageBus.
  */
 
-import { Planner } from '../planner/planner.js';
 import { AGENT_CARDS, agentRoleForWorkerType } from './agent-cards.js';
 import type { Blackboard } from './blackboard.js';
 import type { MessageBus } from './message-bus.js';
 import type { AgentCard, AgentRole, A2ATask, A2ATaskStatus, A2AMessage } from './types.js';
-import type { FrontierItem, WorkerType } from '../types.js';
+import type {
+  FrontierItem,
+  FollowupRequest,
+  MissionConfig,
+  StateNode,
+  WorkerType,
+} from '../types.js';
 import { shortId } from '../constants.js';
+import { Planner } from '../planner/planner.js';
+import type { RepoHints } from '../adaptation/types.js';
+import type { StateGraph } from '../graph/state-graph.js';
+import type { PlannerMemorySignals } from '../memory/types.js';
+import type { DiffContext } from '../diff/types.js';
 
 export interface CoordinatorDeps {
   blackboard: Blackboard;
@@ -32,15 +42,24 @@ export interface CoordinatorDeps {
  * 3. Blackboard posting — task assignments and completions are recorded
  * 4. Reviewer notification — findings and suspicious signals are broadcast
  */
-export class Coordinator extends Planner {
+export class Coordinator {
   private deps: CoordinatorDeps;
   private activeTasks = new Map<string, A2ATask>();
   private agents: ReadonlyMap<AgentRole, AgentCard>;
+  private planner: Planner;
 
   constructor(deps: CoordinatorDeps) {
-    super();
     this.deps = deps;
     this.agents = new Map(Object.entries(AGENT_CARDS) as [AgentRole, AgentCard][]);
+    this.planner = new Planner();
+  }
+
+  get diffPriorityBoost(): number {
+    return this.planner.diffPriorityBoost;
+  }
+
+  set diffPriorityBoost(value: number) {
+    this.planner.diffPriorityBoost = value;
   }
 
   /** Get the agent card for a given role. */
@@ -62,7 +81,10 @@ export class Coordinator extends Planner {
    */
   assignTask(item: FrontierItem): A2ATask {
     const role = agentRoleForWorkerType(item.workerType);
-    const card = this.agents.get(role)!;
+    const card = this.agents.get(role);
+    if (!card) {
+      throw new Error(`No registered agent for role: ${role}`);
+    }
 
     const task: A2ATask = {
       id: `a2a-${shortId()}`,
@@ -213,5 +235,54 @@ export class Coordinator extends Planner {
   /** Resolve the agent role for a given worker type. */
   resolveAgentRole(workerType: WorkerType): AgentRole {
     return agentRoleForWorkerType(workerType);
+  }
+
+  proposeTasks(
+    node: StateNode,
+    graph: StateGraph,
+    mission?: MissionConfig,
+    repoHints?: RepoHints,
+    memorySignals?: PlannerMemorySignals,
+    diffContext?: DiffContext
+  ): FrontierItem[] {
+    return this.planner.proposeTasks(node, graph, mission, repoHints, memorySignals, diffContext);
+  }
+
+  async proposeTasksWithLLM(
+    node: StateNode,
+    graph: StateGraph,
+    plannerModel: string,
+    mission?: MissionConfig,
+    repoHints?: RepoHints,
+    llmRequestTimeoutMs?: number,
+    memorySignals?: PlannerMemorySignals,
+    diffContext?: DiffContext
+  ): Promise<FrontierItem[]> {
+    return this.planner.proposeTasksWithLLM(
+      node,
+      graph,
+      plannerModel,
+      mission,
+      repoHints,
+      llmRequestTimeoutMs,
+      memorySignals,
+      diffContext
+    );
+  }
+
+  recordDispatch(nodeId: string, workerType: WorkerType): void {
+    this.planner.recordDispatch(nodeId, workerType);
+  }
+
+  snapshotDispatchState(): Record<string, WorkerType[]> {
+    return this.planner.snapshotDispatchState();
+  }
+
+  restoreDispatchState(snapshot: Record<string, WorkerType[]>): void {
+    this.planner.restoreDispatchState(snapshot);
+  }
+
+  routeFollowup(request: FollowupRequest, sourceNodeId: string): FrontierItem {
+    return this.planner.routeFollowup(request, sourceNodeId);
   }
 }

@@ -4,6 +4,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Stagehand } from '@browserbasehq/stagehand';
 import type { DramaturgeConfig } from '../config.js';
+import { createEngineLogger } from './logger.js';
+import type { EngineLogger } from './logger.js';
 
 const BOOTSTRAP_LOG_LIMIT = 20;
 const DEFAULT_READY_REQUEST_TIMEOUT_MS = 5_000;
@@ -24,6 +26,7 @@ export interface BootstrapStatus {
 
 interface WaitForBootstrapReadyDeps {
   fetchImpl?: typeof fetch;
+  logger?: EngineLogger;
   sleep?: (ms: number) => Promise<unknown>;
   now?: () => number;
   requestTimeoutMs?: number;
@@ -89,7 +92,8 @@ function formatBootstrapFailure(summary: string, status?: BootstrapStatus): stri
 export function startBootstrapProcess(
   config: DramaturgeConfig,
   spawnImpl: SpawnLike = spawn,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
+  logger: EngineLogger = createEngineLogger(undefined, 'bootstrap')
 ): BootstrapStatus | undefined {
   const bootstrap = config.bootstrap;
   const command = bootstrap?.command;
@@ -106,7 +110,10 @@ export function startBootstrapProcess(
       ? `${command} ${args.join(' ')}`
       : command;
 
-  console.log(`Starting bootstrap command (${mode} mode): ${displayCommand}`);
+  logger.info('Starting bootstrap command', {
+    mode,
+    command: displayCommand,
+  });
   const processRef = useShell
     ? spawnImpl(command, {
         cwd: bootstrap.cwd,
@@ -200,6 +207,7 @@ export async function waitForBootstrapReady(
   }
 
   const fetchImpl = deps.fetchImpl ?? fetch;
+  const logger = deps.logger ?? createEngineLogger(undefined, 'bootstrap');
   const sleep = deps.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const now = deps.now ?? (() => Date.now());
   const requestTimeoutMs = deps.requestTimeoutMs ?? DEFAULT_READY_REQUEST_TIMEOUT_MS;
@@ -233,7 +241,10 @@ export async function waitForBootstrapReady(
       ));
 
     if (urlReady && indicatorReady) {
-      console.log('Bootstrap target is ready.');
+      logger.info('Bootstrap target is ready', {
+        readyUrl,
+        ...(readyIndicator ? { readyIndicator } : {}),
+      });
       return;
     }
 

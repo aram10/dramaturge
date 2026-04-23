@@ -13,6 +13,7 @@ import type {
   ProgressEvent,
   CheckpointEvent,
   ErrorEvent,
+  LogEvent,
 } from './event-stream.js';
 
 describe('EngineEventEmitter', () => {
@@ -159,6 +160,28 @@ describe('EngineEventEmitter', () => {
     emitter.emit('run:error', payload);
 
     expect(handler).toHaveBeenCalledWith(payload);
+  });
+
+  it('emits log events', () => {
+    const emitter = new EngineEventEmitter();
+    const logs: LogEvent[] = [];
+    emitter.on('log', (evt) => logs.push(evt));
+
+    emitter.emit('log', {
+      level: 'info',
+      scope: 'engine',
+      message: 'Started',
+      context: { tasks: 1 },
+    });
+
+    expect(logs).toEqual([
+      {
+        level: 'info',
+        scope: 'engine',
+        message: 'Started',
+        context: { tasks: 1 },
+      },
+    ]);
   });
 
   it('supports multiple listeners on the same event', () => {
