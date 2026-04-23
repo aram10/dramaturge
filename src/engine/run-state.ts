@@ -15,7 +15,8 @@ export interface WarmStartState {
 }
 
 function findRootNode(ctx: EngineContext): StateNode | undefined {
-  return ctx.graph.getAllNodes().find((node) => node.depth === 0) ?? ctx.graph.getAllNodes()[0];
+  const nodes = ctx.graph.getAllNodes();
+  return nodes.find((node) => node.depth === 0) ?? nodes[0];
 }
 
 export function restoreCheckpointState(ctx: EngineContext, resumeDir: string | undefined): number {

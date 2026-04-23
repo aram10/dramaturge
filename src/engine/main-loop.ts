@@ -39,6 +39,10 @@ export interface RunPlannerLoopResult {
   finalFrontierSnapshot: FrontierItem[] | undefined;
 }
 
+function findRootNode(ctx: EngineContext): { id: string } | undefined {
+  return ctx.graph.getAllNodes().find((node) => node.depth === 0);
+}
+
 function handleNavFailure(ctx: EngineContext, item: FrontierItem, logPrefix = ''): void {
   ctx.logger?.warn('Navigation failed', {
     ...(logPrefix ? { logPrefix } : {}),
@@ -231,7 +235,7 @@ export async function runPlannerLoop(
     }
 
     try {
-      const rootNode = ctx.graph.getAllNodes().find((node) => node.depth === 0);
+      const rootNode = findRootNode(ctx);
       if (rootNode) {
         assignPageNodeOwner(ctx, 'primary', rootNode.id);
       }

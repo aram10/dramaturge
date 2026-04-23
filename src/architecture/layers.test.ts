@@ -38,9 +38,10 @@ function listSourceFiles(dir: string): string[] {
 
 function relativeImportTargets(filePath: string): string[] {
   const source = readFileSync(filePath, 'utf-8');
-  const matches = source.matchAll(/from\s+['"](\.[^'"]+)['"]/g);
+  const matches = source.matchAll(/from\s+['"](\.[^'"]+)['"]|import\(\s*['"](\.[^'"]+)['"]\s*\)/g);
   return [...matches].map((match) => {
-    const target = resolve(dirname(filePath), match[1]);
+    const relativeTarget = match[1] ?? match[2];
+    const target = resolve(dirname(filePath), relativeTarget);
     if (target.endsWith('.js')) {
       return target.replace(/\.js$/u, '.ts');
     }

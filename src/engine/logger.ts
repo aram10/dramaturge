@@ -25,6 +25,10 @@ function formatContext(context?: Record<string, unknown>): string {
   }
 }
 
+/**
+ * Console output remains human-oriented; structured consumers should prefer the
+ * `log` engine event instead of parsing console lines.
+ */
 function writeLog(
   level: LogLevel,
   scope: string,

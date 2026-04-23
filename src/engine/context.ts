@@ -63,7 +63,7 @@ export interface EngineContext {
   createIsolatedApiRequestContext?: () => Promise<ApiRequestContextLike>;
   safetyGuard?: SafetyGuard;
   eventStream?: EngineEventEmitter;
-  logger: EngineLogger;
+  logger?: EngineLogger;
   /** Multi-agent coordination layer (A2A protocol). */
   blackboard?: Blackboard;
   messageBus?: MessageBus;
