@@ -14,7 +14,7 @@ const srcRoot = join(repoRoot, 'src');
  * match, so fixture directories are detected portably across platforms.
  */
 function hasPathSegment(path: string, segment: string): boolean {
-  return path.split(/[/\\]+/u).includes(segment);
+  return path.split(/[/\\]+/).includes(segment);
 }
 
 function listSourceFiles(dir: string): string[] {
