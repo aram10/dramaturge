@@ -187,6 +187,13 @@ describe('parseCliArgs', () => {
     expect(result.command).toBe('setup');
   });
 
+  it('parses auto-config command', () => {
+    const result = parseCliArgs(['auto-config', '--repo', './app', '--url', 'https://example.com']);
+    expect(result.command).toBe('auto-config');
+    expect(result.repoPath).toBe('./app');
+    expect(result.url).toBe('https://example.com');
+  });
+
   it('parses setup --repo flag', () => {
     const result = parseCliArgs(['setup', '--repo', './app']);
     expect(result.command).toBe('setup');
@@ -267,6 +274,7 @@ describe('buildHelpText', () => {
     expect(helpText).toContain('doctor');
     expect(helpText).toContain('setup');
     expect(helpText).toContain('init');
+    expect(helpText).toContain('auto-config');
     expect(helpText).toContain('.env');
   });
 });

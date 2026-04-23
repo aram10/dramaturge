@@ -86,14 +86,13 @@ pnpm exec playwright install chromium
 
 ## Run
 
-Copy the example config and customize for your application:
+Generate a config automatically from your repo and answer only the remaining prompts:
 
 ```bash
-curl -O https://raw.githubusercontent.com/aram10/dramaturge/main/dramaturge.config.example.json
-mv dramaturge.config.example.json dramaturge.config.json
+dramaturge auto-config
 ```
 
-Edit `dramaturge.config.json` with your target URL and settings:
+If you prefer the manual path, you can still copy the example config and customize it:
 
 ```json
 {

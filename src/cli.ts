@@ -29,7 +29,16 @@ import type {
 } from './engine/event-stream.js';
 
 export interface ParsedCliArgs {
-  command: 'run' | 'doctor' | 'init' | 'setup' | 'findings' | 'baselines' | 'memory' | 'help';
+  command:
+    | 'run'
+    | 'doctor'
+    | 'init'
+    | 'setup'
+    | 'auto-config'
+    | 'findings'
+    | 'baselines'
+    | 'memory'
+    | 'help';
   configPath?: string;
   resumeDir?: string;
   diffRef?: string;
@@ -82,6 +91,7 @@ Commands:
   run [url]            Run exploratory QA (default command)
   setup                Interactive first-run onboarding wizard
   init                 Generate a config file from a template
+  auto-config          AI-assisted config generation from repo context
   doctor               Check environment and configuration
   findings <sub>       Triage findings in memory (list | suppress | unsuppress)
   baselines <sub>      Manage visual-regression baselines (list | approve)
@@ -105,6 +115,12 @@ Init options:
   --url <url>          Pre-fill target URL in generated config
   --output <path>      Output path for generated config file
 
+Auto-config options:
+  --url <url>          Pre-fill target URL in generated config
+  --output <path>      Output path for generated config file
+  --repo <path>        Scan this repo path for routes, endpoints, and auth hints
+  --no-scan            Skip repo scanning (default is auto-scan when in a git repo)
+
 Setup options:
   --repo <path>        Scan this repo path for routes, endpoints, and auth hints
   --no-scan            Skip repo scanning (default is auto-scan when in a git repo)
@@ -123,6 +139,7 @@ Examples:
   dramaturge run https://app.example.com --focus api --focus adversarial  # Ad-hoc focus mix
   dramaturge setup                                     # Interactive onboarding
   dramaturge init --template minimal                   # Generate minimal config
+  dramaturge auto-config --repo .                      # Generate config from repo context
   dramaturge doctor                                    # Check environment
   dramaturge findings list                             # List findings in memory
   dramaturge findings suppress abc123 --reason "known issue"
@@ -157,6 +174,7 @@ const KNOWN_COMMANDS = new Set([
   'doctor',
   'init',
   'setup',
+  'auto-config',
   'help',
   'findings',
   'baselines',
@@ -469,6 +487,9 @@ export async function runCli(
       case 'setup':
         return await runSetupCommand(dependencies, parsedArgs);
 
+      case 'auto-config':
+        return await runAutoConfigCommand(dependencies, parsedArgs);
+
       case 'run':
         return await runRunCommand(parsedArgs, dependencies);
 
@@ -553,6 +574,66 @@ async function runSetupCommand(
       },
       {
         repoPath: parsedArgs.noScan ? false : parsedArgs.repoPath,
+      }
+    );
+  } finally {
+    rl.close();
+  }
+}
+
+async function runAutoConfigCommand(
+  dependencies: CliDependencies,
+  parsedArgs: ParsedCliArgs
+): Promise<number> {
+  const { runAutoConfig } = await import('./commands/auto-config.js');
+  const readline = await import('node:readline');
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const prompt = (question: string): Promise<string> =>
+    new Promise((resolve) => {
+      rl.question(`  ${question}: `, (answer) => resolve(answer.trim()));
+    });
+
+  const confirm = (question: string, defaultValue = false): Promise<boolean> =>
+    new Promise((resolve) => {
+      const suffix = defaultValue ? ' [Y/n]' : ' [y/N]';
+      rl.question(`  ${question}${suffix}: `, (answer) => {
+        const trimmed = answer.trim().toLowerCase();
+        if (trimmed === '') resolve(defaultValue);
+        else resolve(trimmed === 'y' || trimmed === 'yes');
+      });
+    });
+
+  const select = (question: string, options: string[]): Promise<string> =>
+    new Promise((resolve) => {
+      dependencies.log(`  ${question}`);
+      options.forEach((option, index) => {
+        dependencies.log(`    ${index + 1}. ${option}`);
+      });
+      rl.question('  Choice: ', (answer) => {
+        const index = Number.parseInt(answer.trim(), 10) - 1;
+        resolve(options[index] ?? options[0]);
+      });
+    });
+
+  try {
+    return await runAutoConfig(
+      {
+        log: dependencies.log,
+        error: dependencies.error,
+        cwd: process.cwd(),
+        prompt,
+        confirm,
+        select,
+      },
+      {
+        repoPath: parsedArgs.noScan ? false : parsedArgs.repoPath,
+        targetUrl: parsedArgs.url,
+        outputPath: parsedArgs.initOutput,
       }
     );
   } finally {
