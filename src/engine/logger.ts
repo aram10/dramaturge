@@ -16,7 +16,11 @@ function formatContext(context?: Record<string, unknown>): string {
     return '';
   }
 
-  return ` ${JSON.stringify(context)}`;
+  try {
+    return ` ${JSON.stringify(context)}`;
+  } catch {
+    return ' [unserializable-context]';
+  }
 }
 
 function writeLog(

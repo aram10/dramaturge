@@ -40,14 +40,17 @@ export function restoreCheckpointState(ctx: EngineContext, resumeDir: string | u
 }
 
 export function applyWarmStart(ctx: EngineContext, resumeDir?: string): WarmStartState {
-  if (resumeDir || ctx.graph.nodeCount() > 0 || !ctx.memoryStore || !ctx.config.memory.warmStart) {
+  const memoryStore = ctx.memoryStore;
+  const shouldSkipWarmStart =
+    Boolean(resumeDir) || ctx.graph.nodeCount() > 0 || !memoryStore || !ctx.config.memory.warmStart;
+  if (shouldSkipWarmStart) {
     return {
       warmStartApplied: false,
       warmStartRestoredStateCount: 0,
     };
   }
 
-  const navigationSnapshot = ctx.memoryStore.getNavigationSnapshot(ctx.config.targetUrl);
+  const navigationSnapshot = memoryStore.getNavigationSnapshot(ctx.config.targetUrl);
   if (!navigationSnapshot) {
     return {
       warmStartApplied: false,
@@ -62,7 +65,7 @@ export function applyWarmStart(ctx: EngineContext, resumeDir?: string): WarmStar
     snapshot: navigationSnapshot,
     mission: ctx.mission,
     repoHints: ctx.repoHints,
-    memoryStore: ctx.memoryStore,
+    memoryStore,
   });
   ctx.logger?.info('Applied warm start snapshot', {
     restoredNodes: warmStart.restoredNodeCount,
