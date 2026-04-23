@@ -34,8 +34,11 @@ interface WaitForBootstrapReadyDeps {
 }
 
 export interface StartBootstrapProcessDeps {
+  /** Optional spawn implementation for tests or alternate process launchers. */
   spawnImpl?: SpawnLike;
+  /** Optional platform override used to control detach/cleanup behavior in tests. */
   platform?: NodeJS.Platform;
+  /** Optional structured logger for bootstrap lifecycle messages. */
   logger?: EngineLogger;
 }
 

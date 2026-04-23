@@ -9,6 +9,10 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const srcRoot = join(repoRoot, 'src');
 
+/**
+ * Splits a path on forward or backward slashes and checks for an exact segment
+ * match, so fixture directories are detected portably across platforms.
+ */
 function hasPathSegment(path: string, segment: string): boolean {
   return path.split(/[/\\]+/u).includes(segment);
 }
