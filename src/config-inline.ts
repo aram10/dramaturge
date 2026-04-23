@@ -40,7 +40,7 @@ export interface InlineRunArgs {
   formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
 }
 
-function resolveProviderDefaults(provider: ProviderId): { planner: string; worker: string } {
+export function resolveProviderDefaults(provider: ProviderId): { planner: string; worker: string } {
   switch (provider) {
     case 'anthropic':
       return {

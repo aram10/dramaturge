@@ -118,6 +118,8 @@ Init options:
 Auto-config options:
   --url <url>          Pre-fill target URL in generated config
   --output <path>      Output path for generated config file
+  --repo <path>        Scan this repo path for routes, endpoints, and auth hints
+  --no-scan            Skip repo scanning (default is auto-scan when in a git repo)
 
 Setup options:
   --repo <path>        Scan this repo path for routes, endpoints, and auth hints

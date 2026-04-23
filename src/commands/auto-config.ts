@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { detectFramework, scanRepository } from '../adaptation/repo-scan.js';
+import { resolveProviderDefaults } from '../config-inline.js';
 import { ConfigSchema } from '../config.js';
 import { detectProviderFromEnv, hasConfiguredProvider, sendChatCompletion } from '../llm/index.js';
 import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from '../prompt-safety.js';
@@ -130,51 +131,6 @@ function toRelativeRoot(cwd: string, root: string): string {
   if (root === cwd) return '.';
   const rel = relative(cwd, root);
   return rel || '.';
-}
-
-function resolveProviderModels(provider: ProviderId): { planner: string; worker: string } {
-  switch (provider) {
-    case 'anthropic':
-      return {
-        planner: 'anthropic/claude-sonnet-4-6',
-        worker: 'anthropic/claude-haiku-4-5',
-      };
-    case 'openai':
-      return { planner: 'openai/gpt-4.1', worker: 'openai/gpt-4.1-mini' };
-    case 'google':
-      return { planner: 'google/gemini-2.5-pro', worker: 'google/gemini-2.5-flash' };
-    case 'azure':
-      return { planner: 'azure/gpt-4.1', worker: 'azure/gpt-4.1-mini' };
-    case 'openrouter':
-      return {
-        planner: 'openrouter/anthropic/claude-sonnet-4-6',
-        worker: 'openrouter/anthropic/claude-haiku-4-5',
-      };
-    case 'github':
-      return { planner: 'github/openai/gpt-4.1', worker: 'github/openai/gpt-4.1-mini' };
-    case 'ollama':
-      return {
-        planner: process.env.OLLAMA_PLANNER_MODEL
-          ? `ollama/${process.env.OLLAMA_PLANNER_MODEL}`
-          : 'ollama/llama3.1:70b',
-        worker: process.env.OLLAMA_WORKER_MODEL
-          ? `ollama/${process.env.OLLAMA_WORKER_MODEL}`
-          : 'ollama/llama3.1:8b',
-      };
-    case 'custom': {
-      const plannerModel = process.env.OPENAI_COMPATIBLE_PLANNER_MODEL?.trim();
-      const workerModel = process.env.OPENAI_COMPATIBLE_WORKER_MODEL?.trim();
-      if (!plannerModel || !workerModel) {
-        throw new Error(
-          'Custom provider requires OPENAI_COMPATIBLE_PLANNER_MODEL and OPENAI_COMPATIBLE_WORKER_MODEL.'
-        );
-      }
-      return {
-        planner: `custom/${plannerModel}`,
-        worker: `custom/${workerModel}`,
-      };
-    }
-  }
 }
 
 function resolveScanRoot(deps: AutoConfigDependencies, repoPath?: string | false): string | null {
@@ -625,7 +581,7 @@ function buildConfig(
   scan: RepoScanResult | null,
   provider: ProviderId
 ): Record<string, unknown> {
-  const models = resolveProviderModels(provider);
+  const models = resolveProviderDefaults(provider);
   const config: Record<string, unknown> = {
     targetUrl: answers.targetUrl,
     appDescription: answers.appDescription,
@@ -716,7 +672,17 @@ export async function runAutoConfig(
 
   const provider = detectProviderFromEnv();
   const scan = await maybeRunRepoScan(deps, args);
-  const inferred = await inferConfigFromRepo(deps, scan, resolveProviderModels(provider).planner);
+
+  let plannerModel: string;
+  try {
+    plannerModel = resolveProviderDefaults(provider).planner;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    deps.error(`Failed to resolve provider models: ${message}`);
+    return 1;
+  }
+
+  const inferred = await inferConfigFromRepo(deps, scan, plannerModel);
   const answers = await collectAnswers(deps, args, inferred, scan);
   if (!answers) {
     return 1;
