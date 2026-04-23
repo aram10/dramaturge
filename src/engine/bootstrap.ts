@@ -33,6 +33,12 @@ interface WaitForBootstrapReadyDeps {
   newPage?: () => Promise<StagehandPage>;
 }
 
+export interface StartBootstrapProcessDeps {
+  spawnImpl?: SpawnLike;
+  platform?: NodeJS.Platform;
+  logger?: EngineLogger;
+}
+
 function createBootstrapStatus(processRef?: ChildProcess, command?: string): BootstrapStatus {
   return {
     process: processRef,
@@ -91,10 +97,13 @@ function formatBootstrapFailure(summary: string, status?: BootstrapStatus): stri
 
 export function startBootstrapProcess(
   config: DramaturgeConfig,
-  spawnImpl: SpawnLike = spawn,
-  platform: NodeJS.Platform = process.platform,
-  logger: EngineLogger = createEngineLogger(undefined, 'bootstrap')
+  deps: StartBootstrapProcessDeps = {}
 ): BootstrapStatus | undefined {
+  const {
+    spawnImpl = spawn,
+    platform = process.platform,
+    logger = createEngineLogger(undefined, 'bootstrap'),
+  } = deps;
   const bootstrap = config.bootstrap;
   const command = bootstrap?.command;
   if (!bootstrap || !command) {

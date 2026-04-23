@@ -261,12 +261,9 @@ export async function runEngine(
   });
 
   try {
-    bootstrapProcess = startBootstrapProcess(
-      config,
-      undefined,
-      undefined,
-      logger.child('bootstrap')
-    );
+    bootstrapProcess = startBootstrapProcess(config, {
+      logger: logger.child('bootstrap'),
+    });
     await waitForBootstrapReady(config, stagehand.context.pages()[0], bootstrapProcess, {
       logger: logger.child('bootstrap'),
       newPage: () => stagehand.context.newPage(),

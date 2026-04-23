@@ -9,6 +9,10 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const srcRoot = join(repoRoot, 'src');
 
+function hasPathSegment(path: string, segment: string): boolean {
+  return path.split(/[/\\]+/u).includes(segment);
+}
+
 function listSourceFiles(dir: string): string[] {
   const entries = readdirSync(dir, { withFileTypes: true });
   const files: string[] = [];
@@ -16,7 +20,7 @@ function listSourceFiles(dir: string): string[] {
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (fullPath.includes('/fixtures/')) {
+      if (hasPathSegment(fullPath, 'fixtures')) {
         continue;
       }
       files.push(...listSourceFiles(fullPath));
@@ -93,6 +97,13 @@ const disallowedDependencies: Record<string, string[]> = {
 };
 
 describe('architecture boundaries', () => {
+  it('detects fixture path segments portably', () => {
+    expect(hasPathSegment('/repo/src/adaptation/fixtures', 'fixtures')).toBe(true);
+    expect(hasPathSegment('/repo/src/adaptation/fixtures/nextjs/app.ts', 'fixtures')).toBe(true);
+    expect(hasPathSegment('C:\\repo\\src\\adaptation\\fixtures\\app.ts', 'fixtures')).toBe(true);
+    expect(hasPathSegment('/repo/src/adaptation/fixture-data/app.ts', 'fixtures')).toBe(false);
+  });
+
   it('enforces the documented layer dependency rules', () => {
     const violations: string[] = [];
 
