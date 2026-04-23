@@ -214,23 +214,38 @@ const checkpointSchema = z.object({
   plannerState: z.record(z.string(), z.array(workerTypeSchema)).optional(),
 });
 
-interface SaveCheckpointOptions {
+export interface SaveCheckpointOptions {
   frontierSnapshot?: FrontierItem[];
 }
 
-export function saveCheckpoint(
-  outputDir: string,
-  graph: StateGraph,
-  frontier: FrontierQueue,
-  findingsByNode: Map<string, RawFinding[]>,
-  evidenceByNode: Map<string, Evidence[]>,
-  actionsByNode: Map<string, ReplayableAction[]>,
-  coverage: CoverageTracker,
-  completedTaskIds: string[],
-  tasksExecuted: number,
-  plannerState: Record<string, FrontierItem['workerType'][]>,
-  options?: SaveCheckpointOptions
-): void {
+export interface SaveCheckpointInput {
+  outputDir: string;
+  graph: StateGraph;
+  frontier: FrontierQueue;
+  findingsByNode: Map<string, RawFinding[]>;
+  evidenceByNode: Map<string, Evidence[]>;
+  actionsByNode: Map<string, ReplayableAction[]>;
+  coverage: CoverageTracker;
+  completedTaskIds: string[];
+  tasksExecuted: number;
+  plannerState: Record<string, FrontierItem['workerType'][]>;
+  options?: SaveCheckpointOptions;
+}
+
+export function saveCheckpoint(input: SaveCheckpointInput): void {
+  const {
+    outputDir,
+    graph,
+    frontier,
+    findingsByNode,
+    evidenceByNode,
+    actionsByNode,
+    coverage,
+    completedTaskIds,
+    tasksExecuted,
+    plannerState,
+    options,
+  } = input;
   const checkpoint: Checkpoint = {
     version: 1,
     savedAt: new Date().toISOString(),

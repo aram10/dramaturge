@@ -76,8 +76,19 @@ describe('Checkpoint', () => {
     const actions = new Map<string, ReplayableAction[]>();
     const coverage = new CoverageTracker();
 
-    saveCheckpoint(tmpDir, graph, frontier, findings, evidence, actions, coverage, ['task-0'], 5, {
-      [node.id]: ['navigation'],
+    saveCheckpoint({
+      outputDir: tmpDir,
+      graph,
+      frontier,
+      findingsByNode: findings,
+      evidenceByNode: evidence,
+      actionsByNode: actions,
+      coverage,
+      completedTaskIds: ['task-0'],
+      tasksExecuted: 5,
+      plannerState: {
+        [node.id]: ['navigation'],
+      },
     });
 
     const cpPath = join(tmpDir, 'checkpoint.json');
@@ -112,7 +123,18 @@ describe('Checkpoint', () => {
     const evidence = new Map<string, Evidence[]>();
     const actions = new Map<string, ReplayableAction[]>();
 
-    saveCheckpoint(tmpDir, graph, frontier, findings, evidence, actions, coverage, [], 0, {});
+    saveCheckpoint({
+      outputDir: tmpDir,
+      graph,
+      frontier,
+      findingsByNode: findings,
+      evidenceByNode: evidence,
+      actionsByNode: actions,
+      coverage,
+      completedTaskIds: [],
+      tasksExecuted: 0,
+      plannerState: {},
+    });
 
     const loaded = loadCheckpoint(tmpDir);
     expect(loaded).not.toBeNull();
@@ -197,20 +219,20 @@ describe('Checkpoint', () => {
       severity: 'low',
     });
 
-    saveCheckpoint(
-      tmpDir,
-      origGraph,
-      origFrontier,
-      findings,
-      evidence,
-      actions,
+    saveCheckpoint({
+      outputDir: tmpDir,
+      graph: origGraph,
+      frontier: origFrontier,
+      findingsByNode: findings,
+      evidenceByNode: evidence,
+      actionsByNode: actions,
       coverage,
-      ['task-1', 'task-2'],
-      10,
-      {
+      completedTaskIds: ['task-1', 'task-2'],
+      tasksExecuted: 10,
+      plannerState: {
         [node.id]: ['crud', 'navigation'],
-      }
-    );
+      },
+    });
 
     // Load and hydrate into fresh structures
     const checkpoint = loadCheckpoint(tmpDir);
@@ -277,19 +299,19 @@ describe('Checkpoint', () => {
 
     frontier.drain();
 
-    saveCheckpoint(
-      tmpDir,
+    saveCheckpoint({
+      outputDir: tmpDir,
       graph,
       frontier,
-      findings,
-      evidence,
-      actions,
+      findingsByNode: findings,
+      evidenceByNode: evidence,
+      actionsByNode: actions,
       coverage,
-      [],
-      4,
-      {},
-      { frontierSnapshot: resumableFrontierSnapshot }
-    );
+      completedTaskIds: [],
+      tasksExecuted: 4,
+      plannerState: {},
+      options: { frontierSnapshot: resumableFrontierSnapshot },
+    });
 
     const loaded = loadCheckpoint(tmpDir);
     if (!loaded) {

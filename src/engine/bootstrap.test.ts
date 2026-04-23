@@ -34,7 +34,7 @@ describe('bootstrap supervision', () => {
           cwd: 'C:/tmp/app',
         },
       } as any,
-      spawnImpl as any
+      { spawnImpl: spawnImpl as any }
     )!;
 
     processRef.stderr.write('server crashed\n');
@@ -181,8 +181,7 @@ describe('bootstrap supervision', () => {
           cwd: '/tmp/app',
         },
       } as any,
-      spawnImpl as any,
-      'linux'
+      { spawnImpl: spawnImpl as any, platform: 'linux' }
     );
 
     expect(spawnImpl).toHaveBeenCalledWith('pnpm dev', {
@@ -204,8 +203,7 @@ describe('bootstrap supervision', () => {
           cwd: 'C:/tmp/app',
         },
       } as any,
-      spawnImpl as any,
-      'win32'
+      { spawnImpl: spawnImpl as any, platform: 'win32' }
     );
 
     expect(spawnImpl).toHaveBeenCalledWith('pnpm dev', {
@@ -255,8 +253,7 @@ describe('bootstrap supervision', () => {
           cwd: '/tmp/app',
         },
       } as any,
-      spawnImpl as any,
-      'linux'
+      { spawnImpl: spawnImpl as any, platform: 'linux' }
     );
 
     expect(spawnImpl).toHaveBeenCalledWith('pnpm', ['dev', '--port', '3000'], {
@@ -278,8 +275,7 @@ describe('bootstrap supervision', () => {
           cwd: '/tmp/app',
         },
       } as any,
-      spawnImpl as any,
-      'linux'
+      { spawnImpl: spawnImpl as any, platform: 'linux' }
     );
 
     expect(spawnImpl).toHaveBeenCalledWith('pnpm dev && tail -f log', {
@@ -288,6 +284,33 @@ describe('bootstrap supervision', () => {
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+  });
+
+  it('accepts named bootstrap deps without positional placeholders', () => {
+    const processRef = createMockProcess();
+    const spawnImpl = vi.fn().mockReturnValue(processRef);
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      child: vi.fn(),
+    };
+
+    startBootstrapProcess(
+      {
+        bootstrap: {
+          command: 'pnpm dev',
+          cwd: '/tmp/app',
+        },
+      } as any,
+      { spawnImpl: spawnImpl as any, platform: 'linux', logger: logger as any }
+    );
+
+    expect(logger.info).toHaveBeenCalledWith('Starting bootstrap command', {
+      mode: 'trusted',
+      command: 'pnpm dev',
+    });
+    expect(spawnImpl).toHaveBeenCalledOnce();
   });
 
   it('does not attempt cleanup after the bootstrap process has already exited', () => {
