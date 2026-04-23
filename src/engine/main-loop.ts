@@ -125,18 +125,13 @@ export async function runPlannerLoop(
     }
 
     const batchItems: FrontierItem[] = [];
-    for (
-      let index = 0;
-      index < ctx.config.concurrency.workers && ctx.frontier.hasItems();
-      index++
-    ) {
+    while (batchItems.length < ctx.config.concurrency.workers && ctx.frontier.hasItems()) {
       const item = ctx.frontier.dequeueHighest();
       if (!item) {
         break;
       }
       if (ctx.completedTaskIds.has(item.id)) {
         item.status = 'completed';
-        index--;
         continue;
       }
       batchItems.push(item);

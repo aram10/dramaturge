@@ -14,6 +14,10 @@ export interface WarmStartState {
   warmStartRestoredStateCount: number;
 }
 
+function findRootNode(ctx: EngineContext): StateNode | undefined {
+  return ctx.graph.getAllNodes().find((node) => node.depth === 0) ?? ctx.graph.getAllNodes()[0];
+}
+
 export function restoreCheckpointState(ctx: EngineContext, resumeDir: string | undefined): number {
   if (!resumeDir) {
     return 0;
@@ -131,8 +135,7 @@ export async function seedFrontierIfNeeded(
       tasks: seedTasks.length,
     });
   } else if (ctx.frontier.size() === 0) {
-    const rootNode =
-      ctx.graph.getAllNodes().find((node) => node.depth === 0) ?? ctx.graph.getAllNodes()[0];
+    const rootNode = findRootNode(ctx);
     if (rootNode) {
       assignPageNodeOwner(ctx, 'primary', rootNode.id);
       const seedTasks = await proposeSeedTasks(ctx, rootNode, useLLMPlanner);
@@ -144,8 +147,7 @@ export async function seedFrontierIfNeeded(
     }
   }
 
-  const existingRootNode =
-    ctx.graph.getAllNodes().find((node) => node.depth === 0) ?? ctx.graph.getAllNodes()[0];
+  const existingRootNode = findRootNode(ctx);
   if (existingRootNode) {
     assignPageNodeOwner(ctx, 'primary', existingRootNode.id);
   }

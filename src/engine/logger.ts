@@ -4,6 +4,8 @@
 import { emitEngineEvent } from './event-stream.js';
 import type { EngineEventEmitter, LogLevel } from './event-stream.js';
 
+const CONTEXT_SEPARATOR = ' ';
+
 export interface EngineLogger {
   info(message: string, context?: Record<string, unknown>): void;
   warn(message: string, context?: Record<string, unknown>): void;
@@ -17,9 +19,9 @@ function formatContext(context?: Record<string, unknown>): string {
   }
 
   try {
-    return ` ${JSON.stringify(context)}`;
+    return `${CONTEXT_SEPARATOR}${JSON.stringify(context)}`;
   } catch {
-    return ' [unserializable-context]';
+    return `${CONTEXT_SEPARATOR}[unserializable-context]`;
   }
 }
 

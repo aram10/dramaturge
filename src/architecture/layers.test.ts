@@ -41,7 +41,13 @@ function relativeImportTargets(filePath: string): string[] {
   const matches = source.matchAll(/from\s+['"](\.[^'"]+)['"]/g);
   return [...matches].map((match) => {
     const target = resolve(dirname(filePath), match[1]);
-    return target.endsWith('.js') ? target.replace(/\.js$/u, '.ts') : target;
+    if (target.endsWith('.js')) {
+      return target.replace(/\.js$/u, '.ts');
+    }
+    if (target.endsWith('.jsx')) {
+      return target.replace(/\.jsx$/u, '.tsx');
+    }
+    return target;
   });
 }
 

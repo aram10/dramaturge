@@ -83,7 +83,7 @@ export class Coordinator {
     const role = agentRoleForWorkerType(item.workerType);
     const card = this.agents.get(role);
     if (!card) {
-      throw new Error(`No registered agent for role: ${role}`);
+      throw new Error(`No registered agent for role: ${role} (worker type: ${item.workerType})`);
     }
 
     const task: A2ATask = {
