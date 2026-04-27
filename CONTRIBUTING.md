@@ -42,6 +42,12 @@ pnpm build               # compile TypeScript → dist/
 pnpm run verify:standalone  # smoke-check the packaged tarball
 ```
 
+## Architecture
+
+- Layer boundaries are documented in `docs/architecture/layers.md`.
+- Architecture decisions are recorded under `docs/adr/`.
+- New runtime features should preserve those boundaries and add tests when they introduce a new dependency seam.
+
 ## Pull Requests
 
 1. Create a feature branch from `main`.

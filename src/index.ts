@@ -23,12 +23,16 @@ export {
   createOpenAICompatibleProvider,
 } from './llm/index.js';
 export type { ChatMessage, ProviderId, LLMProviderAdapter, ProviderRequest } from './llm/index.js';
+
+// Stable runtime API
 export { runEngine } from './engine.js';
 export type { RunEngineOptions } from './engine.js';
 export { EngineEventEmitter, emitEngineEvent } from './engine/event-stream.js';
 export type {
   EngineEventMap,
   EngineEventName,
+  LogEvent,
+  LogLevel,
   RunStartEvent,
   RunEndEvent,
   TaskStartEvent,
@@ -168,6 +172,8 @@ export type {
   NormalizedSpecArtifact,
   NormalizedSpecSource,
 } from './spec/types.js';
+
+// Experimental multi-agent coordination API
 export {
   AGENT_CARDS,
   agentRoleForWorkerType,

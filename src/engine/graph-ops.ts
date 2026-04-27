@@ -105,9 +105,11 @@ export async function expandGraph(
             ctx.diffContext
           );
       ctx.frontier.enqueueMany(newTasks);
-      console.log(
-        `  Discovered new state: ${newNode.pageType} (${newNode.id}), +${newTasks.length} tasks`
-      );
+      ctx.logger?.info('Discovered new state', {
+        nodeId: newNode.id,
+        pageType: newNode.pageType,
+        tasksAdded: newTasks.length,
+      });
 
       emitEngineEvent(ctx.eventStream, 'state:discovered', {
         nodeId: newNode.id,
@@ -139,9 +141,9 @@ async function resolveEdgeFingerprint(
       ctx.config.targetUrl
     );
     if (!navigation.success) {
-      console.log(
-        `  Could not resolve discovered edge: ${navigation.reason ?? 'navigation failed'}`
-      );
+      ctx.logger?.warn('Could not resolve discovered edge', {
+        reason: navigation.reason ?? 'navigation failed',
+      });
       return null;
     }
 
@@ -151,9 +153,9 @@ async function resolveEdgeFingerprint(
       url: typeof ctx.page.url === 'function' ? ctx.page.url() : undefined,
     };
   } catch (error) {
-    console.log(
-      `  Could not resolve discovered edge: ${error instanceof Error ? error.message : String(error)}`
-    );
+    ctx.logger?.warn('Could not resolve discovered edge', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -179,7 +181,9 @@ export function maintainFrontier(ctx: EngineContext): void {
         severity: 'low',
       });
     }
-    console.log(`  Pruned ${pruned.length} low-priority frontier items`);
+    ctx.logger?.info('Pruned low-priority frontier items', {
+      count: pruned.length,
+    });
   }
 }
 
@@ -191,7 +195,10 @@ export function flushBrowserErrors(ctx: EngineContext, nodeId: string, pageKey: 
   appendToNodeMap(ctx.findingsByNode, nodeId, findings);
   appendToNodeMap(ctx.evidenceByNode, nodeId, evidence);
 
-  console.log(`  Auto-captured ${findings.length} browser error(s)`);
+  ctx.logger?.info('Auto-captured browser errors', {
+    nodeId,
+    count: findings.length,
+  });
 }
 
 export function assignPageNodeOwner(ctx: EngineContext, pageKey: string, nodeId: string): void {

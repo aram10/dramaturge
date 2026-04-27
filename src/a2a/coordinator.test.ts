@@ -218,8 +218,8 @@ describe('Coordinator', () => {
     });
   });
 
-  describe('inherits Planner functionality', () => {
-    it('can propose tasks (inherited from Planner)', () => {
+  describe('planner delegation', () => {
+    it('can propose tasks via the internal planner', () => {
       const { coordinator } = makeCoordinator();
       const graph = new StateGraph();
       const node = graph.addNode({
@@ -240,7 +240,7 @@ describe('Coordinator', () => {
       expect(tasks.some((t) => t.workerType === 'form')).toBe(true);
     });
 
-    it('can record dispatch and route followups (inherited from Planner)', () => {
+    it('can record dispatch and route followups via the internal planner', () => {
       const { coordinator } = makeCoordinator();
 
       coordinator.recordDispatch('node-1', 'form');

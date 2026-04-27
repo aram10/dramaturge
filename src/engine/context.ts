@@ -30,6 +30,7 @@ import type { DiffContext } from '../diff/types.js';
 import type { Blackboard } from '../a2a/blackboard.js';
 import type { MessageBus } from '../a2a/message-bus.js';
 import type { Coordinator } from '../a2a/coordinator.js';
+import type { EngineLogger } from './logger.js';
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -62,6 +63,7 @@ export interface EngineContext {
   createIsolatedApiRequestContext?: () => Promise<ApiRequestContextLike>;
   safetyGuard?: SafetyGuard;
   eventStream?: EngineEventEmitter;
+  logger?: EngineLogger;
   /** Multi-agent coordination layer (A2A protocol). */
   blackboard?: Blackboard;
   messageBus?: MessageBus;
