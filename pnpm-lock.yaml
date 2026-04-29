@@ -25,7 +25,7 @@ importers:
         version: 5.2.1(@types/react@18.3.28)(bufferutil@4.1.0)(react@18.3.1)
       pixelmatch:
         specifier: ^7.1.0
-        version: 7.1.0
+        version: 7.1.1
       playwright:
         specifier: ^1.58.2
         version: 1.59.1
@@ -2079,8 +2079,8 @@ packages:
     resolution: {integrity: sha512-8OEwKp5juEvb/MjpIc4hjqfgCNysrS94RIOMXYvpYCdm/jglrKEiAYmiumbmGhCvs+IcInsphYDFwqrjr7398w==}
     hasBin: true
 
-  pixelmatch@7.1.0:
-    resolution: {integrity: sha512-1wrVzJ2STrpmONHKBy228LM1b84msXDUoAzVEl0R8Mz4Ce6EPr+IVtxm8+yvrqLYMHswREkjYFaMxnyGnaY3Ng==}
+  pixelmatch@7.1.1:
+    resolution: {integrity: sha512-ug6CkUcHtxn0umoaqV1VB9+h7IMxRgKQQ/fq4W7ahMnyzDSvQ0vsJRo6BC5s+Gv+RvpriWosDcGkI3L8+8Yxbw==}
     hasBin: true
 
   pkce-challenge@5.0.1:
@@ -2101,8 +2101,8 @@ packages:
     resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
     engines: {node: '>=14.19.0'}
 
-  postcss@8.5.10:
-    resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
+  postcss@8.5.12:
+    resolution: {integrity: sha512-W62t/Se6rA0Az3DfCL0AqJwXuKwBeYg6nOaIgzP+xZ7N5BFCI7DYi1qs6ygUYT6rvfi6t9k65UMLJC+PHZpDAA==}
     engines: {node: ^10 || ^12 || >=14}
 
   prelude-ls@1.2.1:
@@ -4798,7 +4798,7 @@ snapshots:
       sonic-boom: 4.2.1
       thread-stream: 3.1.0
 
-  pixelmatch@7.1.0:
+  pixelmatch@7.1.1:
     dependencies:
       pngjs: 7.0.0
 
@@ -4814,7 +4814,7 @@ snapshots:
 
   pngjs@7.0.0: {}
 
-  postcss@8.5.10:
+  postcss@8.5.12:
     dependencies:
       nanoid: 3.3.11
       picocolors: 1.1.1
@@ -5297,7 +5297,7 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.10
+      postcss: 8.5.12
       rolldown: 1.0.0-rc.12(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)
       tinyglobby: 0.2.16
     optionalDependencies:
