@@ -55,6 +55,7 @@ export function getChangedFiles(baseRef: string, repoRoot: string): DiffFileEntr
     const output = execFileSync('git', ['diff', '--name-status', baseRef], {
       cwd: repoRoot,
       encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 30_000,
     });
     return parseDiffNameStatus(output);

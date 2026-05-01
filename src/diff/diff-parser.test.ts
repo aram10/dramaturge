@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { tmpdir } from 'node:os';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getChangedFiles, parseDiffNameStatus } from './diff-parser.js';
 
 describe('parseDiffNameStatus', () => {
@@ -68,5 +68,21 @@ describe('getChangedFiles', () => {
   it('returns an empty array for invalid git ref', () => {
     const result = getChangedFiles('non-existent-ref-abc123', tmpdir());
     expect(result).toEqual([]);
+  });
+
+  it('does not leak raw git errors to process output when diff lookup fails', () => {
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    try {
+      const result = getChangedFiles('non-existent-ref-abc123', tmpdir());
+
+      expect(result).toEqual([]);
+      expect(stderrSpy).not.toHaveBeenCalled();
+      expect(stdoutSpy).not.toHaveBeenCalled();
+    } finally {
+      stderrSpy.mockRestore();
+      stdoutSpy.mockRestore();
+    }
   });
 });

@@ -202,7 +202,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Dramaturge
-        uses: aram10/dramaturge@v0.2.0
+        uses: aram10/dramaturge@v0.4.0
         with:
           config: dramaturge.config.json
           target-url: https://staging.your-app.example.com
@@ -242,7 +242,7 @@ jobs:
 
 ```yaml
 - name: Run Dramaturge with custom settings
-  uses: aram10/dramaturge@v0.2.0
+  uses: aram10/dramaturge@v0.4.0
   with:
     config: .dramaturge/staging.config.json
     target-url: https://pr-${{ github.event.pull_request.number }}.preview.example.com
@@ -253,7 +253,7 @@ jobs:
     force-json-output: true
     force-headless: true
     working-directory: ./app
-    dramaturge-version: 0.2.0
+    dramaturge-version: 0.4.0
 
 - name: Process findings
   if: always()
@@ -624,6 +624,9 @@ pnpm test                # run tests (vitest)
 pnpm build               # compile TypeScript → dist/
 pnpm run verify:standalone  # smoke-check the packaged tarball
 ```
+
+This repository uses `pnpm-lock.yaml` as the source-of-truth lockfile for development and
+CI. Do not add npm/yarn lockfiles unless the package-manager policy changes intentionally.
 
 ## License
 
