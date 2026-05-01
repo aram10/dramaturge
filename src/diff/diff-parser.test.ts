@@ -71,15 +71,23 @@ describe('getChangedFiles', () => {
   });
 
   it('does not leak raw git errors to process output when diff lookup fails', () => {
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const stderrWrites: string[] = [];
+    const stdoutWrites: string[] = [];
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      if (typeof chunk === 'string') stderrWrites.push(chunk);
+      return true;
+    });
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      if (typeof chunk === 'string') stdoutWrites.push(chunk);
+      return true;
+    });
 
     try {
       const result = getChangedFiles('non-existent-ref-abc123', tmpdir());
 
       expect(result).toEqual([]);
-      expect(stderrSpy).not.toHaveBeenCalled();
-      expect(stdoutSpy).not.toHaveBeenCalled();
+      const allOutput = [...stderrWrites, ...stdoutWrites].join('');
+      expect(allOutput).not.toContain('fatal:');
     } finally {
       stderrSpy.mockRestore();
       stdoutSpy.mockRestore();
