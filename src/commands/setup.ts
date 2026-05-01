@@ -421,5 +421,5 @@ function toRelativeRoot(cwd: string, root: string): string {
   if (root === cwd) return '.';
   const rel = relative(cwd, root);
   if (!rel) return '.';
-  return rel;
+  return process.platform === 'win32' ? rel.replaceAll('\\', '/') : rel;
 }
