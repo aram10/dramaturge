@@ -238,50 +238,52 @@ describe('executeFrontierItem', () => {
         pageType: 'list',
         missionContext: 'Example app',
       },
-      'openai/gpt-4.1-mini',
-      'C:/tmp/screenshots',
-      'dom',
-      false,
-      7,
       {
-        knownPatterns: ['401s are expected before login'],
-      },
-      {
-        routes: ['/login', '/manage/knowledge-bases'],
-        routeFamilies: ['/', '/login', '/manage'],
-        stableSelectors: ['#manage-kb-new-btn'],
-        apiEndpoints: [
+        model: 'openai/gpt-4.1-mini',
+        screenshotDir: 'C:/tmp/screenshots',
+        agentMode: 'dom',
+        screenshotsEnabled: false,
+        stagnationThreshold: 7,
+        appContext: {
+          knownPatterns: ['401s are expected before login'],
+        },
+        repoHints: {
+          routes: ['/login', '/manage/knowledge-bases'],
+          routeFamilies: ['/', '/login', '/manage'],
+          stableSelectors: ['#manage-kb-new-btn'],
+          apiEndpoints: [
+            {
+              route: '/api/manage/knowledge-bases',
+              methods: ['GET'],
+              statuses: [401, 403],
+            },
+          ],
+          authHints: {
+            loginRoutes: ['/login'],
+            callbackRoutes: ['/auth/callback'],
+          },
+          expectedHttpNoise: [],
+        },
+        contractSummary: undefined,
+        observedApiEndpoints: [
           {
-            route: '/api/manage/knowledge-bases',
+            route: '/api/widgets',
             methods: ['GET'],
-            statuses: [401, 403],
+            statuses: [200],
+            failures: [],
           },
         ],
-        authHints: {
-          loginRoutes: ['/login'],
-          callbackRoutes: ['/auth/callback'],
+        mission: {
+          appDescription: 'Example app',
+          destructiveActionsAllowed: false,
+          criticalFlows: ['knowledge-bases'],
         },
-        expectedHttpNoise: [],
-      },
-      undefined,
-      [
-        {
-          route: '/api/widgets',
-          methods: ['GET'],
-          statuses: [200],
-          failures: [],
-        },
-      ],
-      {
-        appDescription: 'Example app',
-        destructiveActionsAllowed: false,
-        criticalFlows: ['knowledge-bases'],
-      },
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined
+        history: undefined,
+        adversarialConfig: undefined,
+        judgeConfig: undefined,
+        visionContext: undefined,
+        safetyGuard: undefined,
+      }
     );
     expect(ctx.trafficObserver.resetPage).toHaveBeenCalledWith('page-1');
     expect(ctx.trafficObserver.snapshot).toHaveBeenCalledWith('page-1');
@@ -802,11 +804,9 @@ describe('executeFrontierItem', () => {
     expect(result.result!.findings).toHaveLength(2);
     expect(result.result!.evidence[0]).toEqual(visionEvidence);
 
-    // 3. executeWorkerTask receives the visionContext argument (second-to-last positional arg)
+    // 3. executeWorkerTask receives the visionContext in the options object
     const workerCallArgs = vi.mocked(executeWorkerTask).mock.calls[0];
-    expect(workerCallArgs[workerCallArgs.length - 2]).toBe(
-      'A dashboard with sidebar and main content area.'
-    );
+    expect(workerCallArgs[2].visionContext).toBe('A dashboard with sidebar and main content area.');
   });
 
   it('skips execution when safety guard blocks the node URL', async () => {

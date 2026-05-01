@@ -193,21 +193,23 @@ export async function executeFrontierItem(
       pageType: node.pageType,
       missionContext: ctx.config.appDescription,
     },
-    model,
-    ctx.screenshotDir,
-    resolveAgentMode(ctx.config, item.workerType),
-    ctx.config.output.screenshots,
-    ctx.config.budget.stagnationThreshold ?? 0,
-    ctx.config.appContext,
-    ctx.repoHints,
-    ctx.contractIndex ? summarizeContractIndex(ctx.contractIndex) : undefined,
-    observedApiEndpoints,
-    ctx.mission,
-    history,
-    ctx.config.adversarial,
-    ctx.config.judge,
-    visionContext,
-    ctx.safetyGuard
+    {
+      model,
+      screenshotDir: ctx.screenshotDir,
+      agentMode: resolveAgentMode(ctx.config, item.workerType),
+      screenshotsEnabled: ctx.config.output.screenshots,
+      stagnationThreshold: ctx.config.budget.stagnationThreshold ?? 0,
+      appContext: ctx.config.appContext,
+      repoHints: ctx.repoHints,
+      contractSummary: ctx.contractIndex ? summarizeContractIndex(ctx.contractIndex) : undefined,
+      observedApiEndpoints,
+      mission: ctx.mission,
+      history,
+      adversarialConfig: ctx.config.adversarial,
+      judgeConfig: ctx.config.judge,
+      visionContext,
+      safetyGuard: ctx.safetyGuard,
+    }
   );
 
   const apiContract = buildApiContractArtifacts({

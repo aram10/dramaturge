@@ -54,6 +54,15 @@ export function createSafetyGuardForConfig(
   return new SafetyGuard(guardConfig);
 }
 
+function sanitizeUrl(raw: string): string {
+  try {
+    const { origin, pathname } = new URL(raw);
+    return `${origin}${pathname}`;
+  } catch {
+    return raw;
+  }
+}
+
 export async function attachSafetyRequestGuard(
   page: unknown,
   safetyGuard: SafetyGuard | undefined,
@@ -67,9 +76,14 @@ export async function attachSafetyRequestGuard(
     const request = route.request();
     const method = request.method();
     const url = request.url();
+    const safeUrl = sanitizeUrl(url);
     const urlBlocked = shouldCheckRequestUrl(request) ? safetyGuard.checkUrl(url) : null;
     if (urlBlocked) {
-      logger?.warn('Blocked navigation by safety guard', { method, url, reason: urlBlocked });
+      logger?.warn('Blocked navigation by safety guard', {
+        method,
+        url: safeUrl,
+        reason: urlBlocked,
+      });
       await route.abort('blockedbyclient');
       return;
     }
@@ -77,7 +91,7 @@ export async function attachSafetyRequestGuard(
     const blocked = safetyGuard.checkRequest(method, url);
 
     if (blocked) {
-      logger?.warn('Blocked request by safety guard', { method, url, reason: blocked });
+      logger?.warn('Blocked request by safety guard', { method, url: safeUrl, reason: blocked });
       await route.abort('blockedbyclient');
       return;
     }
@@ -124,7 +138,7 @@ function checkCurrentPageUrl(
   const blocked = safetyGuard.checkUrl(currentUrl);
   if (blocked) {
     logger?.warn('Blocked page URL by safety guard', {
-      url: currentUrl,
+      url: sanitizeUrl(currentUrl),
       reason: blocked,
     });
   }

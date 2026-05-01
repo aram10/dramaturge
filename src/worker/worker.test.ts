@@ -66,24 +66,20 @@ describe('executeWorkerTask', () => {
         pageType: 'list',
         missionContext: 'Example app',
       },
-      'anthropic/claude-haiku-4-5',
-      'C:/tmp/screenshots',
-      'dom',
-      false,
-      0,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
       {
-        appDescription: 'Example app',
-        destructiveActionsAllowed: false,
-      },
-      undefined,
-      undefined,
-      {
-        enabled: true,
-        requestTimeoutMs: 10_000,
+        model: 'anthropic/claude-haiku-4-5',
+        screenshotDir: 'C:/tmp/screenshots',
+        agentMode: 'dom',
+        screenshotsEnabled: false,
+        stagnationThreshold: 0,
+        mission: {
+          appDescription: 'Example app',
+          destructiveActionsAllowed: false,
+        },
+        judgeConfig: {
+          enabled: true,
+          requestTimeoutMs: 10_000,
+        },
       }
     );
 
@@ -127,24 +123,20 @@ describe('executeWorkerTask', () => {
         pageType: 'list',
         missionContext: 'Example app',
       },
-      'anthropic/claude-haiku-4-5',
-      'C:/tmp/screenshots',
-      'dom',
-      false,
-      0,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
       {
-        appDescription: 'Example app',
-        destructiveActionsAllowed: false,
-      },
-      undefined,
-      undefined,
-      {
-        enabled: true,
-        requestTimeoutMs: 10_000,
+        model: 'anthropic/claude-haiku-4-5',
+        screenshotDir: 'C:/tmp/screenshots',
+        agentMode: 'dom',
+        screenshotsEnabled: false,
+        stagnationThreshold: 0,
+        mission: {
+          appDescription: 'Example app',
+          destructiveActionsAllowed: false,
+        },
+        judgeConfig: {
+          enabled: true,
+          requestTimeoutMs: 10_000,
+        },
       }
     );
 

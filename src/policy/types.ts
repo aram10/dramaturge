@@ -10,7 +10,7 @@ export interface ExpectedResponseRule {
 export interface PolicyConfig {
   expectedResponses: ExpectedResponseRule[];
   ignoredConsolePatterns: string[];
-  safety: SafetyPolicyConfig;
+  safety?: SafetyPolicyConfig;
 }
 
 export interface SafetyPolicyConfig {
