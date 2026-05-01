@@ -130,7 +130,8 @@ function reportScan(log: (message: string) => void, scan: RepoScanResult): void 
 function toRelativeRoot(cwd: string, root: string): string {
   if (root === cwd) return '.';
   const rel = relative(cwd, root);
-  return rel || '.';
+  if (!rel) return '.';
+  return process.platform === 'win32' ? rel.replaceAll('\\', '/') : rel;
 }
 
 function resolveScanRoot(deps: AutoConfigDependencies, repoPath?: string | false): string | null {
