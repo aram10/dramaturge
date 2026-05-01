@@ -206,7 +206,8 @@ export async function executeFrontierItem(
     history,
     ctx.config.adversarial,
     ctx.config.judge,
-    visionContext
+    visionContext,
+    ctx.safetyGuard
   );
 
   const apiContract = buildApiContractArtifacts({

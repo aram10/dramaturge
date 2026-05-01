@@ -112,14 +112,23 @@ describe('SafetyGuard', () => {
 
     it('entries contain expected fields', () => {
       const guard = new SafetyGuard(createDefaultSafetyConfig(false));
-      guard.checkRequest('DELETE', '/api/item');
+      guard.checkRequest('DELETE', 'https://example.com/api/item?token=secret#fragment');
 
       const entry = guard.getAuditLog()[0];
       expect(entry.timestamp).toBeTruthy();
       expect(entry.action).toBeTruthy();
-      expect(entry.url).toBe('/api/item');
-      expect(entry.reason).toBeTruthy();
+      expect(entry.url).toBe('https://example.com/api/item');
+      expect(entry.reason).toBe('Destructive HTTP method: DELETE');
+      expect(entry.reason).not.toContain('?');
+      expect(entry.reason).not.toContain('#');
       expect(entry.blocked).toBe(true);
+    });
+
+    it('redacts query strings from relative audit URLs', () => {
+      const guard = new SafetyGuard(createDefaultSafetyConfig(false));
+      guard.checkActionLabel('Delete item', '/items/1?session=secret#danger');
+
+      expect(guard.getAuditLog()[0]?.url).toBe('/items/1');
     });
 
     it('evicts oldest audit entries when maxAuditEntries is exceeded', () => {

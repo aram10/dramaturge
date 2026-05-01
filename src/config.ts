@@ -493,6 +493,49 @@ function argsContainNullBytes(args: string[] | undefined): boolean {
   return Array.isArray(args) && args.some((arg) => arg.includes('\0'));
 }
 
+const SafetyPolicySchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    allowedUrlPatterns: z.array(z.string()).default([]),
+    blockedUrlPatterns: z.array(z.string()).default([]),
+    blockDestructiveRequests: z.boolean().optional(),
+    destructiveActionKeywords: z
+      .array(z.string())
+      .default([
+        'delete',
+        'remove',
+        'destroy',
+        'purge',
+        'drop',
+        'reset all',
+        'clear all',
+        'wipe',
+        'uninstall',
+        'deactivate account',
+        'close account',
+      ]),
+    maxAuditEntries: z.number().int().min(1).default(500),
+  })
+  .default({
+    enabled: true,
+    allowedUrlPatterns: [],
+    blockedUrlPatterns: [],
+    destructiveActionKeywords: [
+      'delete',
+      'remove',
+      'destroy',
+      'purge',
+      'drop',
+      'reset all',
+      'clear all',
+      'wipe',
+      'uninstall',
+      'deactivate account',
+      'close account',
+    ],
+    maxAuditEntries: 500,
+  });
+
 const PolicySchema = z
   .object({
     expectedResponses: z
@@ -505,10 +548,30 @@ const PolicySchema = z
       )
       .default([]),
     ignoredConsolePatterns: z.array(z.string()).default([]),
+    safety: SafetyPolicySchema,
   })
   .default({
     expectedResponses: [],
     ignoredConsolePatterns: [],
+    safety: {
+      enabled: true,
+      allowedUrlPatterns: [],
+      blockedUrlPatterns: [],
+      destructiveActionKeywords: [
+        'delete',
+        'remove',
+        'destroy',
+        'purge',
+        'drop',
+        'reset all',
+        'clear all',
+        'wipe',
+        'uninstall',
+        'deactivate account',
+        'close account',
+      ],
+      maxAuditEntries: 500,
+    },
   });
 
 export const ConfigSchema = z.object({

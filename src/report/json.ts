@@ -130,6 +130,7 @@ export function renderJson(result: RunResult): string {
     stateGraph: result.stateGraphMermaid ?? null,
     runConfig: result.runConfig ?? null,
     runMemory: result.runMemory ?? null,
+    safetyAudit: result.safetyAudit ?? null,
   };
 
   return JSON.stringify(report, null, 2);

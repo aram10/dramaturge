@@ -280,6 +280,7 @@ describe('executeFrontierItem', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       undefined
     );
     expect(ctx.trafficObserver.resetPage).toHaveBeenCalledWith('page-1');
@@ -801,9 +802,9 @@ describe('executeFrontierItem', () => {
     expect(result.result!.findings).toHaveLength(2);
     expect(result.result!.evidence[0]).toEqual(visionEvidence);
 
-    // 3. executeWorkerTask receives the visionContext argument (last positional arg)
+    // 3. executeWorkerTask receives the visionContext argument (second-to-last positional arg)
     const workerCallArgs = vi.mocked(executeWorkerTask).mock.calls[0];
-    expect(workerCallArgs[workerCallArgs.length - 1]).toBe(
+    expect(workerCallArgs[workerCallArgs.length - 2]).toBe(
       'A dashboard with sidebar and main content area.'
     );
   });

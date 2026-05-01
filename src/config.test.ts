@@ -344,7 +344,14 @@ describe('loadConfig', () => {
               "statuses": [401, 403]
             }
           ],
-          "ignoredConsolePatterns": ["ResizeObserver loop"]
+          "ignoredConsolePatterns": ["ResizeObserver loop"],
+          "safety": {
+            "allowedUrlPatterns": ["/app/**"],
+            "blockedUrlPatterns": ["/admin/**"],
+            "blockDestructiveRequests": true,
+            "destructiveActionKeywords": ["nuke"],
+            "maxAuditEntries": 25
+          }
         }
       }`,
       'utf-8'
@@ -361,6 +368,14 @@ describe('loadConfig', () => {
         },
       ],
       ignoredConsolePatterns: ['ResizeObserver loop'],
+      safety: {
+        enabled: true,
+        allowedUrlPatterns: ['/app/**'],
+        blockedUrlPatterns: ['/admin/**'],
+        blockDestructiveRequests: true,
+        destructiveActionKeywords: ['nuke'],
+        maxAuditEntries: 25,
+      },
     });
     expect(config.apiTesting).toMatchObject({
       enabled: false,

@@ -41,6 +41,10 @@ interface WorkerSetup {
   agent: ReturnType<Stagehand['agent']>;
 }
 
+interface SafetyGuardLike {
+  checkUrl(url: string): string | null;
+}
+
 function initWorker(
   stagehand: Stagehand,
   opts: {
@@ -65,6 +69,7 @@ function initWorker(
     adversarialConfig?: AdversarialConfig;
     judgeConfig?: JudgeConfig;
     visionContext?: string;
+    safetyGuard?: SafetyGuardLike;
   }
 ): WorkerSetup {
   const observations: Observation[] = [];
@@ -74,7 +79,17 @@ function initWorker(
   const followupRequests: FollowupRequest[] = [];
   const discoveredEdges: DiscoveredEdge[] = [];
   const page = stagehand.context.pages()[0];
-  const actionRecorder = new ActionRecorder(page);
+  const actionRecorder = new ActionRecorder(page, {
+    afterAction: () => {
+      if (!opts.safetyGuard || typeof page.url !== 'function') {
+        return;
+      }
+      const blocked = opts.safetyGuard.checkUrl(page.url());
+      if (blocked) {
+        throw new Error(`Blocked page URL by safety guard: ${blocked}`);
+      }
+    },
+  });
   actionRecorder.start();
 
   const stagnationTracker =
@@ -175,7 +190,8 @@ export async function exploreArea(
   observedApiEndpoints?: ObservedApiEndpoint[],
   mission?: MissionConfig,
   history?: WorkerHistoryContext,
-  judgeConfig?: JudgeConfig
+  judgeConfig?: JudgeConfig,
+  safetyGuard?: SafetyGuardLike
 ): Promise<AreaResult> {
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
@@ -206,6 +222,7 @@ export async function exploreArea(
       mission,
       history,
       judgeConfig,
+      safetyGuard,
     });
 
   try {
@@ -287,7 +304,8 @@ export async function executeWorkerTask(
   history?: WorkerHistoryContext,
   adversarialConfig?: AdversarialConfig,
   judgeConfig?: JudgeConfig,
-  visionContext?: string
+  visionContext?: string,
+  safetyGuard?: SafetyGuardLike
 ): Promise<WorkerResult> {
   const {
     observations,
@@ -318,6 +336,7 @@ export async function executeWorkerTask(
     adversarialConfig,
     judgeConfig,
     visionContext,
+    safetyGuard,
   });
 
   try {

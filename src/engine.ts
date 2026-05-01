@@ -46,6 +46,7 @@ import {
   restoreCheckpointState,
   seedFrontierIfNeeded,
 } from './engine/run-state.js';
+import { attachSafetyRequestGuard, createSafetyGuardForConfig } from './engine/safety.js';
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -163,6 +164,7 @@ export async function runEngine(
   const contractIndex = loadContractIndex(config, repoHints);
   const diffContext = loadDiffContext(config, repoHints, options.diffRef);
   const policy = resolvePolicy(config.policy, repoHints);
+  const safetyGuard = createSafetyGuardForConfig(config, mission);
   const memoryStore = config.memory.enabled ? new MemoryStore(config.memory.dir) : undefined;
   let bootstrapProcess: BootstrapStatus | undefined;
 
@@ -204,6 +206,7 @@ export async function runEngine(
   await stagehand.init();
   errorCollector.attach(stagehand.context.pages()[0], 'primary');
   trafficObserver.attach(stagehand.context.pages()[0], 'primary');
+  await attachSafetyRequestGuard(stagehand.context.pages()[0], safetyGuard, logger.child('safety'));
 
   let workerPool: WorkerSession[] = [];
 
@@ -242,6 +245,7 @@ export async function runEngine(
     diffContext,
     trafficObserver,
     memoryStore,
+    safetyGuard,
     eventStream,
     logger,
     createIsolatedApiRequestContext: () =>
@@ -290,6 +294,11 @@ export async function runEngine(
         sharedWorkerState
       );
       ctx.workerPool = workerPool;
+      await Promise.all(
+        workerPool.map((worker) =>
+          attachSafetyRequestGuard(worker.page, safetyGuard, logger.child('safety'))
+        )
+      );
       logger.info('Initialized worker pool', {
         workers: concurrency,
       });

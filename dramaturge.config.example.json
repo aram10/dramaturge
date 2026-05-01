@@ -83,6 +83,19 @@
     "includeConcurrencyProbes": false
   },
 
+  // Deterministic safety policy. Enabled by default; URL patterns support
+  // simple globs, and destructive requests default to blocked unless
+  // mission.destructiveActionsAllowed is true.
+  "policy": {
+    "safety": {
+      "enabled": true,
+      "allowedUrlPatterns": [],
+      "blockedUrlPatterns": ["/admin/danger-zone/**"],
+      "destructiveActionKeywords": ["delete", "remove", "destroy", "reset all"],
+      "maxAuditEntries": 500
+    }
+  },
+
   // Observation-to-judgment handoff. Keep enabled unless you are debugging
   // raw explorer output.
   "judge": {

@@ -61,6 +61,10 @@ type PatchablePage = ActionRecorderPage &
     };
   };
 
+export interface ActionRecorderHooks {
+  afterAction?: () => Promise<void> | void;
+}
+
 function summarizeAction(
   kind: ReplayableActionKind,
   target: string | undefined,
@@ -177,7 +181,10 @@ export class ActionRecorder {
   private wrappedLocators = new WeakMap<object, unknown>();
   private started = false;
 
-  constructor(private page?: unknown) {}
+  constructor(
+    private page?: unknown,
+    private hooks?: ActionRecorderHooks
+  ) {}
 
   start(): void {
     const page = this.page as PatchablePage | undefined;
@@ -204,6 +211,7 @@ export class ActionRecorder {
       page.keyboard.press = async (...args: unknown[]) => {
         try {
           const result = await original.apply(page.keyboard, args);
+          await this.runAfterAction();
           if (this.started) {
             this.recordToolAction({
               kind: 'keydown',
@@ -325,6 +333,7 @@ export class ActionRecorder {
     page[method] = async (...args: unknown[]) => {
       try {
         const result = await original.apply(page, args);
+        await this.runAfterAction();
         const url = method === 'goto' ? String(args[0] ?? '') : undefined;
         if (this.started) {
           this.recordToolAction({
@@ -368,6 +377,7 @@ export class ActionRecorder {
       const selector = String(args[0] ?? '');
       try {
         const result = await original.apply(page, args);
+        await this.runAfterAction();
         if (this.started) {
           this.recordToolAction({
             kind: mapActionMethodToKind(method),
@@ -450,6 +460,7 @@ export class ActionRecorder {
           const kind = mapActionMethodToKind(prop);
           try {
             const result = await value.apply(target, args);
+            await this.runAfterAction();
             if (this.started) {
               this.recordToolAction({
                 kind,
@@ -482,5 +493,9 @@ export class ActionRecorder {
 
     this.wrappedLocators.set(locatorObject, proxy);
     return proxy;
+  }
+
+  private async runAfterAction(): Promise<void> {
+    await this.hooks?.afterAction?.();
   }
 }

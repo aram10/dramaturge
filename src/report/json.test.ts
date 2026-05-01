@@ -274,4 +274,37 @@ describe('renderJson', () => {
     expect(report.findings[0].crossRunStatus).not.toHaveProperty('signature');
     expect(report.crossRunSummary.resolvedFindings[0]).not.toHaveProperty('signature');
   });
+
+  it('serializes safety audit summaries', () => {
+    const report = JSON.parse(
+      renderJson({
+        ...makeResult([]),
+        safetyAudit: {
+          blockedCount: 1,
+          entries: [
+            {
+              timestamp: '2026-03-25T10:01:00Z',
+              action: 'DELETE request',
+              url: 'https://example.com/api/users/1',
+              reason: 'Destructive HTTP method',
+              blocked: true,
+            },
+          ],
+        },
+      })
+    );
+
+    expect(report.safetyAudit).toEqual({
+      blockedCount: 1,
+      entries: [
+        {
+          timestamp: '2026-03-25T10:01:00Z',
+          action: 'DELETE request',
+          url: 'https://example.com/api/users/1',
+          reason: 'Destructive HTTP method',
+          blocked: true,
+        },
+      ],
+    });
+  });
 });

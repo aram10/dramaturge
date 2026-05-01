@@ -1,6 +1,8 @@
 dist
 node_modules
 coverage
+.omx
+.dramaturge-state
 pnpm-lock.yaml
 *.md
 CHANGELOG.md

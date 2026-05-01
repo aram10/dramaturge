@@ -201,6 +201,21 @@ export interface RunResult {
   diffSummary?: DiffSummary;
   /** Cross-run classification of findings, present when run memory is enabled. */
   crossRunClassification?: CrossRunClassification;
+  /** SafetyGuard audit summary for blocked/allowed guarded actions. */
+  safetyAudit?: SafetyAuditSummary;
+}
+
+export interface SafetyAuditSummary {
+  blockedCount: number;
+  entries: SafetyAuditReportEntry[];
+}
+
+export interface SafetyAuditReportEntry {
+  timestamp: string;
+  action: string;
+  url: string;
+  reason: string;
+  blocked: boolean;
 }
 
 export interface RunConfigMeta {
