@@ -445,6 +445,7 @@ export class MemoryStore {
       hasFlakyPageNotes: workerContext.flakyPageNotes.length > 0,
       hasNavigationHints:
         workerContext.navigationHints.length > 0 || workerContext.authHints.length > 0,
+      hasApiHints: workerContext.apiHints.length > 0,
     };
   }
 

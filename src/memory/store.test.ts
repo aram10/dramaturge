@@ -248,6 +248,7 @@ describe('MemoryStore', () => {
       hasSuppressedFindings: true,
       hasFlakyPageNotes: true,
       hasNavigationHints: true,
+      hasApiHints: true,
     });
   });
 
