@@ -5,14 +5,16 @@ import type { MissionConfig } from '../types.js';
 import type { RepoHints } from '../adaptation/types.js';
 import { FrontierQueue } from '../graph/frontier.js';
 import { StateGraph } from '../graph/state-graph.js';
-import { Planner } from '../planner/planner.js';
+import type { Planner } from '../planner/planner.js';
+import type { Coordinator } from '../a2a/coordinator.js';
 import type { MemoryStore } from './store.js';
 import type { NavigationMemorySnapshot } from './types.js';
 
 export interface SeedGraphFromNavigationMemoryInput {
   graph: StateGraph;
   frontier: FrontierQueue;
-  planner: Planner;
+  /** Planner or Coordinator (when A2A is enabled). Coordinator extends Planner. */
+  planner: Planner | Coordinator;
   snapshot: NavigationMemorySnapshot;
   mission?: MissionConfig;
   repoHints?: RepoHints;

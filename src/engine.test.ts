@@ -126,6 +126,9 @@ describe('runEngine bootstrap readiness', () => {
       auth: {
         type: 'none',
       },
+      a2a: {
+        enabled: false,
+      },
       policy: {},
     } as never;
 

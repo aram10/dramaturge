@@ -40,7 +40,8 @@ export interface EngineContext {
   page: ReturnType<Stagehand['context']['pages']>[number];
   graph: StateGraph;
   frontier: FrontierQueue;
-  planner: Planner;
+  /** Planner or Coordinator (when A2A is enabled). Coordinator extends Planner. */
+  planner: Planner | Coordinator;
   navigator: Navigator;
   globalCoverage: CoverageTracker;
   costTracker?: CostTracker;
