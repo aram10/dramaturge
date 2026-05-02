@@ -10,4 +10,14 @@ export interface ExpectedResponseRule {
 export interface PolicyConfig {
   expectedResponses: ExpectedResponseRule[];
   ignoredConsolePatterns: string[];
+  safety?: SafetyPolicyConfig;
+}
+
+export interface SafetyPolicyConfig {
+  enabled: boolean;
+  allowedUrlPatterns: string[];
+  blockedUrlPatterns: string[];
+  blockDestructiveRequests?: boolean;
+  destructiveActionKeywords: string[];
+  maxAuditEntries: number;
 }

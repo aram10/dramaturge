@@ -92,6 +92,30 @@ describe('renderMarkdown', () => {
     expect(md).not.toContain('## Run Configuration');
   });
 
+  it('includes safety audit entries when present', () => {
+    const md = renderMarkdown(
+      makeResult({
+        safetyAudit: {
+          blockedCount: 1,
+          entries: [
+            {
+              timestamp: '2026-03-25T10:01:00Z',
+              action: 'DELETE request',
+              url: 'https://example.com/api/users/1',
+              reason: 'Destructive HTTP method',
+              blocked: true,
+            },
+          ],
+        },
+      })
+    );
+
+    expect(md).toContain('## Safety Guard Audit');
+    expect(md).toContain('Blocked actions: 1');
+    expect(md).toContain('DELETE request');
+    expect(md).toContain('Destructive HTTP method');
+  });
+
   it('includes run memory summary when present', () => {
     const md = renderMarkdown(
       makeResult({

@@ -419,6 +419,30 @@ Choose from five auth strategies:
 }
 ```
 
+### Safety Policy and Prompt Trust Boundaries
+
+SafetyGuard is enabled by default. Configure URL scope and destructive-action blocking under
+`policy.safety`; destructive requests are blocked unless `mission.destructiveActionsAllowed` is
+true or `policy.safety.blockDestructiveRequests` explicitly overrides the default.
+
+```json
+{
+  "policy": {
+    "safety": {
+      "enabled": true,
+      "allowedUrlPatterns": ["/app/**"],
+      "blockedUrlPatterns": ["/admin/danger-zone/**"],
+      "destructiveActionKeywords": ["delete", "remove", "destroy", "reset all"],
+      "maxAuditEntries": 500
+    }
+  }
+}
+```
+
+Worker prompts treat target-app, repo-derived, observed-traffic, and prior-run memory content as
+untrusted data. Those sections are labeled with `BEGIN/END UNTRUSTED` delimiters so malicious
+routes, selectors, API paths, or historical finding titles cannot silently become instructions.
+
 ### Budget & Exploration
 
 ```json

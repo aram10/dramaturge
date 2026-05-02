@@ -18,6 +18,13 @@ export function resolvePolicy(config?: PolicyConfig, repoHints?: RepoHints): Pol
       ...(repoHints?.expectedHttpNoise ?? []),
     ],
     ignoredConsolePatterns: [...(config?.ignoredConsolePatterns ?? [])],
+    safety: config?.safety ?? {
+      enabled: true,
+      allowedUrlPatterns: [],
+      blockedUrlPatterns: [],
+      destructiveActionKeywords: [],
+      maxAuditEntries: 500,
+    },
   };
 }
 

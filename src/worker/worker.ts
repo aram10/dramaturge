@@ -41,6 +41,10 @@ interface WorkerSetup {
   agent: ReturnType<Stagehand['agent']>;
 }
 
+interface SafetyGuardLike {
+  checkUrl(url: string): string | null;
+}
+
 function initWorker(
   stagehand: Stagehand,
   opts: {
@@ -65,6 +69,7 @@ function initWorker(
     adversarialConfig?: AdversarialConfig;
     judgeConfig?: JudgeConfig;
     visionContext?: string;
+    safetyGuard?: SafetyGuardLike;
   }
 ): WorkerSetup {
   const observations: Observation[] = [];
@@ -74,7 +79,17 @@ function initWorker(
   const followupRequests: FollowupRequest[] = [];
   const discoveredEdges: DiscoveredEdge[] = [];
   const page = stagehand.context.pages()[0];
-  const actionRecorder = new ActionRecorder(page);
+  const actionRecorder = new ActionRecorder(page, {
+    afterAction: () => {
+      if (!opts.safetyGuard || typeof page.url !== 'function') {
+        return;
+      }
+      const blocked = opts.safetyGuard.checkUrl(page.url());
+      if (blocked) {
+        throw new Error(`Blocked page URL by safety guard: ${blocked}`);
+      }
+    },
+  });
   actionRecorder.start();
 
   const stagnationTracker =
@@ -159,24 +174,46 @@ async function materializeObservedFindings(input: {
   });
 }
 
+export interface ExploreAreaOptions {
+  appDescription: string;
+  model: string;
+  stepsPerArea: number;
+  screenshotDir: string;
+  agentMode?: 'cua' | 'dom';
+  screenshotsEnabled?: boolean;
+  stagnationThreshold?: number;
+  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
+  repoHints?: RepoHints;
+  contractSummary?: string[];
+  observedApiEndpoints?: ObservedApiEndpoint[];
+  mission?: MissionConfig;
+  history?: WorkerHistoryContext;
+  judgeConfig?: JudgeConfig;
+  safetyGuard?: SafetyGuardLike;
+}
+
 export async function exploreArea(
   stagehand: Stagehand,
   area: Area,
-  appDescription: string,
-  model: string,
-  stepsPerArea: number,
-  screenshotDir: string,
-  agentMode: 'cua' | 'dom' = 'cua',
-  screenshotsEnabled = true,
-  stagnationThreshold = 0,
-  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
-  repoHints?: RepoHints,
-  contractSummary?: string[],
-  observedApiEndpoints?: ObservedApiEndpoint[],
-  mission?: MissionConfig,
-  history?: WorkerHistoryContext,
-  judgeConfig?: JudgeConfig
+  opts: ExploreAreaOptions
 ): Promise<AreaResult> {
+  const {
+    appDescription,
+    model,
+    stepsPerArea,
+    screenshotDir,
+    agentMode = 'cua',
+    screenshotsEnabled = true,
+    stagnationThreshold = 0,
+    appContext,
+    repoHints,
+    contractSummary,
+    observedApiEndpoints,
+    mission,
+    history,
+    judgeConfig,
+    safetyGuard,
+  } = opts;
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
   let pageType: PageType = 'unknown';
@@ -206,6 +243,7 @@ export async function exploreArea(
       mission,
       history,
       judgeConfig,
+      safetyGuard,
     });
 
   try {
@@ -271,24 +309,46 @@ export async function exploreArea(
   }
 }
 
+export interface ExecuteWorkerTaskOptions {
+  model: string;
+  screenshotDir: string;
+  agentMode?: 'cua' | 'dom';
+  screenshotsEnabled?: boolean;
+  stagnationThreshold?: number;
+  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
+  repoHints?: RepoHints;
+  contractSummary?: string[];
+  observedApiEndpoints?: ObservedApiEndpoint[];
+  mission?: MissionConfig;
+  history?: WorkerHistoryContext;
+  adversarialConfig?: AdversarialConfig;
+  judgeConfig?: JudgeConfig;
+  visionContext?: string;
+  safetyGuard?: SafetyGuardLike;
+}
+
 export async function executeWorkerTask(
   stagehand: Stagehand,
   task: WorkerTask,
-  model: string,
-  screenshotDir: string,
-  agentMode: 'cua' | 'dom' = 'cua',
-  screenshotsEnabled = true,
-  stagnationThreshold = 0,
-  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] },
-  repoHints?: RepoHints,
-  contractSummary?: string[],
-  observedApiEndpoints?: ObservedApiEndpoint[],
-  mission?: MissionConfig,
-  history?: WorkerHistoryContext,
-  adversarialConfig?: AdversarialConfig,
-  judgeConfig?: JudgeConfig,
-  visionContext?: string
+  opts: ExecuteWorkerTaskOptions
 ): Promise<WorkerResult> {
+  const {
+    model,
+    screenshotDir,
+    agentMode = 'cua',
+    screenshotsEnabled = true,
+    stagnationThreshold = 0,
+    appContext,
+    repoHints,
+    contractSummary,
+    observedApiEndpoints,
+    mission,
+    history,
+    adversarialConfig,
+    judgeConfig,
+    visionContext,
+    safetyGuard,
+  } = opts;
   const {
     observations,
     evidence,
@@ -318,6 +378,7 @@ export async function executeWorkerTask(
     adversarialConfig,
     judgeConfig,
     visionContext,
+    safetyGuard,
   });
 
   try {

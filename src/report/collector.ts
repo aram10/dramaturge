@@ -144,6 +144,7 @@ export function buildRunResult(
     runMemory?: RunMemoryMeta;
     diffSummary?: DiffSummary;
     crossRunClassification?: CrossRunClassification;
+    safetyAudit?: RunResult['safetyAudit'];
   } = {}
 ): RunResult {
   const {
@@ -153,6 +154,7 @@ export function buildRunResult(
     runMemory,
     diffSummary,
     crossRunClassification,
+    safetyAudit,
   } = options;
 
   return {
@@ -168,5 +170,6 @@ export function buildRunResult(
     runMemory,
     diffSummary,
     crossRunClassification,
+    safetyAudit,
   };
 }

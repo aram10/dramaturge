@@ -4,8 +4,10 @@
 import { describe, expect, it } from 'vitest';
 import { ActionRecorder } from './action-recorder.js';
 import { setInputRecordingPolicy } from './input-recording-policy.js';
+import { SafetyGuard, createDefaultSafetyConfig } from '../policy/safety-guard.js';
 
 function createMockPage() {
+  let currentUrl = 'https://example.com/dashboard';
   function createLocator(selector: string) {
     return {
       async click() {
@@ -34,12 +36,17 @@ function createMockPage() {
   }
 
   const page = {
+    async click(_selector: string) {
+      currentUrl = 'https://example.com/admin/users';
+      return undefined;
+    },
     keyboard: {
       async press(_key: string) {
         return undefined;
       },
     },
     async goto(_url: string) {
+      currentUrl = _url;
       return undefined;
     },
     locator(selector: string) {
@@ -47,6 +54,9 @@ function createMockPage() {
     },
     getByRole(role: string, options?: { name?: string }) {
       return createLocator(options?.name ? `role=${role}[name=${options.name}]` : `role=${role}`);
+    },
+    url() {
+      return currentUrl;
     },
   };
 
@@ -87,6 +97,33 @@ describe('ActionRecorder', () => {
       kind: 'keydown',
       key: 'Enter',
     });
+  });
+
+  it('raises after-action failures when the current page URL becomes unsafe', async () => {
+    const page = createMockPage();
+    const guard = new SafetyGuard({
+      ...createDefaultSafetyConfig(false),
+      blockedUrlPatterns: ['/admin/**'],
+    });
+    const recorder = new ActionRecorder(page, {
+      afterAction: () => {
+        const blocked = guard.checkUrl(page.url());
+        if (blocked) {
+          throw new Error(blocked);
+        }
+      },
+    });
+    recorder.start();
+
+    await expect(page.click('button')).rejects.toThrow('URL matches blocked pattern');
+
+    expect(recorder.getActions()).toEqual([
+      expect.objectContaining({
+        kind: 'click',
+        selector: 'button',
+        status: 'error',
+      }),
+    ]);
   });
 
   it('records chained locator queries with selector context', async () => {

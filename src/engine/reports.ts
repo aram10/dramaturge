@@ -70,6 +70,12 @@ export function writeReports(
         affectedApiEndpoints: ctx.diffContext.affectedApiEndpoints,
       }
     : undefined;
+  const safetyAudit = ctx.safetyGuard
+    ? {
+        blockedCount: ctx.safetyGuard.blockedCount,
+        entries: [...ctx.safetyGuard.getAuditLog()],
+      }
+    : undefined;
 
   const runResult = buildRunResult(
     config.targetUrl,
@@ -105,6 +111,7 @@ export function writeReports(
       runMemory: ctx.runMemory,
       diffSummary,
       crossRunClassification: ctx.crossRunClassification,
+      safetyAudit,
     }
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);

@@ -25,6 +25,15 @@ export interface SafetyGuardConfig {
   maxAuditEntries: number;
 }
 
+export interface SafetyGuardPolicyOptions {
+  enabled: boolean;
+  allowedUrlPatterns: string[];
+  blockedUrlPatterns: string[];
+  blockDestructiveRequests?: boolean;
+  destructiveActionKeywords: string[];
+  maxAuditEntries: number;
+}
+
 export interface SafetyAuditEntry {
   timestamp: string;
   action: string;
@@ -58,6 +67,23 @@ export function createDefaultSafetyConfig(destructiveActionsAllowed: boolean): S
   };
 }
 
+export function createSafetyConfigFromPolicy(
+  policy: SafetyGuardPolicyOptions,
+  destructiveActionsAllowed: boolean
+): SafetyGuardConfig {
+  const defaults = createDefaultSafetyConfig(destructiveActionsAllowed);
+  return {
+    allowedUrlPatterns: policy.allowedUrlPatterns,
+    blockedUrlPatterns: policy.blockedUrlPatterns,
+    blockDestructiveRequests: policy.blockDestructiveRequests ?? defaults.blockDestructiveRequests,
+    destructiveActionKeywords:
+      policy.destructiveActionKeywords.length > 0
+        ? policy.destructiveActionKeywords
+        : defaults.destructiveActionKeywords,
+    maxAuditEntries: policy.maxAuditEntries,
+  };
+}
+
 export class SafetyGuard {
   private readonly config: SafetyGuardConfig;
   private readonly auditLog: SafetyAuditEntry[] = [];
@@ -75,7 +101,7 @@ export class SafetyGuard {
 
     // Check blocked patterns first
     for (const pattern of this.config.blockedUrlPatterns) {
-      if (matchesPattern(pathname, pattern)) {
+      if (matchesUrlPattern(url, pathname, pattern)) {
         const reason = `URL matches blocked pattern: ${pattern}`;
         this.log(url, 'navigate', reason, true);
         return reason;
@@ -85,7 +111,7 @@ export class SafetyGuard {
     // Check allowed patterns (if any are set, only those are allowed)
     if (this.config.allowedUrlPatterns.length > 0) {
       const isAllowed = this.config.allowedUrlPatterns.some((pattern) =>
-        matchesPattern(pathname, pattern)
+        matchesUrlPattern(url, pathname, pattern)
       );
       if (!isAllowed) {
         const reason = 'URL not in allowed patterns';
@@ -108,7 +134,7 @@ export class SafetyGuard {
 
     const upperMethod = method.toUpperCase();
     if (upperMethod === 'DELETE') {
-      const reason = `Destructive HTTP method: ${upperMethod} ${url}`;
+      const reason = `Destructive HTTP method: ${upperMethod}`;
       this.log(url, `${upperMethod} request`, reason, true);
       return reason;
     }
@@ -150,13 +176,23 @@ export class SafetyGuard {
     this.auditLog.push({
       timestamp: new Date().toISOString(),
       action,
-      url,
+      url: sanitizeAuditUrl(url),
       reason,
       blocked,
     });
     if (this.auditLog.length > this.config.maxAuditEntries) {
       this.auditLog.splice(0, this.auditLog.length - this.config.maxAuditEntries);
     }
+  }
+}
+
+function sanitizeAuditUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    const [withoutHash] = url.split('#');
+    return withoutHash.split('?')[0] || url;
   }
 }
 
@@ -168,7 +204,11 @@ function normalizePathname(url: string): string {
   }
 }
 
-function matchesPattern(pathname: string, pattern: string): boolean {
+function matchesUrlPattern(url: string, pathname: string, pattern: string): boolean {
+  return matchesPattern(pathname, pattern) || matchesPattern(url, pattern);
+}
+
+function matchesPattern(value: string, pattern: string): boolean {
   // Support simple glob: * matches any segment, ** matches any number of segments.
   // Treat the pattern as a glob, not a raw regular expression: escape regex metacharacters
   // other than the glob wildcards before expanding * / **.
@@ -179,9 +219,9 @@ function matchesPattern(pathname: string, pattern: string): boolean {
     .replace(/___DOUBLESTAR___/g, '.*');
 
   try {
-    return new RegExp(`^${regexStr}$`).test(pathname);
+    return new RegExp(`^${regexStr}$`).test(value);
   } catch {
     // If the pattern is invalid as regex, fall back to prefix match
-    return pathname.startsWith(pattern);
+    return value.startsWith(pattern);
   }
 }

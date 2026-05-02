@@ -362,6 +362,26 @@ export function renderMarkdown(result: RunResult): string {
     lines.push('');
   }
 
+  if (result.safetyAudit) {
+    lines.push('## Safety Guard Audit');
+    lines.push('');
+    lines.push(`- Blocked actions: ${result.safetyAudit.blockedCount}`);
+    lines.push(`- Audit entries retained: ${result.safetyAudit.entries.length}`);
+    if (result.safetyAudit.entries.length > 0) {
+      lines.push('');
+      lines.push('| Time | Blocked | Action | URL | Reason |');
+      lines.push('|------|---------|--------|-----|--------|');
+      for (const entry of result.safetyAudit.entries.slice(-10)) {
+        lines.push(
+          `| ${escapeTableCell(entry.timestamp)} | ${entry.blocked ? 'yes' : 'no'} | ${escapeTableCell(
+            entry.action
+          )} | ${escapeTableCell(entry.url)} | ${escapeTableCell(entry.reason)} |`
+        );
+      }
+    }
+    lines.push('');
+  }
+
   return lines.join('\n');
 }
 
