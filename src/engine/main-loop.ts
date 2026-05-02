@@ -79,6 +79,14 @@ async function processTaskBatch(
     const taskNumber = taskNumberStart + index;
     assignPageNodeOwner(ctx, worker.key, item.nodeId);
 
+    // A2A: Assign task to coordinator and update status to 'working'
+    let a2aTaskId: string | undefined;
+    if (ctx.coordinator) {
+      const a2aTask = ctx.coordinator.assignTask(item);
+      a2aTaskId = a2aTask.id;
+      ctx.coordinator.updateTaskStatus(a2aTaskId, 'working');
+    }
+
     emitEngineEvent(ctx.eventStream, 'task:start', {
       taskId: item.id,
       taskNumber,
@@ -94,10 +102,20 @@ async function processTaskBatch(
       item,
       taskNumber,
       pageKey: worker.key,
+      a2aTaskId,
     });
 
     if (!result.result) {
       handleNavFailure(ctx, item, workers.length > 1 ? `[${taskNumber}]` : '');
+      // A2A: Mark task as failed
+      if (a2aTaskId && ctx.coordinator) {
+        ctx.coordinator.updateTaskStatus(a2aTaskId, 'failed');
+      }
+    } else if (a2aTaskId && ctx.coordinator) {
+      // A2A: Complete task with summary
+      const findingsCount = result.result.findings?.length ?? 0;
+      const summary = `${item.workerType} task on ${item.objective}`;
+      ctx.coordinator.completeTask(a2aTaskId, summary, findingsCount);
     }
 
     return {

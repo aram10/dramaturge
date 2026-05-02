@@ -15,6 +15,7 @@ import type {
   FollowupRequest,
   DiscoveredEdge,
   MissionConfig,
+  AgentRole,
 } from '../types.js';
 import { CoverageTracker } from '../coverage/tracker.js';
 import { StagnationTracker } from './stagnation.js';
@@ -325,6 +326,13 @@ export interface ExecuteWorkerTaskOptions {
   judgeConfig?: JudgeConfig;
   visionContext?: string;
   safetyGuard?: SafetyGuardLike;
+  /** A2A multi-agent context (optional). */
+  a2aContext?: {
+    agentRole: AgentRole;
+    agentId: string;
+    blackboard?: import('../a2a/blackboard.js').Blackboard;
+    blackboardSummary?: string;
+  };
 }
 
 export async function executeWorkerTask(
