@@ -78,6 +78,7 @@ export interface PlannerMemorySignals {
   hasSuppressedFindings: boolean;
   hasFlakyPageNotes: boolean;
   hasNavigationHints: boolean;
+  hasApiHints: boolean;
 }
 
 export interface MemoryRouteMatchInput {
