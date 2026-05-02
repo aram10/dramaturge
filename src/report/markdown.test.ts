@@ -19,6 +19,36 @@ function makeResult(overrides: Partial<RunResult> = {}): RunResult {
 }
 
 describe('renderMarkdown', () => {
+  it('includes an exploration ledger summary when present', () => {
+    const md = renderMarkdown(
+      makeResult({
+        explorationLedger: {
+          version: 1,
+          events: [
+            {
+              id: 'le-1',
+              kind: 'action',
+              timestamp: '2026-01-01T00:00:00.000Z',
+              actionId: 'act-1',
+              action: {
+                id: 'act-1',
+                kind: 'click',
+                summary: 'click login',
+                source: 'page',
+                status: 'worked',
+                timestamp: '2026-01-01T00:00:00.000Z',
+              },
+              source: 'action-recorder',
+            },
+          ],
+        },
+      })
+    );
+
+    expect(md).toContain('## Exploration ledger');
+    expect(md).toContain('Total events');
+  });
+
   it('includes blind spots section when present', () => {
     const md = renderMarkdown(
       makeResult({

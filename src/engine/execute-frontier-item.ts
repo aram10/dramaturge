@@ -15,6 +15,7 @@ import { runMultiViewportVisualRegression } from '../coverage/responsive-regress
 import { analyzeScreenshot } from '../coverage/vision-analysis.js';
 import { buildApiContractArtifacts } from '../api/contract-oracle.js';
 import { summarizeContractIndex } from '../spec/contract-index.js';
+import { appendToLedger, mergeLedgerEntries } from '../ledger.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
@@ -90,6 +91,16 @@ export async function executeFrontierItem(
       createIsolatedRequestContext: ctx.createIsolatedApiRequestContext,
       config: ctx.config.apiTesting,
     });
+
+    const apiLedger = mergeLedgerEntries({
+      actionRecorderActions: [],
+      evidence: result.evidence,
+      findings: result.findings,
+      observedApiEndpoints,
+      costRecords: ctx.costTracker?.getRecords(),
+      context: { areaName: node.title ?? node.id, stateId: node.id, taskId: item.id },
+    });
+    ctx.runLedger = appendToLedger(ctx.runLedger, apiLedger);
 
     return { item, result };
   }
@@ -212,6 +223,10 @@ export async function executeFrontierItem(
     }
   );
 
+  if (result.explorationLedger) {
+    ctx.runLedger = appendToLedger(ctx.runLedger, result.explorationLedger);
+  }
+
   const apiContract = buildApiContractArtifacts({
     areaName: node.title ?? node.id,
     route: node.url ?? ctx.config.targetUrl,
@@ -228,6 +243,18 @@ export async function executeFrontierItem(
   if (apiContract.findings.length > 0) {
     result.findings.push(...apiContract.findings);
     result.evidence.push(...apiContract.evidence);
+  }
+
+  if (apiContract.findings.length > 0 || apiContract.evidence.length > 0) {
+    const contractLedger = mergeLedgerEntries({
+      actionRecorderActions: [],
+      evidence: apiContract.evidence,
+      findings: apiContract.findings,
+      observedApiEndpoints,
+      costRecords: ctx.costTracker?.getRecords(),
+      context: { areaName: node.title ?? node.id, stateId: node.id, taskId: item.id },
+    });
+    ctx.runLedger = appendToLedger(ctx.runLedger, contractLedger);
   }
 
   return { item, result };

@@ -5,6 +5,7 @@ import type { RunResult } from '../types.js';
 import { collectFindings } from './collector.js';
 import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
 import type { DiffContext } from '../diff/types.js';
+import { ledgerSummary } from '../ledger.js';
 
 function escapeTableCell(text: string): string {
   return text
@@ -103,6 +104,19 @@ export function renderMarkdown(result: RunResult): string {
     if (visual.length > 0) lines.push(`- ${visual.length} visual glitch(es)`);
   }
   lines.push('');
+
+  if (result.explorationLedger) {
+    const summary = ledgerSummary(result.explorationLedger);
+    lines.push('## Exploration ledger');
+    lines.push('');
+    lines.push(`- Total events: ${summary.total}`);
+    lines.push(`- Actions: ${summary.actions}`);
+    lines.push(`- Evidence: ${summary.evidence}`);
+    lines.push(`- Network: ${summary.network}`);
+    lines.push(`- Findings: ${summary.findings}`);
+    lines.push(`- Model usage: ${summary.modelUsage}`);
+    lines.push('');
+  }
 
   // Findings
   if (findings.length > 0) {

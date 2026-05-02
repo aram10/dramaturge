@@ -14,6 +14,7 @@ import { writeGeneratedPlaywrightTests } from '../report/test-gen.js';
 import { resolveOutputFormats } from '../config.js';
 import { hasLLMApiKey } from '../llm.js';
 import type { DiffSummary } from '../types.js';
+import { appendToLedger } from '../ledger.js';
 
 export function buildAreaResults(ctx: EngineContext): AreaResult[] {
   const results: AreaResult[] = [];
@@ -36,6 +37,7 @@ export function buildAreaResults(ctx: EngineContext): AreaResult[] {
       steps: node.timesVisited,
       findings,
       replayableActions,
+      explorationLedger: ctx.runLedger,
       screenshots: new Map<string, Buffer>(),
       evidence,
       coverage: {
@@ -112,6 +114,7 @@ export function writeReports(
       diffSummary,
       crossRunClassification: ctx.crossRunClassification,
       safetyAudit,
+      explorationLedger: ctx.runLedger,
     }
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);

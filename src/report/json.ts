@@ -131,6 +131,12 @@ export function renderJson(result: RunResult): string {
     runConfig: result.runConfig ?? null,
     runMemory: result.runMemory ?? null,
     safetyAudit: result.safetyAudit ?? null,
+    explorationLedger: result.explorationLedger
+      ? {
+          version: result.explorationLedger.version,
+          events: result.explorationLedger.events,
+        }
+      : null,
   };
 
   return JSON.stringify(report, null, 2);

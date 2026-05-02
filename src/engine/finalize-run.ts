@@ -54,6 +54,7 @@ export function finalizeRun(ctx: EngineContext, options: FinalizeRunOptions): vo
       completedTaskIds: [...ctx.completedTaskIds],
       tasksExecuted,
       plannerState: ctx.planner.snapshotDispatchState(),
+      explorationLedger: ctx.runLedger,
       options: {
         frontierSnapshot: finalFrontierSnapshot,
       },

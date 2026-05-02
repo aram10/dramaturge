@@ -4,7 +4,14 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import type { Checkpoint, RawFinding, Evidence, ReplayableAction, FrontierItem } from './types.js';
+import type {
+  Checkpoint,
+  ExplorationLedger,
+  RawFinding,
+  Evidence,
+  ReplayableAction,
+  FrontierItem,
+} from './types.js';
 import type { StateGraph } from './graph/state-graph.js';
 import type { FrontierQueue } from './graph/frontier.js';
 import type { CoverageTracker } from './coverage/tracker.js';
@@ -212,6 +219,12 @@ const checkpointSchema = z.object({
   blindSpots: z.array(blindSpotSchema),
   completedTaskIds: z.array(z.string()),
   plannerState: z.record(z.string(), z.array(workerTypeSchema)).optional(),
+  explorationLedger: z
+    .object({
+      version: z.literal(1),
+      events: z.array(z.unknown()),
+    })
+    .optional(),
 });
 
 export interface SaveCheckpointOptions {
@@ -229,6 +242,7 @@ export interface SaveCheckpointInput {
   completedTaskIds: string[];
   tasksExecuted: number;
   plannerState: Record<string, FrontierItem['workerType'][]>;
+  explorationLedger?: ExplorationLedger;
   options?: SaveCheckpointOptions;
 }
 
@@ -244,6 +258,7 @@ export function saveCheckpoint(input: SaveCheckpointInput): void {
     completedTaskIds,
     tasksExecuted,
     plannerState,
+    explorationLedger,
     options,
   } = input;
   const checkpoint: Checkpoint = {
@@ -262,6 +277,7 @@ export function saveCheckpoint(input: SaveCheckpointInput): void {
     blindSpots: coverage.getBlindSpots(),
     completedTaskIds,
     plannerState,
+    ...(explorationLedger ? { explorationLedger } : {}),
   };
 
   const path = join(outputDir, CHECKPOINT_FILE);
@@ -295,6 +311,7 @@ export function hydrateFromCheckpoint(
   completedTaskIds: Set<string>;
   tasksExecuted: number;
   plannerState: Record<string, FrontierItem['workerType'][]>;
+  explorationLedger?: ExplorationLedger;
 } {
   // Restore graph nodes
   for (const node of checkpoint.graphSnapshot.nodes) {
@@ -323,5 +340,6 @@ export function hydrateFromCheckpoint(
     completedTaskIds: new Set(checkpoint.completedTaskIds),
     tasksExecuted: checkpoint.tasksExecuted,
     plannerState: checkpoint.plannerState ?? {},
+    explorationLedger: checkpoint.explorationLedger as ExplorationLedger | undefined,
   };
 }

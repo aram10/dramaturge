@@ -27,6 +27,7 @@ import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
 import type { Observation } from '../judge/types.js';
 import { judgeWorkerObservations } from '../judge/judge.js';
 import { hasLLMApiKey, judgeObservationWithLLM } from '../llm.js';
+import { mergeLedgerEntries } from '../ledger.js';
 
 type StagehandToolSet = NonNullable<Parameters<Stagehand['agent']>[0]>['tools'];
 
@@ -174,6 +175,14 @@ async function materializeObservedFindings(input: {
   });
 }
 
+async function safeStagehandActions(result: unknown): Promise<unknown> {
+  if (!result || typeof result !== 'object') {
+    return undefined;
+  }
+  const record = result as Record<string, unknown>;
+  return record.actions;
+}
+
 export interface ExploreAreaOptions {
   appDescription: string;
   model: string;
@@ -255,23 +264,35 @@ export async function exploreArea(
     const stepCount =
       'actions' in result && Array.isArray(result.actions) ? result.actions.length : 0;
 
+    const findings = await materializeObservedFindings({
+      observations,
+      evidence,
+      actionRecorder,
+      judgeConfig,
+      judgeModel: model,
+    });
+    const stagehandActions = await safeStagehandActions(result);
+    const explorationLedger = mergeLedgerEntries({
+      actionRecorderActions: actionRecorder.getActions(),
+      stagehandActions,
+      evidence,
+      findings,
+      observedApiEndpoints,
+      context: { areaName: area.name },
+    });
+
     return {
       name: area.name,
       url: area.url,
       steps: stepCount,
-      findings: await materializeObservedFindings({
-        observations,
-        evidence,
-        actionRecorder,
-        judgeConfig,
-        judgeModel: model,
-      }),
+      findings,
       replayableActions: actionRecorder.getActions(),
       screenshots,
       evidence,
       coverage: coverageTracker.snapshot(),
       pageType,
       fingerprint,
+      explorationLedger,
       status: 'explored' as const,
     };
   } catch (error) {
@@ -290,6 +311,14 @@ export async function exploreArea(
       // Judge failed to materialize findings; return empty findings array
     }
 
+    const explorationLedger = mergeLedgerEntries({
+      actionRecorderActions: actionRecorder.getActions(),
+      evidence,
+      findings,
+      observedApiEndpoints,
+      context: { areaName: area.name },
+    });
+
     return {
       name: area.name,
       url: area.url,
@@ -301,6 +330,7 @@ export async function exploreArea(
       coverage: coverageTracker.snapshot(),
       pageType,
       fingerprint,
+      explorationLedger,
       status: 'failed',
       failureReason: message,
     };
@@ -382,7 +412,7 @@ export async function executeWorkerTask(
   });
 
   try {
-    await agent.execute({
+    const result = await agent.execute({
       instruction:
         task.workerType === 'adversarial'
           ? `${task.objective}\nPrioritize stale-state, replay, idempotency, and boundary-value probes. Stay read-only unless the run explicitly allows mutation-dependent adversarial sequences.`
@@ -390,20 +420,33 @@ export async function executeWorkerTask(
       maxSteps: task.maxSteps,
     });
 
+    const findings = await materializeObservedFindings({
+      observations,
+      evidence,
+      actionRecorder,
+      judgeConfig,
+      judgeModel: model,
+    });
+
+    const stagehandActions = await safeStagehandActions(result);
+    const explorationLedger = mergeLedgerEntries({
+      actionRecorderActions: actionRecorder.getActions(),
+      stagehandActions,
+      evidence,
+      findings,
+      observedApiEndpoints,
+      context: { areaName: task.nodeId, stateId: task.nodeId, taskId: task.id },
+    });
+
     return {
       taskId: task.id,
-      findings: await materializeObservedFindings({
-        observations,
-        evidence,
-        actionRecorder,
-        judgeConfig,
-        judgeModel: model,
-      }),
+      findings,
       evidence,
       replayableActions: actionRecorder.getActions(),
       coverageSnapshot: coverageTracker.snapshot(),
       followupRequests,
       discoveredEdges,
+      explorationLedger,
       outcome: 'completed',
       summary: `Completed ${task.workerType} task: ${task.objective}`,
     };
@@ -421,6 +464,14 @@ export async function executeWorkerTask(
       // Judge failed to materialize findings; return empty findings array
     }
 
+    const explorationLedger = mergeLedgerEntries({
+      actionRecorderActions: actionRecorder.getActions(),
+      evidence,
+      findings,
+      observedApiEndpoints,
+      context: { areaName: task.nodeId, stateId: task.nodeId, taskId: task.id },
+    });
+
     return {
       taskId: task.id,
       findings,
@@ -429,6 +480,7 @@ export async function executeWorkerTask(
       coverageSnapshot: coverageTracker.snapshot(),
       followupRequests,
       discoveredEdges,
+      explorationLedger,
       outcome: 'failed',
       summary: error instanceof Error ? error.message : String(error),
     };
