@@ -61,6 +61,10 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
   const areaActions = new Map(
     result.areaResults.map((area) => [area.name, area.replayableActions ?? []] as const)
   );
+  const ledgerActions =
+    result.explorationLedger?.events
+      .filter((event) => event.kind === 'action')
+      .map((event) => event.action) ?? [];
 
   return findings
     .filter((finding) => finding.meta?.repro)
@@ -72,7 +76,12 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         actionIds.size > 0
           ? availableActions.filter((action) => actionIds.has(action.id))
           : availableActions;
-      const renderedActions = selectedActions
+      const selectedLedgerActions =
+        actionIds.size > 0
+          ? ledgerActions.filter((action) => actionIds.has(action.id))
+          : ledgerActions;
+      const actionsToRender = selectedActions.length > 0 ? selectedActions : selectedLedgerActions;
+      const renderedActions = actionsToRender
         .map((action) => renderAction(action))
         .filter((line): line is string => Boolean(line));
       const route = finding.meta?.repro?.route ?? area?.url ?? result.targetUrl;
