@@ -236,7 +236,7 @@ export async function runEngine(
     });
   }
 
-  // Use coordinator as planner when A2A is enabled (coordinator extends planner)
+  // Use the coordinator in the planner role when A2A is enabled.
   const planner = coordinator ?? new Planner();
   if (!coordinator) {
     planner.diffPriorityBoost = config.diffAware.priorityBoost;
