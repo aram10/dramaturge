@@ -7,7 +7,7 @@ import type { Evidence, FrontierItem, RawFinding, WorkerResult } from '../types.
 import { hasEvaluate, hasRequestContext, hasScreenshot } from '../browser/page-interface.js';
 import type { EngineContext } from './context.js';
 import { executeApiWorkerTask } from '../api/worker.js';
-import { executeWorkerTask } from '../worker/worker.js';
+import { executeWorkerTask, type ExecuteWorkerTaskOptions } from '../worker/worker.js';
 import { runAccessibilityScan } from '../coverage/accessibility.js';
 import { runVisualRegressionScan } from '../coverage/visual-regression.js';
 import { collectWebVitals, evaluateWebVitals } from '../coverage/web-vitals.js';
@@ -26,14 +26,31 @@ export interface ExecuteFrontierItemDeps {
   taskNumber: number;
   pageKey: string;
   logPrefix?: string;
+  /** A2A task ID when multi-agent mode is enabled. */
+  a2aTaskId?: string;
 }
 
 export async function executeFrontierItem(
   deps: ExecuteFrontierItemDeps
 ): Promise<{ item: FrontierItem; result: WorkerResult | null }> {
-  const { ctx, stagehand, page, item, taskNumber, pageKey, logPrefix = '' } = deps;
+  const { ctx, stagehand, page, item, taskNumber, pageKey, logPrefix = '', a2aTaskId } = deps;
   const node = ctx.graph.getNode(item.nodeId);
   const nodeUrl = node.url ?? ctx.config.targetUrl;
+
+  // A2A: Resolve agent role and prepare context
+  let a2aContext: ExecuteWorkerTaskOptions['a2aContext'];
+  if (ctx.coordinator && ctx.blackboard && a2aTaskId) {
+    const agentRole = ctx.coordinator.resolveAgentRole(item.workerType);
+    const agentCard = ctx.coordinator.getAgent(agentRole);
+    if (agentCard) {
+      a2aContext = {
+        agentRole,
+        agentId: agentCard.id,
+        blackboard: ctx.blackboard,
+        blackboardSummary: ctx.blackboard.summarize(10),
+      };
+    }
+  }
 
   if (ctx.safetyGuard) {
     const blocked = ctx.safetyGuard.checkUrl(nodeUrl);
@@ -209,6 +226,7 @@ export async function executeFrontierItem(
       judgeConfig: ctx.config.judge,
       visionContext,
       safetyGuard: ctx.safetyGuard,
+      a2aContext,
     }
   );
 

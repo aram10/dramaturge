@@ -574,6 +574,21 @@ const PolicySchema = z
     },
   });
 
+const A2ASchema = z
+  .object({
+    /** Enable multi-agent coordination mode (A2A protocol). */
+    enabled: z.boolean().default(false),
+    /** Maximum number of entries to retain in the blackboard (default: 500). */
+    maxBlackboardEntries: z.number().int().min(1).default(500),
+    /** Maximum number of messages to retain in the message bus history (default: 500). */
+    maxMessageHistory: z.number().int().min(1).default(500),
+  })
+  .default({
+    enabled: false,
+    maxBlackboardEntries: 500,
+    maxMessageHistory: 500,
+  });
+
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
   appDescription: z.string().min(1),
@@ -601,6 +616,7 @@ export const ConfigSchema = z.object({
   diffAware: DiffAwareSchema,
   bootstrap: BootstrapSchema,
   policy: PolicySchema,
+  a2a: A2ASchema,
 });
 
 export type DramaturgeConfig = z.infer<typeof ConfigSchema>;
