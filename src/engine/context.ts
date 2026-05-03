@@ -31,6 +31,7 @@ import type { Blackboard } from '../a2a/blackboard.js';
 import type { MessageBus } from '../a2a/message-bus.js';
 import type { Coordinator } from '../a2a/coordinator.js';
 import type { EngineLogger } from './logger.js';
+import type { ExplorationLedger } from '../types.js';
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -50,6 +51,9 @@ export interface EngineContext {
   findingsByNode: Map<string, RawFinding[]>;
   evidenceByNode: Map<string, Evidence[]>;
   actionsByNode: Map<string, ReplayableAction[]>;
+  runLedger?: ExplorationLedger;
+  /** Index into CostTracker records marking the start of records not yet appended to runLedger. */
+  costLedgerCursor: number;
   errorCollector: BrowserErrorCollector;
   pageNodeOwners: Map<string, string>;
   completedTaskIds: Set<string>;

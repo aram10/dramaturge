@@ -3,7 +3,12 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ReplayableAction, RunResult } from '../types.js';
+import type {
+  ReplayableAction,
+  RunResult,
+  ExplorationLedgerEvent,
+  ExplorationLedgerActionEvent,
+} from '../types.js';
 import { collectFindings } from './collector.js';
 import { inferAssertions } from './assertion-inference.js';
 
@@ -56,11 +61,19 @@ function renderAction(action: ReplayableAction): string | null {
   }
 }
 
+function isLedgerActionEvent(event: ExplorationLedgerEvent): event is ExplorationLedgerActionEvent {
+  return event.kind === 'action';
+}
+
 export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightTest[] {
   const findings = collectFindings(result.areaResults);
   const areaActions = new Map(
     result.areaResults.map((area) => [area.name, area.replayableActions ?? []] as const)
   );
+  const ledgerActions =
+    result.explorationLedger?.events.flatMap((event) =>
+      isLedgerActionEvent(event) ? [event.action] : []
+    ) ?? [];
 
   return findings
     .filter((finding) => finding.meta?.repro)
@@ -72,7 +85,12 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
         actionIds.size > 0
           ? availableActions.filter((action) => actionIds.has(action.id))
           : availableActions;
-      const renderedActions = selectedActions
+      const selectedLedgerActions =
+        actionIds.size > 0
+          ? ledgerActions.filter((action) => actionIds.has(action.id))
+          : ledgerActions;
+      const actionsToRender = selectedActions.length > 0 ? selectedActions : selectedLedgerActions;
+      const renderedActions = actionsToRender
         .map((action) => renderAction(action))
         .filter((line): line is string => Boolean(line));
       const route = finding.meta?.repro?.route ?? area?.url ?? result.targetUrl;

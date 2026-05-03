@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { CrossRunClassification } from './report/cross-run-classification.js';
+import type { CostRecord } from './coverage/cost-tracker.js';
+import type { ObservedApiEndpoint } from './network/traffic-observer.js';
 export type { CrossRunClassification };
 
 export type FindingCategory =
@@ -158,6 +160,7 @@ export interface AreaResult {
   steps: number;
   findings: RawFinding[];
   replayableActions?: ReplayableAction[];
+  explorationLedger?: ExplorationLedger;
   screenshots: Map<string, Buffer>;
   evidence: Evidence[];
   coverage: CoverageSnapshot;
@@ -203,6 +206,62 @@ export interface RunResult {
   crossRunClassification?: CrossRunClassification;
   /** SafetyGuard audit summary for blocked/allowed guarded actions. */
   safetyAudit?: SafetyAuditSummary;
+  /** Canonical timeline of exploration events for the full run. */
+  explorationLedger?: ExplorationLedger;
+}
+
+export interface ExplorationLedger {
+  version: 1;
+  events: ExplorationLedgerEvent[];
+}
+
+export type ExplorationLedgerEvent =
+  | ExplorationLedgerActionEvent
+  | ExplorationLedgerEvidenceEvent
+  | ExplorationLedgerNetworkEvent
+  | ExplorationLedgerFindingEvent
+  | ExplorationLedgerModelUsageEvent;
+
+interface ExplorationLedgerEventBase {
+  id: string;
+  timestamp: string;
+  areaName?: string;
+  stateId?: string;
+  taskId?: string;
+}
+
+export interface ExplorationLedgerActionEvent extends ExplorationLedgerEventBase {
+  kind: 'action';
+  actionId: string;
+  action: ReplayableAction;
+  agentStepId?: string;
+  source: 'action-recorder' | 'stagehand';
+}
+
+export interface ExplorationLedgerEvidenceEvent extends ExplorationLedgerEventBase {
+  kind: 'evidence';
+  evidenceId: string;
+  evidence: Evidence;
+  linkedActionIds?: string[];
+}
+
+export interface ExplorationLedgerNetworkEvent extends ExplorationLedgerEventBase {
+  kind: 'network';
+  requestId: string;
+  endpoint: ObservedApiEndpoint;
+}
+
+export interface ExplorationLedgerFindingEvent extends ExplorationLedgerEventBase {
+  kind: 'finding';
+  findingRef: string;
+  finding: RawFinding;
+  linkedEvidenceIds?: string[];
+  linkedActionIds?: string[];
+}
+
+export interface ExplorationLedgerModelUsageEvent extends ExplorationLedgerEventBase {
+  kind: 'model-usage';
+  record: CostRecord;
 }
 
 export interface SafetyAuditSummary {
@@ -331,6 +390,7 @@ export interface WorkerResult {
   findings: RawFinding[];
   evidence: Evidence[];
   replayableActions?: ReplayableAction[];
+  explorationLedger?: ExplorationLedger;
   coverageSnapshot: CoverageSnapshot;
   followupRequests: FollowupRequest[];
   discoveredEdges: DiscoveredEdge[];
@@ -436,6 +496,7 @@ export interface Checkpoint {
   blindSpots: BlindSpot[];
   completedTaskIds: string[];
   plannerState?: Record<string, WorkerType[]>;
+  explorationLedger?: ExplorationLedger;
 }
 
 // --- LLM Planner Task Proposal ---

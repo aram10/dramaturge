@@ -246,6 +246,7 @@ export async function runPlannerLoop(
         completedTaskIds: [...ctx.completedTaskIds],
         tasksExecuted,
         plannerState: ctx.planner.snapshotDispatchState(),
+        explorationLedger: ctx.runLedger,
       });
       tasksSinceCheckpoint = 0;
       ctx.logger?.info('Saved checkpoint', {

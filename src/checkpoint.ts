@@ -4,7 +4,14 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import type { Checkpoint, RawFinding, Evidence, ReplayableAction, FrontierItem } from './types.js';
+import type {
+  Checkpoint,
+  ExplorationLedger,
+  RawFinding,
+  Evidence,
+  ReplayableAction,
+  FrontierItem,
+} from './types.js';
 import type { StateGraph } from './graph/state-graph.js';
 import type { FrontierQueue } from './graph/frontier.js';
 import type { CoverageTracker } from './coverage/tracker.js';
@@ -197,6 +204,72 @@ const frontierItemSchema = z.object({
   status: frontierItemStatusSchema,
 });
 
+const ledgerEventBaseSchema = z.object({
+  id: z.string(),
+  timestamp: z.string(),
+  areaName: z.string().optional(),
+  stateId: z.string().optional(),
+  taskId: z.string().optional(),
+});
+
+const ledgerActionEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('action'),
+  actionId: z.string(),
+  action: replayableActionSchema,
+  agentStepId: z.string().optional(),
+  source: z.enum(['action-recorder', 'stagehand']),
+});
+
+const ledgerEvidenceEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('evidence'),
+  evidenceId: z.string(),
+  evidence: evidenceSchema,
+  linkedActionIds: z.array(z.string()).optional(),
+});
+
+const ledgerNetworkEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('network'),
+  requestId: z.string(),
+  endpoint: z
+    .object({
+      route: z.string(),
+      methods: z.array(z.string()),
+      statuses: z.array(z.number()),
+      failures: z.array(z.string()),
+      samples: z.array(z.object({}).passthrough()).optional(),
+      responses: z.array(z.object({ status: z.number() }).passthrough()).optional(),
+    })
+    .passthrough(),
+});
+
+const ledgerFindingEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('finding'),
+  findingRef: z.string(),
+  finding: rawFindingSchema,
+  linkedEvidenceIds: z.array(z.string()).optional(),
+  linkedActionIds: z.array(z.string()).optional(),
+});
+
+const ledgerModelUsageEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('model-usage'),
+  record: z.object({
+    model: z.string(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    costUsd: z.number(),
+    timestamp: z.string(),
+    label: z.string(),
+  }),
+});
+
+const ledgerEventSchema = z.discriminatedUnion('kind', [
+  ledgerActionEventSchema,
+  ledgerEvidenceEventSchema,
+  ledgerNetworkEventSchema,
+  ledgerFindingEventSchema,
+  ledgerModelUsageEventSchema,
+]);
+
 const checkpointSchema = z.object({
   version: z.literal(1),
   savedAt: z.string(),
@@ -212,6 +285,12 @@ const checkpointSchema = z.object({
   blindSpots: z.array(blindSpotSchema),
   completedTaskIds: z.array(z.string()),
   plannerState: z.record(z.string(), z.array(workerTypeSchema)).optional(),
+  explorationLedger: z
+    .object({
+      version: z.literal(1),
+      events: z.array(ledgerEventSchema),
+    })
+    .optional(),
 });
 
 export interface SaveCheckpointOptions {
@@ -229,6 +308,7 @@ export interface SaveCheckpointInput {
   completedTaskIds: string[];
   tasksExecuted: number;
   plannerState: Record<string, FrontierItem['workerType'][]>;
+  explorationLedger?: ExplorationLedger;
   options?: SaveCheckpointOptions;
 }
 
@@ -244,6 +324,7 @@ export function saveCheckpoint(input: SaveCheckpointInput): void {
     completedTaskIds,
     tasksExecuted,
     plannerState,
+    explorationLedger,
     options,
   } = input;
   const checkpoint: Checkpoint = {
@@ -262,6 +343,7 @@ export function saveCheckpoint(input: SaveCheckpointInput): void {
     blindSpots: coverage.getBlindSpots(),
     completedTaskIds,
     plannerState,
+    ...(explorationLedger ? { explorationLedger } : {}),
   };
 
   const path = join(outputDir, CHECKPOINT_FILE);
@@ -295,6 +377,7 @@ export function hydrateFromCheckpoint(
   completedTaskIds: Set<string>;
   tasksExecuted: number;
   plannerState: Record<string, FrontierItem['workerType'][]>;
+  explorationLedger?: ExplorationLedger;
 } {
   // Restore graph nodes
   for (const node of checkpoint.graphSnapshot.nodes) {
@@ -323,5 +406,6 @@ export function hydrateFromCheckpoint(
     completedTaskIds: new Set(checkpoint.completedTaskIds),
     tasksExecuted: checkpoint.tasksExecuted,
     plannerState: checkpoint.plannerState ?? {},
+    explorationLedger: checkpoint.explorationLedger as ExplorationLedger | undefined,
   };
 }

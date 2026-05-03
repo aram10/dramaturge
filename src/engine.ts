@@ -259,6 +259,7 @@ export async function runEngine(
     findingsByNode: new Map(),
     evidenceByNode: new Map(),
     actionsByNode: new Map(),
+    costLedgerCursor: 0,
     errorCollector,
     pageNodeOwners: new Map(),
     completedTaskIds: new Set(),

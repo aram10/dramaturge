@@ -145,6 +145,7 @@ export function buildRunResult(
     diffSummary?: DiffSummary;
     crossRunClassification?: CrossRunClassification;
     safetyAudit?: RunResult['safetyAudit'];
+    explorationLedger?: RunResult['explorationLedger'];
   } = {}
 ): RunResult {
   const {
@@ -155,6 +156,7 @@ export function buildRunResult(
     diffSummary,
     crossRunClassification,
     safetyAudit,
+    explorationLedger,
   } = options;
 
   return {
@@ -171,5 +173,6 @@ export function buildRunResult(
     diffSummary,
     crossRunClassification,
     safetyAudit,
+    explorationLedger,
   };
 }

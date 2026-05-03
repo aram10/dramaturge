@@ -36,6 +36,7 @@ export function buildAreaResults(ctx: EngineContext): AreaResult[] {
       steps: node.timesVisited,
       findings,
       replayableActions,
+      explorationLedger: ctx.runLedger,
       screenshots: new Map<string, Buffer>(),
       evidence,
       coverage: {
@@ -112,6 +113,7 @@ export function writeReports(
       diffSummary,
       crossRunClassification: ctx.crossRunClassification,
       safetyAudit,
+      explorationLedger: ctx.runLedger,
     }
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);

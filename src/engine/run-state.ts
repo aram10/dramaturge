@@ -33,6 +33,7 @@ export function restoreCheckpointState(ctx: EngineContext, resumeDir: string | u
   ctx.findingsByNode = hydrated.findingsByNode;
   ctx.evidenceByNode = hydrated.evidenceByNode;
   ctx.actionsByNode = hydrated.actionsByNode;
+  ctx.runLedger = hydrated.explorationLedger;
   ctx.completedTaskIds = hydrated.completedTaskIds;
   ctx.planner.restoreDispatchState(hydrated.plannerState);
 
