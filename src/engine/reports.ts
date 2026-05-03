@@ -14,7 +14,6 @@ import { writeGeneratedPlaywrightTests } from '../report/test-gen.js';
 import { resolveOutputFormats } from '../config.js';
 import { hasLLMApiKey } from '../llm.js';
 import type { DiffSummary } from '../types.js';
-import { appendToLedger } from '../ledger.js';
 
 export function buildAreaResults(ctx: EngineContext): AreaResult[] {
   const results: AreaResult[] = [];
