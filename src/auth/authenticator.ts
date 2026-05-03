@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { Stagehand } from '@browserbasehq/stagehand';
-import type { DramaturgeConfig } from '../config.js';
+import { resolveAuthProfile, type AuthConfig, type DramaturgeConfig } from '../config.js';
 import { adaptStagehand } from '../browser/page-interface.js';
 import { authenticateNone } from './none.js';
 import { authenticateStoredState } from './stored-state.js';
@@ -10,8 +10,18 @@ import { authenticateForm } from './form.js';
 import { authenticateOAuthRedirect } from './oauth-redirect.js';
 import { authenticateInteractive } from './interactive.js';
 
-export async function authenticate(stagehand: Stagehand, config: DramaturgeConfig): Promise<void> {
-  const { auth, targetUrl } = config;
+/**
+ * Authenticate using the provided Stagehand instance and config.
+ * If a profileName is provided and the config uses auth profiles, it will authenticate
+ * using that specific profile. Otherwise, it uses the default profile or the direct auth config.
+ */
+export async function authenticate(
+  stagehand: Stagehand,
+  config: DramaturgeConfig,
+  profileName?: string
+): Promise<void> {
+  const { targetUrl } = config;
+  const auth = resolveAuthProfile(config.auth, profileName);
   const browser = adaptStagehand(stagehand);
 
   switch (auth.type) {

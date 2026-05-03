@@ -395,14 +395,29 @@ export class MemoryStore {
   }
 
   rememberAuthFromConfig(config: DramaturgeConfig): void {
-    switch (config.auth.type) {
-      case 'form':
-      case 'oauth-redirect':
-      case 'interactive':
-        this.rememberAuthHint(config.auth.loginUrl);
-        break;
-      default:
-        break;
+    // Handle both direct auth and auth profiles
+    const authConfigs: Array<{ type: string; loginUrl?: string }> = [];
+
+    if ('profiles' in config.auth) {
+      // Auth profiles - remember all login URLs
+      authConfigs.push(...Object.values(config.auth.profiles));
+    } else {
+      // Direct auth
+      authConfigs.push(config.auth);
+    }
+
+    for (const auth of authConfigs) {
+      switch (auth.type) {
+        case 'form':
+        case 'oauth-redirect':
+        case 'interactive':
+          if ('loginUrl' in auth && auth.loginUrl) {
+            this.rememberAuthHint(auth.loginUrl);
+          }
+          break;
+        default:
+          break;
+      }
     }
   }
 

@@ -301,8 +301,9 @@ export async function runEngine(
     });
 
     // Authenticate primary browser
+    const authType = 'profiles' in config.auth ? 'multi-profile' : config.auth.type;
     logger.info('Authenticating primary browser', {
-      strategy: config.auth.type,
+      strategy: authType,
     });
     await authenticate(stagehand, config);
     logger.info('Authentication successful');
