@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
 import type { Stagehand } from '@browserbasehq/stagehand';
+import type { BrowserAgent } from '../browser/agent.js';
 import type { DramaturgeConfig } from '../config.js';
 import type {
   BudgetConfig,
@@ -37,6 +38,9 @@ export interface EngineContext {
   config: DramaturgeConfig;
   budget: BudgetConfig;
   mission: MissionConfig | undefined;
+  /** Browser agent abstraction (currently Stagehand, but can be swapped). */
+  browserAgent: BrowserAgent;
+  /** Legacy Stagehand reference - will be removed once migration is complete. */
   stagehand: Stagehand;
   page: ReturnType<Stagehand['context']['pages']>[number];
   graph: StateGraph;
