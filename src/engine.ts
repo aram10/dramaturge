@@ -143,6 +143,8 @@ export interface RunEngineOptions {
   eventStream?: EngineEventEmitter;
   /** Git ref to diff against for diff-aware exploration. Overrides config.diffAware.baseRef. */
   diffRef?: string;
+  /** Auth profile to use (for multi-role auth configs). */
+  profile?: string;
 }
 
 export async function runEngine(
@@ -304,8 +306,9 @@ export async function runEngine(
     const authType = 'profiles' in config.auth ? 'multi-profile' : config.auth.type;
     logger.info('Authenticating primary browser', {
       strategy: authType,
+      profile: options.profile,
     });
-    await authenticate(stagehand, config);
+    await authenticate(stagehand, config, options.profile);
     logger.info('Authentication successful');
     memoryStore?.rememberAuthFromConfig(config);
 
