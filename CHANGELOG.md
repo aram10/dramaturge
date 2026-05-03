@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.5.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.4.0...dramaturge-v0.5.0) (2026-05-03)
+
+
+### Features
+
+* add A2A config and instantiate components in engine ([f789e7c](https://github.com/aram10/dramaturge/commit/f789e7c1c43916ddd37ebbd6f39140eccb247d3c))
+* add A2A integration test and documentation ([1fcb164](https://github.com/aram10/dramaturge/commit/1fcb164510909ac6593f8996d7a65fe5c408e03d))
+* add auto-config command ([5b5f9cc](https://github.com/aram10/dramaturge/commit/5b5f9cc5f4dc8ee80c143e4b1b568cac62b36893))
+* add exploration ledger persisted in reports/checkpoints ([d5b9202](https://github.com/aram10/dramaturge/commit/d5b9202f5da6b60bf646e081778c645e432e91d4))
+* extend priority with API memory signal ([217e411](https://github.com/aram10/dramaturge/commit/217e411cba4bac7fc221abb749a8afefac0953bc))
+* integrate A2A task lifecycle and worker context ([6cad039](https://github.com/aram10/dramaturge/commit/6cad039e10cf055367b771345ddfdd270adc4600))
+* let test-gen fall back to ledger actions ([fd27ac6](https://github.com/aram10/dramaturge/commit/fd27ac67d195240f66132b76d375cf83eb055428))
+
+
+### Bug Fixes
+
+* address bootstrap safe-mode review feedback ([eb34ed5](https://github.com/aram10/dramaturge/commit/eb34ed5667d225f8c4cc634befae4799e059bc2d))
+* address bootstrap safe-mode review feedback ([78416a4](https://github.com/aram10/dramaturge/commit/78416a44eb1ee21cdc96a125f3c276f9b88efaef))
+* address bootstrap safe-mode review feedback ([0f89f61](https://github.com/aram10/dramaturge/commit/0f89f61e45df7ff435a86b61463d6788c837e6b2))
+* address bootstrap safe-mode review feedback ([2a0a59d](https://github.com/aram10/dramaturge/commit/2a0a59df9a89b840bd6545a4429aee396dd4addc))
+* address cross-run classification review feedback ([3dfb80d](https://github.com/aram10/dramaturge/commit/3dfb80d087f81481a1ff9bdd0342cad0966fc0bf))
+* address PR feedback for ollama/custom provider defaults ([9835e0f](https://github.com/aram10/dramaturge/commit/9835e0f6cd46caefd821e38b17a30c21f01622ee))
+* address PR review comments on auto-config ([b121289](https://github.com/aram10/dramaturge/commit/b1212890a16e0ea010da912a234c339446732ad8))
+* address PR review comments on toRelativeRoot and diff-parser test ([5e0f1f1](https://github.com/aram10/dramaturge/commit/5e0f1f15491628b177815008b259b8f22121379a))
+* address PR review feedback for SARIF, JUnit, and CLI format help ([412e842](https://github.com/aram10/dramaturge/commit/412e842cae43a365fd451f0acae2dc018af968d0))
+* address PR review feedback for triage commands ([c56f12a](https://github.com/aram10/dramaturge/commit/c56f12a04884503c84ec0e83f88a205f7b1ffd8d))
+* address PR review feedback on A2A integration ([fe0467d](https://github.com/aram10/dramaturge/commit/fe0467d028c7fe72b2a02344f900e0a18a4cbcc2))
+* address PR review feedback on ExplorationLedger implementation ([7209eb1](https://github.com/aram10/dramaturge/commit/7209eb154da5877e228071e5ba78a1ed46462eac))
+* address review concerns on bootstrap and architecture tests ([04b3fc6](https://github.com/aram10/dramaturge/commit/04b3fc6f57fa3e7dee5f3f8b797babb7e95e324b))
+* address review feedback ([d4e1de5](https://github.com/aram10/dramaturge/commit/d4e1de5a394eb9d024085037a86b385f2ff5b344))
+* address setup repo-scan PR feedback ([d118ca7](https://github.com/aram10/dramaturge/commit/d118ca7c1355567b5d650e695cb8bec7fe5de149))
+* address setup repo-scan PR feedback ([ccb3a4b](https://github.com/aram10/dramaturge/commit/ccb3a4bc8171df5b3bd3111d54e772af9670373b))
+* address triage and baseline review feedback ([a430a9a](https://github.com/aram10/dramaturge/commit/a430a9a792552c4e71ffb9177597f87fbbd19c15))
+* apply review feedback - optional safety config, URL sanitization, options objects for worker functions ([7caa93a](https://github.com/aram10/dramaturge/commit/7caa93a0d850ccb1e224b55c0f22acd9121bfcdb))
+* clarify safe-mode shell metacharacter regex ([3c08787](https://github.com/aram10/dramaturge/commit/3c08787acf3b5d42df5f8bfd66db22f64dad083f))
+* polish auto-config flow ([91dbf5b](https://github.com/aram10/dramaturge/commit/91dbf5b6585ae5700c1aa844078daf1969486a27))
+* quiet contributor hygiene checks ([ba0d821](https://github.com/aram10/dramaturge/commit/ba0d821e96ee1a951483baa87a76212b53732559))
+* quiet contributor hygiene checks ([dd3f2c3](https://github.com/aram10/dramaturge/commit/dd3f2c3f0f25ebbfccc15bf128ad04d07cb60540))
+* replace inline Blackboard import with proper import statement and add JSDoc ([ebf2906](https://github.com/aram10/dramaturge/commit/ebf2906bfbb008071351f9ccd361fa0896f25f32))
+
 ## [0.4.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.3.0...dramaturge-v0.4.0) (2026-04-21)
 
 
