@@ -28,6 +28,7 @@ import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
 import type { Observation } from '../judge/types.js';
 import { judgeWorkerObservations } from '../judge/judge.js';
 import { hasLLMApiKey, judgeObservationWithLLM } from '../llm.js';
+import type { Blackboard } from '../a2a/blackboard.js';
 
 type StagehandToolSet = NonNullable<Parameters<Stagehand['agent']>[0]>['tools'];
 
@@ -71,9 +72,13 @@ function initWorker(
     judgeConfig?: JudgeConfig;
     visionContext?: string;
     safetyGuard?: SafetyGuardLike;
+    /** A2A agent role; enables role-specific prompt sections when set. */
     agentRole?: AgentRole;
+    /** Recent blackboard summary for context injection into worker system prompt. */
     blackboardSummary?: string;
-    blackboard?: import('../a2a/blackboard.js').Blackboard;
+    /** Shared blackboard; enables the post_to_blackboard tool when set. */
+    blackboard?: Blackboard;
+    /** Agent identifier used when posting entries to the blackboard. */
     agentId?: string;
   }
 ): WorkerSetup {
@@ -338,7 +343,7 @@ export interface ExecuteWorkerTaskOptions {
   a2aContext?: {
     agentRole: AgentRole;
     agentId: string;
-    blackboard?: import('../a2a/blackboard.js').Blackboard;
+    blackboard?: Blackboard;
     blackboardSummary?: string;
   };
 }
