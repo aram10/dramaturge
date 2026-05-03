@@ -28,6 +28,8 @@ export function computePriority(
     risk: 0.2,
     coverageGap: 0.3,
     revisitPenalty: 0.2,
+    apiGap: 0.1,
+    diffApiGap: 0.05,
   };
 
   // Novelty: fraction of controls not yet exercised
@@ -55,12 +57,23 @@ export function computePriority(
       ? (ctx.diffPriorityBoost ?? 0.3)
       : 0;
 
+  const apiGap = workerType === 'api' && !ctx.memory?.hasApiHints ? 1 : 0;
+  const diffApiGap =
+    workerType === 'api' &&
+    ctx.diffContext &&
+    (ctx.diffContext.affectedApiEndpoints.length ?? 0) > 0 &&
+    !ctx.memory?.hasApiHints
+      ? 1
+      : 0;
+
   return Math.max(
     0,
     weights.novelty * unseenRatio +
       weights.risk * risk +
       weights.coverageGap * coverageGap -
       weights.revisitPenalty * revisitPenalty +
+      weights.apiGap * apiGap +
+      weights.diffApiGap * diffApiGap +
       historicalBoost +
       flakyBoost -
       suppressionPenalty -

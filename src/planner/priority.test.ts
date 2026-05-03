@@ -99,6 +99,7 @@ describe('computePriority', () => {
         hasFlakyPageNotes: true,
         hasNavigationHints: true,
         hasSuppressedFindings: false,
+        hasApiHints: false,
       },
     });
 
@@ -114,6 +115,7 @@ describe('computePriority', () => {
         hasFlakyPageNotes: false,
         hasNavigationHints: false,
         hasSuppressedFindings: true,
+        hasApiHints: false,
       },
     });
 
@@ -157,5 +159,45 @@ describe('computePriority', () => {
     });
 
     expect(notBoosted).toBeCloseTo(baseline);
+  });
+
+  it('boosts API worker when no API hints exist yet', () => {
+    const node = makeNode();
+    const baseline = computePriority(node, 'api', emptyCtx);
+    const boosted = computePriority(node, 'api', {
+      visitedWorkerTypes: new Set(),
+      memory: {
+        hasSuppressedFindings: false,
+        hasFlakyPageNotes: false,
+        hasNavigationHints: false,
+        hasApiHints: false,
+      },
+    });
+
+    expect(boosted).toBeCloseTo(baseline);
+  });
+
+  it('adds extra boost when diff indicates changed API endpoints', () => {
+    const node = makeNode({ url: 'https://app.com/dashboard' });
+    const baseline = computePriority(node, 'api', emptyCtx);
+    const boosted = computePriority(node, 'api', {
+      visitedWorkerTypes: new Set(),
+      memory: {
+        hasSuppressedFindings: false,
+        hasFlakyPageNotes: false,
+        hasNavigationHints: false,
+        hasApiHints: false,
+      },
+      diffContext: {
+        baseRef: 'origin/main',
+        changedFiles: [],
+        affectedRoutes: [],
+        affectedApiEndpoints: ['GET /api/orders'],
+        affectedRouteFamilies: [],
+      },
+      nodeUrl: node.url,
+    });
+
+    expect(boosted - baseline).toBeCloseTo(0.05);
   });
 });

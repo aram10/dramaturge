@@ -15,6 +15,7 @@ import type {
   FollowupRequest,
   DiscoveredEdge,
   MissionConfig,
+  AgentRole,
 } from '../types.js';
 import { CoverageTracker } from '../coverage/tracker.js';
 import { StagnationTracker } from './stagnation.js';
@@ -28,6 +29,7 @@ import type { Observation } from '../judge/types.js';
 import { judgeWorkerObservations } from '../judge/judge.js';
 import { hasLLMApiKey, judgeObservationWithLLM } from '../llm.js';
 import { mergeLedgerEntries } from '../ledger.js';
+import type { Blackboard } from '../a2a/blackboard.js';
 
 type StagehandToolSet = NonNullable<Parameters<Stagehand['agent']>[0]>['tools'];
 
@@ -71,6 +73,14 @@ function initWorker(
     judgeConfig?: JudgeConfig;
     visionContext?: string;
     safetyGuard?: SafetyGuardLike;
+    /** A2A agent role; enables role-specific prompt sections when set. */
+    agentRole?: AgentRole;
+    /** Recent blackboard summary for context injection into worker system prompt. */
+    blackboardSummary?: string;
+    /** Shared blackboard; enables the post_to_blackboard tool when set. */
+    blackboard?: Blackboard;
+    /** Agent identifier used when posting entries to the blackboard. */
+    agentId?: string;
   }
 ): WorkerSetup {
   const observations: Observation[] = [];
@@ -116,6 +126,8 @@ function initWorker(
           : opts.objectiveLabel,
       },
       actionRecorder,
+      blackboard: opts.blackboard,
+      agentId: opts.agentId,
     }
   );
   const stagehandTools: StagehandToolSet = tools;
@@ -133,7 +145,9 @@ function initWorker(
     opts.history,
     opts.workerType,
     opts.adversarialConfig,
-    opts.visionContext
+    opts.visionContext,
+    opts.agentRole,
+    opts.blackboardSummary
   );
 
   const agent = stagehand.agent({
@@ -355,6 +369,13 @@ export interface ExecuteWorkerTaskOptions {
   judgeConfig?: JudgeConfig;
   visionContext?: string;
   safetyGuard?: SafetyGuardLike;
+  /** A2A multi-agent context (optional). */
+  a2aContext?: {
+    agentRole: AgentRole;
+    agentId: string;
+    blackboard?: Blackboard;
+    blackboardSummary?: string;
+  };
 }
 
 export async function executeWorkerTask(
@@ -378,6 +399,7 @@ export async function executeWorkerTask(
     judgeConfig,
     visionContext,
     safetyGuard,
+    a2aContext,
   } = opts;
   const {
     observations,
@@ -409,6 +431,10 @@ export async function executeWorkerTask(
     judgeConfig,
     visionContext,
     safetyGuard,
+    agentRole: a2aContext?.agentRole,
+    blackboardSummary: a2aContext?.blackboardSummary,
+    blackboard: a2aContext?.blackboard,
+    agentId: a2aContext?.agentId,
   });
 
   try {

@@ -47,6 +47,9 @@ import {
   seedFrontierIfNeeded,
 } from './engine/run-state.js';
 import { attachSafetyRequestGuard, createSafetyGuardForConfig } from './engine/safety.js';
+import { Blackboard } from './a2a/blackboard.js';
+import { MessageBus } from './a2a/message-bus.js';
+import { Coordinator } from './a2a/coordinator.js';
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -216,8 +219,28 @@ export async function runEngine(
     budget.costLimitUsd && budget.costLimitUsd > 0 ? budget.costLimitUsd : Infinity
   );
 
-  const planner = new Planner();
-  planner.diffPriorityBoost = config.diffAware.priorityBoost;
+  // A2A multi-agent coordination layer (optional)
+  let blackboard: Blackboard | undefined;
+  let messageBus: MessageBus | undefined;
+  let coordinator: Coordinator | undefined;
+
+  if (config.a2a.enabled) {
+    blackboard = new Blackboard({ maxEntries: config.a2a.maxBlackboardEntries });
+    messageBus = new MessageBus({ maxHistory: config.a2a.maxMessageHistory });
+    coordinator = new Coordinator({ blackboard, messageBus });
+    coordinator.diffPriorityBoost = config.diffAware.priorityBoost;
+    logger.info('A2A multi-agent mode enabled', {
+      agents: coordinator.listAgents().length,
+      blackboardMaxEntries: config.a2a.maxBlackboardEntries,
+      messageBusMaxHistory: config.a2a.maxMessageHistory,
+    });
+  }
+
+  // Use the coordinator in the planner role when A2A is enabled.
+  const planner = coordinator ?? new Planner();
+  if (!coordinator) {
+    planner.diffPriorityBoost = config.diffAware.priorityBoost;
+  }
 
   const ctx: EngineContext = {
     config,
@@ -249,6 +272,9 @@ export async function runEngine(
     safetyGuard,
     eventStream,
     logger,
+    blackboard,
+    messageBus,
+    coordinator,
     createIsolatedApiRequestContext: () =>
       playwrightRequest.newContext({
         baseURL: config.targetUrl,
