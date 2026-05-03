@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { authenticateStoredState } from './stored-state.js';
 
@@ -28,6 +28,10 @@ vi.mock('./success-indicator.js', () => ({
 }));
 
 describe('authenticateStoredState', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('applies the storage state and does not validate without an indicator', async () => {
     mocks.readFileSync.mockReturnValue(JSON.stringify({ cookies: [], origins: [] }));
     mocks.applyStorageState.mockResolvedValue(undefined);
@@ -48,7 +52,7 @@ describe('authenticateStoredState', () => {
 
     await authenticateStoredState({}, 'https://example.com', '/tmp/state.json', 'text:ok');
 
-    expect(mocks.getPrimaryPage).toHaveBeenCalledTimes(2);
+    expect(mocks.getPrimaryPage).toHaveBeenCalledTimes(1);
     expect(mocks.waitForSuccess).toHaveBeenCalledTimes(1);
   });
 });

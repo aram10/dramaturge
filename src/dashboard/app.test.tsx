@@ -1,12 +1,12 @@
-import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-
-import { render } from 'ink-testing-library';
+import { Box, Text } from 'ink';
+import { renderToString } from 'react-dom/server';
+import { describe, expect, it } from 'vitest';
 
 import { Dashboard } from './app.js';
 
 function makeEventStream() {
   const handlers = new Map<string, Set<(...args: unknown[]) => void>>();
+
   return {
     emit: (event: string, ...args: unknown[]) => {
       for (const handler of handlers.get(event) ?? []) handler(...args);
@@ -23,9 +23,17 @@ function makeEventStream() {
 }
 
 describe('Dashboard', () => {
-  it('renders without crashing', () => {
+  it('renders a header label without crashing', () => {
     const eventStream = makeEventStream();
-    const { lastFrame } = render(<Dashboard eventStream={eventStream as never} />);
-    expect(lastFrame()).toBeTypeOf('string');
+
+    const output = renderToString(
+      <Box>
+        <Text>
+          <Dashboard eventStream={eventStream} />
+        </Text>
+      </Box>
+    );
+
+    expect(output).toContain('Dramaturge Dashboard');
   });
 });

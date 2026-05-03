@@ -47,9 +47,7 @@ describe('authenticate', () => {
         auth: {
           type: 'stored-state',
           stateFile: '/tmp/auth.json',
-          successIndicator: {
-            type: 'none',
-          },
+          successIndicator: 'selector:body',
         },
       } as const
     );
