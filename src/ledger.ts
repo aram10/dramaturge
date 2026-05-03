@@ -106,21 +106,23 @@ export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
     if (matched) {
       continue;
     }
+    const timestamp = stagehandAction.timestamp ?? new Date().toISOString();
+    const actionId = ledgerId('stg');
     events.push({
       id: ledgerId('le'),
       kind: 'action',
-      timestamp: stagehandAction.timestamp ?? new Date().toISOString(),
+      timestamp,
       areaName: context?.areaName,
       stateId: context?.stateId,
       taskId: context?.taskId,
-      actionId: ledgerId('stg'),
+      actionId,
       action: {
-        id: ledgerId('stg'),
+        id: actionId,
         kind: 'open',
         summary,
         source: 'page',
         status: 'recorded',
-        timestamp: stagehandAction.timestamp ?? new Date().toISOString(),
+        timestamp,
       },
       source: 'stagehand',
     });
