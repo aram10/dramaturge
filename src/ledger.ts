@@ -39,10 +39,6 @@ function inferTimestamp(value: { timestamp?: string } | undefined): string {
   return new Date().toISOString();
 }
 
-function toActionIdSet(actions: ReplayableAction[]): Set<string> {
-  return new Set(actions.map((action) => action.id));
-}
-
 function normalizeStagehandActions(value: unknown): Array<{ summary: string; timestamp?: string }> {
   if (!Array.isArray(value)) {
     return [];
@@ -83,7 +79,6 @@ export function createExplorationLedger(events: ExplorationLedgerEvent[] = []): 
 export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
   const context = input.context;
   const events: ExplorationLedgerEvent[] = [];
-  const actionIdSet = toActionIdSet(input.actionRecorderActions);
 
   for (const action of input.actionRecorderActions) {
     events.push({
@@ -129,7 +124,6 @@ export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
   }
 
   for (const ev of input.evidence) {
-    const linkedActionIds = ev.relatedFindingIds.length > 0 ? undefined : undefined;
     events.push({
       id: ledgerId('le'),
       kind: 'evidence',
@@ -139,7 +133,6 @@ export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
       taskId: context?.taskId,
       evidenceId: ev.id,
       evidence: ev,
-      linkedActionIds,
     });
   }
 

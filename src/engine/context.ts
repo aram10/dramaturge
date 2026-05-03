@@ -51,6 +51,8 @@ export interface EngineContext {
   evidenceByNode: Map<string, Evidence[]>;
   actionsByNode: Map<string, ReplayableAction[]>;
   runLedger?: ExplorationLedger;
+  /** Index into CostTracker records marking the start of records not yet appended to runLedger. */
+  costLedgerCursor: number;
   errorCollector: BrowserErrorCollector;
   pageNodeOwners: Map<string, string>;
   completedTaskIds: Set<string>;

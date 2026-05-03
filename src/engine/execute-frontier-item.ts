@@ -92,12 +92,15 @@ export async function executeFrontierItem(
       config: ctx.config.apiTesting,
     });
 
+    const allCostRecords = ctx.costTracker?.getRecords() ?? [];
+    const newCostRecords = allCostRecords.slice(ctx.costLedgerCursor);
+    ctx.costLedgerCursor = allCostRecords.length;
     const apiLedger = mergeLedgerEntries({
       actionRecorderActions: [],
       evidence: result.evidence,
       findings: result.findings,
       observedApiEndpoints,
-      costRecords: ctx.costTracker?.getRecords(),
+      costRecords: newCostRecords,
       context: { areaName: node.title ?? node.id, stateId: node.id, taskId: item.id },
     });
     ctx.runLedger = appendToLedger(ctx.runLedger, apiLedger);
@@ -246,12 +249,15 @@ export async function executeFrontierItem(
   }
 
   if (apiContract.findings.length > 0 || apiContract.evidence.length > 0) {
+    const allCostRecords = ctx.costTracker?.getRecords() ?? [];
+    const newCostRecords = allCostRecords.slice(ctx.costLedgerCursor);
+    ctx.costLedgerCursor = allCostRecords.length;
     const contractLedger = mergeLedgerEntries({
       actionRecorderActions: [],
       evidence: apiContract.evidence,
       findings: apiContract.findings,
       observedApiEndpoints,
-      costRecords: ctx.costTracker?.getRecords(),
+      costRecords: newCostRecords,
       context: { areaName: node.title ?? node.id, stateId: node.id, taskId: item.id },
     });
     ctx.runLedger = appendToLedger(ctx.runLedger, contractLedger);

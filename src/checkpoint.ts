@@ -204,6 +204,72 @@ const frontierItemSchema = z.object({
   status: frontierItemStatusSchema,
 });
 
+const ledgerEventBaseSchema = z.object({
+  id: z.string(),
+  timestamp: z.string(),
+  areaName: z.string().optional(),
+  stateId: z.string().optional(),
+  taskId: z.string().optional(),
+});
+
+const ledgerActionEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('action'),
+  actionId: z.string(),
+  action: replayableActionSchema,
+  agentStepId: z.string().optional(),
+  source: z.enum(['action-recorder', 'stagehand']),
+});
+
+const ledgerEvidenceEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('evidence'),
+  evidenceId: z.string(),
+  evidence: evidenceSchema,
+  linkedActionIds: z.array(z.string()).optional(),
+});
+
+const ledgerNetworkEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('network'),
+  requestId: z.string(),
+  endpoint: z
+    .object({
+      route: z.string(),
+      methods: z.array(z.string()),
+      statuses: z.array(z.number()),
+      failures: z.array(z.string()),
+      samples: z.array(z.object({}).passthrough()).optional(),
+      responses: z.array(z.object({ status: z.number() }).passthrough()).optional(),
+    })
+    .passthrough(),
+});
+
+const ledgerFindingEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('finding'),
+  findingRef: z.string(),
+  finding: rawFindingSchema,
+  linkedEvidenceIds: z.array(z.string()).optional(),
+  linkedActionIds: z.array(z.string()).optional(),
+});
+
+const ledgerModelUsageEventSchema = ledgerEventBaseSchema.extend({
+  kind: z.literal('model-usage'),
+  record: z.object({
+    model: z.string(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    costUsd: z.number(),
+    timestamp: z.string(),
+    label: z.string(),
+  }),
+});
+
+const ledgerEventSchema = z.discriminatedUnion('kind', [
+  ledgerActionEventSchema,
+  ledgerEvidenceEventSchema,
+  ledgerNetworkEventSchema,
+  ledgerFindingEventSchema,
+  ledgerModelUsageEventSchema,
+]);
+
 const checkpointSchema = z.object({
   version: z.literal(1),
   savedAt: z.string(),
@@ -222,7 +288,7 @@ const checkpointSchema = z.object({
   explorationLedger: z
     .object({
       version: z.literal(1),
-      events: z.array(z.unknown()),
+      events: z.array(ledgerEventSchema),
     })
     .optional(),
 });
