@@ -71,6 +71,10 @@ function initWorker(
     judgeConfig?: JudgeConfig;
     visionContext?: string;
     safetyGuard?: SafetyGuardLike;
+    agentRole?: AgentRole;
+    blackboardSummary?: string;
+    blackboard?: import('../a2a/blackboard.js').Blackboard;
+    agentId?: string;
   }
 ): WorkerSetup {
   const observations: Observation[] = [];
@@ -116,6 +120,8 @@ function initWorker(
           : opts.objectiveLabel,
       },
       actionRecorder,
+      blackboard: opts.blackboard,
+      agentId: opts.agentId,
     }
   );
   const stagehandTools: StagehandToolSet = tools;
@@ -133,7 +139,9 @@ function initWorker(
     opts.history,
     opts.workerType,
     opts.adversarialConfig,
-    opts.visionContext
+    opts.visionContext,
+    opts.agentRole,
+    opts.blackboardSummary
   );
 
   const agent = stagehand.agent({
@@ -356,6 +364,7 @@ export async function executeWorkerTask(
     judgeConfig,
     visionContext,
     safetyGuard,
+    a2aContext,
   } = opts;
   const {
     observations,
@@ -387,6 +396,10 @@ export async function executeWorkerTask(
     judgeConfig,
     visionContext,
     safetyGuard,
+    agentRole: a2aContext?.agentRole,
+    blackboardSummary: a2aContext?.blackboardSummary,
+    blackboard: a2aContext?.blackboard,
+    agentId: a2aContext?.agentId,
   });
 
   try {

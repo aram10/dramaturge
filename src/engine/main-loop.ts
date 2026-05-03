@@ -112,10 +112,16 @@ async function processTaskBatch(
         ctx.coordinator.updateTaskStatus(a2aTaskId, 'failed');
       }
     } else if (a2aTaskId && ctx.coordinator) {
-      // A2A: Complete task with summary
-      const findingsCount = result.result.findings?.length ?? 0;
-      const summary = `${item.workerType} task on ${item.objective}`;
-      ctx.coordinator.completeTask(a2aTaskId, summary, findingsCount);
+      // A2A: Update task status based on actual worker outcome
+      const outcome = result.result.outcome;
+      if (outcome === 'completed') {
+        const findingsCount = result.result.findings?.length ?? 0;
+        const summary = `${item.workerType} task on ${item.objective}`;
+        ctx.coordinator.completeTask(a2aTaskId, summary, findingsCount);
+      } else {
+        // 'failed', 'blocked', and 'timed-out' all map to A2A 'failed' status
+        ctx.coordinator.updateTaskStatus(a2aTaskId, 'failed');
+      }
     }
 
     return {

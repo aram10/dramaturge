@@ -13,7 +13,7 @@ import type { NavigationMemorySnapshot } from './types.js';
 export interface SeedGraphFromNavigationMemoryInput {
   graph: StateGraph;
   frontier: FrontierQueue;
-  /** Planner or Coordinator (when A2A is enabled). Coordinator extends Planner. */
+  /** Planner or Coordinator (when A2A is enabled). Coordinator implements a planner-compatible API used here. */
   planner: Planner | Coordinator;
   snapshot: NavigationMemorySnapshot;
   mission?: MissionConfig;

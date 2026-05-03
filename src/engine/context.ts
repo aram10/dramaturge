@@ -40,7 +40,7 @@ export interface EngineContext {
   page: ReturnType<Stagehand['context']['pages']>[number];
   graph: StateGraph;
   frontier: FrontierQueue;
-  /** Planner or Coordinator (when A2A is enabled). Coordinator extends Planner. */
+  /** Planner or Coordinator (when A2A is enabled). Coordinator implements a planner-compatible API used here. */
   planner: Planner | Coordinator;
   navigator: Navigator;
   globalCoverage: CoverageTracker;
