@@ -79,17 +79,18 @@ const AuthConfigSchema = z.discriminatedUnion('type', [
 const AuthProfilesSchema = z
   .object({
     profiles: z
-      .record(z.string(), AuthConfigSchema)
+      .record(z.string().min(1), AuthConfigSchema)
       .refine((profiles) => Object.keys(profiles).length > 0, {
         message: 'At least one auth profile is required when using profiles.',
       }),
-    default: z.string().optional(),
+    default: z.string().min(1).optional(),
   })
+  .strict()
   .refine((value) => !value.default || value.profiles[value.default] !== undefined, {
     message: 'The default profile must exist in the profiles object.',
   });
 
-const AuthSchema = z.union([AuthConfigSchema, AuthProfilesSchema]).default({ type: 'none' });
+const AuthSchema = z.union([AuthProfilesSchema, AuthConfigSchema]).default({ type: 'none' });
 
 const WorkerModelsSchema = z
   .object({

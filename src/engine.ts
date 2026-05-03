@@ -310,7 +310,7 @@ export async function runEngine(
     });
     await authenticate(stagehand, config, options.profile);
     logger.info('Authentication successful');
-    memoryStore?.rememberAuthFromConfig(config);
+    memoryStore?.rememberAuthFromConfig(config, options.profile);
 
     if (concurrency > 1) {
       const sharedWorkerState = await captureStorageState(

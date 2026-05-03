@@ -394,13 +394,21 @@ export class MemoryStore {
     this.persist(snapshot);
   }
 
-  rememberAuthFromConfig(config: DramaturgeConfig): void {
+  rememberAuthFromConfig(config: DramaturgeConfig, profile?: string): void {
     // Handle both direct auth and auth profiles
+    // When using profiles, only remember the active profile's login URL to avoid
+    // polluting planner hints with login routes from unrelated roles.
     const authConfigs: Array<{ type: string; loginUrl?: string }> = [];
 
     if ('profiles' in config.auth) {
-      // Auth profiles - remember all login URLs
-      authConfigs.push(...Object.values(config.auth.profiles));
+      const activeProfileName = profile ?? config.auth.default;
+      if (activeProfileName) {
+        const activeProfile = config.auth.profiles[activeProfileName];
+        if (activeProfile) {
+          authConfigs.push(activeProfile);
+        }
+      }
+      // If no profile is resolved (no active and no default), remember nothing.
     } else {
       // Direct auth
       authConfigs.push(config.auth);

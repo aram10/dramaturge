@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { resolve } from 'node:path';
-import type { DramaturgeConfig } from './config.js';
+import type { AuthConfig, DramaturgeConfig } from './config.js';
 
 export interface ConfigFileContext {
   configPath: string;
@@ -38,7 +38,7 @@ export function normalizeConfigPaths(
   const auth = (() => {
     if ('profiles' in config.auth) {
       // Auth profiles - normalize each profile
-      const normalizedProfiles: Record<string, any> = {};
+      const normalizedProfiles: Record<string, AuthConfig> = {};
       for (const [name, profile] of Object.entries(config.auth.profiles)) {
         if (profile.type === 'interactive' || profile.type === 'stored-state') {
           normalizedProfiles[name] = {
