@@ -197,6 +197,121 @@ async function safeStagehandActions(result: unknown): Promise<unknown> {
   return record.actions;
 }
 
+async function materializeObservedFindingsSafe(input: {
+  observations: WorkerSetup['observations'];
+  evidence: WorkerSetup['evidence'];
+  actionRecorder: WorkerSetup['actionRecorder'];
+  judgeConfig?: JudgeConfig;
+  judgeModel?: string;
+}): Promise<Awaited<ReturnType<typeof materializeObservedFindings>>> {
+  try {
+    return await materializeObservedFindings(input);
+  } catch {
+    return [];
+  }
+}
+
+async function buildWorkerExecutionResult(input: {
+  task: WorkerTask;
+  model: string;
+  judgeConfig?: JudgeConfig;
+  observations: WorkerSetup['observations'];
+  evidence: WorkerSetup['evidence'];
+  actionRecorder: WorkerSetup['actionRecorder'];
+  coverageTracker: WorkerSetup['coverageTracker'];
+  followupRequests: WorkerSetup['followupRequests'];
+  discoveredEdges: WorkerSetup['discoveredEdges'];
+  observedApiEndpoints?: ObservedApiEndpoint[];
+  stagehandResult?: unknown;
+  outcome: WorkerResult['outcome'];
+  summary: string;
+}): Promise<WorkerResult> {
+  const findings = await materializeObservedFindingsSafe({
+    observations: input.observations,
+    evidence: input.evidence,
+    actionRecorder: input.actionRecorder,
+    judgeConfig: input.judgeConfig,
+    judgeModel: input.model,
+  });
+  const stagehandActions = input.stagehandResult
+    ? await safeStagehandActions(input.stagehandResult)
+    : undefined;
+  const explorationLedger = mergeLedgerEntries({
+    actionRecorderActions: input.actionRecorder.getActions(),
+    ...(stagehandActions ? { stagehandActions } : {}),
+    evidence: input.evidence,
+    findings,
+    observedApiEndpoints: input.observedApiEndpoints,
+    context: {
+      areaName: input.task.nodeId,
+      stateId: input.task.nodeId,
+      taskId: input.task.id,
+    },
+  });
+
+  return {
+    taskId: input.task.id,
+    findings,
+    evidence: input.evidence,
+    replayableActions: input.actionRecorder.getActions(),
+    coverageSnapshot: input.coverageTracker.snapshot(),
+    followupRequests: input.followupRequests,
+    discoveredEdges: input.discoveredEdges,
+    explorationLedger,
+    outcome: input.outcome,
+    summary: input.summary,
+  };
+}
+
+interface StagehandAgentExecuteArgs {
+  instruction: string;
+  maxSteps: number;
+  signal?: AbortSignal;
+}
+
+type StagehandAgentExecuteOutcome =
+  | { kind: 'completed'; result: unknown }
+  | { kind: 'timed-out' }
+  | { kind: 'error'; error: unknown };
+
+async function runStagehandExecute(input: {
+  agent: WorkerSetup['agent'];
+  args: StagehandAgentExecuteArgs;
+  timeoutMs?: number;
+}): Promise<StagehandAgentExecuteOutcome> {
+  const execute = input.agent.execute as unknown as (
+    args: StagehandAgentExecuteArgs
+  ) => Promise<unknown>;
+  const timeoutMs = input.timeoutMs;
+  if (!timeoutMs || timeoutMs <= 0) {
+    try {
+      return { kind: 'completed', result: await execute(input.args) };
+    } catch (error) {
+      return { kind: 'error', error };
+    }
+  }
+
+  const controller = new AbortController();
+  const executePromise = execute({ ...input.args, signal: controller.signal }).then(
+    (result) => ({ kind: 'completed' as const, result }),
+    (error) => ({ kind: 'error' as const, error })
+  );
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<StagehandAgentExecuteOutcome>((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ kind: 'timed-out' });
+      controller.abort();
+    }, timeoutMs);
+  });
+
+  const outcome = await Promise.race([executePromise, timeoutPromise]);
+  if (timeoutId) {
+    clearTimeout(timeoutId);
+  }
+  return outcome;
+}
+
 export interface ExploreAreaOptions {
   appDescription: string;
   model: string;
@@ -356,6 +471,7 @@ export async function exploreArea(
 export interface ExecuteWorkerTaskOptions {
   model: string;
   screenshotDir: string;
+  timeoutMs?: number;
   agentMode?: 'cua' | 'dom';
   screenshotsEnabled?: boolean;
   stagnationThreshold?: number;
@@ -386,6 +502,7 @@ export async function executeWorkerTask(
   const {
     model,
     screenshotDir,
+    timeoutMs,
     agentMode = 'cua',
     screenshotsEnabled = true,
     stagnationThreshold = 0,
@@ -438,78 +555,87 @@ export async function executeWorkerTask(
   });
 
   try {
-    const result = await agent.execute({
-      instruction:
-        task.workerType === 'adversarial'
-          ? `${task.objective}\nPrioritize stale-state, replay, idempotency, and boundary-value probes. Stay read-only unless the run explicitly allows mutation-dependent adversarial sequences.`
-          : task.objective,
-      maxSteps: task.maxSteps,
+    const executeOutcome = await runStagehandExecute({
+      agent,
+      args: {
+        instruction:
+          task.workerType === 'adversarial'
+            ? `${task.objective}\nPrioritize stale-state, replay, idempotency, and boundary-value probes. Stay read-only unless the run explicitly allows mutation-dependent adversarial sequences.`
+            : task.objective,
+        maxSteps: task.maxSteps,
+      },
+      timeoutMs,
     });
 
-    const findings = await materializeObservedFindings({
-      observations,
-      evidence,
-      actionRecorder,
-      judgeConfig,
-      judgeModel: model,
-    });
-
-    const stagehandActions = await safeStagehandActions(result);
-    const explorationLedger = mergeLedgerEntries({
-      actionRecorderActions: actionRecorder.getActions(),
-      stagehandActions,
-      evidence,
-      findings,
-      observedApiEndpoints,
-      context: { areaName: task.nodeId, stateId: task.nodeId, taskId: task.id },
-    });
-
-    return {
-      taskId: task.id,
-      findings,
-      evidence,
-      replayableActions: actionRecorder.getActions(),
-      coverageSnapshot: coverageTracker.snapshot(),
-      followupRequests,
-      discoveredEdges,
-      explorationLedger,
-      outcome: 'completed',
-      summary: `Completed ${task.workerType} task: ${task.objective}`,
-    };
-  } catch (error) {
-    let findings: Awaited<ReturnType<typeof materializeObservedFindings>> = [];
-    try {
-      findings = await materializeObservedFindings({
+    if (executeOutcome.kind === 'completed') {
+      return await buildWorkerExecutionResult({
+        task,
+        model,
+        judgeConfig,
         observations,
         evidence,
         actionRecorder,
-        judgeConfig,
-        judgeModel: model,
+        coverageTracker,
+        followupRequests,
+        discoveredEdges,
+        observedApiEndpoints,
+        stagehandResult: executeOutcome.result,
+        outcome: 'completed',
+        summary: `Completed ${task.workerType} task: ${task.objective}`,
       });
-    } catch {
-      // Judge failed to materialize findings; return empty findings array
     }
 
-    const explorationLedger = mergeLedgerEntries({
-      actionRecorderActions: actionRecorder.getActions(),
-      evidence,
-      findings,
-      observedApiEndpoints,
-      context: { areaName: task.nodeId, stateId: task.nodeId, taskId: task.id },
-    });
+    if (executeOutcome.kind === 'timed-out') {
+      return await buildWorkerExecutionResult({
+        task,
+        model,
+        judgeConfig,
+        observations,
+        evidence,
+        actionRecorder,
+        coverageTracker,
+        followupRequests,
+        discoveredEdges,
+        observedApiEndpoints,
+        outcome: 'timed-out',
+        summary: timeoutMs ? `Timed out after ${timeoutMs}ms` : 'Timed out',
+      });
+    }
 
-    return {
-      taskId: task.id,
-      findings,
+    const message =
+      executeOutcome.error instanceof Error
+        ? executeOutcome.error.message
+        : String(executeOutcome.error);
+    return await buildWorkerExecutionResult({
+      task,
+      model,
+      judgeConfig,
+      observations,
       evidence,
-      replayableActions: actionRecorder.getActions(),
-      coverageSnapshot: coverageTracker.snapshot(),
+      actionRecorder,
+      coverageTracker,
       followupRequests,
       discoveredEdges,
-      explorationLedger,
+      observedApiEndpoints,
       outcome: 'failed',
-      summary: error instanceof Error ? error.message : String(error),
-    };
+      summary: message,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return await buildWorkerExecutionResult({
+      task,
+      model,
+      judgeConfig,
+      observations,
+      evidence,
+      actionRecorder,
+      coverageTracker,
+      followupRequests,
+      discoveredEdges,
+      observedApiEndpoints,
+      outcome: 'failed',
+      summary: message,
+    });
   } finally {
     actionRecorder.stop();
   }

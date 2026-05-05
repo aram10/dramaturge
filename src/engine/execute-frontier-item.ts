@@ -26,6 +26,7 @@ export interface ExecuteFrontierItemDeps {
   item: FrontierItem;
   taskNumber: number;
   pageKey: string;
+  taskTimeoutMs?: number;
   logPrefix?: string;
   /** A2A task ID when multi-agent mode is enabled. */
   a2aTaskId?: string;
@@ -34,7 +35,17 @@ export interface ExecuteFrontierItemDeps {
 export async function executeFrontierItem(
   deps: ExecuteFrontierItemDeps
 ): Promise<{ item: FrontierItem; result: WorkerResult | null }> {
-  const { ctx, stagehand, page, item, taskNumber, pageKey, logPrefix = '', a2aTaskId } = deps;
+  const {
+    ctx,
+    stagehand,
+    page,
+    item,
+    taskNumber,
+    pageKey,
+    taskTimeoutMs,
+    logPrefix = '',
+    a2aTaskId,
+  } = deps;
   const node = ctx.graph.getNode(item.nodeId);
   const nodeUrl = node.url ?? ctx.config.targetUrl;
 
@@ -227,6 +238,7 @@ export async function executeFrontierItem(
     {
       model,
       screenshotDir: ctx.screenshotDir,
+      timeoutMs: taskTimeoutMs,
       agentMode: resolveAgentMode(ctx.config, item.workerType),
       screenshotsEnabled: ctx.config.output.screenshots,
       stagnationThreshold: ctx.config.budget.stagnationThreshold ?? 0,
