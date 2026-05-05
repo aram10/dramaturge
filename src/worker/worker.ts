@@ -132,23 +132,23 @@ function initWorker(
   );
   const stagehandTools: StagehandToolSet = tools;
 
-  const systemPrompt = buildWorkerSystemPrompt(
-    opts.appDescription,
-    opts.objectiveLabel,
-    opts.objectiveDescription,
-    opts.pageType,
-    opts.appContext,
-    opts.repoHints,
-    opts.contractSummary,
-    opts.observedApiEndpoints,
-    opts.mission,
-    opts.history,
-    opts.workerType,
-    opts.adversarialConfig,
-    opts.visionContext,
-    opts.agentRole,
-    opts.blackboardSummary
-  );
+  const systemPrompt = buildWorkerSystemPrompt({
+    appDescription: opts.appDescription,
+    areaName: opts.objectiveLabel,
+    areaDescription: opts.objectiveDescription,
+    pageType: opts.pageType,
+    appContext: opts.appContext,
+    repoHints: opts.repoHints,
+    contractSummary: opts.contractSummary,
+    observedApiEndpoints: opts.observedApiEndpoints,
+    mission: opts.mission,
+    history: opts.history,
+    workerType: opts.workerType,
+    adversarialConfig: opts.adversarialConfig,
+    visionContext: opts.visionContext,
+    agentRole: opts.agentRole,
+    blackboardSummary: opts.blackboardSummary,
+  });
 
   const agent = stagehand.agent({
     mode: opts.agentMode,

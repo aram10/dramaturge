@@ -17,9 +17,13 @@ function expectInsideUntrustedSection(prompt: string, label: string, text: strin
 
 describe('buildWorkerSystemPrompt', () => {
   it('includes app context known patterns when provided', () => {
-    const prompt = buildWorkerSystemPrompt('A todo app', 'Main', undefined, undefined, {
-      knownPatterns: ["Empty list shows 'No items yet'"],
-      notBugs: ['Loading spinner appears for up to 3 seconds'],
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      appContext: {
+        knownPatterns: ["Empty list shows 'No items yet'"],
+        notBugs: ['Loading spinner appears for up to 3 seconds'],
+      },
     });
     expect(prompt).toContain('No items yet');
     expect(prompt).toContain('Loading spinner appears for up to 3 seconds');
@@ -27,38 +31,46 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('omits app context section when not provided', () => {
-    const prompt = buildWorkerSystemPrompt('A todo app', 'Main');
+    const prompt = buildWorkerSystemPrompt({ appDescription: 'A todo app', areaName: 'Main' });
     expect(prompt).not.toContain('Known Patterns');
     expect(prompt).not.toContain('NOT bugs');
   });
 
   it('includes ignored behaviors when provided', () => {
-    const prompt = buildWorkerSystemPrompt('A todo app', 'Main', undefined, undefined, {
-      ignoredBehaviors: ['Occasional 500ms delay on API calls'],
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      appContext: {
+        ignoredBehaviors: ['Occasional 500ms delay on API calls'],
+      },
     });
     expect(prompt).toContain('500ms delay on API calls');
     expect(prompt).toContain('Ignore');
   });
 
   it('includes compact repo hints when provided', () => {
-    const prompt = buildWorkerSystemPrompt('A todo app', 'Main', undefined, undefined, undefined, {
-      routes: ['/login', '/manage/knowledge-bases', '/?kb=starter'],
-      routeFamilies: ['/', '/login', '/manage'],
-      stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
-      apiEndpoints: [
-        {
-          route: '/api/manage/knowledge-bases',
-          methods: ['GET'],
-          statuses: [401, 403],
-          authRequired: true,
-          validationSchemas: ['CreateKnowledgeBaseSchema'],
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      repoHints: {
+        routes: ['/login', '/manage/knowledge-bases', '/?kb=starter'],
+        routeFamilies: ['/', '/login', '/manage'],
+        stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
+        apiEndpoints: [
+          {
+            route: '/api/manage/knowledge-bases',
+            methods: ['GET'],
+            statuses: [401, 403],
+            authRequired: true,
+            validationSchemas: ['CreateKnowledgeBaseSchema'],
+          },
+        ],
+        authHints: {
+          loginRoutes: ['/login'],
+          callbackRoutes: ['/auth/callback'],
         },
-      ],
-      authHints: {
-        loginRoutes: ['/login'],
-        callbackRoutes: ['/auth/callback'],
+        expectedHttpNoise: [],
       },
-      expectedHttpNoise: [],
     });
 
     expect(prompt).toContain('Repo Hints');
@@ -75,23 +87,18 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('includes observed API traffic when provided', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Main',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      [
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      observedApiEndpoints: [
         {
           route: '/api/widgets',
           methods: ['GET', 'POST'],
           statuses: [0, 200, 201],
           failures: ['net::ERR_CONNECTION_RESET'],
         },
-      ]
-    );
+      ],
+    });
 
     expect(prompt).toContain('Observed API Traffic');
     expect(prompt).toContain('GET/POST /api/widgets');
@@ -100,16 +107,11 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('includes condensed contract summaries when provided', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Main',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      ['POST /api/widgets (statuses 201, 400; request body required)'],
-      undefined
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      contractSummary: ['POST /api/widgets (statuses 201, 400; request body required)'],
+    });
 
     expect(prompt).toContain('Contract Expectations');
     expect(prompt).toContain('POST /api/widgets');
@@ -117,21 +119,16 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('adds stronger safety guidance when destructive actions are disabled', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Main',
-      undefined,
-      'list',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      {
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      pageType: 'list',
+      mission: {
         appDescription: 'A todo app',
         destructiveActionsAllowed: false,
         criticalFlows: ['knowledge-bases', 'search'],
-      }
-    );
+      },
+    });
 
     expect(prompt).toContain('Destructive actions are disabled');
     expect(prompt).toContain('knowledge-bases');
@@ -139,17 +136,11 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('includes historical suppressions, flaky-page notes, and prior navigation hints when provided', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Settings',
-      undefined,
-      'settings',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      {
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Settings',
+      pageType: 'settings',
+      history: {
         suppressedFindings: ['Known spinner jitter on autosave toast'],
         flakyPageNotes: ['Relative timestamps refresh every second near the header'],
         navigationHints: ['Known transition: Settings -> Members via role=button[name=Members]'],
@@ -162,8 +153,8 @@ describe('buildWorkerSystemPrompt', () => {
             failures: ['validation failed'],
           },
         ],
-      }
-    );
+      },
+    });
 
     expect(prompt).toContain('Historical Notes');
     expect(prompt).toContain('spinner jitter');
@@ -175,29 +166,23 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('adds adversarial guardrails and scenario guidance when adversarial mode is enabled', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Profile settings',
-      undefined,
-      'settings',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      {
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Profile settings',
+      pageType: 'settings',
+      mission: {
         appDescription: 'A todo app',
         destructiveActionsAllowed: false,
       },
-      undefined,
-      'adversarial',
-      {
+      workerType: 'adversarial',
+      adversarialConfig: {
         enabled: true,
         maxSequencesPerNode: 3,
         safeMode: true,
         includeAuthzProbes: false,
         includeConcurrencyProbes: false,
-      }
-    );
+      },
+    });
 
     expect(prompt).toContain('Adversarial Mode');
     expect(prompt).toContain('Safe mode is enabled');
@@ -208,22 +193,11 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('includes scout agent role guidance when agentRole is scout', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Main',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'scout'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      agentRole: 'scout',
+    });
 
     expect(prompt).toContain('Agent Role: Scout');
     expect(prompt).toContain('surface-area mapping');
@@ -231,22 +205,13 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('includes tester agent role guidance when agentRole is tester', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Form area',
-      undefined,
-      'form',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'form',
-      undefined,
-      undefined,
-      'tester'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Form area',
+      pageType: 'form',
+      workerType: 'form',
+      agentRole: 'tester',
+    });
 
     expect(prompt).toContain('Agent Role: Tester');
     expect(prompt).toContain('deep testing');
@@ -254,22 +219,13 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('includes security agent role guidance when agentRole is security', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Settings',
-      undefined,
-      'settings',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'adversarial',
-      undefined,
-      undefined,
-      'security'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Settings',
+      pageType: 'settings',
+      workerType: 'adversarial',
+      agentRole: 'security',
+    });
 
     expect(prompt).toContain('Agent Role: Security');
     expect(prompt).toContain('OWASP');
@@ -277,67 +233,35 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('includes reviewer agent role guidance', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Review',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'reviewer'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Review',
+      agentRole: 'reviewer',
+    });
 
     expect(prompt).toContain('Agent Role: Reviewer');
     expect(prompt).toContain('quality oversight');
   });
 
   it('includes reporter agent role guidance', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Report',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'reporter'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Report',
+      agentRole: 'reporter',
+    });
 
     expect(prompt).toContain('Agent Role: Reporter');
     expect(prompt).toContain('synthesis');
   });
 
   it('includes blackboard summary when provided with agent role', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Main',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'scout',
-      'Blackboard (2 entries, showing last 2):\n[finding] (agent-tester) Missing label\n[coverage] (agent-scout) 5 pages mapped'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      agentRole: 'scout',
+      blackboardSummary:
+        'Blackboard (2 entries, showing last 2):\n[finding] (agent-tester) Missing label\n[coverage] (agent-scout) 5 pages mapped',
+    });
 
     expect(prompt).toContain('Team Blackboard');
     expect(prompt).toContain('Missing label');
@@ -345,27 +269,19 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('omits agent role section when not provided', () => {
-    const prompt = buildWorkerSystemPrompt('A todo app', 'Main');
+    const prompt = buildWorkerSystemPrompt({ appDescription: 'A todo app', areaName: 'Main' });
     expect(prompt).not.toContain('Agent Role');
     expect(prompt).not.toContain('Team Blackboard');
   });
 
   it('includes vision context section when visionContext is provided', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Dashboard',
-      undefined,
-      'dashboard',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'A dashboard with sidebar navigation and main content area.\nVisible components: search input, data table, chart widget'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Dashboard',
+      pageType: 'dashboard',
+      visionContext:
+        'A dashboard with sidebar navigation and main content area.\nVisible components: search input, data table, chart widget',
+    });
 
     expect(prompt).toContain('Visual Page Analysis');
     expect(prompt).toContain('UNTRUSTED VISION CONTEXT');
@@ -375,47 +291,27 @@ describe('buildWorkerSystemPrompt', () => {
   });
 
   it('omits vision context section when visionContext is undefined', () => {
-    const prompt = buildWorkerSystemPrompt('A todo app', 'Main');
+    const prompt = buildWorkerSystemPrompt({ appDescription: 'A todo app', areaName: 'Main' });
     expect(prompt).not.toContain('Visual Page Analysis');
     expect(prompt).not.toContain('UNTRUSTED VISION CONTEXT');
   });
 
   it('omits vision context section when visionContext is empty', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Main',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      ''
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      visionContext: '',
+    });
     expect(prompt).not.toContain('Visual Page Analysis');
     expect(prompt).not.toContain('UNTRUSTED VISION CONTEXT');
   });
 
   it('sanitizes triple backticks in vision context to prevent code fence escape', () => {
-    const prompt = buildWorkerSystemPrompt(
-      'A todo app',
-      'Main',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'Some text with ``` embedded code fence ``` inside'
-    );
+    const prompt = buildWorkerSystemPrompt({
+      appDescription: 'A todo app',
+      areaName: 'Main',
+      visionContext: 'Some text with ``` embedded code fence ``` inside',
+    });
 
     expect(prompt).toContain('Visual Page Analysis');
     expect(prompt).not.toMatch(/```[^`\n\\]/);
