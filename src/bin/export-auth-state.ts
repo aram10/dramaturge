@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import { existsSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
+import { captureAuthStateViaSuccessUrl } from '../auth/auth-state-capture.js';
 
 export interface ExportAuthStateArgs {
   url?: string;
@@ -23,6 +21,9 @@ Options:
   --success-url <url>       URL that indicates sign-in succeeded (default: site root)
   --timeout-seconds <n>     How long to wait for login completion (default: 120)
   --help, -h                Show this help message
+
+Note:
+  dramaturge-auth-state is deprecated. Prefer: dramaturge auth capture
 `;
 
 export function buildExportAuthStateHelpText(): string {
@@ -103,33 +104,19 @@ export async function runExportAuthStateCli(
       return 0;
     }
 
-    const browser = await chromium.launch({ headless: false });
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    const outputPath = resolve(parsed.output!);
-
-    io.log(`Launching browser for manual sign-in at ${parsed.url}...`);
-    await page.goto(parsed.url!);
-    io.log(`Waiting up to ${parsed.timeoutSeconds}s for ${parsed.successUrl}...`);
-
-    try {
-      await page.waitForURL(parsed.successUrl!, {
-        timeout: parsed.timeoutSeconds * 1000,
-      });
-      await page.waitForTimeout(5000);
-      io.log('Login detected. Saving browser state...');
-    } catch {
-      io.log('Timed out waiting for the success URL. Saving the current browser state anyway.');
-    }
-
-    const outputDir = dirname(outputPath);
-    if (!existsSync(outputDir)) {
-      mkdirSync(outputDir, { recursive: true });
-    }
-
-    await context.storageState({ path: outputPath });
-    io.log(`Saved browser state to ${outputPath}`);
-    await browser.close();
+    io.log('Note: dramaturge-auth-state is deprecated. Prefer: dramaturge auth capture');
+    await captureAuthStateViaSuccessUrl(
+      {
+        loginUrl: parsed.url!,
+        outputPath: parsed.output!,
+        successUrl: parsed.successUrl!,
+        timeoutMs: parsed.timeoutSeconds * 1000,
+      },
+      {
+        log: io.log,
+        error: io.error,
+      }
+    );
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
