@@ -3,7 +3,7 @@
 
 import { shortId } from '../constants.js';
 import { buildConfirmedFindingMeta } from '../repro/repro.js';
-import { redactSensitiveValue, truncateString } from '../redaction.js';
+import { redactSensitiveValue } from '../redaction.js';
 import { validateOperationResponse, type ContractIndex } from '../spec/contract-index.js';
 import type { Evidence, FindingSeverity, RawFinding } from '../types.js';
 import type { ApiProbeTarget, ApiReplayResponse } from './types.js';

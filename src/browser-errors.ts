@@ -46,6 +46,8 @@ export class BrowserErrorCollector {
       this.detach(pageKey);
     }
     // Stagehand's Page type only exposes a subset of Playwright events,
+    // so we cast to access Playwright's full event API.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const p = page as any;
     const bucket = this.getBucket(pageKey);
     const teardowns = this.teardownFns.get(pageKey) ?? [];

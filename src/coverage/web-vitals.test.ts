@@ -3,7 +3,6 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  collectWebVitals,
   evaluateWebVitals,
   type WebVitalsResult,
 } from "./web-vitals.js";

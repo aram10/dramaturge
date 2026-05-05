@@ -2,13 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { EventEmitter } from 'node:events';
-import type {
-  RawFinding,
-  WorkerResult,
-  FrontierItem,
-  FindingSeverity,
-  WorkerType,
-} from '../types.js';
+import type { WorkerResult, FindingSeverity, WorkerType } from '../types.js';
 
 // --- Event payload types ---
 

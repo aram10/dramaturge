@@ -49,7 +49,7 @@ function buildFailureBody(finding: Finding): string {
     sections.push(`Route: ${route}`);
   }
   if ((finding.evidenceIds?.length ?? 0) > 0) {
-    sections.push(`Evidence: ${finding.evidenceIds!.join(', ')}`);
+    sections.push(`Evidence: ${(finding.evidenceIds ?? []).join(', ')}`);
   }
   return sections.join('\n\n');
 }

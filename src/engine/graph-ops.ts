@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { EngineContext } from './context.js';
-import type { WorkerResult, FrontierItem } from '../types.js';
+import type { WorkerResult } from '../types.js';
 import { captureFingerprint } from '../graph/fingerprint.js';
 import { classifyPage } from '../planner/page-classifier.js';
 import { emitEngineEvent } from './event-stream.js';
@@ -71,7 +71,8 @@ export async function expandGraph(
       if (
         diffHasScope &&
         ctx.config.diffAware.restrictToChanged &&
-        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext!)
+        ctx.diffContext &&
+        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext)
       ) {
         continue;
       }

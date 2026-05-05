@@ -124,7 +124,7 @@ function buildLocations(
     .filter((ev): ev is Evidence => Boolean(ev && ev.path));
   for (const evidence of screenshotEvidence) {
     locations.push({
-      physicalLocation: { artifactLocation: { uri: evidence.path! } },
+      physicalLocation: { artifactLocation: { uri: evidence.path ?? '' } },
     });
   }
   return locations.length > 0 ? locations : undefined;

@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { Planner } from './planner.js';
 import { StateGraph } from '../graph/state-graph.js';
-import type { StateNode, MissionConfig, PageFingerprint } from '../types.js';
+import type { MissionConfig, PageFingerprint } from '../types.js';
 
 function makeFp(hash: string): PageFingerprint {
   return {

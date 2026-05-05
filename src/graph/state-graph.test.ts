@@ -354,7 +354,7 @@ describe('StateGraph', () => {
 
     it('escapes double quotes in labels', () => {
       const graph = new StateGraph();
-      const node = graph.addNode({
+      graph.addNode({
         fingerprint: makeFp('m3'),
         pageType: 'detail',
         title: 'Item "Special"',

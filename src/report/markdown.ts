@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import type { RunResult } from '../types.js';
+import type { RunResult, Finding } from '../types.js';
 import { collectFindings } from './collector.js';
 import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
 import type { DiffContext } from '../diff/types.js';
@@ -30,31 +30,15 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${remainingSeconds}s`;
 }
 
-export function renderMarkdown(result: RunResult): string {
-  const findings = collectFindings(result.areaResults);
-  const duration = result.endTime.getTime() - result.startTime.getTime();
-  const findingIdByRef = new Map<string, string>();
-  const exploredAreas = result.areaResults.filter((a) => a.status === 'explored');
-  const totalSteps = result.areaResults.reduce((sum, a) => sum + a.steps, 0);
+// --- Section renderers ---
 
-  for (const finding of findings) {
-    for (const occurrence of finding.occurrences) {
-      findingIdByRef.set(occurrence.ref, finding.id);
-    }
-  }
-
-  // Build diff-scope lookup: area name → "changed" | "unchanged"
-  const diffScope = result.diffSummary ? buildDiffScopeMap(result) : undefined;
-
-  const bugs = findings.filter((f) => f.category === 'Bug');
-  const ux = findings.filter((f) => f.category === 'UX Concern');
-  const a11y = findings.filter((f) => f.category === 'Accessibility Issue');
-  const perf = findings.filter((f) => f.category === 'Performance Issue');
-  const visual = findings.filter((f) => f.category === 'Visual Glitch');
-
+function renderHeader(
+  result: RunResult,
+  duration: number,
+  exploredAreas: RunResult['areaResults'],
+  totalSteps: number
+): string[] {
   const lines: string[] = [];
-
-  // Header
   const timestamp = result.startTime.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   lines.push(`# Dramaturge Report — ${timestamp}`);
   if (result.partial) {
@@ -66,27 +50,41 @@ export function renderMarkdown(result: RunResult): string {
     `**Duration:** ${formatDuration(duration)} | **Areas explored:** ${exploredAreas.length} | **Total steps:** ${totalSteps}`
   );
   lines.push('');
+  return lines;
+}
 
-  // Changes Since Last Run (cross-run classification)
-  if (result.crossRunClassification) {
-    const { summary, resolved } = result.crossRunClassification;
-    lines.push('## Changes Since Last Run');
-    lines.push(
-      `- ${summary.new} new, ${summary.recurring} recurring, ${summary.resolved} resolved, ${summary.flaky} flaky, ${summary.suppressed} suppressed`
-    );
-    if (resolved.length > 0) {
-      lines.push('');
-      lines.push('**Resolved findings (present in prior runs, absent now):**');
-      for (const entry of resolved) {
-        lines.push(
-          `- ${escapeMarkdownInline(entry.severity)} ${escapeMarkdownInline(entry.category)}: ${escapeMarkdownInline(entry.title)} (last seen ${escapeMarkdownInline(entry.lastSeenAt)}, ${entry.runCount} prior run(s))`
-        );
-      }
-    }
+function renderCrossRunSection(result: RunResult): string[] {
+  if (!result.crossRunClassification) return [];
+  const { summary, resolved } = result.crossRunClassification;
+  const lines: string[] = [];
+  lines.push('## Changes Since Last Run');
+  lines.push(
+    `- ${summary.new} new, ${summary.recurring} recurring, ${summary.resolved} resolved, ${summary.flaky} flaky, ${summary.suppressed} suppressed`
+  );
+  if (resolved.length > 0) {
     lines.push('');
+    lines.push('**Resolved findings (present in prior runs, absent now):**');
+    for (const entry of resolved) {
+      lines.push(
+        `- ${escapeMarkdownInline(entry.severity)} ${escapeMarkdownInline(entry.category)}: ${escapeMarkdownInline(entry.title)} (last seen ${escapeMarkdownInline(entry.lastSeenAt)}, ${entry.runCount} prior run(s))`
+      );
+    }
   }
+  lines.push('');
+  return lines;
+}
 
-  // Summary
+interface FindingCategories {
+  bugs: Finding[];
+  ux: Finding[];
+  a11y: Finding[];
+  perf: Finding[];
+  visual: Finding[];
+}
+
+function renderSummarySection(findings: Finding[], categories: FindingCategories): string[] {
+  const { bugs, ux, a11y, perf, visual } = categories;
+  const lines: string[] = [];
   lines.push('## Summary');
   if (findings.length === 0) {
     lines.push('- No issues found');
@@ -104,125 +102,152 @@ export function renderMarkdown(result: RunResult): string {
     if (visual.length > 0) lines.push(`- ${visual.length} visual glitch(es)`);
   }
   lines.push('');
+  return lines;
+}
 
-  if (result.explorationLedger) {
-    const summary = ledgerSummary(result.explorationLedger);
-    lines.push('## Exploration ledger');
-    lines.push('');
-    lines.push(`- Total events: ${summary.total}`);
-    lines.push(`- Actions: ${summary.actions}`);
-    lines.push(`- Evidence: ${summary.evidence}`);
-    lines.push(`- Network: ${summary.network}`);
-    lines.push(`- Findings: ${summary.findings}`);
-    lines.push(`- Model usage: ${summary.modelUsage}`);
-    lines.push('');
+function renderLedgerSection(result: RunResult): string[] {
+  if (!result.explorationLedger) return [];
+  const summary = ledgerSummary(result.explorationLedger);
+  return [
+    '## Exploration ledger',
+    '',
+    `- Total events: ${summary.total}`,
+    `- Actions: ${summary.actions}`,
+    `- Evidence: ${summary.evidence}`,
+    `- Network: ${summary.network}`,
+    `- Findings: ${summary.findings}`,
+    `- Model usage: ${summary.modelUsage}`,
+    '',
+  ];
+}
+
+function renderFindingEntry(
+  f: Finding,
+  result: RunResult,
+  diffScope: Map<string, 'changed' | 'unchanged'> | undefined
+): string[] {
+  const lines: string[] = [];
+  const steps = f.stepsToReproduce
+    .map((s, i) => `  ${i + 1}. ${escapeMarkdownInline(s)}`)
+    .join('\n');
+  lines.push(
+    `### [${escapeMarkdownInline(f.id)}] ${escapeMarkdownInline(f.severity)}: ${escapeMarkdownInline(f.title)}`
+  );
+  lines.push(`- **Area:** ${escapeMarkdownInline(f.area)}`);
+  const crossRunStatus = result.crossRunClassification?.byFindingId[f.id];
+  if (crossRunStatus) {
+    const parts = [`status: ${crossRunStatus.status}`];
+    if (crossRunStatus.firstSeenAt) parts.push(`first seen ${crossRunStatus.firstSeenAt}`);
+    if (crossRunStatus.runCount !== undefined)
+      parts.push(`${crossRunStatus.runCount} prior run(s)`);
+    if (crossRunStatus.dismissalReason) parts.push(`reason: ${crossRunStatus.dismissalReason}`);
+    lines.push(`- **Cross-run:** ${escapeMarkdownInline(parts.join(' | '))}`);
   }
-
-  // Findings
-  if (findings.length > 0) {
-    lines.push('## Findings');
-    lines.push('');
-    for (const f of findings) {
-      const steps = f.stepsToReproduce
-        .map((s, i) => `  ${i + 1}. ${escapeMarkdownInline(s)}`)
-        .join('\n');
-      lines.push(
-        `### [${escapeMarkdownInline(f.id)}] ${escapeMarkdownInline(f.severity)}: ${escapeMarkdownInline(f.title)}`
-      );
-      lines.push(`- **Area:** ${escapeMarkdownInline(f.area)}`);
-      const crossRunStatus = result.crossRunClassification?.byFindingId[f.id];
-      if (crossRunStatus) {
-        const parts = [`status: ${crossRunStatus.status}`];
-        if (crossRunStatus.firstSeenAt) {
-          parts.push(`first seen ${crossRunStatus.firstSeenAt}`);
-        }
-        if (crossRunStatus.runCount !== undefined) {
-          parts.push(`${crossRunStatus.runCount} prior run(s)`);
-        }
-        if (crossRunStatus.dismissalReason) {
-          parts.push(`reason: ${crossRunStatus.dismissalReason}`);
-        }
-        lines.push(`- **Cross-run:** ${escapeMarkdownInline(parts.join(' | '))}`);
-      }
-      if (diffScope) {
-        const scope = diffScope.get(f.area) ?? 'unchanged';
-        lines.push(`- **Diff scope:** ${escapeMarkdownInline(scope)}`);
-      }
-      lines.push(`- **Category:** ${escapeMarkdownInline(f.category)}`);
-      lines.push(`- **Severity:** ${escapeMarkdownInline(f.severity)}`);
-      lines.push(`- **Steps to reproduce:**`);
-      lines.push(steps);
-      lines.push(`- **Expected:** ${escapeMarkdownInline(f.expected)}`);
-      lines.push(`- **Actual:** ${escapeMarkdownInline(f.actual)}`);
-      if (f.verdict) {
-        lines.push(`- **Hypothesis:** ${escapeMarkdownInline(f.verdict.hypothesis)}`);
-        lines.push(`- **Observation:** ${escapeMarkdownInline(f.verdict.observation)}`);
-        if (f.verdict.evidenceChain.length > 0) {
-          lines.push(
-            `- **Evidence chain:** ${f.verdict.evidenceChain.map((entry) => escapeMarkdownInline(entry)).join(' | ')}`
-          );
-        }
-        if (f.verdict.alternativesConsidered.length > 0) {
-          lines.push(
-            `- **Alternative explanations:** ${f.verdict.alternativesConsidered.map((entry) => escapeMarkdownInline(entry)).join(' | ')}`
-          );
-        }
-        if (f.verdict.suggestedVerification.length > 0) {
-          lines.push(
-            `- **Suggested verification:** ${f.verdict.suggestedVerification.map((entry) => escapeMarkdownInline(entry)).join(' | ')}`
-          );
-        }
-      }
-      if (f.occurrenceCount > 1) {
-        lines.push(`- **Occurrences:** ${f.occurrenceCount}`);
-        lines.push(
-          `- **Impacted areas:** ${f.impactedAreas.map((area) => escapeMarkdownInline(area)).join(', ')}`
-        );
-      }
-      if (f.screenshot) {
-        lines.push(`- **Screenshot:** ${escapeMarkdownInline(f.screenshot)}`);
-      }
-      if (f.meta) {
-        lines.push(`- **Source:** ${escapeMarkdownInline(f.meta.source)}`);
-        lines.push(`- **Confidence:** ${escapeMarkdownInline(f.meta.confidence)}`);
-        if (f.meta.repro?.stateId) {
-          lines.push(`- **Repro state:** ${escapeMarkdownInline(f.meta.repro.stateId)}`);
-        }
-        if (f.meta.repro?.route) {
-          lines.push(`- **Repro route:** ${escapeMarkdownInline(f.meta.repro.route)}`);
-        }
-        if (f.meta.repro?.objective) {
-          lines.push(`- **Repro objective:** ${escapeMarkdownInline(f.meta.repro.objective)}`);
-        }
-        if ((f.meta.repro?.breadcrumbs?.length ?? 0) > 0) {
-          lines.push(
-            `- **Repro breadcrumbs:** ${f.meta.repro?.breadcrumbs.map((crumb) => escapeMarkdownInline(crumb)).join(' | ')}`
-          );
-        }
-        if ((f.meta.repro?.actionIds?.length ?? 0) > 0) {
-          lines.push(
-            `- **Repro action ids:** ${f.meta.repro?.actionIds?.map((id) => escapeMarkdownInline(id)).join(', ')}`
-          );
-        }
-        if ((f.meta.repro?.evidenceIds?.length ?? 0) > 0) {
-          lines.push(
-            `- **Repro evidence:** ${f.meta.repro?.evidenceIds.map((id) => escapeMarkdownInline(id)).join(', ')}`
-          );
-        }
-        if (
-          (f.meta.repro?.actionIds?.length ?? 0) > 0 ||
-          (f.meta.repro?.evidenceIds?.length ?? 0) > 0
-        ) {
-          lines.push(
-            `- **Trace bundle:** actions=${f.meta.repro?.actionIds?.map((id) => escapeMarkdownInline(id)).join(', ') || 'none'} | evidence=${f.meta.repro?.evidenceIds?.map((id) => escapeMarkdownInline(id)).join(', ') || 'none'}`
-          );
-        }
-      }
-      lines.push('');
-    }
+  if (diffScope) {
+    const scope = diffScope.get(f.area) ?? 'unchanged';
+    lines.push(`- **Diff scope:** ${escapeMarkdownInline(scope)}`);
   }
+  lines.push(`- **Category:** ${escapeMarkdownInline(f.category)}`);
+  lines.push(`- **Severity:** ${escapeMarkdownInline(f.severity)}`);
+  lines.push(`- **Steps to reproduce:**`);
+  lines.push(steps);
+  lines.push(`- **Expected:** ${escapeMarkdownInline(f.expected)}`);
+  lines.push(`- **Actual:** ${escapeMarkdownInline(f.actual)}`);
+  renderFindingVerdict(f, lines);
+  renderFindingRepro(f, lines);
+  lines.push('');
+  return lines;
+}
 
-  // Coverage Map
+function renderFindingVerdict(f: Finding, lines: string[]): void {
+  if (!f.verdict) return;
+  lines.push(`- **Hypothesis:** ${escapeMarkdownInline(f.verdict.hypothesis)}`);
+  lines.push(`- **Observation:** ${escapeMarkdownInline(f.verdict.observation)}`);
+  if (f.verdict.evidenceChain.length > 0) {
+    lines.push(
+      `- **Evidence chain:** ${f.verdict.evidenceChain.map((e) => escapeMarkdownInline(e)).join(' | ')}`
+    );
+  }
+  if (f.verdict.alternativesConsidered.length > 0) {
+    lines.push(
+      `- **Alternative explanations:** ${f.verdict.alternativesConsidered.map((e) => escapeMarkdownInline(e)).join(' | ')}`
+    );
+  }
+  if (f.verdict.suggestedVerification.length > 0) {
+    lines.push(
+      `- **Suggested verification:** ${f.verdict.suggestedVerification.map((e) => escapeMarkdownInline(e)).join(' | ')}`
+    );
+  }
+}
+
+function renderFindingReproMeta(
+  repro: NonNullable<NonNullable<Finding['meta']>['repro']>,
+  lines: string[]
+): void {
+  if (repro.stateId) lines.push(`- **Repro state:** ${escapeMarkdownInline(repro.stateId)}`);
+  if (repro.route) lines.push(`- **Repro route:** ${escapeMarkdownInline(repro.route)}`);
+  lines.push(`- **Repro objective:** ${escapeMarkdownInline(repro.objective)}`);
+  if (repro.breadcrumbs.length > 0) {
+    lines.push(
+      `- **Repro breadcrumbs:** ${repro.breadcrumbs.map((c) => escapeMarkdownInline(c)).join(' | ')}`
+    );
+  }
+  if ((repro.actionIds?.length ?? 0) > 0) {
+    lines.push(
+      `- **Repro action ids:** ${repro.actionIds?.map((id) => escapeMarkdownInline(id)).join(', ')}`
+    );
+  }
+  if (repro.evidenceIds.length > 0) {
+    lines.push(
+      `- **Repro evidence:** ${repro.evidenceIds.map((id) => escapeMarkdownInline(id)).join(', ')}`
+    );
+  }
+  renderTraceBundleLine(repro, lines);
+}
+
+function renderTraceBundleLine(
+  repro: NonNullable<NonNullable<Finding['meta']>['repro']>,
+  lines: string[]
+): void {
+  if (!repro.actionIds?.length && !repro.evidenceIds.length) return;
+  const actions = repro.actionIds?.map((id) => escapeMarkdownInline(id)).join(', ') || 'none';
+  const evidence = repro.evidenceIds.map((id) => escapeMarkdownInline(id)).join(', ') || 'none';
+  lines.push(`- **Trace bundle:** actions=${actions} | evidence=${evidence}`);
+}
+
+function renderFindingRepro(f: Finding, lines: string[]): void {
+  if (f.occurrenceCount > 1) {
+    lines.push(`- **Occurrences:** ${f.occurrenceCount}`);
+    lines.push(
+      `- **Impacted areas:** ${f.impactedAreas.map((area) => escapeMarkdownInline(area)).join(', ')}`
+    );
+  }
+  if (f.screenshot) {
+    lines.push(`- **Screenshot:** ${escapeMarkdownInline(f.screenshot)}`);
+  }
+  if (!f.meta) return;
+  lines.push(`- **Source:** ${escapeMarkdownInline(f.meta.source)}`);
+  lines.push(`- **Confidence:** ${escapeMarkdownInline(f.meta.confidence)}`);
+  if (f.meta.repro) {
+    renderFindingReproMeta(f.meta.repro, lines);
+  }
+}
+
+function renderFindingsSection(
+  findings: Finding[],
+  result: RunResult,
+  diffScope: Map<string, 'changed' | 'unchanged'> | undefined
+): string[] {
+  if (findings.length === 0) return [];
+  const lines: string[] = ['## Findings', ''];
+  for (const f of findings) {
+    lines.push(...renderFindingEntry(f, result, diffScope));
+  }
+  return lines;
+}
+
+function renderCoverageMapSection(result: RunResult): string[] {
+  const lines: string[] = [];
   lines.push('## Coverage Map');
   lines.push('| Area | Page Type | Steps | Findings | Controls (exercised/discovered) | Status |');
   lines.push('|------|-----------|-------|----------|-------------------------------|--------|');
@@ -236,8 +261,10 @@ export function renderMarkdown(result: RunResult): string {
     );
   }
   lines.push('');
+  return lines;
+}
 
-  // Coverage Summary
+function renderCoverageSummarySection(result: RunResult): string[] {
   const totalControlsDiscovered = result.areaResults.reduce(
     (sum, a) => sum + a.coverage.controlsDiscovered,
     0
@@ -246,157 +273,221 @@ export function renderMarkdown(result: RunResult): string {
     (sum, a) => sum + a.coverage.controlsExercised,
     0
   );
-  if (totalControlsDiscovered > 0) {
-    const pct = Math.round((totalControlsExercised / totalControlsDiscovered) * 100);
-    lines.push('## Coverage Summary');
-    lines.push(`- **Controls discovered:** ${totalControlsDiscovered}`);
-    lines.push(`- **Controls exercised:** ${totalControlsExercised} (${pct}%)`);
-    lines.push('');
-  }
+  if (totalControlsDiscovered === 0) return [];
+  const pct = Math.round((totalControlsExercised / totalControlsDiscovered) * 100);
+  return [
+    '## Coverage Summary',
+    `- **Controls discovered:** ${totalControlsDiscovered}`,
+    `- **Controls exercised:** ${totalControlsExercised} (${pct}%)`,
+    '',
+  ];
+}
 
-  // Evidence Index
+function renderEvidenceIndexSection(
+  result: RunResult,
+  findingIdByRef: Map<string, string>
+): string[] {
   const allEvidence = result.areaResults.flatMap((a) => a.evidence);
-  if (allEvidence.length > 0) {
-    lines.push('## Evidence Index');
-    lines.push('| ID | Type | Area | Summary | Path | Related findings |');
-    lines.push('|----|------|------|---------|------|------------------|');
-    for (const ev of allEvidence) {
-      const relatedFindings = Array.from(
-        new Set(ev.relatedFindingIds.map((ref) => findingIdByRef.get(ref) ?? ref))
-      );
-      lines.push(
-        `| ${escapeTableCell(ev.id)} | ${escapeTableCell(ev.type)} | ${escapeTableCell(ev.areaName ?? '—')} | ${escapeTableCell(ev.summary)} | ${escapeTableCell(ev.path ?? '—')} | ${escapeTableCell(relatedFindings.join(', ') || '—')} |`
-      );
-    }
-    lines.push('');
+  if (allEvidence.length === 0) return [];
+  const lines: string[] = [];
+  lines.push('## Evidence Index');
+  lines.push('| ID | Type | Area | Summary | Path | Related findings |');
+  lines.push('|----|------|------|---------|------|------------------|');
+  for (const ev of allEvidence) {
+    const relatedFindings = Array.from(
+      new Set(ev.relatedFindingIds.map((ref) => findingIdByRef.get(ref) ?? ref))
+    );
+    lines.push(
+      `| ${escapeTableCell(ev.id)} | ${escapeTableCell(ev.type)} | ${escapeTableCell(ev.areaName ?? '—')} | ${escapeTableCell(ev.summary)} | ${escapeTableCell(ev.path ?? '—')} | ${escapeTableCell(relatedFindings.join(', ') || '—')} |`
+    );
   }
+  lines.push('');
+  return lines;
+}
 
+function renderActionTraceSection(result: RunResult): string[] {
   const allActions = result.areaResults.flatMap((area) =>
-    (area.replayableActions ?? []).map((action) => ({
-      areaName: area.name,
-      ...action,
-    }))
+    (area.replayableActions ?? []).map((action) => ({ areaName: area.name, ...action }))
   );
-  if (allActions.length > 0) {
-    lines.push('## Action Trace');
-    lines.push('| ID | Area | Kind | Source | Summary | Status |');
-    lines.push('|----|------|------|--------|---------|--------|');
-    for (const action of allActions) {
+  if (allActions.length === 0) return [];
+  const lines: string[] = [];
+  lines.push('## Action Trace');
+  lines.push('| ID | Area | Kind | Source | Summary | Status |');
+  lines.push('|----|------|------|--------|---------|--------|');
+  for (const action of allActions) {
+    lines.push(
+      `| ${escapeTableCell(action.id)} | ${escapeTableCell(action.areaName)} | ${escapeTableCell(action.kind)} | ${escapeTableCell(action.source)} | ${escapeTableCell(action.summary)} | ${escapeTableCell(action.status)} |`
+    );
+  }
+  lines.push('');
+  return lines;
+}
+
+function renderUnexploredAreasSection(result: RunResult): string[] {
+  if (result.unexploredAreas.length === 0) return [];
+  const lines: string[] = ['## Areas Not Explored'];
+  for (const area of result.unexploredAreas) {
+    lines.push(`- ${escapeMarkdownInline(area.name)} (${escapeMarkdownInline(area.reason)})`);
+  }
+  lines.push('');
+  return lines;
+}
+
+function renderBlindSpotsSection(result: RunResult): string[] {
+  if (result.blindSpots.length === 0) return [];
+  const lines: string[] = [
+    '## Blind Spots',
+    'Areas where testing coverage may be incomplete:',
+    '',
+    '| Severity | Reason | Summary |',
+    '|----------|--------|---------|',
+  ];
+  for (const spot of result.blindSpots) {
+    lines.push(
+      `| ${escapeTableCell(spot.severity)} | ${escapeTableCell(spot.reason)} | ${escapeTableCell(spot.summary)} |`
+    );
+  }
+  lines.push('');
+  return lines;
+}
+
+function renderStateGraphSection(result: RunResult): string[] {
+  if (!result.stateGraphMermaid) return [];
+  return ['## State Graph', '', '```mermaid', result.stateGraphMermaid, '```', ''];
+}
+
+function renderDiffSummarySection(
+  result: RunResult,
+  diffScope: Map<string, 'changed' | 'unchanged'> | undefined
+): string[] {
+  if (!result.diffSummary) return [];
+  const ds = result.diffSummary;
+  const lines: string[] = [];
+  lines.push('## Diff Summary');
+  lines.push(`- **Base ref:** ${escapeMarkdownInline(ds.baseRef)}`);
+  lines.push(`- **Changed files:** ${ds.changedFileCount}`);
+  lines.push(
+    `- **Affected routes:** ${ds.affectedRoutes.length > 0 ? ds.affectedRoutes.map((r) => escapeMarkdownInline(r)).join(', ') : 'none detected'}`
+  );
+  lines.push(
+    `- **Affected API endpoints:** ${ds.affectedApiEndpoints.length > 0 ? ds.affectedApiEndpoints.map((e) => escapeMarkdownInline(e)).join(', ') : 'none detected'}`
+  );
+  if (diffScope) {
+    const changedCount = [...diffScope.values()].filter((v) => v === 'changed').length;
+    const unchangedCount = [...diffScope.values()].filter((v) => v === 'unchanged').length;
+    lines.push(`- **Areas in changed code paths:** ${changedCount}`);
+    lines.push(`- **Areas in unchanged code paths:** ${unchangedCount}`);
+  }
+  lines.push('');
+  return lines;
+}
+
+function renderRunMemorySection(result: RunResult): string[] {
+  if (!result.runMemory) return [];
+  const rm = result.runMemory;
+  return [
+    `## Run Memory`,
+    `- **Enabled:** ${rm.enabled ? 'yes' : 'no'}`,
+    `- **Warm start applied:** ${rm.warmStartApplied ? 'yes' : 'no'}`,
+    `- **Restored states:** ${rm.restoredStateCount}`,
+    `- **Known findings tracked:** ${rm.knownFindingCount}`,
+    `- **Suppressed findings:** ${rm.suppressedFindingCount}`,
+    `- **Flaky pages noted:** ${rm.flakyPageCount}`,
+    `- **Visual baselines tracked:** ${rm.visualBaselineCount}`,
+    '',
+  ];
+}
+
+function renderRunConfigSection(result: RunResult): string[] {
+  if (!result.runConfig) return [];
+  const rc = result.runConfig;
+  const ckpt = rc.checkpointInterval === 0 ? 'disabled' : `every ${rc.checkpointInterval} tasks`;
+  return [
+    `## Run Configuration`,
+    `- **App:** ${escapeMarkdownInline(rc.appDescription)}`,
+    `- **Planner model:** ${escapeMarkdownInline(rc.models.planner)}`,
+    `- **Worker model:** ${escapeMarkdownInline(rc.models.worker)}`,
+    `- **Concurrency:** ${rc.concurrency} worker(s)`,
+    `- **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states`,
+    `- **Checkpoint interval:** ${escapeMarkdownInline(ckpt)}`,
+    `- **Auto-capture:** ${rc.autoCaptureEnabled ? 'enabled' : 'disabled'}`,
+    `- **LLM planner:** ${rc.llmPlannerEnabled ? 'enabled' : 'disabled'}`,
+    `- **Memory:** ${rc.memoryEnabled ? 'enabled' : 'disabled'}`,
+    `- **Warm start:** ${rc.warmStartEnabled ? 'enabled' : 'disabled'}`,
+    `- **Visual regression:** ${rc.visualRegressionEnabled ? 'enabled' : 'disabled'}`,
+    '',
+  ];
+}
+
+function renderSafetyAuditSection(result: RunResult): string[] {
+  if (!result.safetyAudit) return [];
+  const lines: string[] = [
+    '## Safety Guard Audit',
+    '',
+    `- Blocked actions: ${result.safetyAudit.blockedCount}`,
+    `- Audit entries retained: ${result.safetyAudit.entries.length}`,
+  ];
+  if (result.safetyAudit.entries.length > 0) {
+    lines.push(
+      '',
+      '| Time | Blocked | Action | URL | Reason |',
+      '|------|---------|--------|-----|--------|'
+    );
+    for (const entry of result.safetyAudit.entries.slice(-10)) {
       lines.push(
-        `| ${escapeTableCell(action.id)} | ${escapeTableCell(action.areaName)} | ${escapeTableCell(action.kind)} | ${escapeTableCell(action.source)} | ${escapeTableCell(action.summary)} | ${escapeTableCell(action.status)} |`
+        `| ${escapeTableCell(entry.timestamp)} | ${entry.blocked ? 'yes' : 'no'} | ${escapeTableCell(entry.action)} | ${escapeTableCell(entry.url)} | ${escapeTableCell(entry.reason)} |`
       );
     }
-    lines.push('');
   }
+  lines.push('');
+  return lines;
+}
 
-  // Unexplored Areas
-  if (result.unexploredAreas.length > 0) {
-    lines.push('## Areas Not Explored');
-    for (const area of result.unexploredAreas) {
-      lines.push(`- ${escapeMarkdownInline(area.name)} (${escapeMarkdownInline(area.reason)})`);
+// --- Public API ---
+
+export function renderMarkdown(result: RunResult): string {
+  const findings = collectFindings(result.areaResults);
+  const duration = result.endTime.getTime() - result.startTime.getTime();
+  const findingIdByRef = new Map<string, string>();
+  const exploredAreas = result.areaResults.filter((a) => a.status === 'explored');
+  const totalSteps = result.areaResults.reduce((sum, a) => sum + a.steps, 0);
+
+  for (const finding of findings) {
+    for (const occurrence of finding.occurrences) {
+      findingIdByRef.set(occurrence.ref, finding.id);
     }
-    lines.push('');
   }
 
-  // Blind Spots
-  if (result.blindSpots.length > 0) {
-    lines.push('## Blind Spots');
-    lines.push('Areas where testing coverage may be incomplete:');
-    lines.push('');
-    lines.push('| Severity | Reason | Summary |');
-    lines.push('|----------|--------|---------|');
-    for (const spot of result.blindSpots) {
-      lines.push(
-        `| ${escapeTableCell(spot.severity)} | ${escapeTableCell(spot.reason)} | ${escapeTableCell(spot.summary)} |`
-      );
-    }
-    lines.push('');
-  }
+  const diffScope = result.diffSummary ? buildDiffScopeMap(result) : undefined;
 
-  // State Graph
-  if (result.stateGraphMermaid) {
-    lines.push('## State Graph');
-    lines.push('');
-    lines.push('```mermaid');
-    lines.push(result.stateGraphMermaid);
-    lines.push('```');
-    lines.push('');
-  }
+  const categories: FindingCategories = {
+    bugs: findings.filter((f) => f.category === 'Bug'),
+    ux: findings.filter((f) => f.category === 'UX Concern'),
+    a11y: findings.filter((f) => f.category === 'Accessibility Issue'),
+    perf: findings.filter((f) => f.category === 'Performance Issue'),
+    visual: findings.filter((f) => f.category === 'Visual Glitch'),
+  };
 
-  // Diff Summary
-  if (result.diffSummary) {
-    const ds = result.diffSummary;
-    lines.push('## Diff Summary');
-    lines.push(`- **Base ref:** ${escapeMarkdownInline(ds.baseRef)}`);
-    lines.push(`- **Changed files:** ${ds.changedFileCount}`);
-    lines.push(
-      `- **Affected routes:** ${ds.affectedRoutes.length > 0 ? ds.affectedRoutes.map((route) => escapeMarkdownInline(route)).join(', ') : 'none detected'}`
-    );
-    lines.push(
-      `- **Affected API endpoints:** ${ds.affectedApiEndpoints.length > 0 ? ds.affectedApiEndpoints.map((endpoint) => escapeMarkdownInline(endpoint)).join(', ') : 'none detected'}`
-    );
-    if (diffScope) {
-      const changedCount = [...diffScope.values()].filter((v) => v === 'changed').length;
-      const unchangedCount = [...diffScope.values()].filter((v) => v === 'unchanged').length;
-      lines.push(`- **Areas in changed code paths:** ${changedCount}`);
-      lines.push(`- **Areas in unchanged code paths:** ${unchangedCount}`);
-    }
-    lines.push('');
-  }
+  const sections: string[][] = [
+    renderHeader(result, duration, exploredAreas, totalSteps),
+    renderCrossRunSection(result),
+    renderSummarySection(findings, categories),
+    renderLedgerSection(result),
+    renderFindingsSection(findings, result, diffScope),
+    renderCoverageMapSection(result),
+    renderCoverageSummarySection(result),
+    renderEvidenceIndexSection(result, findingIdByRef),
+    renderActionTraceSection(result),
+    renderUnexploredAreasSection(result),
+    renderBlindSpotsSection(result),
+    renderStateGraphSection(result),
+    renderDiffSummarySection(result, diffScope),
+    renderRunMemorySection(result),
+    renderRunConfigSection(result),
+    renderSafetyAuditSection(result),
+  ];
 
-  // Run Configuration
-  if (result.runMemory) {
-    const rm = result.runMemory;
-    lines.push(`## Run Memory
-- **Enabled:** ${rm.enabled ? 'yes' : 'no'}
-- **Warm start applied:** ${rm.warmStartApplied ? 'yes' : 'no'}
-- **Restored states:** ${rm.restoredStateCount}
-- **Known findings tracked:** ${rm.knownFindingCount}
-- **Suppressed findings:** ${rm.suppressedFindingCount}
-- **Flaky pages noted:** ${rm.flakyPageCount}
-- **Visual baselines tracked:** ${rm.visualBaselineCount}`);
-    lines.push('');
-  }
-
-  if (result.runConfig) {
-    const rc = result.runConfig;
-    const ckpt = rc.checkpointInterval === 0 ? 'disabled' : `every ${rc.checkpointInterval} tasks`;
-    lines.push(`## Run Configuration
-- **App:** ${escapeMarkdownInline(rc.appDescription)}
-- **Planner model:** ${escapeMarkdownInline(rc.models.planner)}
-- **Worker model:** ${escapeMarkdownInline(rc.models.worker)}
-- **Concurrency:** ${rc.concurrency} worker(s)
-- **Budget:** ${rc.budget.timeLimitSeconds}s time limit, ${rc.budget.maxStepsPerTask} steps/task, ${rc.budget.maxStateNodes} max states
-- **Checkpoint interval:** ${escapeMarkdownInline(ckpt)}
-- **Auto-capture:** ${rc.autoCaptureEnabled ? 'enabled' : 'disabled'}
-- **LLM planner:** ${rc.llmPlannerEnabled ? 'enabled' : 'disabled'}
-- **Memory:** ${rc.memoryEnabled ? 'enabled' : 'disabled'}
-- **Warm start:** ${rc.warmStartEnabled ? 'enabled' : 'disabled'}
-- **Visual regression:** ${rc.visualRegressionEnabled ? 'enabled' : 'disabled'}`);
-    lines.push('');
-  }
-
-  if (result.safetyAudit) {
-    lines.push('## Safety Guard Audit');
-    lines.push('');
-    lines.push(`- Blocked actions: ${result.safetyAudit.blockedCount}`);
-    lines.push(`- Audit entries retained: ${result.safetyAudit.entries.length}`);
-    if (result.safetyAudit.entries.length > 0) {
-      lines.push('');
-      lines.push('| Time | Blocked | Action | URL | Reason |');
-      lines.push('|------|---------|--------|-----|--------|');
-      for (const entry of result.safetyAudit.entries.slice(-10)) {
-        lines.push(
-          `| ${escapeTableCell(entry.timestamp)} | ${entry.blocked ? 'yes' : 'no'} | ${escapeTableCell(
-            entry.action
-          )} | ${escapeTableCell(entry.url)} | ${escapeTableCell(entry.reason)} |`
-        );
-      }
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n');
+  return sections.flat().join('\n');
 }
 
 /**

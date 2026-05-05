@@ -4,7 +4,7 @@
 import { shortId } from '../constants.js';
 import { buildAutoCaptureFindingMeta } from '../repro/repro.js';
 import type { Evidence, FindingSeverity, RawFinding } from '../types.js';
-import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/traffic-observer.js';
+import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
 import {
   matchContractOperation,
   matchContractOperationsForRoute,
@@ -18,14 +18,6 @@ function uniqueSorted(values: string[]): string[] {
 
 function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values)].sort((left, right) => left - right);
-}
-
-function normalizeRoute(route: string): string {
-  try {
-    return new URL(route).pathname;
-  } catch {
-    return route;
-  }
 }
 
 interface ObservedMethodSlice {

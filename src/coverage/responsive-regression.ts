@@ -48,10 +48,11 @@ export interface MultiViewportOptions {
  *
  * Results from all breakpoints are merged into a single findings + evidence array.
  *
- * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param page - Page object (Playwright or Stagehand Page). Cast needed for viewport/screenshot API.
  * @param options - Configuration for multi-viewport testing
  */
 export async function runMultiViewportVisualRegression(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   page: any,
   options: MultiViewportOptions
 ): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
@@ -96,7 +97,7 @@ export async function runMultiViewportVisualRegression(
 
       allFindings.push(...result.findings);
       allEvidence.push(...result.evidence);
-    } catch (error) {
+    } catch {
       // Viewport resize or visual regression may fail; continue with remaining breakpoints
     }
   }
@@ -105,7 +106,7 @@ export async function runMultiViewportVisualRegression(
   if (originalViewport && typeof page.setViewportSize === "function") {
     try {
       await page.setViewportSize(originalViewport);
-    } catch (error) {
+    } catch {
       // Best-effort restore; page may have been closed or navigated
     }
   }
