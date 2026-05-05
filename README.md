@@ -98,9 +98,10 @@ Dramaturge supports multiple auth strategies:
     "loginUrl": "/login",
     "fields": [
       { "selector": "input[name='email']", "value": "${TEST_USER_EMAIL}" },
-      { "selector": "input[name='password']", "value": "${TEST_USER_PASSWORD}" }
+      { "selector": "input[name='password']", "value": "${TEST_USER_PASSWORD}", "secret": true }
     ],
-    "submit": { "selector": "button[type='submit']" }
+    "submit": { "selector": "button[type='submit']" },
+    "successIndicator": "selector:[data-testid='dashboard']"
   }
 }
 ```
@@ -115,7 +116,11 @@ The minimal config:
 {
   "targetUrl": "https://your-app.example.com",
   "appDescription": "Brief description of your app",
-  "auth": { "type": "interactive" },
+  "auth": {
+    "type": "interactive",
+    "loginUrl": "/login",
+    "successIndicator": "selector:[data-testid='dashboard']"
+  },
   "models": {
     "planner": "anthropic/claude-sonnet-4-6",
     "worker": "anthropic/claude-haiku-4-5"
@@ -274,7 +279,7 @@ Script multi-step IdP flows.
       { "type": "click", "selector": "button[data-provider='google']" },
       { "type": "fill", "selector": "input[type='email']", "value": "${TEST_USER_EMAIL}" },
       { "type": "click", "selector": "input[type='submit']" },
-      { "type": "fill", "selector": "input[type='password']", "value": "${TEST_USER_PASSWORD}" },
+      { "type": "fill", "selector": "input[type='password']", "value": "${TEST_USER_PASSWORD}", "secret": true },
       { "type": "click", "selector": "input[type='submit']" }
     ],
     "successIndicator": "selector:[data-testid='user-menu']"

@@ -18,53 +18,69 @@ export class StagehandBrowserAgent implements BrowserAgent {
   private stagehand: Stagehand;
 
   constructor() {
-    this.stagehand = new Stagehand({
-      env: 'LOCAL',
-      verbose: 0,
-      debugDom: false,
-      headless: false,
-      enableCaching: false,
-    });
+    this.stagehand = new Stagehand({ env: 'LOCAL', verbose: 0 });
   }
 
   get context(): BrowserContext {
-    return this.stagehand.context;
+    // Stagehand's V3Context is structurally compatible but uses a different Page
+    // type from a vendored Playwright. Cast through unknown to satisfy our interface.
+    return this.stagehand.context as unknown as BrowserContext;
   }
 
   async init(options: BrowserAgentInitOptions): Promise<void> {
-    // Stagehand is initialized in constructor, but we can update config here
+    const modelName = options.modelName;
     this.stagehand = new Stagehand({
       env: (options.env as 'LOCAL' | 'BROWSERBASE') ?? 'LOCAL',
       verbose: options.verbose ?? 0,
-      debugDom: options.debugDom ?? false,
-      headless: options.headless ?? false,
-      enableCaching: options.enableCaching ?? false,
-      modelName: options.modelName,
-      modelClientOptions: options.modelClientOptions,
+      ...(options.headless !== undefined && {
+        localBrowserLaunchOptions: { headless: options.headless },
+      }),
+      ...(modelName && {
+        model: options.modelClientOptions
+          ? {
+              modelName,
+              apiKey: options.modelClientOptions.apiKey,
+              baseURL: options.modelClientOptions.baseURL,
+            }
+          : modelName,
+      }),
     });
 
     await this.stagehand.init();
   }
 
   agent(options: BrowserAgentOptions): BrowserAgentExecutor {
-    // Convert our generic agent options to Stagehand's format
+    // Build the Stagehand agent with the options we received.
+    // The tools field in AgentConfig uses Stagehand's ToolSet format from the "ai" package.
+    // Our BrowserAgentTool uses inputSchema+execute; we pass tools without unsafe coercion
+    // by omitting them here — tool injection into Stagehand happens at a lower level
+    // via the worker setup and is not part of this abstraction layer yet.
     const stagehandAgent = this.stagehand.agent({
-      instructions: options.instructions,
-      tools: options.tools as Parameters<Stagehand['agent']>[0]['tools'],
+      model: options.model,
+      systemPrompt: options.systemPrompt,
       mode: options.mode,
     });
 
-    // Return a wrapper that conforms to BrowserAgentExecutor
-    return async (instruction: string) => {
-      try {
-        await stagehandAgent(instruction);
-        return { success: true };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error : new Error(String(error)),
-        };
-      }
+    return {
+      execute: async (executeOptions) => {
+        try {
+          const result = await stagehandAgent.execute({
+            instruction: executeOptions.instruction,
+            maxSteps: executeOptions.maxSteps,
+          });
+          return {
+            success: result.completed,
+            message: result.message,
+            actions: Array.isArray(result.actions) ? result.actions : [],
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error : new Error(String(error)),
+            actions: [],
+          };
+        }
+      },
     };
   }
 

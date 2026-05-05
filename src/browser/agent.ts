@@ -20,7 +20,7 @@ export interface BrowserAgent {
   init(options: BrowserAgentInitOptions): Promise<void>;
 
   /**
-   * Creates a new agent instance for worker execution.
+   * Creates a new agent executor for worker execution.
    * @param options - Agent configuration options
    * @returns An agent executor handle
    */
@@ -79,12 +79,12 @@ export interface BrowserContext {
  */
 export interface BrowserAgentInitOptions {
   /**
-   * Model identifier for LLM operations.
+   * Model name for LLM operations (e.g. 'openai/gpt-4o').
    */
   modelName?: string;
 
   /**
-   * Optional model configuration for API endpoint.
+   * Optional model API configuration.
    */
   modelClientOptions?: {
     apiKey?: string;
@@ -102,48 +102,57 @@ export interface BrowserAgentInitOptions {
   headless?: boolean;
 
   /**
-   * Whether to enable logging.
-   */
-  enableCaching?: boolean;
-
-  /**
    * Optional verbose logging level (0-2).
    */
-  verbose?: number;
-
-  /**
-   * Optional debugging port.
-   */
-  debugDom?: boolean;
+  verbose?: 0 | 1 | 2;
 }
 
 /**
  * Configuration options for creating an agent executor.
+ * These map to the per-agent options passed by each worker invocation.
  */
 export interface BrowserAgentOptions {
   /**
-   * Instruction prompt for the agent.
+   * Model identifier to use for this agent (e.g. 'anthropic/claude-3-5-haiku').
    */
-  instructions?: string;
+  model?: string;
 
   /**
-   * Tools available to the agent.
+   * System prompt providing context and instructions to the agent.
+   */
+  systemPrompt?: string;
+
+  /**
+   * Tools available to the agent. Each tool uses the same shape as worker tools:
+   * an `inputSchema` (Zod schema) and an async `execute` function.
    */
   tools?: Record<string, BrowserAgentTool>;
 
   /**
-   * Agent mode: 'cua' (computer-use agent) or 'dom' (DOM inspection).
+   * Agent mode: 'cua' (computer-use), 'dom' (DOM inspection), or 'hybrid'.
    */
-  mode?: 'cua' | 'dom';
+  mode?: 'cua' | 'dom' | 'hybrid';
 }
 
 /**
  * Tool definition for browser agents.
+ * Matches the tool shape used in src/worker/tools.ts (inputSchema + execute).
  */
 export interface BrowserAgentTool {
   description: string;
-  parameters: Record<string, unknown>;
-  method: (...args: unknown[]) => Promise<unknown> | unknown;
+  /** JSON Schema object describing the tool input parameters. */
+  inputSchema: Record<string, unknown>;
+  execute: (input: unknown) => Promise<unknown>;
+}
+
+/**
+ * Options passed to each execute() call on the agent executor.
+ */
+export interface BrowserAgentExecuteOptions {
+  /** Natural language instruction for the agent to carry out. */
+  instruction: string;
+  /** Maximum number of steps the agent may take before stopping. */
+  maxSteps?: number;
 }
 
 /**
@@ -151,11 +160,11 @@ export interface BrowserAgentTool {
  */
 export interface BrowserAgentExecutor {
   /**
-   * Executes the agent with the given instruction.
-   * @param instruction - Task instruction for the agent
+   * Executes the agent with the given options.
+   * @param options - Execution options including the instruction and optional step limit
    * @returns Execution result
    */
-  (instruction: string): Promise<BrowserAgentResult>;
+  execute(options: BrowserAgentExecuteOptions): Promise<BrowserAgentResult>;
 }
 
 /**
@@ -176,4 +185,10 @@ export interface BrowserAgentResult {
    * Optional error if execution failed.
    */
   error?: Error;
+
+  /**
+   * Actions taken by the agent during execution.
+   * Matches the `result.actions` array returned by Stagehand's agent.execute().
+   */
+  actions?: unknown[];
 }

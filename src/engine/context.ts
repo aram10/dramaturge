@@ -38,8 +38,8 @@ export interface EngineContext {
   config: DramaturgeConfig;
   budget: BudgetConfig;
   mission: MissionConfig | undefined;
-  /** Browser agent abstraction (currently Stagehand, but can be swapped). */
-  browserAgent: BrowserAgent;
+  /** Browser agent abstraction (currently Stagehand, but can be swapped). Optional during incremental migration. */
+  browserAgent?: BrowserAgent;
   /** Legacy Stagehand reference - will be removed once migration is complete. */
   stagehand: Stagehand;
   page: ReturnType<Stagehand['context']['pages']>[number];
