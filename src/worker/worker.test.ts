@@ -23,6 +23,67 @@ describe('executeWorkerTask', () => {
     vi.mocked(judgeObservationWithLLM).mockReset();
   });
 
+  it('aborts stagehand agent execution after the configured timeout', async () => {
+    vi.useFakeTimers();
+
+    const page = createMockPage();
+    let receivedSignal: AbortSignal | undefined;
+
+    const stagehand = {
+      context: {
+        pages: () => [page],
+      },
+      agent: vi.fn(() => ({
+        execute: ({ signal }: { signal?: AbortSignal }) => {
+          receivedSignal = signal;
+          return new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+          });
+        },
+      })),
+    } as any;
+
+    const resultPromise = executeWorkerTask(
+      stagehand,
+      {
+        id: 'task-timeout-1',
+        workerType: 'navigation',
+        nodeId: 'node-1',
+        objective: 'Inspect the knowledge bases page',
+        maxSteps: 5,
+        pageType: 'list',
+        missionContext: 'Example app',
+      },
+      {
+        model: 'anthropic/claude-haiku-4-5',
+        screenshotDir: 'C:/tmp/screenshots',
+        timeoutMs: 1_000,
+        agentMode: 'dom',
+        screenshotsEnabled: false,
+        stagnationThreshold: 0,
+        mission: {
+          appDescription: 'Example app',
+          destructiveActionsAllowed: false,
+        },
+        judgeConfig: {
+          enabled: true,
+          requestTimeoutMs: 10_000,
+        },
+      }
+    );
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    const result = await resultPromise;
+
+    expect(receivedSignal).toBeDefined();
+    expect(receivedSignal?.aborted).toBe(true);
+    expect(result.outcome).toBe('timed-out');
+    expect(result.summary).toContain('Timed out');
+    expect(result.taskId).toBe('task-timeout-1');
+
+    vi.useRealTimers();
+  });
+
   it('uses the configured judge model path when an LLM judge is available', async () => {
     vi.mocked(hasLLMApiKey).mockReturnValue(true);
     vi.mocked(judgeObservationWithLLM).mockResolvedValue({

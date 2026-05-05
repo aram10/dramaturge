@@ -444,6 +444,7 @@ export interface MissionConfig {
 
 export interface BudgetConfig {
   globalTimeLimitSeconds: number;
+  taskTimeLimitSeconds?: number;
   maxStepsPerTask: number;
   maxFrontierSize: number;
   maxStateNodes: number;

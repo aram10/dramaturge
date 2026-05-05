@@ -312,6 +312,12 @@ const MissionSchema = z
 const BudgetSchema = z
   .object({
     globalTimeLimitSeconds: z.number().int().min(60).default(900),
+    /**
+     * Hard timeout (in seconds) for an individual worker task.
+     *
+     * When unset, the engine derives a per-task timeout from the remaining global budget.
+     */
+    taskTimeLimitSeconds: z.number().int().min(5).optional(),
     maxStepsPerTask: z.number().int().min(5).default(40),
     maxFrontierSize: z.number().int().min(10).default(200),
     maxStateNodes: z.number().int().min(5).default(50),

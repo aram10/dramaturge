@@ -54,6 +54,7 @@ import { Coordinator } from './a2a/coordinator.js';
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
     globalTimeLimitSeconds: config.budget.globalTimeLimitSeconds ?? config.exploration.totalTimeout,
+    taskTimeLimitSeconds: config.budget.taskTimeLimitSeconds,
     maxStepsPerTask: config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
     maxFrontierSize: config.budget.maxFrontierSize ?? 200,
     maxStateNodes: config.budget.maxStateNodes ?? 50,
