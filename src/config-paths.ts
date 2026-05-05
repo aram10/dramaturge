@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { resolve } from 'node:path';
-import type { DramaturgeConfig } from './config.js';
+import type { AuthConfig, DramaturgeConfig } from './config.js';
 
 export interface ConfigFileContext {
   configPath: string;
@@ -34,13 +34,36 @@ export function normalizeConfigPaths(
   config: DramaturgeConfig,
   context: ConfigFileContext
 ): ConfigWithMeta<DramaturgeConfig> {
-  const auth =
-    config.auth.type === 'interactive' || config.auth.type === 'stored-state'
-      ? {
+  // Normalize auth paths - handle both direct auth config and profiles
+  const auth = (() => {
+    if ('profiles' in config.auth) {
+      // Auth profiles - normalize each profile
+      const normalizedProfiles: Record<string, AuthConfig> = {};
+      for (const [name, profile] of Object.entries(config.auth.profiles)) {
+        if (profile.type === 'interactive' || profile.type === 'stored-state') {
+          normalizedProfiles[name] = {
+            ...profile,
+            stateFile: resolveFromConfigDir(context.configDir, profile.stateFile),
+          };
+        } else {
+          normalizedProfiles[name] = profile;
+        }
+      }
+      return {
+        profiles: normalizedProfiles,
+        default: config.auth.default,
+      };
+    } else {
+      // Direct auth config
+      if (config.auth.type === 'interactive' || config.auth.type === 'stored-state') {
+        return {
           ...config.auth,
           stateFile: resolveFromConfigDir(context.configDir, config.auth.stateFile),
-        }
-      : config.auth;
+        };
+      }
+      return config.auth;
+    }
+  })();
 
   const normalizedRepoContext = config.repoContext
     ? (() => {

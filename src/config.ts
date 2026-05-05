@@ -11,72 +11,86 @@ import {
   type LoadedConfigMeta,
 } from './config-paths.js';
 
-const AuthSchema = z
-  .discriminatedUnion('type', [
-    z.object({
-      type: z.literal('none'),
+const AuthConfigSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('none'),
+  }),
+  z.object({
+    type: z.literal('stored-state'),
+    stateFile: z.string(),
+    successIndicator: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('form'),
+    loginUrl: z.string(),
+    fields: z
+      .array(
+        z.object({
+          selector: z.string().min(1),
+          value: z.string(),
+          label: z.string().optional(),
+          secret: z.boolean().default(false),
+        })
+      )
+      .min(1),
+    submit: z.object({
+      selector: z.string().min(1),
+      label: z.string().optional(),
     }),
-    z.object({
-      type: z.literal('stored-state'),
-      stateFile: z.string(),
-      successIndicator: z.string().optional(),
-    }),
-    z.object({
-      type: z.literal('form'),
-      loginUrl: z.string(),
-      fields: z
-        .array(
+    successIndicator: z.string(),
+  }),
+  z.object({
+    type: z.literal('oauth-redirect'),
+    loginUrl: z.string(),
+    steps: z
+      .array(
+        z.discriminatedUnion('type', [
           z.object({
+            type: z.literal('click'),
+            selector: z.string().min(1),
+            label: z.string().optional(),
+          }),
+          z.object({
+            type: z.literal('fill'),
             selector: z.string().min(1),
             value: z.string(),
             label: z.string().optional(),
             secret: z.boolean().default(false),
-          })
-        )
-        .min(1),
-      submit: z.object({
-        selector: z.string().min(1),
-        label: z.string().optional(),
+          }),
+          z.object({
+            type: z.literal('wait-for-selector'),
+            selector: z.string().min(1),
+          }),
+        ])
+      )
+      .min(1),
+    successIndicator: z.string(),
+  }),
+  z.object({
+    type: z.literal('interactive'),
+    loginUrl: z.string(),
+    successIndicator: z.string(),
+    stateFile: z.string().default('./.dramaturge-state/user.json'),
+    /** Timeout in seconds for the human to complete login (default: 120). */
+    manualTimeoutSeconds: z.number().int().min(30).default(120),
+  }),
+]);
+
+const AuthProfilesSchema = z
+  .object({
+    profiles: z
+      .record(z.string().min(1), AuthConfigSchema)
+      .refine((profiles) => Object.keys(profiles).length > 0, {
+        message: 'At least one auth profile is required when using profiles.',
       }),
-      successIndicator: z.string(),
-    }),
-    z.object({
-      type: z.literal('oauth-redirect'),
-      loginUrl: z.string(),
-      steps: z
-        .array(
-          z.discriminatedUnion('type', [
-            z.object({
-              type: z.literal('click'),
-              selector: z.string().min(1),
-              label: z.string().optional(),
-            }),
-            z.object({
-              type: z.literal('fill'),
-              selector: z.string().min(1),
-              value: z.string(),
-              label: z.string().optional(),
-              secret: z.boolean().default(false),
-            }),
-            z.object({
-              type: z.literal('wait-for-selector'),
-              selector: z.string().min(1),
-            }),
-          ])
-        )
-        .min(1),
-      successIndicator: z.string(),
-    }),
-    z.object({
-      type: z.literal('interactive'),
-      loginUrl: z.string(),
-      successIndicator: z.string(),
-      stateFile: z.string().default('./.dramaturge-state/user.json'),
-      /** Timeout in seconds for the human to complete login (default: 120). */
-      manualTimeoutSeconds: z.number().int().min(30).default(120),
-    }),
-  ])
-  .default({ type: 'none' });
+    default: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine((value) => !value.default || value.profiles[value.default] !== undefined, {
+    message: 'The default profile must exist in the profiles object.',
+  });
+
+const AuthSchema = z.union([AuthProfilesSchema, AuthConfigSchema]).default({ type: 'none' });
 
 const WorkerModelsSchema = z
   .object({
@@ -626,12 +640,59 @@ export type AdversarialConfig = z.infer<typeof AdversarialSchema>;
 export type JudgeConfig = z.infer<typeof JudgeSchema>;
 export type VisionAnalysisConfig = z.infer<typeof VisionAnalysisSchema>;
 export type { ConfigFileContext, LoadedConfigMeta } from './config-paths.js';
-export type FormAuthField = Extract<DramaturgeConfig['auth'], { type: 'form' }>['fields'][number];
-export type FormAuthSubmit = Extract<DramaturgeConfig['auth'], { type: 'form' }>['submit'];
-export type OAuthRedirectStep = Extract<
-  DramaturgeConfig['auth'],
-  { type: 'oauth-redirect' }
->['steps'][number];
+export type AuthConfig = z.infer<typeof AuthConfigSchema>;
+export type AuthProfiles = z.infer<typeof AuthProfilesSchema>;
+export type FormAuthField = Extract<AuthConfig, { type: 'form' }>['fields'][number];
+export type FormAuthSubmit = Extract<AuthConfig, { type: 'form' }>['submit'];
+export type OAuthRedirectStep = Extract<AuthConfig, { type: 'oauth-redirect' }>['steps'][number];
+
+/**
+ * Check if auth config uses profiles (multi-role) mode.
+ */
+export function isAuthProfiles(auth: DramaturgeConfig['auth']): auth is AuthProfiles {
+  return 'profiles' in auth && typeof auth.profiles === 'object';
+}
+
+/**
+ * Resolve a specific auth profile by name from the config.
+ * Returns the resolved profile or throws if the profile doesn't exist.
+ */
+export function resolveAuthProfile(
+  auth: DramaturgeConfig['auth'],
+  profileName?: string
+): AuthConfig {
+  // If auth is a direct config (backward compatibility), return it
+  if (!isAuthProfiles(auth)) {
+    return auth;
+  }
+
+  // Determine which profile to use
+  const targetProfile = profileName ?? auth.default;
+  if (!targetProfile) {
+    throw new Error(
+      'No profile specified and no default profile set. Please specify a profile with --profile or set auth.default in config.'
+    );
+  }
+
+  // Resolve the profile
+  const profile = auth.profiles[targetProfile];
+  if (!profile) {
+    const available = Object.keys(auth.profiles).join(', ');
+    throw new Error(`Auth profile "${targetProfile}" not found. Available profiles: ${available}`);
+  }
+
+  return profile;
+}
+
+/**
+ * Get all profile names from the auth config.
+ */
+export function getAuthProfileNames(auth: DramaturgeConfig['auth']): string[] {
+  if (!isAuthProfiles(auth)) {
+    return [];
+  }
+  return Object.keys(auth.profiles);
+}
 
 function interpolateEnvVars(value: unknown): unknown {
   if (typeof value === 'string') {
