@@ -34,6 +34,7 @@ export interface ParsedCliArgs {
     | 'doctor'
     | 'init'
     | 'setup'
+    | 'auth'
     | 'auto-config'
     | 'findings'
     | 'baselines'
@@ -66,6 +67,10 @@ export interface ParsedCliArgs {
   repoPath?: string;
   /** --no-scan flag for setup: disables repo scan entirely */
   noScan?: true;
+  /** Subcommand after auth (e.g. "capture", "list") */
+  authSubcommand?: string;
+  /** --profile flag for auth capture */
+  authProfile?: string;
   /** Subcommand after findings/baselines/memory (e.g. "list", "suppress") */
   triageSubcommand?: string;
   /** Positional args for triage subcommands */
@@ -90,6 +95,7 @@ const HELP_TEXT = `Usage: dramaturge <command> [options]
 Commands:
   run [url]            Run exploratory QA (default command)
   setup                Interactive first-run onboarding wizard
+  auth <sub>           Capture or list auth profiles (capture | list)
   init                 Generate a config file from a template
   auto-config          AI-assisted config generation from repo context
   doctor               Check environment and configuration
@@ -138,6 +144,8 @@ Examples:
   dramaturge run https://app.example.com --preset security  # Security-focused scan
   dramaturge run https://app.example.com --focus api --focus adversarial  # Ad-hoc focus mix
   dramaturge setup                                     # Interactive onboarding
+  dramaturge auth capture --profile admin               # Capture storage state to .dramaturge-state/admin.json
+  dramaturge auth list                                  # List saved profiles in .dramaturge-state
   dramaturge init --template minimal                   # Generate minimal config
   dramaturge auto-config --repo .                      # Generate config from repo context
   dramaturge doctor                                    # Check environment
@@ -174,6 +182,7 @@ const KNOWN_COMMANDS = new Set([
   'doctor',
   'init',
   'setup',
+  'auth',
   'auto-config',
   'help',
   'findings',
@@ -203,6 +212,8 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let initOutput: string | undefined;
   let repoPath: string | undefined;
   let noScan: true | undefined;
+  let authSubcommand: string | undefined;
+  let authProfile: string | undefined;
   let triageSubcommand: string | undefined;
   const triagePositional: string[] = [];
   let triageSuppressedOnly: boolean | undefined;
@@ -375,6 +386,14 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--profile') {
+      const value = args[i + 1];
+      if (!value) throw new Error('Missing value for --profile');
+      authProfile = value;
+      i++;
+      continue;
+    }
+
     if (arg === '--suppressed') {
       triageSuppressedOnly = true;
       continue;
@@ -413,6 +432,14 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (command === 'auth') {
+      if (!authSubcommand) {
+        authSubcommand = arg;
+        continue;
+      }
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+
     throw new Error(`Unknown argument: ${arg}`);
   }
 
@@ -438,6 +465,12 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     initOutput,
     repoPath,
     noScan,
+    ...(command === 'auth'
+      ? {
+          authSubcommand,
+          authProfile,
+        }
+      : {}),
     ...(TRIAGE_COMMANDS.has(command)
       ? {
           triageSubcommand,
@@ -486,6 +519,9 @@ export async function runCli(
 
       case 'setup':
         return await runSetupCommand(dependencies, parsedArgs);
+
+      case 'auth':
+        return await runAuthCommand(dependencies, parsedArgs);
 
       case 'auto-config':
         return await runAutoConfigCommand(dependencies, parsedArgs);
@@ -574,6 +610,55 @@ async function runSetupCommand(
       },
       {
         repoPath: parsedArgs.noScan ? false : parsedArgs.repoPath,
+      }
+    );
+  } finally {
+    rl.close();
+  }
+}
+
+async function runAuthCommand(
+  dependencies: CliDependencies,
+  parsedArgs: ParsedCliArgs
+): Promise<number> {
+  const { runAuthCommand: runAuthCommandInner } = await import('./commands/auth.js');
+  const readline = await import('node:readline');
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const prompt = (question: string): Promise<string> =>
+    new Promise((resolve) => {
+      rl.question(`  ${question}: `, (answer) => resolve(answer.trim()));
+    });
+
+  const confirm = (question: string, defaultValue = false): Promise<boolean> =>
+    new Promise((resolve) => {
+      const suffix = defaultValue ? ' [Y/n]' : ' [y/N]';
+      rl.question(`  ${question}${suffix}: `, (answer) => {
+        const trimmed = answer.trim().toLowerCase();
+        if (trimmed === '') resolve(defaultValue);
+        else resolve(trimmed === 'y' || trimmed === 'yes');
+      });
+    });
+
+  try {
+    return await runAuthCommandInner(
+      {
+        subcommand: parsedArgs.authSubcommand,
+        configPath: parsedArgs.configPath,
+        profile: parsedArgs.authProfile,
+        url: parsedArgs.url,
+      },
+      {
+        log: dependencies.log,
+        error: dependencies.error,
+        cwd: process.cwd(),
+        prompt,
+        confirm,
+        loadConfig: dependencies.loadConfig,
       }
     );
   } finally {
