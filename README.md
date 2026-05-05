@@ -168,16 +168,24 @@ Check the output directory for:
 
 ## Capturing Authentication State
 
-For `stored-state` auth mode, capture reusable session state interactively:
+The easiest way to capture auth state is via the setup wizard:
 
 ```bash
-pnpm exec dramaturge-auth-state \
-  --url https://your-app.example.com/login \
-  --output ./.dramaturge-state/user.json \
-  --success-url https://your-app.example.com/dashboard
+pnpm exec dramaturge setup
 ```
 
-This opens a browser where you can manually log in. Once authenticated and the success URL is reached, the browser state is saved to the output file for reuse in future runs.
+The wizard can open a browser for manual sign-in, save the resulting storage state to `.dramaturge-state/<profile>.json`, and update your generated config to use `stored-state` auth.
+
+To capture auth state later (outside the wizard):
+
+```bash
+pnpm exec dramaturge auth capture --profile user
+pnpm exec dramaturge auth list
+```
+
+`dramaturge auth capture` opens a browser at the configured login URL (from `dramaturge.config.json` by default), then asks you to confirm whether login succeeded before saving the state.
+
+Note: the legacy helper binary `pnpm exec dramaturge-auth-state` is deprecated in favor of `dramaturge auth capture`.
 
 ## GitHub Action
 

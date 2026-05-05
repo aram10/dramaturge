@@ -5,6 +5,7 @@ import { existsSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { resolve, relative, dirname, isAbsolute } from 'node:path';
 import { detectFramework, scanRepository } from '../adaptation/repo-scan.js';
 import type { RepoFramework, RepoHints } from '../adaptation/types.js';
+import { captureAuthStateViaUserConfirmation } from '../auth/auth-state-capture.js';
 
 export interface SetupAnswers {
   targetUrl: string;
@@ -38,6 +39,7 @@ export interface SetupDependencies {
   prompt: (question: string) => Promise<string>;
   confirm: (question: string, defaultValue?: boolean) => Promise<boolean>;
   select: (question: string, options: string[]) => Promise<string>;
+  captureAuthState?: typeof captureAuthStateViaUserConfirmation;
   /**
    * Scanner override for tests. Defaults to detecting the framework for the
    * provided root and then calling scanRepository({ root, framework }).
@@ -161,14 +163,25 @@ export async function runSetup(deps: SetupDependencies, args: SetupArgs = {}): P
   );
 
   // 3. Auth
-  const detectedLoginRoute = scan?.hints.authHints.loginRoutes[0];
+  const detectedLoginRoutes = scan?.hints.authHints.loginRoutes ?? [];
+  const detectedLoginRoute = detectedLoginRoutes[0];
   if (detectedLoginRoute) {
-    deps.log(`  (Detected possible login route: ${detectedLoginRoute})`);
+    const suffix =
+      detectedLoginRoutes.length > 1 ? ` (+${detectedLoginRoutes.length - 1} more)` : '';
+    deps.log(`  (Detected possible login route: ${detectedLoginRoute}${suffix})`);
   }
   const requiresLogin = await deps.confirm(
     'Does the app require login?',
     Boolean(detectedLoginRoute)
   );
+
+  let loginUrl = targetUrl;
+  if (requiresLogin) {
+    loginUrl = await resolveLoginUrl(deps, {
+      targetUrl,
+      detectedLoginRoute,
+    });
+  }
 
   // 4-5. Provider + API key
   const { providerKey, envKey, apiKey } = await selectProvider(deps);
@@ -197,11 +210,6 @@ export async function runSetup(deps: SetupDependencies, args: SetupArgs = {}): P
 
   // Build config
   const models = PROVIDER_MODELS[providerKey];
-  const detectedLoginPath = scan?.hints.authHints.loginRoutes[0];
-  const loginUrl =
-    requiresLogin && detectedLoginPath
-      ? new URL(detectedLoginPath, targetUrl).toString()
-      : targetUrl;
   const successIndicator = `url:${new URL(targetUrl).origin}`;
 
   const config: Record<string, unknown> = {
@@ -230,6 +238,15 @@ export async function runSetup(deps: SetupDependencies, args: SetupArgs = {}): P
       headless,
     },
   };
+
+  if (requiresLogin) {
+    await maybeCaptureAuthState(deps, {
+      config,
+      loginUrl,
+      successIndicator,
+      saveConfig,
+    });
+  }
 
   if (scan !== null) {
     const relRoot = toRelativeRoot(deps.cwd, scan.root);
@@ -262,7 +279,11 @@ export async function runSetup(deps: SetupDependencies, args: SetupArgs = {}): P
     deps.log(`  dramaturge run ${targetUrl}`);
   }
   if (requiresLogin) {
-    deps.log('  (A browser will open for you to sign in on first run.)');
+    if ((config.auth as { type?: string }).type === 'stored-state') {
+      deps.log('  (Using captured auth state — no sign-in needed on first run.)');
+    } else {
+      deps.log('  (A browser will open for you to sign in on first run.)');
+    }
   }
   deps.log('  dramaturge doctor           # verify your environment');
   deps.log('');
@@ -422,4 +443,90 @@ function toRelativeRoot(cwd: string, root: string): string {
   const rel = relative(cwd, root);
   if (!rel) return '.';
   return rel.replaceAll('\\', '/');
+}
+
+async function resolveLoginUrl(
+  deps: SetupDependencies,
+  options: { targetUrl: string; detectedLoginRoute?: string }
+): Promise<string> {
+  if (options.detectedLoginRoute) {
+    const suggested = new URL(options.detectedLoginRoute, options.targetUrl).toString();
+    const useSuggested = await deps.confirm(`Use detected login URL? (${suggested})`, true);
+    if (useSuggested) return suggested;
+  }
+
+  const input = await deps.prompt(
+    `What URL should Dramaturge open for login? (leave blank to use ${options.targetUrl})`
+  );
+  const candidate = input.trim() === '' ? options.targetUrl : input.trim();
+  try {
+    return new URL(candidate).toString();
+  } catch {
+    deps.error(`Invalid login URL: ${candidate}`);
+    return options.targetUrl;
+  }
+}
+
+async function maybeCaptureAuthState(
+  deps: SetupDependencies,
+  options: {
+    config: Record<string, unknown>;
+    loginUrl: string;
+    successIndicator: string;
+    saveConfig: boolean;
+  }
+): Promise<void> {
+  const captureNow = await deps.confirm('Would you like to capture auth state now?', false);
+  if (!captureNow) return;
+
+  const profileRaw = await deps.prompt('Profile name for saved auth state (default: user)');
+  const profile = sanitizeProfileName(profileRaw);
+  const stateFile = `./.dramaturge-state/${profile}.json`;
+
+  deps.log('Opening a browser for manual sign-in...');
+
+  const captureAuthState = deps.captureAuthState ?? captureAuthStateViaUserConfirmation;
+  const result = await captureAuthState(
+    {
+      loginUrl: options.loginUrl,
+      outputPath: resolve(deps.cwd, '.dramaturge-state', `${profile}.json`),
+    },
+    {
+      log: deps.log,
+      error: deps.error,
+      prompt: deps.prompt,
+      confirm: deps.confirm,
+    }
+  );
+
+  if (!result.confirmed) {
+    deps.log('Auth capture canceled; leaving auth type as interactive.');
+    return;
+  }
+
+  deps.log(
+    `Captured auth profile "${profile}". Updating generated config to use stored-state auth.`
+  );
+  options.config.auth = {
+    type: 'stored-state',
+    stateFile,
+    successIndicator: options.successIndicator,
+  };
+
+  if (!options.saveConfig) {
+    deps.log(
+      '  (You chose not to save a config file — remember to copy this auth block into your config.)'
+    );
+  }
+}
+
+function sanitizeProfileName(profileRaw: string | undefined): string {
+  const raw = profileRaw?.trim() ?? '';
+  if (raw === '') return 'user';
+  const sanitized = raw
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9_-]/g, '-')
+    .replaceAll(/-+/g, '-')
+    .replaceAll(/^[-_]+|[-_]+$/g, '');
+  return sanitized === '' ? 'user' : sanitized;
 }

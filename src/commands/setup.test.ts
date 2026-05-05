@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (c) 2026 Alex Rambasek
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -39,6 +39,7 @@ function makeHarness(
     confirms?: boolean[];
     selects?: string[];
     scan?: (root: string) => RepoScanResult;
+    captureAuthState?: SetupDependencies['captureAuthState'];
   } = {}
 ): Harness {
   const messages: string[] = [];
@@ -66,6 +67,7 @@ function makeHarness(
       return selectQueue.shift() ?? options[0];
     },
     scanRepo: queues.scan,
+    captureAuthState: queues.captureAuthState,
   };
   return {
     deps,
@@ -140,6 +142,7 @@ describe('runSetup', () => {
       confirms: [
         /* use detected hints */ true,
         /* requiresLogin (default true because login route detected) */ true,
+        /* use detected login url */ true,
         /* headless */ false,
         /* enable API testing */ true,
         /* enable adversarial */ false,
@@ -159,6 +162,56 @@ describe('runSetup', () => {
     expect(config.adversarial).toBeUndefined();
     expect(config.auth.type).toBe('interactive');
     expect(config.auth.loginUrl).toBe('https://example.com/login');
+  });
+
+  it('offers auth capture and rewrites config to stored-state when confirmed', async () => {
+    const scan: RepoScanResult = {
+      root: testDir,
+      framework: 'nextjs',
+      hints: makeHints({
+        routes: ['/', '/dashboard', '/login'],
+        authHints: { loginRoutes: ['/login'], callbackRoutes: [] },
+      }),
+    };
+
+    const captureAuthState = vi.fn().mockResolvedValue({
+      outputPath: resolve(testDir, '.dramaturge-state', 'admin.json'),
+      confirmed: true,
+    });
+
+    const h = makeHarness(testDir, {
+      prompts: ['https://example.com', 'Next.js app', 'Admin'],
+      confirms: [
+        /* use detected hints */ true,
+        /* requiresLogin */ true,
+        /* use detected login url */ true,
+        /* headless */ false,
+        /* saveConfig */ true,
+        /* capture auth state now */ true,
+      ],
+      selects: ['Anthropic'],
+      scan: () => scan,
+      captureAuthState,
+    });
+
+    const code = await runSetup(h.deps, { repoPath: testDir });
+    expect(code).toBe(0);
+
+    expect(captureAuthState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        loginUrl: 'https://example.com/login',
+        outputPath: resolve(testDir, '.dramaturge-state', 'admin.json'),
+      }),
+      expect.any(Object)
+    );
+
+    const configPath = resolve(testDir, 'dramaturge.config.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    expect(config.auth).toEqual({
+      type: 'stored-state',
+      stateFile: './.dramaturge-state/admin.json',
+      successIndicator: 'url:https://example.com',
+    });
   });
 
   it('auto-detects a git repo in cwd and scans it', async () => {
