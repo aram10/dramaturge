@@ -58,6 +58,8 @@ export interface ParsedCliArgs {
   focusModes?: FocusMode[];
   /** --format flag — comma-separated list of report formats */
   formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
+  /** --profile flag for multi-role auth */
+  profile?: string;
   /** --template flag for init */
   initTemplate?: InitTemplate;
   /** --output flag for init */
@@ -108,6 +110,7 @@ Run options:
   --preset <name>      Preset: smoke, thorough, security, accessibility, api-contract, visual, pre-release
   --focus <modes>      Focus modes (repeatable / comma-separated): navigation, form, crud, api, adversarial
   --format <list>      Report formats, comma-separated: markdown, json, junit, sarif, or both (legacy alias) (e.g. markdown,sarif)
+  --profile <name>     Auth profile to use (when config has multiple auth profiles)
   --help, -h           Show this help message
 
 Init options:
@@ -200,6 +203,7 @@ interface CliParseState {
   preset?: ParsedCliArgs['preset'];
   focusModes: FocusMode[];
   formats?: ParsedCliArgs['formats'];
+  profile?: string;
   initTemplate?: InitTemplate;
   initOutput?: string;
   repoPath?: string;
@@ -333,6 +337,12 @@ const VALUE_FLAG_HANDLERS = new Map<string, ValueFlagHandler>([
       s.formats = parseFormatValue(v);
     },
   ],
+  [
+    '--profile',
+    (s, v) => {
+      s.profile = v;
+    },
+  ],
   ['--template', applyTemplateFlag],
   ['--repo', applyRepoFlag],
 ]);
@@ -454,6 +464,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     preset: state.preset,
     focusModes: state.focusModes.length > 0 ? state.focusModes : undefined,
     formats: state.formats,
+    profile: state.profile,
     initTemplate: state.initTemplate,
     initOutput: state.initOutput,
     repoPath: state.repoPath,
@@ -708,6 +719,7 @@ async function runRunCommand(
     resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
     eventStream,
     diffRef: parsedArgs.diffRef,
+    profile: parsedArgs.profile,
   });
 
   if (dashboardHandle) {

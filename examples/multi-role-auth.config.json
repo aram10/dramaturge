@@ -1,0 +1,38 @@
+{
+  // Example config demonstrating multi-role auth profiles
+  "targetUrl": "https://my-app.example.com",
+  "appDescription": "Multi-role application with role-based access control",
+
+  "auth": {
+    "profiles": {
+      "admin": {
+        "type": "stored-state",
+        "stateFile": ".dramaturge-state/admin.json",
+        "successIndicator": "url:/dashboard"
+      },
+      "editor": {
+        "type": "stored-state",
+        "stateFile": ".dramaturge-state/editor.json",
+        "successIndicator": "url:/dashboard"
+      },
+      "viewer": {
+        "type": "stored-state",
+        "stateFile": ".dramaturge-state/viewer.json",
+        "successIndicator": "url:/dashboard"
+      }
+    },
+    "default": "admin"
+  },
+
+  "exploration": {
+    "maxAreasToExplore": 10,
+    "stepsPerArea": 40,
+    "totalTimeout": 900
+  },
+
+  "output": {
+    "dir": "./dramaturge-reports",
+    "format": "markdown",
+    "screenshots": true
+  }
+}

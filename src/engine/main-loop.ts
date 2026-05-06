@@ -26,6 +26,28 @@ interface BatchTaskResult {
   pageKey: string;
 }
 
+function createEmptyCoverageSnapshot(): WorkerResult['coverageSnapshot'] {
+  return {
+    controlsDiscovered: 0,
+    controlsExercised: 0,
+    events: [],
+  };
+}
+
+function normalizeBatchError(taskId: string, error: unknown): WorkerResult {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    taskId,
+    findings: [],
+    evidence: [],
+    coverageSnapshot: createEmptyCoverageSnapshot(),
+    followupRequests: [],
+    discoveredEdges: [],
+    outcome: 'failed',
+    summary: message,
+  };
+}
+
 export interface RunPlannerLoopOptions {
   initialTasksExecuted: number;
   useLLMPlanner: boolean;
@@ -62,10 +84,34 @@ function handleNavFailure(ctx: EngineContext, item: FrontierItem, logPrefix = ''
   }
 }
 
+const MIN_DERIVED_TASK_TIMEOUT_MS = 5_000;
+const MAX_DERIVED_TASK_TIMEOUT_MS = 5 * 60_000;
+const DERIVED_TASK_TIMEOUT_FRACTION = 0.25;
+
+function resolveTaskTimeoutMs(ctx: EngineContext, startMs: number): number {
+  const remainingMs = ctx.budget.globalTimeLimitSeconds * 1000 - (Date.now() - startMs);
+  if (remainingMs <= 0) {
+    return 1;
+  }
+
+  const configuredSeconds = ctx.budget.taskTimeLimitSeconds;
+  if (configuredSeconds !== undefined) {
+    return Math.max(1, Math.min(remainingMs, configuredSeconds * 1000));
+  }
+
+  const derived = Math.floor(remainingMs * DERIVED_TASK_TIMEOUT_FRACTION);
+  const bounded = Math.min(
+    MAX_DERIVED_TASK_TIMEOUT_MS,
+    Math.max(MIN_DERIVED_TASK_TIMEOUT_MS, derived)
+  );
+  return Math.max(1, Math.min(remainingMs, bounded));
+}
+
 async function processTaskBatch(
   ctx: EngineContext,
   batchItems: FrontierItem[],
-  taskNumberStart: number
+  taskNumberStart: number,
+  startMs: number
 ): Promise<BatchTaskResult[]> {
   const primaryWorker: WorkerSession = {
     key: 'primary',
@@ -73,6 +119,7 @@ async function processTaskBatch(
     page: ctx.page,
   };
   const workers = [primaryWorker, ...ctx.workerPool];
+  const a2aTaskIds = new Array<string | undefined>(batchItems.length);
 
   const promises = batchItems.map(async (item, index): Promise<BatchTaskResult> => {
     const worker = workers[index % workers.length];
@@ -86,6 +133,7 @@ async function processTaskBatch(
       a2aTaskId = a2aTask.id;
       ctx.coordinator.updateTaskStatus(a2aTaskId, 'working');
     }
+    a2aTaskIds[index] = a2aTaskId;
 
     emitEngineEvent(ctx.eventStream, 'task:start', {
       taskId: item.id,
@@ -95,6 +143,7 @@ async function processTaskBatch(
       objective: item.objective,
     });
 
+    const taskTimeoutMs = resolveTaskTimeoutMs(ctx, startMs);
     const result = await executeFrontierItem({
       ctx,
       stagehand: worker.stagehand,
@@ -102,6 +151,7 @@ async function processTaskBatch(
       item,
       taskNumber,
       pageKey: worker.key,
+      taskTimeoutMs,
       a2aTaskId,
     });
 
@@ -130,7 +180,25 @@ async function processTaskBatch(
     };
   });
 
-  return Promise.all(promises);
+  const settled = await Promise.allSettled(promises);
+  return settled.map((entry, index): BatchTaskResult => {
+    if (entry.status === 'fulfilled') {
+      return entry.value;
+    }
+
+    const item = batchItems[index];
+    const worker = workers[index % workers.length];
+    const a2aTaskId = a2aTaskIds[index];
+    if (a2aTaskId && ctx.coordinator) {
+      ctx.coordinator.updateTaskStatus(a2aTaskId, 'failed');
+    }
+
+    return {
+      item,
+      result: normalizeBatchError(item.id, entry.reason),
+      pageKey: worker.key,
+    };
+  });
 }
 
 export async function runPlannerLoop(
@@ -169,7 +237,7 @@ export async function runPlannerLoop(
       break;
     }
 
-    const batchResults = await processTaskBatch(ctx, batchItems, tasksExecuted + 1);
+    const batchResults = await processTaskBatch(ctx, batchItems, tasksExecuted + 1, startMs);
     for (const { item, result, pageKey } of batchResults) {
       flushOwnedBrowserErrors(ctx, pageKey);
       if (!result) {

@@ -217,6 +217,7 @@ describe('executeFrontierItem', () => {
       item,
       taskNumber: 1,
       pageKey: 'page-1',
+      taskTimeoutMs: 12_345,
     });
 
     expect(result).toMatchObject({
@@ -241,6 +242,7 @@ describe('executeFrontierItem', () => {
       {
         model: 'openai/gpt-4.1-mini',
         screenshotDir: 'C:/tmp/screenshots',
+        timeoutMs: 12_345,
         agentMode: 'dom',
         screenshotsEnabled: false,
         stagnationThreshold: 7,
