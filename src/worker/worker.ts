@@ -106,30 +106,28 @@ function initWorker(
   const stagnationTracker =
     opts.stagnationThreshold > 0 ? new StagnationTracker(opts.stagnationThreshold) : undefined;
 
-  const tools = createWorkerTools(
+  const tools = createWorkerTools({
     observations,
     screenshots,
     evidence,
     coverageTracker,
     page,
-    opts.screenshotDir,
-    opts.areaName,
+    screenshotDir: opts.screenshotDir,
+    areaName: opts.areaName,
     followupRequests,
     discoveredEdges,
-    opts.screenshotsEnabled,
-    {
-      stagnationTracker,
-      findingContext: {
-        stateId: opts.stateId,
-        objective: opts.objectiveDescription
-          ? `${opts.objectiveLabel}: ${opts.objectiveDescription}`
-          : opts.objectiveLabel,
-      },
-      actionRecorder,
-      blackboard: opts.blackboard,
-      agentId: opts.agentId,
-    }
-  );
+    screenshotsEnabled: opts.screenshotsEnabled,
+    stagnationTracker,
+    findingContext: {
+      stateId: opts.stateId,
+      objective: opts.objectiveDescription
+        ? `${opts.objectiveLabel}: ${opts.objectiveDescription}`
+        : opts.objectiveLabel,
+    },
+    actionRecorder,
+    blackboard: opts.blackboard,
+    agentId: opts.agentId,
+  });
   const stagehandTools: StagehandToolSet = tools;
 
   const systemPrompt = buildWorkerSystemPrompt({
