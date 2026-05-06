@@ -11,14 +11,23 @@ import {
 } from '../browser/page-interface.js';
 import { parseIndicator, waitForSuccess } from './success-indicator.js';
 
-export async function authenticateForm(
-  browser: BrowserSessionLike<AuthBrowserPage>,
-  targetUrl: string,
-  loginUrl: string,
-  fields: FormAuthField[],
-  submit: FormAuthSubmit,
-  successIndicator: string
-): Promise<void> {
+export interface AuthenticateFormOptions {
+  browser: BrowserSessionLike<AuthBrowserPage>;
+  targetUrl: string;
+  loginUrl: string;
+  fields: FormAuthField[];
+  submit: FormAuthSubmit;
+  successIndicator: string;
+}
+
+export async function authenticateForm({
+  browser,
+  targetUrl,
+  loginUrl,
+  fields,
+  submit,
+  successIndicator,
+}: AuthenticateFormOptions): Promise<void> {
   const primaryPage = getPrimaryPage(browser, 'form authentication');
   const page = adaptDeterministicAuthPage(primaryPage);
   const fullLoginUrl = new URL(loginUrl, targetUrl).href;

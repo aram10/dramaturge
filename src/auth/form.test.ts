@@ -43,17 +43,17 @@ describe('authenticateForm', () => {
     const recorder = new ActionRecorder(page);
     recorder.start();
 
-    await authenticateForm(
+    await authenticateForm({
       browser,
-      'https://example.com/app',
-      '/login',
-      [
+      targetUrl: 'https://example.com/app',
+      loginUrl: '/login',
+      fields: [
         { selector: "input[name='email']", value: 'user@example.com', secret: false },
         { selector: "input[name='password']", value: 'super-secret', secret: true },
       ],
-      { selector: "button[type='submit']", label: 'Sign in' },
-      "selector:[data-testid='user-nav-button']"
-    );
+      submit: { selector: "button[type='submit']", label: 'Sign in' },
+      successIndicator: "selector:[data-testid='user-nav-button']",
+    });
 
     expect(spies.goto).toHaveBeenCalledWith('https://example.com/login');
     expect(spies.fill).toHaveBeenNthCalledWith(1, "input[name='email']", 'user@example.com');
@@ -107,14 +107,14 @@ describe('authenticateForm', () => {
       },
     } satisfies BrowserSessionLike<AuthBrowserPage>;
 
-    await authenticateForm(
+    await authenticateForm({
       browser,
-      'https://example.com/app',
-      '/login',
-      [{ selector: "input[name='email']", value: 'user@example.com', secret: false }],
-      { selector: "button[type='submit']", label: 'Sign in' },
-      "selector:[data-testid='user-nav-button']"
-    );
+      targetUrl: 'https://example.com/app',
+      loginUrl: '/login',
+      fields: [{ selector: "input[name='email']", value: 'user@example.com', secret: false }],
+      submit: { selector: "button[type='submit']", label: 'Sign in' },
+      successIndicator: "selector:[data-testid='user-nav-button']",
+    });
 
     expect(page.locator).toHaveBeenNthCalledWith(1, "input[name='email']");
     expect(locator.fill).toHaveBeenCalledWith('user@example.com');

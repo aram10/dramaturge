@@ -133,14 +133,14 @@ async function resolveEdgeFingerprint(
   url?: string;
 } | null> {
   try {
-    const navigation = await ctx.navigator.navigateFromNode(
-      sourceNodeId,
+    const navigation = await ctx.navigator.navigateFromNode({
+      fromNodeId: sourceNodeId,
       hint,
-      ctx.graph,
-      ctx.page,
-      ctx.stagehand,
-      ctx.config.targetUrl
-    );
+      graph: ctx.graph,
+      page: ctx.page,
+      stagehand: ctx.stagehand,
+      rootUrl: ctx.config.targetUrl,
+    });
     if (!navigation.success) {
       ctx.logger?.warn('Could not resolve discovered edge', {
         reason: navigation.reason ?? 'navigation failed',

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { Stagehand } from '@browserbasehq/stagehand';
-import { resolveAuthProfile, type AuthConfig, type DramaturgeConfig } from '../config.js';
+import { resolveAuthProfile, type DramaturgeConfig } from '../config.js';
 import { adaptStagehand } from '../browser/page-interface.js';
 import { authenticateNone } from './none.js';
 import { authenticateStoredState } from './stored-state.js';
@@ -32,14 +32,14 @@ export async function authenticate(
       return authenticateStoredState(browser, targetUrl, auth.stateFile, auth.successIndicator);
 
     case 'form':
-      return authenticateForm(
+      return authenticateForm({
         browser,
         targetUrl,
-        auth.loginUrl,
-        auth.fields,
-        auth.submit,
-        auth.successIndicator
-      );
+        loginUrl: auth.loginUrl,
+        fields: auth.fields,
+        submit: auth.submit,
+        successIndicator: auth.successIndicator,
+      });
 
     case 'oauth-redirect':
       return authenticateOAuthRedirect(
@@ -51,13 +51,13 @@ export async function authenticate(
       );
 
     case 'interactive':
-      return authenticateInteractive(
+      return authenticateInteractive({
         browser,
         targetUrl,
-        auth.loginUrl,
-        auth.successIndicator,
-        auth.stateFile,
-        auth.manualTimeoutSeconds * 1000
-      );
+        loginUrl: auth.loginUrl,
+        successIndicator: auth.successIndicator,
+        stateFile: auth.stateFile,
+        manualTimeoutMs: auth.manualTimeoutSeconds * 1000,
+      });
   }
 }
