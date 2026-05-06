@@ -136,8 +136,8 @@ export function buildRunResult(
   startTime: Date,
   areaResults: AreaResult[],
   unexploredAreas: Array<{ name: string; reason: string }>,
-  partial: boolean,
   options: {
+    partial: boolean;
     blindSpots?: BlindSpot[];
     stateGraphMermaid?: string;
     runConfig?: RunConfigMeta;
@@ -146,9 +146,10 @@ export function buildRunResult(
     crossRunClassification?: CrossRunClassification;
     safetyAudit?: RunResult['safetyAudit'];
     explorationLedger?: RunResult['explorationLedger'];
-  } = {}
+  }
 ): RunResult {
   const {
+    partial,
     blindSpots = [],
     stateGraphMermaid,
     runConfig,

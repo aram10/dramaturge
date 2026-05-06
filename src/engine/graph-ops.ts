@@ -87,24 +87,20 @@ export async function expandGraph(
       ctx.graph.addEdge(sourceNodeId, newNode.id, edge);
 
       const newTasks = useLLMPlanner
-        ? await ctx.planner.proposeTasksWithLLM(
-            newNode,
-            ctx.graph,
-            ctx.config.models.planner,
-            ctx.mission,
-            ctx.repoHints,
-            ctx.config.llm.requestTimeoutMs,
-            ctx.memoryStore?.getPlannerSignals(newNode),
-            ctx.diffContext
-          )
-        : ctx.planner.proposeTasks(
-            newNode,
-            ctx.graph,
-            ctx.mission,
-            ctx.repoHints,
-            ctx.memoryStore?.getPlannerSignals(newNode),
-            ctx.diffContext
-          );
+        ? await ctx.planner.proposeTasksWithLLM(newNode, ctx.graph, {
+            plannerModel: ctx.config.models.planner,
+            mission: ctx.mission,
+            repoHints: ctx.repoHints,
+            llmRequestTimeoutMs: ctx.config.llm.requestTimeoutMs,
+            memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
+            diffContext: ctx.diffContext,
+          })
+        : ctx.planner.proposeTasks(newNode, ctx.graph, {
+            mission: ctx.mission,
+            repoHints: ctx.repoHints,
+            memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
+            diffContext: ctx.diffContext,
+          });
       ctx.frontier.enqueueMany(newTasks);
       ctx.logger?.info('Discovered new state', {
         nodeId: newNode.id,

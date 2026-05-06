@@ -88,7 +88,7 @@ describe('Planner', () => {
         focusModes: ['form'], // only form workers
       };
 
-      const tasks = planner.proposeTasks(node, graph, mission);
+      const tasks = planner.proposeTasks(node, graph, { mission });
       const workerTypes = tasks.map((t) => t.workerType);
       // settings → form worker, but navigation should be excluded
       expect(workerTypes).toContain('form');
@@ -124,22 +124,24 @@ describe('Planner', () => {
         depth: 0,
       });
 
-      const tasks = planner.proposeTasks(node, graph, undefined, {
-        routes: ['/login', '/manage/knowledge-bases'],
-        routeFamilies: ['/', '/login', '/manage'],
-        stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
-        apiEndpoints: [
-          {
-            route: '/api/manage/knowledge-bases',
-            methods: ['GET'],
-            statuses: [401, 403],
+      const tasks = planner.proposeTasks(node, graph, {
+        repoHints: {
+          routes: ['/login', '/manage/knowledge-bases'],
+          routeFamilies: ['/', '/login', '/manage'],
+          stableSelectors: ['#manage-kb-new-btn', '[data-testid="app-nav"]'],
+          apiEndpoints: [
+            {
+              route: '/api/manage/knowledge-bases',
+              methods: ['GET'],
+              statuses: [401, 403],
+            },
+          ],
+          authHints: {
+            loginRoutes: ['/login'],
+            callbackRoutes: ['/auth/callback'],
           },
-        ],
-        authHints: {
-          loginRoutes: ['/login'],
-          callbackRoutes: ['/auth/callback'],
+          expectedHttpNoise: [],
         },
-        expectedHttpNoise: [],
       });
 
       expect(
@@ -163,15 +165,13 @@ describe('Planner', () => {
         depth: 1,
       });
 
-      const tasks = planner.proposeTasks(
-        node,
-        graph,
-        {
+      const tasks = planner.proposeTasks(node, graph, {
+        mission: {
           appDescription: 'Test app',
           destructiveActionsAllowed: false,
           focusModes: ['navigation', 'crud', 'api'],
         },
-        {
+        repoHints: {
           routes: ['/manage/knowledge-bases'],
           routeFamilies: ['/manage'],
           stableSelectors: [],
@@ -187,8 +187,8 @@ describe('Planner', () => {
             callbackRoutes: [],
           },
           expectedHttpNoise: [],
-        }
-      );
+        },
+      });
 
       expect(tasks.some((task) => task.workerType === 'api')).toBe(true);
     });
@@ -205,9 +205,11 @@ describe('Planner', () => {
       });
 
       const tasks = planner.proposeTasks(node, graph, {
-        appDescription: 'Test app',
-        destructiveActionsAllowed: false,
-        focusModes: ['form', 'adversarial'],
+        mission: {
+          appDescription: 'Test app',
+          destructiveActionsAllowed: false,
+          focusModes: ['form', 'adversarial'],
+        },
       });
 
       const formTask = tasks.find((task) => task.workerType === 'form');
@@ -234,7 +236,7 @@ describe('Planner', () => {
         excludedAreas: ['billing'],
       };
 
-      expect(planner.proposeTasks(node, graph, mission)).toEqual([]);
+      expect(planner.proposeTasks(node, graph, { mission })).toEqual([]);
     });
 
     it('boosts matching critical flows', () => {
@@ -250,9 +252,11 @@ describe('Planner', () => {
 
       const baselineTasks = planner.proposeTasks(node, graph);
       const boostedTasks = planner.proposeTasks(node, graph, {
-        appDescription: 'Test app',
-        destructiveActionsAllowed: false,
-        criticalFlows: ['knowledge-bases'],
+        mission: {
+          appDescription: 'Test app',
+          destructiveActionsAllowed: false,
+          criticalFlows: ['knowledge-bases'],
+        },
       });
 
       const baselineCrud = baselineTasks.find((task) => task.workerType === 'crud');

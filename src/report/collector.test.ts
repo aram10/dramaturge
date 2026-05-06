@@ -139,20 +139,25 @@ describe('buildRunResult', () => {
     const blindSpots: BlindSpot[] = [
       { summary: 'Unreachable modal', reason: 'state-unreachable', severity: 'medium' },
     ];
-    const result = buildRunResult('https://example.com', new Date(), [], [], false, { blindSpots });
+    const result = buildRunResult('https://example.com', new Date(), [], [], {
+      partial: false,
+      blindSpots,
+    });
     expect(result.blindSpots).toHaveLength(1);
     expect(result.blindSpots[0].summary).toBe('Unreachable modal');
   });
 
   it('includes stateGraphMermaid when provided', () => {
-    const result = buildRunResult('https://example.com', new Date(), [], [], false, {
+    const result = buildRunResult('https://example.com', new Date(), [], [], {
+      partial: false,
       stateGraphMermaid: 'graph TD\n  A --> B',
     });
     expect(result.stateGraphMermaid).toBe('graph TD\n  A --> B');
   });
 
   it('includes runConfig when provided', () => {
-    const result = buildRunResult('https://example.com', new Date(), [], [], false, {
+    const result = buildRunResult('https://example.com', new Date(), [], [], {
+      partial: false,
       runConfig: {
         appDescription: 'Test app',
         models: { planner: 'claude-sonnet', worker: 'claude-haiku' },

@@ -62,13 +62,11 @@ export function seedGraphFromNavigationMemory(
 
   let seededTaskCount = 0;
   for (const node of candidateNodes) {
-    const tasks = planner.proposeTasks(
-      node,
-      graph,
+    const tasks = planner.proposeTasks(node, graph, {
       mission,
       repoHints,
-      memoryStore?.getPlannerSignals(node)
-    );
+      memorySignals: memoryStore?.getPlannerSignals(node),
+    });
     seededTaskCount += tasks.length;
     frontier.enqueueMany(tasks);
   }

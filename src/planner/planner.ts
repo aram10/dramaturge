@@ -119,6 +119,101 @@ function relevantApiEndpointsForNode(
   return matches.length > 0 ? matches : repoHints.apiEndpoints;
 }
 
+export interface ProposeTasksOptions {
+  mission?: MissionConfig;
+  repoHints?: RepoHints;
+  memorySignals?: PlannerMemorySignals;
+  diffContext?: DiffContext;
+}
+
+export interface ProposeTasksWithLLMOptions extends ProposeTasksOptions {
+  plannerModel: string;
+  llmRequestTimeoutMs?: number;
+}
+
+const ADVERSARIAL_PAGE_TYPES = new Set<PageType>([
+  'form',
+  'list',
+  'detail',
+  'settings',
+  'wizard',
+  'modal',
+]);
+
+function buildDefaultWorkerProposal(
+  node: StateNode,
+  defaultWorker: WorkerType,
+  allowedTypes: WorkerType[]
+): PlannerProposal | null {
+  if (!allowedTypes.includes(defaultWorker)) return null;
+  return {
+    workerType: defaultWorker,
+    objective: `Explore ${node.pageType} page${node.url ? ` at ${node.url}` : ''}: ${node.title ?? 'untitled'}`,
+    reason: `Auto-assigned ${defaultWorker} worker for ${node.pageType} page`,
+  };
+}
+
+function buildNavigationProposal(
+  node: StateNode,
+  defaultWorker: WorkerType,
+  allowedTypes: WorkerType[]
+): PlannerProposal | null {
+  if (defaultWorker === 'navigation' || !allowedTypes.includes('navigation')) return null;
+  if (node.timesVisited !== 0) return null;
+  return {
+    workerType: 'navigation',
+    objective: `Discover navigation targets from ${node.pageType} page${node.url ? ` at ${node.url}` : ''}`,
+    reason: 'Navigation discovery for new page',
+  };
+}
+
+function buildRepoAwareSeedProposal(
+  node: StateNode,
+  allowedTypes: WorkerType[],
+  repoHintSummary: string | undefined
+): PlannerProposal | null {
+  if (!repoHintSummary || !allowedTypes.includes('navigation')) return null;
+  if (node.depth !== 0 || node.timesVisited !== 0) return null;
+  return {
+    workerType: 'navigation',
+    objective: `Use repo-aware hints to probe likely routes and controls from this page: ${repoHintSummary}`,
+    reason: 'Repo-aware navigation seed',
+    priority: 0.85,
+  };
+}
+
+function buildApiProposal(
+  node: StateNode,
+  allowedTypes: WorkerType[],
+  apiHints: RepoHints['apiEndpoints']
+): PlannerProposal | null {
+  if (!allowedTypes.includes('api') || node.timesVisited !== 0 || apiHints.length === 0)
+    return null;
+  return {
+    workerType: 'api',
+    objective: `Probe related API contracts and auth boundaries for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ''}: ${apiHints
+      .slice(0, MAX_API_ENDPOINTS_IN_PLANNER)
+      .map((endpoint) => `${endpoint.methods.join('/') || 'ANY'} ${endpoint.route}`)
+      .join(', ')}`,
+    reason: 'API-aware follow-up for this page',
+    priority: 0.78,
+  };
+}
+
+function buildAdversarialProposal(
+  node: StateNode,
+  allowedTypes: WorkerType[]
+): PlannerProposal | null {
+  if (!allowedTypes.includes('adversarial') || node.timesVisited !== 0) return null;
+  if (!ADVERSARIAL_PAGE_TYPES.has(node.pageType)) return null;
+  return {
+    workerType: 'adversarial',
+    objective: `Probe edge cases, stale-state behavior, and replay/idempotency risks for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ''}`,
+    reason: 'Low-priority adversarial coverage pass',
+    priority: 0.35,
+  };
+}
+
 export class Planner {
   private workerTypesPerNode = new Map<string, Set<WorkerType>>();
   /** Configurable diff priority boost; set from config.diffAware.priorityBoost. */
@@ -131,80 +226,21 @@ export class Planner {
   proposeTasks(
     node: StateNode,
     _graph: StateGraph,
-    mission?: MissionConfig,
-    repoHints?: RepoHints,
-    memorySignals?: PlannerMemorySignals,
-    diffContext?: DiffContext
+    options: ProposeTasksOptions = {}
   ): FrontierItem[] {
-    const proposals: PlannerProposal[] = [];
-
-    // Default worker for the page type
+    const { mission, repoHints, memorySignals, diffContext } = options;
     const defaultWorker = PAGE_TYPE_WORKER_MAP[node.pageType];
-
-    // Filter by focus modes if configured
     const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
-
-    if (allowedTypes.includes(defaultWorker)) {
-      proposals.push({
-        workerType: defaultWorker,
-        objective: `Explore ${node.pageType} page${node.url ? ` at ${node.url}` : ''}: ${node.title ?? 'untitled'}`,
-        reason: `Auto-assigned ${defaultWorker} worker for ${node.pageType} page`,
-      });
-    }
-
-    // For non-navigation pages, also add a navigation task to discover links
-    if (
-      defaultWorker !== 'navigation' &&
-      allowedTypes.includes('navigation') &&
-      node.timesVisited === 0
-    ) {
-      proposals.push({
-        workerType: 'navigation',
-        objective: `Discover navigation targets from ${node.pageType} page${node.url ? ` at ${node.url}` : ''}`,
-        reason: 'Navigation discovery for new page',
-      });
-    }
-
     const repoHintSummary = summarizeRepoHints(repoHints);
-    if (
-      repoHintSummary &&
-      allowedTypes.includes('navigation') &&
-      node.depth === 0 &&
-      node.timesVisited === 0
-    ) {
-      proposals.push({
-        workerType: 'navigation',
-        objective: `Use repo-aware hints to probe likely routes and controls from this page: ${repoHintSummary}`,
-        reason: 'Repo-aware navigation seed',
-        priority: 0.85,
-      });
-    }
-
     const apiHints = relevantApiEndpointsForNode(node, repoHints);
-    if (allowedTypes.includes('api') && node.timesVisited === 0 && apiHints.length > 0) {
-      proposals.push({
-        workerType: 'api',
-        objective: `Probe related API contracts and auth boundaries for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ''}: ${apiHints
-          .slice(0, MAX_API_ENDPOINTS_IN_PLANNER)
-          .map((endpoint) => `${endpoint.methods.join('/') || 'ANY'} ${endpoint.route}`)
-          .join(', ')}`,
-        reason: 'API-aware follow-up for this page',
-        priority: 0.78,
-      });
-    }
 
-    if (
-      allowedTypes.includes('adversarial') &&
-      node.timesVisited === 0 &&
-      ['form', 'list', 'detail', 'settings', 'wizard', 'modal'].includes(node.pageType)
-    ) {
-      proposals.push({
-        workerType: 'adversarial',
-        objective: `Probe edge cases, stale-state behavior, and replay/idempotency risks for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ''}`,
-        reason: 'Low-priority adversarial coverage pass',
-        priority: 0.35,
-      });
-    }
+    const proposals = [
+      buildDefaultWorkerProposal(node, defaultWorker, allowedTypes),
+      buildNavigationProposal(node, defaultWorker, allowedTypes),
+      buildRepoAwareSeedProposal(node, allowedTypes, repoHintSummary),
+      buildApiProposal(node, allowedTypes, apiHints),
+      buildAdversarialProposal(node, allowedTypes),
+    ].filter((p): p is PlannerProposal => p !== null);
 
     return this.toFrontierItems(node, proposals, mission, memorySignals, diffContext);
   }
@@ -217,13 +253,10 @@ export class Planner {
   async proposeTasksWithLLM(
     node: StateNode,
     graph: StateGraph,
-    plannerModel: string,
-    mission?: MissionConfig,
-    repoHints?: RepoHints,
-    llmRequestTimeoutMs?: number,
-    memorySignals?: PlannerMemorySignals,
-    diffContext?: DiffContext
+    options: ProposeTasksWithLLMOptions
   ): Promise<FrontierItem[]> {
+    const { plannerModel, mission, repoHints, llmRequestTimeoutMs, memorySignals, diffContext } =
+      options;
     const allowedTypes = mission?.focusModes ?? DEFAULT_FOCUS_MODES;
     const repoHintSummary = summarizeRepoHints(repoHints);
 
@@ -251,7 +284,7 @@ export class Planner {
 
     if (!llmProposals) {
       // LLM failed — fall back to deterministic
-      return this.proposeTasks(node, graph, mission, repoHints, memorySignals, diffContext);
+      return this.proposeTasks(node, graph, { mission, repoHints, memorySignals, diffContext });
     }
 
     return this.toFrontierItems(node, llmProposals, mission, memorySignals, diffContext);

@@ -86,8 +86,8 @@ export function writeReports(
       name: r.objective,
       reason: `Not reached (priority: ${r.priority.toFixed(2)})`,
     })),
-    remaining.length > 0,
     {
+      partial: remaining.length > 0,
       blindSpots,
       stateGraphMermaid,
       runConfig: {
