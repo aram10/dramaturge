@@ -131,6 +131,11 @@ Setup options:
   --repo <path>        Scan this repo path for routes, endpoints, and auth hints
   --no-scan            Skip repo scanning (default is auto-scan when in a git repo)
 
+Auth options:
+  --config <path>      Config file to read the login URL from (default: dramaturge.config.json)
+  --profile <name>     Profile name for the saved state file (default: user)
+  --url <url>          Override login URL (skips reading from config)
+
 Triage options:
   --suppressed         findings list: only show suppressed findings
   --reason <text>      findings suppress: reason text recorded with the suppression

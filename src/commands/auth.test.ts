@@ -12,23 +12,25 @@ import { ConfigSchema, type LoadedDramaturgeConfig } from '../config.js';
 function makeDeps(
   cwd: string,
   overrides: Partial<AuthCommandDependencies> = {}
-): AuthCommandDependencies {
+): AuthCommandDependencies & { messages: string[]; errors: string[] } {
   const messages: string[] = [];
   const errors: string[] = [];
 
-  const deps: AuthCommandDependencies = {
+  const deps = {
     cwd,
-    log: (msg) => messages.push(msg),
-    error: (msg) => errors.push(msg),
+    log: (msg: string) => messages.push(msg),
+    error: (msg: string) => errors.push(msg),
     prompt: async () => '',
     confirm: async () => true,
     loadConfig: () => {
       throw new Error('loadConfig not implemented');
     },
     ...overrides,
+    messages,
+    errors,
   };
 
-  return Object.assign(deps, { messages, errors });
+  return deps;
 }
 
 function makeLoadedConfig(overrides: Partial<LoadedDramaturgeConfig> = {}): LoadedDramaturgeConfig {
@@ -75,11 +77,8 @@ describe('runAuthCommand', () => {
     const code = await runAuthCommand({ subcommand: 'list' }, deps);
 
     expect(code).toBe(0);
-    // @ts-expect-error attached in test helper
     expect(deps.messages.join('\n')).toContain('Saved auth profiles:');
-    // @ts-expect-error attached in test helper
     expect(deps.messages.join('\n')).toContain('admin');
-    // @ts-expect-error attached in test helper
     expect(deps.messages.join('\n')).toContain('viewer');
   });
 
@@ -98,7 +97,7 @@ describe('runAuthCommand', () => {
     expect(captureAuthState).toHaveBeenCalledWith(
       {
         loginUrl: 'https://example.com/login',
-        outputPath: resolve(testDir, '.dramaturge-state', 'admin.json'),
+        outputPath: resolve('/tmp', '.dramaturge-state', 'admin.json'),
       },
       expect.objectContaining({
         log: expect.any(Function),

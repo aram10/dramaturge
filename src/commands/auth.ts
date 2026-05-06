@@ -5,6 +5,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { LoadedDramaturgeConfig, DramaturgeConfig } from '../config.js';
 import { captureAuthStateViaUserConfirmation } from '../auth/auth-state-capture.js';
+import { sanitizeProfileName } from './profile-utils.js';
 
 export interface AuthCommandDependencies {
   log: (message: string) => void;
@@ -53,11 +54,14 @@ async function runAuthCapture(
   const profile = sanitizeProfileName(args.profile);
 
   let loginUrl: string;
+  let baseDir = deps.cwd;
+
   if (args.url) {
     loginUrl = args.url;
   } else {
     const loaded = deps.loadConfig(args.configPath);
     loginUrl = getLoginUrlFromConfig(loaded);
+    baseDir = loaded._meta.configDir;
   }
 
   try {
@@ -67,7 +71,7 @@ async function runAuthCapture(
     return 1;
   }
 
-  const outputPath = resolve(deps.cwd, '.dramaturge-state', `${profile}.json`);
+  const outputPath = resolve(baseDir, '.dramaturge-state', `${profile}.json`);
   const result = await captureAuthState(
     {
       loginUrl,
@@ -113,19 +117,6 @@ function runAuthList(deps: AuthCommandDependencies): number {
     deps.log(`  ${profile}`);
   }
   return 0;
-}
-
-function sanitizeProfileName(profile: string | undefined): string {
-  const raw = profile?.trim() ?? '';
-  if (raw === '') return 'user';
-
-  const sanitized = raw
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9_-]/g, '-')
-    .replaceAll(/-+/g, '-')
-    .replaceAll(/^[-_]+|[-_]+$/g, '');
-
-  return sanitized === '' ? 'user' : sanitized;
 }
 
 function getLoginUrlFromConfig(config: DramaturgeConfig): string {

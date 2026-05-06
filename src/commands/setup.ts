@@ -6,6 +6,7 @@ import { resolve, relative, dirname, isAbsolute } from 'node:path';
 import { detectFramework, scanRepository } from '../adaptation/repo-scan.js';
 import type { RepoFramework, RepoHints } from '../adaptation/types.js';
 import { captureAuthStateViaUserConfirmation } from '../auth/auth-state-capture.js';
+import { sanitizeProfileName } from './profile-utils.js';
 
 export interface SetupAnswers {
   targetUrl: string;
@@ -460,7 +461,7 @@ async function resolveLoginUrl(
   );
   const candidate = input.trim() === '' ? options.targetUrl : input.trim();
   try {
-    return new URL(candidate).toString();
+    return new URL(candidate, options.targetUrl).toString();
   } catch {
     deps.error(`Invalid login URL: ${candidate}`);
     return options.targetUrl;
@@ -518,15 +519,4 @@ async function maybeCaptureAuthState(
       '  (You chose not to save a config file — remember to copy this auth block into your config.)'
     );
   }
-}
-
-function sanitizeProfileName(profileRaw: string | undefined): string {
-  const raw = profileRaw?.trim() ?? '';
-  if (raw === '') return 'user';
-  const sanitized = raw
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9_-]/g, '-')
-    .replaceAll(/-+/g, '-')
-    .replaceAll(/^[-_]+|[-_]+$/g, '');
-  return sanitized === '' ? 'user' : sanitized;
 }
