@@ -76,31 +76,32 @@ export function createExplorationLedger(events: ExplorationLedgerEvent[] = []): 
   return { version: 1, events };
 }
 
-export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
-  const context = input.context;
+function buildActionEvents(
+  actions: ReplayableAction[],
+  context: LedgerContext | undefined
+): ExplorationLedgerEvent[] {
+  return actions.map((action) => ({
+    id: ledgerId('le'),
+    kind: 'action' as const,
+    timestamp: inferTimestamp(action),
+    areaName: context?.areaName,
+    stateId: context?.stateId,
+    taskId: context?.taskId,
+    actionId: action.id,
+    action,
+    source: 'action-recorder' as const,
+  }));
+}
+
+function buildStagehandEvents(
+  stagehandActions: Array<{ summary: string; timestamp?: string }>,
+  actionRecorderActions: ReplayableAction[],
+  context: LedgerContext | undefined
+): ExplorationLedgerEvent[] {
   const events: ExplorationLedgerEvent[] = [];
-
-  for (const action of input.actionRecorderActions) {
-    events.push({
-      id: ledgerId('le'),
-      kind: 'action',
-      timestamp: inferTimestamp(action),
-      areaName: context?.areaName,
-      stateId: context?.stateId,
-      taskId: context?.taskId,
-      actionId: action.id,
-      action,
-      source: 'action-recorder',
-    });
-  }
-
-  const stagehandActions = normalizeStagehandActions(input.stagehandActions);
   for (const stagehandAction of stagehandActions) {
-    const summary = stagehandAction.summary;
-    const matched = input.actionRecorderActions.find((action) => action.summary === summary);
-    if (matched) {
-      continue;
-    }
+    const { summary } = stagehandAction;
+    if (actionRecorderActions.find((a) => a.summary === summary)) continue;
     const timestamp = stagehandAction.timestamp ?? new Date().toISOString();
     const actionId = ledgerId('stg');
     events.push({
@@ -122,27 +123,36 @@ export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
       source: 'stagehand',
     });
   }
+  return events;
+}
 
-  for (const ev of input.evidence) {
-    events.push({
-      id: ledgerId('le'),
-      kind: 'evidence',
-      timestamp: inferTimestamp(ev),
-      areaName: ev.areaName ?? context?.areaName,
-      stateId: context?.stateId,
-      taskId: context?.taskId,
-      evidenceId: ev.id,
-      evidence: ev,
-    });
-  }
+function buildEvidenceEvents(
+  evidence: Evidence[],
+  context: LedgerContext | undefined
+): ExplorationLedgerEvent[] {
+  return evidence.map((ev) => ({
+    id: ledgerId('le'),
+    kind: 'evidence' as const,
+    timestamp: inferTimestamp(ev),
+    areaName: ev.areaName ?? context?.areaName,
+    stateId: context?.stateId,
+    taskId: context?.taskId,
+    evidenceId: ev.id,
+    evidence: ev,
+  }));
+}
 
-  for (const finding of input.findings) {
+function buildFindingEvents(
+  findings: RawFinding[],
+  context: LedgerContext | undefined
+): ExplorationLedgerEvent[] {
+  return findings.map((finding) => {
     const findingRef = finding.ref ?? ledgerId('finding');
     const linkedEvidenceIds = finding.evidenceIds ?? finding.meta?.repro?.evidenceIds ?? [];
     const linkedActionIds = finding.meta?.repro?.actionIds ?? [];
-    events.push({
+    return {
       id: ledgerId('le'),
-      kind: 'finding',
+      kind: 'finding' as const,
       timestamp: new Date().toISOString(),
       areaName: context?.areaName,
       stateId: context?.stateId,
@@ -151,35 +161,52 @@ export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
       finding,
       linkedEvidenceIds: linkedEvidenceIds.length > 0 ? linkedEvidenceIds : undefined,
       linkedActionIds: linkedActionIds.length > 0 ? linkedActionIds : undefined,
-    });
-  }
+    };
+  });
+}
 
-  for (const endpoint of input.observedApiEndpoints ?? []) {
-    const requestId = ledgerId('req');
-    events.push({
-      id: ledgerId('le'),
-      kind: 'network',
-      timestamp: new Date().toISOString(),
-      areaName: context?.areaName,
-      stateId: context?.stateId,
-      taskId: context?.taskId,
-      requestId,
-      endpoint,
-    });
-  }
+function buildNetworkEvents(
+  endpoints: ObservedApiEndpoint[],
+  context: LedgerContext | undefined
+): ExplorationLedgerEvent[] {
+  return endpoints.map((endpoint) => ({
+    id: ledgerId('le'),
+    kind: 'network' as const,
+    timestamp: new Date().toISOString(),
+    areaName: context?.areaName,
+    stateId: context?.stateId,
+    taskId: context?.taskId,
+    requestId: ledgerId('req'),
+    endpoint,
+  }));
+}
 
-  for (const record of input.costRecords ?? []) {
-    events.push({
-      id: ledgerId('le'),
-      kind: 'model-usage',
-      timestamp: record.timestamp,
-      areaName: context?.areaName,
-      stateId: context?.stateId,
-      taskId: context?.taskId,
-      record,
-    });
-  }
+function buildCostEvents(
+  costRecords: readonly CostRecord[],
+  context: LedgerContext | undefined
+): ExplorationLedgerEvent[] {
+  return costRecords.map((record) => ({
+    id: ledgerId('le'),
+    kind: 'model-usage' as const,
+    timestamp: record.timestamp,
+    areaName: context?.areaName,
+    stateId: context?.stateId,
+    taskId: context?.taskId,
+    record,
+  }));
+}
 
+export function mergeLedgerEntries(input: LedgerMergeInput): ExplorationLedger {
+  const { context } = input;
+  const stagehandActions = normalizeStagehandActions(input.stagehandActions);
+  const events: ExplorationLedgerEvent[] = [
+    ...buildActionEvents(input.actionRecorderActions, context),
+    ...buildStagehandEvents(stagehandActions, input.actionRecorderActions, context),
+    ...buildEvidenceEvents(input.evidence, context),
+    ...buildFindingEvents(input.findings, context),
+    ...buildNetworkEvents(input.observedApiEndpoints ?? [], context),
+    ...buildCostEvents(input.costRecords ?? [], context),
+  ];
   const sorted = [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   return createExplorationLedger(sorted);
 }

@@ -7,7 +7,9 @@ import type {
   CrossRunClassification,
   DiffSummary,
   Finding,
+  FindingOccurrence,
   FindingSeverity,
+  RawFinding,
   RunConfigMeta,
   RunMemoryMeta,
   RunResult,
@@ -38,6 +40,43 @@ export function buildFindingGroupKey(input: {
   ]);
 }
 
+function mergeUniqueStrings(...arrays: Array<string[] | undefined>): string[] {
+  return Array.from(new Set(arrays.flatMap((a) => a ?? [])));
+}
+
+function mergeReproData(existing: Finding, raw: RawFinding): Finding['meta'] {
+  const base = existing.meta ?? raw.meta;
+  if (!base) return undefined;
+  const er = existing.meta?.repro;
+  const rr = raw.meta?.repro;
+  return {
+    ...base,
+    repro: {
+      ...(er ?? rr),
+      objective: er?.objective ?? rr?.objective ?? 'Investigate observed issue',
+      actionIds: mergeUniqueStrings(er?.actionIds, rr?.actionIds),
+      evidenceIds: mergeUniqueStrings(er?.evidenceIds, rr?.evidenceIds),
+      breadcrumbs: mergeUniqueStrings(er?.breadcrumbs, rr?.breadcrumbs),
+    },
+  };
+}
+
+function mergeExistingFinding(
+  existing: Finding,
+  raw: RawFinding,
+  occurrence: FindingOccurrence
+): void {
+  existing.occurrences.push(occurrence);
+  existing.impactedAreas = Array.from(new Set([...existing.impactedAreas, occurrence.area]));
+  existing.occurrenceCount = existing.occurrences.length;
+  existing.evidenceIds = Array.from(
+    new Set([...(existing.evidenceIds ?? []), ...(raw.evidenceIds ?? [])])
+  );
+  if (existing.meta?.repro || raw.meta?.repro) {
+    existing.meta = mergeReproData(existing, raw);
+  }
+}
+
 export function collectFindings(areaResults: AreaResult[]): Finding[] {
   const grouped = new Map<string, Finding>();
   let missingRefCounter = 1;
@@ -46,7 +85,7 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
     for (const raw of area.findings) {
       const findingRef = raw.ref ?? `fid-legacy-${missingRefCounter++}`;
       const groupKey = buildFindingGroupKey(raw);
-      const occurrence = {
+      const occurrence: FindingOccurrence = {
         area: area.name,
         route: raw.meta?.repro?.route,
         evidenceIds: raw.evidenceIds ?? [],
@@ -55,45 +94,7 @@ export function collectFindings(areaResults: AreaResult[]): Finding[] {
 
       const existing = grouped.get(groupKey);
       if (existing) {
-        existing.occurrences.push(occurrence);
-        existing.impactedAreas = Array.from(new Set([...existing.impactedAreas, area.name]));
-        existing.occurrenceCount = existing.occurrences.length;
-        existing.evidenceIds = Array.from(
-          new Set([...(existing.evidenceIds ?? []), ...(raw.evidenceIds ?? [])])
-        );
-        if (existing.meta?.repro || raw.meta?.repro) {
-          existing.meta = existing.meta ?? raw.meta;
-          if (existing.meta) {
-            existing.meta = {
-              ...existing.meta,
-              repro: {
-                ...(existing.meta.repro ?? raw.meta?.repro),
-                objective:
-                  existing.meta.repro?.objective ??
-                  raw.meta?.repro?.objective ??
-                  'Investigate observed issue',
-                actionIds: Array.from(
-                  new Set([
-                    ...(existing.meta.repro?.actionIds ?? []),
-                    ...(raw.meta?.repro?.actionIds ?? []),
-                  ])
-                ),
-                evidenceIds: Array.from(
-                  new Set([
-                    ...(existing.meta.repro?.evidenceIds ?? []),
-                    ...(raw.meta?.repro?.evidenceIds ?? []),
-                  ])
-                ),
-                breadcrumbs: Array.from(
-                  new Set([
-                    ...(existing.meta.repro?.breadcrumbs ?? []),
-                    ...(raw.meta?.repro?.breadcrumbs ?? []),
-                  ])
-                ),
-              },
-            };
-          }
-        }
+        mergeExistingFinding(existing, raw, occurrence);
         continue;
       }
 
