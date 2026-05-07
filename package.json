@@ -10,7 +10,7 @@
   "bugs": {
     "url": "https://github.com/aram10/dramaturge/issues"
   },
-  "license": "GPL-3.0-only",
+  "license": "Apache-2.0",
   "author": "Alex Rambasek (https://github.com/aram10)",
   "keywords": [
     "qa",

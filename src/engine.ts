@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
 import { mkdirSync } from 'node:fs';
@@ -54,6 +54,7 @@ import { Coordinator } from './a2a/coordinator.js';
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
     globalTimeLimitSeconds: config.budget.globalTimeLimitSeconds ?? config.exploration.totalTimeout,
+    taskTimeLimitSeconds: config.budget.taskTimeLimitSeconds,
     maxStepsPerTask: config.budget.maxStepsPerTask ?? config.exploration.stepsPerArea,
     maxFrontierSize: config.budget.maxFrontierSize ?? 200,
     maxStateNodes: config.budget.maxStateNodes ?? 50,
@@ -143,6 +144,8 @@ export interface RunEngineOptions {
   eventStream?: EngineEventEmitter;
   /** Git ref to diff against for diff-aware exploration. Overrides config.diffAware.baseRef. */
   diffRef?: string;
+  /** Auth profile to use (for multi-role auth configs). */
+  profile?: string;
 }
 
 export async function runEngine(
@@ -301,12 +304,14 @@ export async function runEngine(
     });
 
     // Authenticate primary browser
+    const authType = 'profiles' in config.auth ? 'multi-profile' : config.auth.type;
     logger.info('Authenticating primary browser', {
-      strategy: config.auth.type,
+      strategy: authType,
+      profile: options.profile,
     });
-    await authenticate(stagehand, config);
+    await authenticate(stagehand, config, options.profile);
     logger.info('Authentication successful');
-    memoryStore?.rememberAuthFromConfig(config);
+    memoryStore?.rememberAuthFromConfig(config, options.profile);
 
     if (concurrency > 1) {
       const sharedWorkerState = await captureStorageState(

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
 import { pathToFileURL } from 'node:url';
@@ -59,6 +59,8 @@ export interface ParsedCliArgs {
   focusModes?: FocusMode[];
   /** --format flag — comma-separated list of report formats */
   formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
+  /** --profile flag for multi-role auth */
+  profile?: string;
   /** --template flag for init */
   initTemplate?: InitTemplate;
   /** --output flag for init */
@@ -114,6 +116,7 @@ Run options:
   --preset <name>      Preset: smoke, thorough, security, accessibility, api-contract, visual, pre-release
   --focus <modes>      Focus modes (repeatable / comma-separated): navigation, form, crud, api, adversarial
   --format <list>      Report formats, comma-separated: markdown, json, junit, sarif, or both (legacy alias) (e.g. markdown,sarif)
+  --profile <name>     Auth profile to use (when config has multiple auth profiles)
   --help, -h           Show this help message
 
 Init options:
@@ -213,6 +216,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   let preset: ParsedCliArgs['preset'];
   const focusModes: FocusMode[] = [];
   let formats: ParsedCliArgs['formats'];
+  let profile: string | undefined;
   let initTemplate: InitTemplate | undefined;
   let initOutput: string | undefined;
   let repoPath: string | undefined;
@@ -351,6 +355,14 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (arg === '--profile') {
+      const value = args[i + 1];
+      if (!value) throw new Error('Missing value for --profile');
+      profile = value;
+      i++;
+      continue;
+    }
+
     if (arg === '--template') {
       const value = args[i + 1];
       if (!value) throw new Error('Missing value for --template');
@@ -466,6 +478,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     preset,
     focusModes: focusModes.length > 0 ? focusModes : undefined,
     formats,
+    profile,
     initTemplate,
     initOutput,
     repoPath,
@@ -778,6 +791,7 @@ async function runRunCommand(
     resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
     eventStream,
     diffRef: parsedArgs.diffRef,
+    profile: parsedArgs.profile,
   });
 
   if (dashboardHandle) {

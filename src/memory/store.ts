@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -394,15 +394,38 @@ export class MemoryStore {
     this.persist(snapshot);
   }
 
-  rememberAuthFromConfig(config: DramaturgeConfig): void {
-    switch (config.auth.type) {
-      case 'form':
-      case 'oauth-redirect':
-      case 'interactive':
-        this.rememberAuthHint(config.auth.loginUrl);
-        break;
-      default:
-        break;
+  rememberAuthFromConfig(config: DramaturgeConfig, profile?: string): void {
+    // Handle both direct auth and auth profiles
+    // When using profiles, only remember the active profile's login URL to avoid
+    // polluting planner hints with login routes from unrelated roles.
+    const authConfigs: Array<{ type: string; loginUrl?: string }> = [];
+
+    if ('profiles' in config.auth) {
+      const activeProfileName = profile ?? config.auth.default;
+      if (activeProfileName) {
+        const activeProfile = config.auth.profiles[activeProfileName];
+        if (activeProfile) {
+          authConfigs.push(activeProfile);
+        }
+      }
+      // If no profile is resolved (no active and no default), remember nothing.
+    } else {
+      // Direct auth
+      authConfigs.push(config.auth);
+    }
+
+    for (const auth of authConfigs) {
+      switch (auth.type) {
+        case 'form':
+        case 'oauth-redirect':
+        case 'interactive':
+          if ('loginUrl' in auth && auth.loginUrl) {
+            this.rememberAuthHint(auth.loginUrl);
+          }
+          break;
+        default:
+          break;
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
 import { describe, expect, it, vi } from 'vitest';
@@ -259,6 +259,21 @@ describe('parseCliArgs', () => {
       triagePositional: ['abc123'],
     });
   });
+
+  it('parses --profile flag', () => {
+    const result = parseCliArgs(['run', 'https://example.com', '--profile', 'admin']);
+    expect(result.profile).toBe('admin');
+  });
+
+  it('parses --profile alongside other flags', () => {
+    const result = parseCliArgs(['run', '--config', 'c.json', '--profile', 'viewer']);
+    expect(result.configPath).toBe('c.json');
+    expect(result.profile).toBe('viewer');
+  });
+
+  it('throws when --profile has no value', () => {
+    expect(() => parseCliArgs(['run', '--profile'])).toThrow('Missing value for --profile');
+  });
 });
 
 describe('buildHelpText', () => {
@@ -396,6 +411,27 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(1);
     expect(errors).toEqual(['Error: missing config']);
+  });
+
+  it('forwards --profile to runEngine options', async () => {
+    const config = {
+      targetUrl: 'https://example.com',
+      _meta: { configDir: resolve('C:/tmp') },
+    } as never;
+    const loadConfig = vi.fn().mockReturnValue(config);
+    const runEngineMock = vi.fn().mockResolvedValue(undefined);
+
+    const exitCode = await runCli(['run', '--config', 'c.json', '--profile', 'admin'], {
+      loadConfig,
+      runEngine: runEngineMock,
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(runEngineMock).toHaveBeenCalledTimes(1);
+    const passedOptions = runEngineMock.mock.calls[0][1];
+    expect(passedOptions.profile).toBe('admin');
   });
 
   it('runs doctor command', async () => {

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -217,6 +217,7 @@ describe('executeFrontierItem', () => {
       item,
       taskNumber: 1,
       pageKey: 'page-1',
+      taskTimeoutMs: 12_345,
     });
 
     expect(result).toMatchObject({
@@ -241,6 +242,7 @@ describe('executeFrontierItem', () => {
       {
         model: 'openai/gpt-4.1-mini',
         screenshotDir: 'C:/tmp/screenshots',
+        timeoutMs: 12_345,
         agentMode: 'dom',
         screenshotsEnabled: false,
         stagnationThreshold: 7,
