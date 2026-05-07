@@ -5,6 +5,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   publish-npm:
     if: >-
@@ -27,22 +30,26 @@ jobs:
           node-version: 22.14.0
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-          registry-url: https://registry.npmjs.org
 
-      - name: Update npm CLI
-        run: npm install --global npm@11.5.1
+      - name: Update npm CLI for trusted publishing
+        run: npm install --global npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm run test
 
       - name: Build package
-        run: pnpm build
+        run: pnpm run build
 
-      - name: Publish package
-        run: npm publish --provenance
+      - name: Publish package to npm with OIDC
+        run: |
+          npm config delete //registry.npmjs.org/:_authToken --location=user || true
+          unset NODE_AUTH_TOKEN
+          npm publish --provenance --access public --registry https://registry.npmjs.org
+        env:
+          NODE_AUTH_TOKEN: ''
 
   publish-github-packages:
     if: >-
@@ -72,17 +79,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm run test
 
       - name: Build package
-        run: pnpm build
+        run: pnpm run build
 
       - name: Rewrite package metadata for GitHub Packages
         run: |
           npm pkg set name=@aram10/dramaturge
           npm pkg set publishConfig.registry=https://npm.pkg.github.com
 
-      - name: Publish to GitHub Packages
+      - name: Publish package to GitHub Packages
         run: pnpm publish --no-git-checks --registry https://npm.pkg.github.com
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
