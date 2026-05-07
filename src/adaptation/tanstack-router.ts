@@ -5,6 +5,7 @@ import { readdirSync } from 'node:fs';
 import { basename, join, relative, sep } from 'node:path';
 import type { ApiEndpointHint, RepoHints } from './types.js';
 import { readTextFileWithinLimit } from './file-utils.js';
+import { isCallbackRoute, isLoginRoute, trimTrailingSlashes } from './route-utils.js';
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -105,7 +106,7 @@ function routeFamily(route: string): string {
 }
 
 function normalizeRoute(raw: string): string {
-  const trimmed = raw.replace(/\/+$/, '');
+  const trimmed = trimTrailingSlashes(raw);
   return trimmed || '/';
 }
 
@@ -275,10 +276,10 @@ export function scanTanStackRouterRepo(root: string): RepoHints {
       ...extractRouteConfigPaths(content),
       ...extractCreateFileRoutePaths(content),
     ]) {
-      if (/(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)) {
+      if (isLoginRoute(route)) {
         loginRoutes.push(route);
       }
-      if (/(^|\/)(callback|oauth|sso)(\/|$)/i.test(route)) {
+      if (isCallbackRoute(route)) {
         callbackRoutes.push(route);
       }
     }
@@ -289,10 +290,10 @@ export function scanTanStackRouterRepo(root: string): RepoHints {
   routes.push(...fileRoutes);
 
   for (const route of fileRoutes) {
-    if (/(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)) {
+    if (isLoginRoute(route)) {
       loginRoutes.push(route);
     }
-    if (/(^|\/)(callback|oauth|sso)(\/|$)/i.test(route)) {
+    if (isCallbackRoute(route)) {
       callbackRoutes.push(route);
     }
   }

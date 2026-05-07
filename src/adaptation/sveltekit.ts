@@ -5,9 +5,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 import { readTextFileWithinLimit } from './file-utils.js';
+import { isCallbackRoute, isLoginRoute, trimTrailingSlashes } from './route-utils.js';
 
-const PAGE_FILE_RE = /(?:^|\/)src\/routes(?:\/.*)?\/\+page\.(?:svelte|ts|js)$/;
-const SERVER_FILE_RE = /(?:^|\/)src\/routes(?:\/.*)?\/\+server\.(?:ts|js)$/;
 const SVELTE_FILE_RE = /\.svelte$/;
 const SELECTOR_SOURCE_RE = /^src\/(routes|lib)\//;
 const QUERY_ROUTE_RE = /["'`](\/[^"'`\n]*\?[^"'`\n]+)["'`]/g;
@@ -19,6 +18,8 @@ const EXPORTED_METHOD_RE =
 const AUTH_RE =
   /\b(locals\.user|getSession|requireAuth|requireUser|assertRole|unauthorized|forbidden)\b/;
 const VALIDATION_SCHEMA_RE = /\b([A-Z][A-Za-z0-9]+Schema)\b/g;
+const PAGE_FILE_NAMES = new Set(['+page.svelte', '+page.ts', '+page.js']);
+const SERVER_FILE_NAMES = new Set(['+server.ts', '+server.js']);
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -62,8 +63,18 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function normalizeRoute(routePath: string): string {
-  const normalized = routePath.replace(/\/+$/g, '');
+  const normalized = trimTrailingSlashes(routePath);
   return normalized || '/';
+}
+
+function isSvelteKitRouteFile(relPath: string, fileNames: Set<string>): boolean {
+  if (!relPath.startsWith('src/routes/')) {
+    return false;
+  }
+
+  const segments = relPath.split('/');
+  const fileName = segments[segments.length - 1];
+  return fileName ? fileNames.has(fileName) : false;
 }
 
 function routeFamily(routePath: string): string {
@@ -206,10 +217,10 @@ export function scanSvelteKitRepo(root: string): RepoHints {
   }));
 
   const pageFiles = relFiles
-    .filter(({ relPath }) => PAGE_FILE_RE.test(relPath))
+    .filter(({ relPath }) => isSvelteKitRouteFile(relPath, PAGE_FILE_NAMES))
     .map(({ filePath }) => filePath);
   const serverFiles = relFiles
-    .filter(({ relPath }) => SERVER_FILE_RE.test(relPath))
+    .filter(({ relPath }) => isSvelteKitRouteFile(relPath, SERVER_FILE_NAMES))
     .map(({ filePath }) => filePath);
   const svelteFiles = relFiles
     .filter(({ relPath }) => SELECTOR_SOURCE_RE.test(relPath) && SVELTE_FILE_RE.test(relPath))
@@ -238,8 +249,8 @@ export function scanSvelteKitRepo(root: string): RepoHints {
     stableSelectors,
     apiEndpoints,
     authHints: {
-      loginRoutes: routes.filter((route) => /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)),
-      callbackRoutes: routes.filter((route) => /(^|\/)(callback|oauth|sso)(\/|$)/i.test(route)),
+      loginRoutes: routes.filter(isLoginRoute),
+      callbackRoutes: routes.filter(isCallbackRoute),
     },
     expectedHttpNoise: extractExpectedHttpNoise(resolvedRoot, serverFiles),
   };

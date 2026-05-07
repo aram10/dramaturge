@@ -5,6 +5,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 import { readTextFileWithinLimit } from './file-utils.js';
+import { isCallbackRoute, isLoginRoute, trimTrailingSlashes } from './route-utils.js';
 
 const IGNORED_DIRECTORY_NAMES = new Set([
   'node_modules',
@@ -96,7 +97,7 @@ function routeFamily(route: string): string {
 }
 
 function normalizePath(raw: string): string {
-  let cleaned = raw.replace(/\/+$/, '');
+  let cleaned = trimTrailingSlashes(raw);
   if (cleaned && !cleaned.startsWith('/')) cleaned = `/${cleaned}`;
   return cleaned || '/';
 }
@@ -286,10 +287,10 @@ export function scanRailsRepo(root: string): RepoHints {
         apiEndpoints.set(path, ep);
       }
 
-      if (/(^|\/)(login|signin|sign-in)(\/|$)/i.test(path)) {
+      if (isLoginRoute(path)) {
         loginRoutes.push(path);
       }
-      if (/(^|\/)(callback|oauth|sso)(\/|$)/i.test(path)) {
+      if (isCallbackRoute(path)) {
         callbackRoutes.push(path);
       }
     }

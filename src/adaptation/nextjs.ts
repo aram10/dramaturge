@@ -5,10 +5,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 import { readTextFileWithinLimit } from './file-utils.js';
+import { isCallbackRoute, isLoginRoute, trimTrailingSlashes } from './route-utils.js';
 
-const PAGE_FILE_RE = /(?:^|\/)app(?:\/.*)?\/page\.(?:ts|tsx|js|jsx|mdx)$/;
-const ROUTE_FILE_RE = /(?:^|\/)app(?:\/.*)?\/route\.(?:ts|tsx|js|jsx)$/;
-const SELECTOR_SOURCE_RE = /^(app|components|tests)\//;
 const QUERY_ROUTE_RE = /["'`](\/[^"'`\n]*\?[^"'`\n]+)["'`]/g;
 const SELECTOR_RE = /\b(id|data-testid)\s*=\s*["'`]([^"'`]+)["'`]/g;
 const STATUS_RE = /status\s*:\s*(\d{3})\b/g;
@@ -17,6 +15,8 @@ const EXPORTED_METHOD_RE =
 const AUTH_RE =
   /\b(getServerSession|requireAuth|requireUser|assertRole|unauthorized|forbidden|auth)\b/;
 const VALIDATION_SCHEMA_RE = /\b([A-Z][A-Za-z0-9]+Schema)\b/g;
+const PAGE_FILE_NAMES = new Set(['page.ts', 'page.tsx', 'page.js', 'page.jsx', 'page.mdx']);
+const ROUTE_FILE_NAMES = new Set(['route.ts', 'route.tsx', 'route.js', 'route.jsx']);
 
 function toPosix(value: string): string {
   return value.split(sep).join('/');
@@ -46,8 +46,24 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function normalizeRoutePath(routePath: string): string {
-  const normalized = routePath.replace(/\/+$/g, '');
+  const normalized = trimTrailingSlashes(routePath);
   return normalized || '/';
+}
+
+function isNextAppFile(relPath: string, fileNames: Set<string>): boolean {
+  if (!relPath.startsWith('app/')) {
+    return false;
+  }
+
+  const segments = relPath.split('/');
+  const fileName = segments[segments.length - 1];
+  return fileName ? fileNames.has(fileName) : false;
+}
+
+function isSelectorSourceFile(relPath: string): boolean {
+  return (
+    relPath.startsWith('app/') || relPath.startsWith('components/') || relPath.startsWith('tests/')
+  );
 }
 
 function routeFamilyFromRoute(routePath: string): string {
@@ -168,13 +184,13 @@ export function scanNextJsRepo(root: string): RepoHints {
   }));
 
   const pageFiles = relFiles
-    .filter(({ relPath }) => PAGE_FILE_RE.test(relPath))
+    .filter(({ relPath }) => isNextAppFile(relPath, PAGE_FILE_NAMES))
     .map(({ filePath }) => filePath);
   const routeFiles = relFiles
-    .filter(({ relPath }) => ROUTE_FILE_RE.test(relPath))
+    .filter(({ relPath }) => isNextAppFile(relPath, ROUTE_FILE_NAMES))
     .map(({ filePath }) => filePath);
   const selectorFiles = relFiles
-    .filter(({ relPath }) => SELECTOR_SOURCE_RE.test(relPath))
+    .filter(({ relPath }) => isSelectorSourceFile(relPath))
     .map(({ filePath }) => filePath);
 
   const routes = uniqueSorted([
@@ -199,8 +215,8 @@ export function scanNextJsRepo(root: string): RepoHints {
     stableSelectors,
     apiEndpoints,
     authHints: {
-      loginRoutes: routes.filter((route) => /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)),
-      callbackRoutes: routes.filter((route) => /(^|\/)(callback|oauth|sso)(\/|$)/i.test(route)),
+      loginRoutes: routes.filter(isLoginRoute),
+      callbackRoutes: routes.filter(isCallbackRoute),
     },
     expectedHttpNoise: extractExpectedHttpNoise(resolvedRoot, routeFiles),
   };

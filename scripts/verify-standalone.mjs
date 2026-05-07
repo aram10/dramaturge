@@ -94,42 +94,46 @@ export function parseVerifyStandaloneArgs(args) {
 }
 
 function resolveCommand(command) {
-  if (process.platform === 'win32' && command === 'pnpm') {
-    return 'pnpm.cmd';
-  }
-
   return command;
 }
 
-function quoteForWindowsCmd(value) {
-  if (value.length === 0) {
-    return '""';
+function resolveCommandInvocation(command, args) {
+  if (process.platform === 'win32' && command === 'pnpm') {
+    const nodeDir = dirname(process.execPath);
+    const pnpmEntrypoint = join(nodeDir, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs');
+    if (existsSync(pnpmEntrypoint)) {
+      return {
+        command: process.execPath,
+        args: [pnpmEntrypoint, ...args],
+      };
+    }
+
+    const corepackEntrypoint = join(nodeDir, 'node_modules', 'corepack', 'dist', 'corepack.js');
+    if (existsSync(corepackEntrypoint)) {
+      return {
+        command: process.execPath,
+        args: [corepackEntrypoint, 'pnpm', ...args],
+      };
+    }
+
+    throw new Error(
+      'Unable to locate pnpm or Corepack entrypoint for shell-free Windows execution'
+    );
   }
 
-  if (!/[ \t"&()<>^|]/.test(value)) {
-    return value;
-  }
-
-  return `"${value.replace(/(["^])/g, '^$1')}"`;
+  return {
+    command: resolveCommand(command),
+    args,
+  };
 }
 
 function runCommand(command, args, options = {}) {
-  const result =
-    process.platform === 'win32' && command === 'pnpm'
-      ? spawnSync(
-          process.env.ComSpec ?? 'cmd.exe',
-          ['/d', '/s', '/c', [command, ...args].map(quoteForWindowsCmd).join(' ')],
-          {
-            cwd: options.cwd,
-            encoding: 'utf-8',
-            stdio: 'pipe',
-          }
-        )
-      : spawnSync(resolveCommand(command), args, {
-          cwd: options.cwd,
-          encoding: 'utf-8',
-          stdio: 'pipe',
-        });
+  const invocation = resolveCommandInvocation(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
+    cwd: options.cwd,
+    encoding: 'utf-8',
+    stdio: 'pipe',
+  });
 
   if (result.status !== 0) {
     const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();

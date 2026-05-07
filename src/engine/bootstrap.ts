@@ -188,7 +188,8 @@ async function hasReadyIndicator(
       timeoutMs: navigationTimeoutMs,
     });
     const found = await readinessPage.evaluate(
-      `() => Boolean(document.querySelector(${JSON.stringify(selector)}))`
+      (readySelector: string) => Boolean(document.querySelector(readySelector)),
+      selector
     );
     return found === true;
   } catch {
