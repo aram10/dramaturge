@@ -16,7 +16,7 @@ importers:
         version: 4.11.2(playwright-core@1.59.1)
       '@browserbasehq/stagehand':
         specifier: ^3.2.0
-        version: 3.2.1(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(zod@4.3.6)
+        version: 3.2.1(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(zod@4.4.3)
       ajv:
         specifier: ^8.18.0
         version: 8.18.0
@@ -40,7 +40,7 @@ importers:
         version: 2.8.3
       zod:
         specifier: ^4.3.6
-        version: 4.3.6
+        version: 4.4.3
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -2681,139 +2681,139 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
 snapshots:
 
-  '@ai-sdk/amazon-bedrock@3.0.93(zod@4.3.6)':
+  '@ai-sdk/amazon-bedrock@3.0.93(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/anthropic': 2.0.74(zod@4.3.6)
+      '@ai-sdk/anthropic': 2.0.74(zod@4.4.3)
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
       '@smithy/eventstream-codec': 4.2.13
       '@smithy/util-utf8': 4.2.2
       aws4fetch: 1.0.20
-      zod: 4.3.6
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/anthropic@2.0.74(zod@4.3.6)':
+  '@ai-sdk/anthropic@2.0.74(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/azure@2.0.104(zod@4.3.6)':
+  '@ai-sdk/azure@2.0.104(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/openai': 2.0.102(zod@4.3.6)
+      '@ai-sdk/openai': 2.0.102(zod@4.4.3)
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/cerebras@1.0.40(zod@4.3.6)':
+  '@ai-sdk/cerebras@1.0.40(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/openai-compatible': 1.0.35(zod@4.3.6)
+      '@ai-sdk/openai-compatible': 1.0.35(zod@4.4.3)
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/deepseek@1.0.36(zod@4.3.6)':
+  '@ai-sdk/deepseek@1.0.36(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/gateway@2.0.76(zod@4.3.6)':
+  '@ai-sdk/gateway@2.0.76(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
       '@vercel/oidc': 3.1.0
-      zod: 4.3.6
+      zod: 4.4.3
 
-  '@ai-sdk/google-vertex@3.0.127(zod@4.3.6)':
+  '@ai-sdk/google-vertex@3.0.127(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/anthropic': 2.0.74(zod@4.3.6)
-      '@ai-sdk/google': 2.0.67(zod@4.3.6)
-      '@ai-sdk/openai-compatible': 1.0.35(zod@4.3.6)
+      '@ai-sdk/anthropic': 2.0.74(zod@4.4.3)
+      '@ai-sdk/google': 2.0.67(zod@4.4.3)
+      '@ai-sdk/openai-compatible': 1.0.35(zod@4.4.3)
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
       google-auth-library: 10.6.2
-      zod: 4.3.6
+      zod: 4.4.3
     transitivePeerDependencies:
       - supports-color
     optional: true
 
-  '@ai-sdk/google@2.0.67(zod@4.3.6)':
+  '@ai-sdk/google@2.0.67(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/groq@2.0.37(zod@4.3.6)':
+  '@ai-sdk/groq@2.0.37(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/mistral@2.0.30(zod@4.3.6)':
+  '@ai-sdk/mistral@2.0.30(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/openai-compatible@1.0.35(zod@4.3.6)':
+  '@ai-sdk/openai-compatible@1.0.35(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/openai@2.0.102(zod@4.3.6)':
+  '@ai-sdk/openai@2.0.102(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/perplexity@2.0.27(zod@4.3.6)':
+  '@ai-sdk/perplexity@2.0.27(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/provider-utils@3.0.23(zod@4.3.6)':
+  '@ai-sdk/provider-utils@3.0.23(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 4.3.6
+      zod: 4.4.3
 
   '@ai-sdk/provider@2.0.1':
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/togetherai@1.0.38(zod@4.3.6)':
+  '@ai-sdk/togetherai@1.0.38(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/openai-compatible': 1.0.35(zod@4.3.6)
+      '@ai-sdk/openai-compatible': 1.0.35(zod@4.4.3)
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
-  '@ai-sdk/xai@2.0.67(zod@4.3.6)':
+  '@ai-sdk/xai@2.0.67(zod@4.4.3)':
     dependencies:
-      '@ai-sdk/openai-compatible': 1.0.35(zod@4.3.6)
+      '@ai-sdk/openai-compatible': 1.0.35(zod@4.4.3)
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
   '@alcalzone/ansi-tokenize@0.1.3':
@@ -2885,43 +2885,43 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@browserbasehq/stagehand@3.2.1(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(zod@4.3.6)':
+  '@browserbasehq/stagehand@3.2.1(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.1
       '@anthropic-ai/sdk': 0.39.0
       '@browserbasehq/sdk': 2.10.0
-      '@google/genai': 1.49.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.3.6))(bufferutil@4.1.0)
-      '@langchain/openai': 0.4.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6)))(ws@8.20.0(bufferutil@4.1.0))
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.3.6)
-      ai: 5.0.172(zod@4.3.6)
+      '@google/genai': 1.49.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)
+      '@langchain/openai': 0.4.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3)))(ws@8.20.0(bufferutil@4.1.0))
+      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      ai: 5.0.172(zod@4.4.3)
       deepmerge: 4.3.1
       devtools-protocol: 0.0.1464554
       fetch-cookie: 3.2.0
-      openai: 4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6)
+      openai: 4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3)
       pino: 9.14.0
       pino-pretty: 13.1.3
       uuid: 11.1.0
       ws: 8.20.0(bufferutil@4.1.0)
-      zod: 4.3.6
-      zod-to-json-schema: 3.25.2(zod@4.3.6)
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
     optionalDependencies:
-      '@ai-sdk/amazon-bedrock': 3.0.93(zod@4.3.6)
-      '@ai-sdk/anthropic': 2.0.74(zod@4.3.6)
-      '@ai-sdk/azure': 2.0.104(zod@4.3.6)
-      '@ai-sdk/cerebras': 1.0.40(zod@4.3.6)
-      '@ai-sdk/deepseek': 1.0.36(zod@4.3.6)
-      '@ai-sdk/google': 2.0.67(zod@4.3.6)
-      '@ai-sdk/google-vertex': 3.0.127(zod@4.3.6)
-      '@ai-sdk/groq': 2.0.37(zod@4.3.6)
-      '@ai-sdk/mistral': 2.0.30(zod@4.3.6)
-      '@ai-sdk/openai': 2.0.102(zod@4.3.6)
-      '@ai-sdk/perplexity': 2.0.27(zod@4.3.6)
-      '@ai-sdk/togetherai': 1.0.38(zod@4.3.6)
-      '@ai-sdk/xai': 2.0.67(zod@4.3.6)
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6))
+      '@ai-sdk/amazon-bedrock': 3.0.93(zod@4.4.3)
+      '@ai-sdk/anthropic': 2.0.74(zod@4.4.3)
+      '@ai-sdk/azure': 2.0.104(zod@4.4.3)
+      '@ai-sdk/cerebras': 1.0.40(zod@4.4.3)
+      '@ai-sdk/deepseek': 1.0.36(zod@4.4.3)
+      '@ai-sdk/google': 2.0.67(zod@4.4.3)
+      '@ai-sdk/google-vertex': 3.0.127(zod@4.4.3)
+      '@ai-sdk/groq': 2.0.37(zod@4.4.3)
+      '@ai-sdk/mistral': 2.0.30(zod@4.4.3)
+      '@ai-sdk/openai': 2.0.102(zod@4.4.3)
+      '@ai-sdk/perplexity': 2.0.27(zod@4.4.3)
+      '@ai-sdk/togetherai': 1.0.38(zod@4.4.3)
+      '@ai-sdk/xai': 2.0.67(zod@4.4.3)
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3))
       bufferutil: 4.1.0
       chrome-launcher: 1.2.1
-      ollama-ai-provider-v2: 1.5.5(zod@4.3.6)
+      ollama-ai-provider-v2: 1.5.5(zod@4.4.3)
       patchright-core: 1.59.4
       playwright: 1.59.1
       playwright-core: 1.59.1
@@ -3068,14 +3068,14 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@google/genai@1.49.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.3.6))(bufferutil@4.1.0)':
+  '@google/genai@1.49.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)':
     dependencies:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
       protobufjs: 7.5.5
       ws: 8.20.0(bufferutil@4.1.0)
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.3.6)
+      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -3110,14 +3110,14 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6))':
+  '@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       ansi-styles: 5.2.0
       camelcase: 6.3.0
       decamelize: 1.2.0
       js-tiktoken: 1.0.21
-      langsmith: 0.4.6(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6))
+      langsmith: 0.4.6(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3))
       mustache: 4.2.0
       p-queue: 6.6.2
       p-retry: 4.6.2
@@ -3130,9 +3130,9 @@ snapshots:
       - '@opentelemetry/sdk-trace-base'
       - openai
 
-  '@langchain/openai@0.4.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6)))(ws@8.20.0(bufferutil@4.1.0))':
+  '@langchain/openai@0.4.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3)))(ws@8.20.0(bufferutil@4.1.0))':
     dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6))
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3))
       js-tiktoken: 1.0.21
       openai: 4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@3.25.76)
       zod: 3.25.76
@@ -3141,7 +3141,7 @@ snapshots:
       - encoding
       - ws
 
-  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.3.6)':
+  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 1.19.13(hono@4.12.18)
       ajv: 8.18.0
@@ -3158,8 +3158,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.3.6
-      zod-to-json-schema: 3.25.2(zod@4.3.6)
+      zod: 4.4.3
+      zod-to-json-schema: 3.25.2(zod@4.4.3)
     optionalDependencies:
       '@cfworker/json-schema': 4.1.1
     transitivePeerDependencies:
@@ -3547,13 +3547,13 @@ snapshots:
     dependencies:
       humanize-ms: 1.2.1
 
-  ai@5.0.172(zod@4.3.6):
+  ai@5.0.172(zod@4.4.3):
     dependencies:
-      '@ai-sdk/gateway': 2.0.76(zod@4.3.6)
+      '@ai-sdk/gateway': 2.0.76(zod@4.4.3)
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
       '@opentelemetry/api': 1.9.0
-      zod: 4.3.6
+      zod: 4.4.3
 
   ajv-formats@3.0.1(ajv@8.18.0):
     optionalDependencies:
@@ -4442,7 +4442,7 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  langsmith@0.4.6(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6)):
+  langsmith@0.4.6(@opentelemetry/api@1.9.0)(openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3)):
     dependencies:
       '@types/uuid': 10.0.0
       chalk: 4.1.2
@@ -4452,7 +4452,7 @@ snapshots:
       uuid: 10.0.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
-      openai: 4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6)
+      openai: 4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3)
 
   levn@0.4.1:
     dependencies:
@@ -4637,11 +4637,11 @@ snapshots:
 
   obug@2.1.1: {}
 
-  ollama-ai-provider-v2@1.5.5(zod@4.3.6):
+  ollama-ai-provider-v2@1.5.5(zod@4.4.3):
     dependencies:
       '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@4.3.6)
-      zod: 4.3.6
+      '@ai-sdk/provider-utils': 3.0.23(zod@4.4.3)
+      zod: 4.4.3
     optional: true
 
   on-exit-leak-free@2.1.2: {}
@@ -4677,7 +4677,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.3.6):
+  openai@4.104.0(ws@8.20.0(bufferutil@4.1.0))(zod@4.4.3):
     dependencies:
       '@types/node': 18.19.130
       '@types/node-fetch': 2.6.13
@@ -4688,7 +4688,7 @@ snapshots:
       node-fetch: 2.7.0
     optionalDependencies:
       ws: 8.20.0(bufferutil@4.1.0)
-      zod: 4.3.6
+      zod: 4.4.3
     transitivePeerDependencies:
       - encoding
 
@@ -5432,13 +5432,13 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  zod-to-json-schema@3.25.2(zod@4.3.6):
+  zod-to-json-schema@3.25.2(zod@4.4.3):
     dependencies:
-      zod: 4.3.6
+      zod: 4.4.3
 
   zod@3.23.8:
     optional: true
 
   zod@3.25.76: {}
 
-  zod@4.3.6: {}
+  zod@4.4.3: {}
