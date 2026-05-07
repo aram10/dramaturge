@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.6.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.5.0...dramaturge-v0.6.0) (2026-05-07)
+
+
+### Features
+
+* add auth capture and list commands ([74838dd](https://github.com/aram10/dramaturge/commit/74838dd51c429919af30863247c7a13241428acc))
+* add auth profiles support to config schema ([4e34fa3](https://github.com/aram10/dramaturge/commit/4e34fa305b816b746e906902d16d689729991675))
+* add CLI --profile flag for multi-role auth ([e35df20](https://github.com/aram10/dramaturge/commit/e35df20e5b9daf4cd432a9cb44c3d0f51b06ebae))
+* integrate auth capture into setup wizard ([75476b0](https://github.com/aram10/dramaturge/commit/75476b0baa8749fbdbe0d456ef4baa9a735bae12))
+* reduce lint warnings from 268 to 47 (82% reduction) ([c3c3339](https://github.com/aram10/dramaturge/commit/c3c33399abbe9ca34df6285fc336896577977b8f))
+
+
+### Bug Fixes
+
+* add per-task timeouts and batch isolation ([e8add3d](https://github.com/aram10/dramaturge/commit/e8add3d15bb8bdcf97b60d66c7ade244232ea129))
+* address all PR review comments - fix build failure and improve BrowserAgent abstraction ([73d4a0b](https://github.com/aram10/dramaturge/commit/73d4a0bde875665e742cb3582e6bca9649e6537d))
+* address PR review feedback on auth profile schema, memory scoping, and CLI tests ([2612fcf](https://github.com/aram10/dramaturge/commit/2612fcf5eb3a7c2ce692d1c0d00780e006743603))
+* apply all review suggestions for auth capture feature ([e36a31a](https://github.com/aram10/dramaturge/commit/e36a31a5ea29eedcbe48a081979a2d2d1d445aae))
+* close dependency and CodeQL security alerts ([ad2fbc6](https://github.com/aram10/dramaturge/commit/ad2fbc6ca6c9011af522b24d9e75ff79906a3bcb))
+* reduce mergeReproData complexity and fix remaining lint warnings ([09638fd](https://github.com/aram10/dramaturge/commit/09638fd191829ebdf7f700a4a3ca9b3440609789))
+* remediate Dependabot and CodeQL alerts ([7fa0c46](https://github.com/aram10/dramaturge/commit/7fa0c46d056290a48438a0a7d218466e1d6581ce))
+* remove non-null assertions in export-auth-state by using discriminated union type ([a4d8c8d](https://github.com/aram10/dramaturge/commit/a4d8c8df426c5925f995bbde63c3b41235b1bcf0))
+* remove unused imports and convert over-parameterized functions to options objects ([5f33c97](https://github.com/aram10/dramaturge/commit/5f33c97c3d96cba3d310cd3bcb70ca6c1b73d171))
+* restore Windows pnpm PATH fallback in standalone verification ([f5778da](https://github.com/aram10/dramaturge/commit/f5778dab7a71ab18e5244c0f6b4646a6ee2a0eb7))
+* update prompts.test.ts to use WorkerSystemPromptOptions object ([fefd019](https://github.com/aram10/dramaturge/commit/fefd019464152083ee6b2622ad10ae5a10ffde62))
+
 ## [0.5.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.4.0...dramaturge-v0.5.0) (2026-05-03)
 
 
