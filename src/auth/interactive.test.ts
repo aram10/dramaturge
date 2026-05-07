@@ -100,13 +100,13 @@ describe('authenticateInteractive', () => {
 
     const { browser, page } = createMockStagehand();
 
-    await authenticateInteractive(
+    await authenticateInteractive({
       browser,
-      'https://example.com/app',
-      '/login',
-      "selector:[data-testid='app-shell']",
-      stateFile
-    );
+      targetUrl: 'https://example.com/app',
+      loginUrl: '/login',
+      successIndicator: "selector:[data-testid='app-shell']",
+      stateFile,
+    });
 
     expect(browser.context.addCookies).toHaveBeenCalledWith([
       {
@@ -144,14 +144,14 @@ describe('authenticateInteractive', () => {
     const stateFile = join(dir, 'nested', 'user.json');
     const { browser, page } = createMockStagehand();
 
-    await authenticateInteractive(
+    await authenticateInteractive({
       browser,
-      'https://example.com/app',
-      '/login',
-      "selector:[data-testid='app-shell']",
+      targetUrl: 'https://example.com/app',
+      loginUrl: '/login',
+      successIndicator: "selector:[data-testid='app-shell']",
       stateFile,
-      45_000
-    );
+      manualTimeoutMs: 45_000,
+    });
 
     expect(page.goto).toHaveBeenCalledWith('https://example.com/login', {
       waitUntil: 'domcontentloaded',

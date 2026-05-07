@@ -59,14 +59,14 @@ describe('Navigator.navigateFromNode', () => {
     } as any;
 
     const navigator = new Navigator();
-    const result = await navigator.navigateFromNode(
-      'wizard-node',
-      { selector: '#wizard-next' },
+    const result = await navigator.navigateFromNode({
+      fromNodeId: 'wizard-node',
+      hint: { selector: '#wizard-next' },
       graph,
       page,
       stagehand,
-      'https://example.com/'
-    );
+      rootUrl: 'https://example.com/',
+    });
 
     expect(result).toEqual({ success: true });
     expect(page.goto).toHaveBeenCalledWith('https://example.com/wizard?step=2');
@@ -99,14 +99,14 @@ describe('Navigator.navigateFromNode', () => {
     } as any;
 
     const navigator = new Navigator();
-    const result = await navigator.navigateFromNode(
-      'wizard-node',
-      { selector: '#wizard-next' },
+    const result = await navigator.navigateFromNode({
+      fromNodeId: 'wizard-node',
+      hint: { selector: '#wizard-next' },
       graph,
       page,
       stagehand,
-      'https://example.com/'
-    );
+      rootUrl: 'https://example.com/',
+    });
 
     expect(result).toEqual({
       success: false,

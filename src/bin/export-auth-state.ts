@@ -106,14 +106,14 @@ export async function runExportAuthStateCli(
     const browser = await chromium.launch({ headless: false });
     const context = await browser.newContext();
     const page = await context.newPage();
-    const outputPath = resolve(parsed.output!);
+    const outputPath = resolve(parsed.output as string);
 
     io.log(`Launching browser for manual sign-in at ${parsed.url}...`);
-    await page.goto(parsed.url!);
+    await page.goto(parsed.url as string);
     io.log(`Waiting up to ${parsed.timeoutSeconds}s for ${parsed.successUrl}...`);
 
     try {
-      await page.waitForURL(parsed.successUrl!, {
+      await page.waitForURL(parsed.successUrl as string, {
         timeout: parsed.timeoutSeconds * 1000,
       });
       await page.waitForTimeout(5000);

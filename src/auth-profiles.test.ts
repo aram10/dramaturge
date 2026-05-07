@@ -8,7 +8,6 @@ import {
   resolveAuthProfile,
   type AuthConfig,
   type AuthProfiles,
-  type DramaturgeConfig,
 } from './config.js';
 
 describe('Auth Profiles', () => {

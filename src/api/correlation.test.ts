@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
 import type { ContractIndex } from '../spec/contract-index.js';
 import type { NormalizedOperationSpec } from '../spec/types.js';
-import type { ApiProbeTarget } from './types.js';
 import { selectApiProbeTargets } from './correlation.js';
 
 function makeObservedEndpoint(overrides: Partial<ObservedApiEndpoint> = {}): ObservedApiEndpoint {

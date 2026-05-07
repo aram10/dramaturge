@@ -10,7 +10,6 @@ import { collectFindings, buildFindingGroupKey } from '../report/collector.js';
 import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/traffic-observer.js';
 import type {
   FlakyPageInput,
-  HistoricalFlakyPageRecord,
   HistoricalApiEndpointRecord,
   MemoryRouteMatchInput,
   MemorySnapshot,

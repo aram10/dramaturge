@@ -31,22 +31,22 @@ describe('createWorkerTools', () => {
     const evidence: any[] = [];
     const screenshots = new Map<string, Buffer>();
     const actionRecorder = new ActionRecorder();
-    const tools = createWorkerTools(
+    const tools = createWorkerTools({
       observations,
       screenshots,
       evidence,
-      { recordEvent: vi.fn() } as any,
-      {
+      coverageTracker: { recordEvent: vi.fn() } as any,
+      page: {
         url: () => 'https://example.com/manage/knowledge-bases',
         screenshot: vi.fn().mockResolvedValue(Buffer.from('png-data')),
       } as any,
       screenshotDir,
-      'Knowledge bases',
-      [],
-      [],
-      true,
-      { actionRecorder }
-    );
+      areaName: 'Knowledge bases',
+      followupRequests: [],
+      discoveredEdges: [],
+      screenshotsEnabled: true,
+      actionRecorder,
+    });
 
     const result = await tools.take_screenshot.execute({
       ref: '../escape/outside',
@@ -72,22 +72,22 @@ describe('createWorkerTools', () => {
     const evidence: any[] = [];
     const screenshots = new Map<string, Buffer>();
     const actionRecorder = new ActionRecorder();
-    const tools = createWorkerTools(
+    const tools = createWorkerTools({
       observations,
       screenshots,
       evidence,
-      { recordEvent: vi.fn() } as any,
-      {
+      coverageTracker: { recordEvent: vi.fn() } as any,
+      page: {
         url: () => 'https://example.com/manage/knowledge-bases',
         screenshot: vi.fn().mockResolvedValue(Buffer.from('png-data')),
       } as any,
       screenshotDir,
-      'Knowledge bases',
-      [],
-      [],
-      true,
-      { actionRecorder }
-    );
+      areaName: 'Knowledge bases',
+      followupRequests: [],
+      discoveredEdges: [],
+      screenshotsEnabled: true,
+      actionRecorder,
+    });
 
     const shot = await tools.take_screenshot.execute({
       ref: 'create-button',
@@ -116,19 +116,20 @@ describe('createWorkerTools', () => {
   it('includes post_to_blackboard tool when blackboard is provided', () => {
     const screenshotDir = createTempDir();
     const blackboard = new Blackboard();
-    const tools = createWorkerTools(
-      [],
-      new Map(),
-      [],
-      { recordEvent: vi.fn() } as any,
-      { url: () => 'https://example.com' } as any,
+    const tools = createWorkerTools({
+      observations: [],
+      screenshots: new Map(),
+      evidence: [],
+      coverageTracker: { recordEvent: vi.fn() } as any,
+      page: { url: () => 'https://example.com' } as any,
       screenshotDir,
-      'Test area',
-      [],
-      [],
-      true,
-      { blackboard, agentId: 'agent-tester' }
-    );
+      areaName: 'Test area',
+      followupRequests: [],
+      discoveredEdges: [],
+      screenshotsEnabled: true,
+      blackboard,
+      agentId: 'agent-tester',
+    });
 
     expect(tools.post_to_blackboard).toBeDefined();
   });
@@ -136,19 +137,20 @@ describe('createWorkerTools', () => {
   it('post_to_blackboard posts an entry to the blackboard', async () => {
     const screenshotDir = createTempDir();
     const blackboard = new Blackboard();
-    const tools = createWorkerTools(
-      [],
-      new Map(),
-      [],
-      { recordEvent: vi.fn() } as any,
-      { url: () => 'https://example.com/settings' } as any,
+    const tools = createWorkerTools({
+      observations: [],
+      screenshots: new Map(),
+      evidence: [],
+      coverageTracker: { recordEvent: vi.fn() } as any,
+      page: { url: () => 'https://example.com/settings' } as any,
       screenshotDir,
-      'Settings',
-      [],
-      [],
-      true,
-      { blackboard, agentId: 'agent-tester' }
-    );
+      areaName: 'Settings',
+      followupRequests: [],
+      discoveredEdges: [],
+      screenshotsEnabled: true,
+      blackboard,
+      agentId: 'agent-tester',
+    });
 
     const result = await (tools as any).post_to_blackboard.execute({
       kind: 'finding',
@@ -165,15 +167,15 @@ describe('createWorkerTools', () => {
 
   it('omits post_to_blackboard tool when blackboard is not provided', () => {
     const screenshotDir = createTempDir();
-    const tools = createWorkerTools(
-      [],
-      new Map(),
-      [],
-      { recordEvent: vi.fn() } as any,
-      { url: () => 'https://example.com' } as any,
+    const tools = createWorkerTools({
+      observations: [],
+      screenshots: new Map(),
+      evidence: [],
+      coverageTracker: { recordEvent: vi.fn() } as any,
+      page: { url: () => 'https://example.com' } as any,
       screenshotDir,
-      'Test area'
-    );
+      areaName: 'Test area',
+    });
 
     expect((tools as any).post_to_blackboard).toBeUndefined();
   });

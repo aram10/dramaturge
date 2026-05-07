@@ -53,9 +53,11 @@ export class NetworkTrafficObserver {
 
   /**
    * Attach network observers to a page.
-   * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+   * Accepts Playwright or Stagehand Page objects; cast needed for event API access.
+   * @param page - Page object with `.on()` / `.off()` event listener methods.
    * @param pageKey - Unique key for tracking this page's endpoints separately
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attach(page: any, pageKey = 'default'): void {
     if (this.teardownFns.has(pageKey)) {
       this.detach(pageKey);

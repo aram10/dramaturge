@@ -15,6 +15,15 @@ export interface NavigationResult {
   reason?: string;
 }
 
+export interface NavigateFromNodeOptions {
+  fromNodeId: string;
+  hint: NavigationHint;
+  graph: StateGraph;
+  page: StagehandPage;
+  stagehand: Stagehand;
+  rootUrl: string;
+}
+
 export class Navigator {
   async navigateTo(
     nodeId: string,
@@ -60,14 +69,14 @@ export class Navigator {
     return this.verifyArrival(node, page);
   }
 
-  async navigateFromNode(
-    fromNodeId: string,
-    hint: NavigationHint,
-    graph: StateGraph,
-    page: StagehandPage,
-    stagehand: Stagehand,
-    rootUrl: string
-  ): Promise<NavigationResult> {
+  async navigateFromNode({
+    fromNodeId,
+    hint,
+    graph,
+    page,
+    stagehand,
+    rootUrl,
+  }: NavigateFromNodeOptions): Promise<NavigationResult> {
     const restored = await this.navigateTo(fromNodeId, graph, page, stagehand, rootUrl);
     if (!restored.success) {
       return restored;

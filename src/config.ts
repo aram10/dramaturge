@@ -4,12 +4,7 @@
 import { z } from 'zod';
 import { readFileSync } from 'node:fs';
 import { parseJsoncObject } from './utils/jsonc.js';
-import {
-  getConfigFileContext,
-  normalizeConfigPaths,
-  type ConfigWithMeta,
-  type LoadedConfigMeta,
-} from './config-paths.js';
+import { getConfigFileContext, normalizeConfigPaths, type ConfigWithMeta } from './config-paths.js';
 
 const AuthConfigSchema = z.discriminatedUnion('type', [
   z.object({

@@ -65,6 +65,115 @@ function isLedgerActionEvent(event: ExplorationLedgerEvent): event is Exploratio
   return event.kind === 'action';
 }
 
+interface TestFileContext {
+  result: RunResult;
+  areaActions: Map<string, ReplayableAction[]>;
+  ledgerActions: ReplayableAction[];
+}
+
+function buildTestFileContent(
+  finding: ReturnType<typeof collectFindings>[number],
+  ctx: TestFileContext
+): GeneratedPlaywrightTest {
+  const { result, areaActions, ledgerActions } = ctx;
+  const area = result.areaResults.find((candidate) => candidate.name === finding.area);
+  const availableActions = areaActions.get(finding.area) ?? [];
+  const actionIds = new Set(finding.meta?.repro?.actionIds ?? []);
+  const selectedActions =
+    actionIds.size > 0
+      ? availableActions.filter((action) => actionIds.has(action.id))
+      : availableActions;
+  const selectedLedgerActions =
+    actionIds.size > 0 ? ledgerActions.filter((action) => actionIds.has(action.id)) : ledgerActions;
+  const actionsToRender = selectedActions.length > 0 ? selectedActions : selectedLedgerActions;
+  const renderedActions = actionsToRender
+    .map((action) => renderAction(action))
+    .filter((line): line is string => Boolean(line));
+  const route = finding.meta?.repro?.route ?? area?.url ?? result.targetUrl;
+  const filename = `${finding.id.toLowerCase()}-${slugify(finding.title)}.spec.ts`;
+  const breadcrumbs = finding.meta?.repro?.breadcrumbs ?? [];
+
+  const impactedAreaNames = new Set(finding.impactedAreas);
+  const allLinkedEvidence = result.areaResults
+    .filter((a) => impactedAreaNames.has(a.name))
+    .flatMap((a) => a.evidence);
+  const reproEvidenceIds = new Set(finding.meta?.repro?.evidenceIds ?? []);
+  const findingEvidenceIds = new Set([...(finding.evidenceIds ?? []), ...reproEvidenceIds]);
+  const evidenceTypes = [
+    ...new Set(
+      allLinkedEvidence
+        .filter(
+          (e) =>
+            findingEvidenceIds.has(e.id) ||
+            (finding.ref != null && e.relatedFindingIds.includes(finding.ref))
+        )
+        .map((e) => e.type)
+    ),
+  ];
+
+  const assertions = inferAssertions({
+    title: finding.title,
+    expected: finding.expected,
+    actual: finding.actual,
+    category: finding.category,
+    evidenceTypes,
+  });
+
+  const preambles = assertions.filter((a) => a.preamble).map((a) => a.preamble as string);
+  const lines = buildTestBodyLines({
+    finding,
+    route,
+    preambles,
+    renderedActions,
+    breadcrumbs,
+    assertions,
+  });
+  return { filename, content: `${lines.join('\n')}\n` };
+}
+
+interface TestBodyOptions {
+  finding: ReturnType<typeof collectFindings>[number];
+  route: string;
+  preambles: string[];
+  renderedActions: string[];
+  breadcrumbs: string[];
+  assertions: ReturnType<typeof inferAssertions>;
+}
+
+function buildTestBodyLines(opts: TestBodyOptions): string[] {
+  const { finding, route, preambles, renderedActions, breadcrumbs, assertions } = opts;
+  const lines = [
+    'import { test, expect } from "@playwright/test";',
+    '',
+    `test(${escapeString(`${finding.id}: ${finding.title}`)}, async ({ page }) => {`,
+    `  // Expected: ${finding.expected.replace(/[\r\n]+/g, ' ')}`,
+    `  // Actual: ${finding.actual.replace(/[\r\n]+/g, ' ')}`,
+  ];
+  for (const preamble of preambles) {
+    lines.push(`  ${preamble}`);
+  }
+  lines.push(`  await page.goto(${escapeString(route)});`);
+  if (renderedActions.length > 0) {
+    for (const action of renderedActions) {
+      lines.push(`  ${action}`);
+    }
+  } else if (breadcrumbs.length > 0) {
+    lines.push('  // Breadcrumbs:');
+    for (const breadcrumb of breadcrumbs) {
+      lines.push(`  // - ${breadcrumb.replace(/[\r\n]+/g, ' ')}`);
+    }
+  }
+  if (assertions.length > 0) {
+    for (const assertion of assertions) {
+      lines.push(`  ${assertion.code}`);
+    }
+  } else {
+    lines.push('  // No confident assertion could be inferred automatically.');
+  }
+  lines.push('});');
+  return lines;
+}
+
 export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightTest[] {
   const findings = collectFindings(result.areaResults);
   const areaActions = new Map(
@@ -75,97 +184,10 @@ export function generatePlaywrightTests(result: RunResult): GeneratedPlaywrightT
       isLedgerActionEvent(event) ? [event.action] : []
     ) ?? [];
 
+  const ctx: TestFileContext = { result, areaActions, ledgerActions };
   return findings
     .filter((finding) => finding.meta?.repro)
-    .map((finding) => {
-      const area = result.areaResults.find((candidate) => candidate.name === finding.area);
-      const availableActions = areaActions.get(finding.area) ?? [];
-      const actionIds = new Set(finding.meta?.repro?.actionIds ?? []);
-      const selectedActions =
-        actionIds.size > 0
-          ? availableActions.filter((action) => actionIds.has(action.id))
-          : availableActions;
-      const selectedLedgerActions =
-        actionIds.size > 0
-          ? ledgerActions.filter((action) => actionIds.has(action.id))
-          : ledgerActions;
-      const actionsToRender = selectedActions.length > 0 ? selectedActions : selectedLedgerActions;
-      const renderedActions = actionsToRender
-        .map((action) => renderAction(action))
-        .filter((line): line is string => Boolean(line));
-      const route = finding.meta?.repro?.route ?? area?.url ?? result.targetUrl;
-      const filename = `${finding.id.toLowerCase()}-${slugify(finding.title)}.spec.ts`;
-      const breadcrumbs = finding.meta?.repro?.breadcrumbs ?? [];
-
-      // Resolve evidence types linked to this finding across all impacted areas.
-      const impactedAreaNames = new Set(finding.impactedAreas);
-      const allLinkedEvidence = result.areaResults
-        .filter((a) => impactedAreaNames.has(a.name))
-        .flatMap((a) => a.evidence);
-      const reproEvidenceIds = new Set(finding.meta?.repro?.evidenceIds ?? []);
-      const findingEvidenceIds = new Set([...(finding.evidenceIds ?? []), ...reproEvidenceIds]);
-      const evidenceTypes = [
-        ...new Set(
-          allLinkedEvidence
-            .filter(
-              (e) =>
-                findingEvidenceIds.has(e.id) ||
-                (finding.ref != null && e.relatedFindingIds.includes(finding.ref))
-            )
-            .map((e) => e.type)
-        ),
-      ];
-
-      const assertions = inferAssertions({
-        title: finding.title,
-        expected: finding.expected,
-        actual: finding.actual,
-        category: finding.category,
-        evidenceTypes,
-      });
-
-      const preambles = assertions.filter((a) => a.preamble).map((a) => a.preamble!);
-
-      const lines = [
-        'import { test, expect } from "@playwright/test";',
-        '',
-        `test(${escapeString(`${finding.id}: ${finding.title}`)}, async ({ page }) => {`,
-        `  // Expected: ${finding.expected.replace(/[\r\n]+/g, ' ')}`,
-        `  // Actual: ${finding.actual.replace(/[\r\n]+/g, ' ')}`,
-      ];
-
-      // Preamble code (event listeners) must appear before navigation to capture all events.
-      for (const preamble of preambles) {
-        lines.push(`  ${preamble}`);
-      }
-
-      lines.push(`  await page.goto(${escapeString(route)});`);
-
-      if (renderedActions.length > 0) {
-        for (const action of renderedActions) {
-          lines.push(`  ${action}`);
-        }
-      } else if (breadcrumbs.length > 0) {
-        lines.push('  // Breadcrumbs:');
-        for (const breadcrumb of breadcrumbs) {
-          lines.push(`  // - ${breadcrumb.replace(/[\r\n]+/g, ' ')}`);
-        }
-      }
-
-      if (assertions.length > 0) {
-        for (const assertion of assertions) {
-          lines.push(`  ${assertion.code}`);
-        }
-      } else {
-        lines.push('  // No confident assertion could be inferred automatically.');
-      }
-      lines.push('});');
-
-      return {
-        filename,
-        content: `${lines.join('\n')}\n`,
-      };
-    });
+    .map((finding) => buildTestFileContent(finding, ctx));
 }
 
 export function writeGeneratedPlaywrightTests(

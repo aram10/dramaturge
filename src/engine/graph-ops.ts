@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { EngineContext } from './context.js';
-import type { WorkerResult, FrontierItem } from '../types.js';
+import type { WorkerResult } from '../types.js';
 import { captureFingerprint } from '../graph/fingerprint.js';
 import { classifyPage } from '../planner/page-classifier.js';
 import { emitEngineEvent } from './event-stream.js';
@@ -71,7 +71,8 @@ export async function expandGraph(
       if (
         diffHasScope &&
         ctx.config.diffAware.restrictToChanged &&
-        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext!)
+        ctx.diffContext &&
+        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext)
       ) {
         continue;
       }
@@ -86,24 +87,20 @@ export async function expandGraph(
       ctx.graph.addEdge(sourceNodeId, newNode.id, edge);
 
       const newTasks = useLLMPlanner
-        ? await ctx.planner.proposeTasksWithLLM(
-            newNode,
-            ctx.graph,
-            ctx.config.models.planner,
-            ctx.mission,
-            ctx.repoHints,
-            ctx.config.llm.requestTimeoutMs,
-            ctx.memoryStore?.getPlannerSignals(newNode),
-            ctx.diffContext
-          )
-        : ctx.planner.proposeTasks(
-            newNode,
-            ctx.graph,
-            ctx.mission,
-            ctx.repoHints,
-            ctx.memoryStore?.getPlannerSignals(newNode),
-            ctx.diffContext
-          );
+        ? await ctx.planner.proposeTasksWithLLM(newNode, ctx.graph, {
+            plannerModel: ctx.config.models.planner,
+            mission: ctx.mission,
+            repoHints: ctx.repoHints,
+            llmRequestTimeoutMs: ctx.config.llm.requestTimeoutMs,
+            memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
+            diffContext: ctx.diffContext,
+          })
+        : ctx.planner.proposeTasks(newNode, ctx.graph, {
+            mission: ctx.mission,
+            repoHints: ctx.repoHints,
+            memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
+            diffContext: ctx.diffContext,
+          });
       ctx.frontier.enqueueMany(newTasks);
       ctx.logger?.info('Discovered new state', {
         nodeId: newNode.id,
@@ -132,14 +129,14 @@ async function resolveEdgeFingerprint(
   url?: string;
 } | null> {
   try {
-    const navigation = await ctx.navigator.navigateFromNode(
-      sourceNodeId,
+    const navigation = await ctx.navigator.navigateFromNode({
+      fromNodeId: sourceNodeId,
       hint,
-      ctx.graph,
-      ctx.page,
-      ctx.stagehand,
-      ctx.config.targetUrl
-    );
+      graph: ctx.graph,
+      page: ctx.page,
+      stagehand: ctx.stagehand,
+      rootUrl: ctx.config.targetUrl,
+    });
     if (!navigation.success) {
       ctx.logger?.warn('Could not resolve discovered edge', {
         reason: navigation.reason ?? 'navigation failed',
