@@ -90,226 +90,300 @@ export interface WorkerToolOptions {
   agentId?: string;
 }
 
-export function createWorkerTools(
-  observations: Observation[],
-  screenshots: Map<string, Buffer>,
-  evidence: Evidence[],
-  coverageTracker: CoverageTracker,
-  page: WorkerToolPage,
-  screenshotDir: string,
-  areaName: string,
-  followupRequests: FollowupRequest[] = [],
-  discoveredEdges: DiscoveredEdge[] = [],
-  screenshotsEnabled = true,
-  options: WorkerToolOptions = {}
+export interface CreateWorkerToolsOptions extends WorkerToolOptions {
+  observations: Observation[];
+  screenshots: Map<string, Buffer>;
+  evidence: Evidence[];
+  coverageTracker: CoverageTracker;
+  page: WorkerToolPage;
+  screenshotDir: string;
+  areaName: string;
+  followupRequests?: FollowupRequest[];
+  discoveredEdges?: DiscoveredEdge[];
+  screenshotsEnabled?: boolean;
+}
+
+interface ToolContext {
+  observations: Observation[];
+  screenshots: Map<string, Buffer>;
+  evidence: Evidence[];
+  coverageTracker: CoverageTracker;
+  page: WorkerToolPage;
+  screenshotDir: string;
+  areaName: string;
+  followupRequests: FollowupRequest[];
+  discoveredEdges: DiscoveredEdge[];
+  screenshotsEnabled: boolean;
+  stagnationTracker?: StagnationTracker;
+  findingContext?: { stateId?: string; objective?: string };
+  actionRecorder?: ActionRecorder;
+  breadcrumbs: string[];
+  rememberBreadcrumb: (value: string) => void;
+}
+
+function buildLogFindingTool(ctx: ToolContext) {
+  const {
+    observations,
+    evidence,
+    findingContext,
+    actionRecorder,
+    stagnationTracker,
+    page,
+    breadcrumbs,
+  } = ctx;
+  return {
+    description:
+      'Report a bug, UX concern, accessibility, performance, or visual issue. Attach evidence IDs from take_screenshot calls.',
+    inputSchema: LogFindingSchema,
+    execute: async (input: z.infer<typeof LogFindingSchema>) => {
+      const evidenceIds = input.evidenceIds ?? [];
+      const observationId = `obs-${shortId()}`;
+      observations.push({
+        id: observationId,
+        ...input,
+        evidenceIds,
+        route: page.url(),
+        objective: findingContext?.objective ?? 'Investigate the current page',
+        breadcrumbs: actionRecorder?.getRecentSummaries() ?? [...breadcrumbs],
+        actionIds: actionRecorder?.getRecentActionIds() ?? [],
+        verdictHint: input.verdict,
+      });
+      // Cross-link evidence to this finding
+      if (evidenceIds.length > 0) {
+        for (const eid of evidenceIds) {
+          const ev = evidence.find((e) => e.id === eid);
+          if (ev) {
+            ev.relatedFindingIds.push(observationId);
+          }
+        }
+      }
+      stagnationTracker?.recordStep({ findings: 1, newControls: 0, edges: 0 });
+      return {
+        logged: true,
+        observationId,
+        observationIndex: observations.length - 1,
+        message: `Observation logged: ${input.title}`,
+      };
+    },
+  };
+}
+
+function buildTakeScreenshotTool(ctx: ToolContext) {
+  const {
+    page,
+    screenshotsEnabled,
+    screenshots,
+    screenshotDir,
+    evidence,
+    areaName,
+    actionRecorder,
+    rememberBreadcrumb,
+  } = ctx;
+  return {
+    description: 'Capture a screenshot. Returns an evidenceId to pass to log_finding.',
+    inputSchema: TakeScreenshotSchema,
+    execute: async (input: z.infer<typeof TakeScreenshotSchema>) => {
+      if (!screenshotsEnabled) {
+        return { captured: false, ref: input.ref, message: 'Screenshots disabled in config' };
+      }
+      let buffer: Buffer;
+      try {
+        buffer = await page.screenshot({ fullPage: false, type: 'png' });
+      } catch (screenshotError) {
+        const msg =
+          screenshotError instanceof Error ? screenshotError.message : String(screenshotError);
+        return { captured: false, ref: input.ref, message: `Screenshot failed: ${msg}` };
+      }
+      const screenshotId = `ss-${shortId()}`;
+      screenshots.set(screenshotId, buffer);
+      const filename = `${screenshotId}.png`;
+      try {
+        writeFileSync(join(screenshotDir, filename), buffer);
+      } catch (writeError) {
+        const msg = writeError instanceof Error ? writeError.message : String(writeError);
+        // Screenshot was captured in memory but disk write failed
+        return {
+          captured: false,
+          ref: input.ref,
+          message: `Screenshot captured in memory but failed to write to disk: ${msg}`,
+        };
+      }
+      const evidenceId = `ev-${shortId()}`;
+      evidence.push({
+        id: evidenceId,
+        type: 'screenshot',
+        summary: input.annotation ?? `Screenshot: ${input.ref}`,
+        path: `screenshots/${filename}`,
+        timestamp: new Date().toISOString(),
+        areaName,
+        relatedFindingIds: [],
+      });
+      rememberBreadcrumb(`capture screenshot ${input.ref}`);
+      actionRecorder?.recordToolAction({
+        kind: 'screenshot',
+        summary: `capture screenshot ${input.ref}`,
+        source: 'worker-tool',
+        status: 'recorded',
+      });
+      return { captured: true, ref: input.ref, filename, evidenceId };
+    },
+  };
+}
+
+function buildMarkControlExercisedTool(ctx: ToolContext) {
+  const { coverageTracker, actionRecorder, stagnationTracker, rememberBreadcrumb } = ctx;
+  return {
+    description: 'Report interaction with a UI control for coverage tracking.',
+    inputSchema: MarkControlExercisedSchema,
+    execute: async (input: z.infer<typeof MarkControlExercisedSchema>) => {
+      const event: CoverageEvent = {
+        controlId: input.controlId,
+        action: input.action,
+        outcome: input.outcome,
+        timestamp: new Date().toISOString(),
+      };
+      coverageTracker.recordEvent(event);
+      rememberBreadcrumb(`${input.action} ${input.controlId} -> ${input.outcome}`);
+      actionRecorder?.recordControlAction(input.controlId, input.action, input.outcome);
+      stagnationTracker?.recordStep({ findings: 0, newControls: 1, edges: 0 });
+      return {
+        recorded: true,
+        controlId: input.controlId,
+        message: `Coverage recorded: ${input.action} on ${input.controlId} → ${input.outcome}`,
+      };
+    },
+  };
+}
+
+function buildRequestFollowupTool(ctx: ToolContext) {
+  const { followupRequests } = ctx;
+  return {
+    description: 'Request additional investigation on the current page or a related area.',
+    inputSchema: RequestFollowupSchema,
+    execute: async (input: z.infer<typeof RequestFollowupSchema>) => {
+      followupRequests.push({
+        type: input.type,
+        reason: input.reason,
+        relatedFindingId: input.relatedFindingId,
+      });
+      return { requested: true, message: `Follow-up requested: ${input.type} — ${input.reason}` };
+    },
+  };
+}
+
+function buildReportDiscoveredEdgeTool(ctx: ToolContext) {
+  const { discoveredEdges, actionRecorder, stagnationTracker, rememberBreadcrumb } = ctx;
+  return {
+    description:
+      'Report a navigation target (link, button, action) leading to a different page/state.',
+    inputSchema: ReportDiscoveredEdgeSchema,
+    execute: async (input: z.infer<typeof ReportDiscoveredEdgeSchema>) => {
+      discoveredEdges.push({
+        actionLabel: input.actionLabel,
+        navigationHint: {
+          url: input.url,
+          selector: input.selector,
+          actionDescription: input.actionDescription,
+        },
+        // Placeholder — engine fills these when it actually navigates
+        targetFingerprint: {
+          normalizedPath: '',
+          signature: { pathname: '', query: [], uiMarkers: [] },
+          title: '',
+          heading: '',
+          dialogTitles: [],
+          hash: '',
+        },
+        targetPageType: 'unknown',
+      });
+      rememberBreadcrumb(`discover edge ${input.actionLabel}`);
+      actionRecorder?.recordToolAction({
+        kind: 'discover-edge',
+        selector: input.selector,
+        url: input.url,
+        summary: `discover edge ${input.actionLabel}`,
+        source: 'worker-tool',
+        status: 'recorded',
+      });
+      stagnationTracker?.recordStep({ findings: 0, newControls: 0, edges: 1 });
+      return { reported: true, message: `Discovered edge: ${input.actionLabel}` };
+    },
+  };
+}
+
+function buildPostToBlackboardTool(
+  ctx: ToolContext,
+  blackboard: Blackboard,
+  agentId: string | undefined
 ) {
-  const { stagnationTracker, findingContext, actionRecorder, blackboard, agentId } = options;
+  const { areaName, page } = ctx;
+  return {
+    description:
+      'Share a signal with other agents on the team blackboard. Use this to flag suspicious behaviors, coverage gaps, or interesting patterns.',
+    inputSchema: PostToBlackboardSchema,
+    execute: async (input: z.infer<typeof PostToBlackboardSchema>) => {
+      const entry = blackboard.post(
+        input.kind as BlackboardEntryKind,
+        agentId ?? areaName,
+        { summary: input.summary, route: page.url() },
+        input.tags ?? []
+      );
+      return { posted: true, entryId: entry.id, message: `Posted to blackboard: ${input.summary}` };
+    },
+  };
+}
+
+export function createWorkerTools(opts: CreateWorkerToolsOptions) {
+  const {
+    observations,
+    screenshots,
+    evidence,
+    coverageTracker,
+    page,
+    screenshotDir,
+    areaName,
+    followupRequests = [],
+    discoveredEdges = [],
+    screenshotsEnabled = true,
+    stagnationTracker,
+    findingContext,
+    actionRecorder,
+    blackboard,
+    agentId,
+  } = opts;
   mkdirSync(screenshotDir, { recursive: true });
   const breadcrumbs: string[] = [];
-
   const rememberBreadcrumb = (value: string) => {
     breadcrumbs.push(value);
     if (breadcrumbs.length > MAX_BREADCRUMBS) {
       breadcrumbs.shift();
     }
   };
-
+  const toolCtx: ToolContext = {
+    observations,
+    screenshots,
+    evidence,
+    coverageTracker,
+    page,
+    screenshotDir,
+    areaName,
+    followupRequests,
+    discoveredEdges,
+    screenshotsEnabled,
+    stagnationTracker,
+    findingContext,
+    actionRecorder,
+    breadcrumbs,
+    rememberBreadcrumb,
+  };
   return {
-    log_finding: {
-      description:
-        'Report a bug, UX concern, accessibility, performance, or visual issue. Attach evidence IDs from take_screenshot calls.',
-      inputSchema: LogFindingSchema,
-      execute: async (input: z.infer<typeof LogFindingSchema>) => {
-        const evidenceIds = input.evidenceIds ?? [];
-        const observationId = `obs-${shortId()}`;
-        observations.push({
-          id: observationId,
-          ...input,
-          evidenceIds,
-          route: page.url(),
-          objective: findingContext?.objective ?? 'Investigate the current page',
-          breadcrumbs: actionRecorder?.getRecentSummaries() ?? [...breadcrumbs],
-          actionIds: actionRecorder?.getRecentActionIds() ?? [],
-          verdictHint: input.verdict,
-        });
-        // Cross-link evidence to this finding
-        if (evidenceIds.length > 0) {
-          for (const eid of evidenceIds) {
-            const ev = evidence.find((e) => e.id === eid);
-            if (ev) {
-              ev.relatedFindingIds.push(observationId);
-            }
-          }
-        }
-        stagnationTracker?.recordStep({ findings: 1, newControls: 0, edges: 0 });
-        return {
-          logged: true,
-          observationId,
-          observationIndex: observations.length - 1,
-          message: `Observation logged: ${input.title}`,
-        };
-      },
-    },
-
-    take_screenshot: {
-      description: 'Capture a screenshot. Returns an evidenceId to pass to log_finding.',
-      inputSchema: TakeScreenshotSchema,
-      execute: async (input: z.infer<typeof TakeScreenshotSchema>) => {
-        if (!screenshotsEnabled) {
-          return { captured: false, ref: input.ref, message: 'Screenshots disabled in config' };
-        }
-        let buffer: Buffer;
-        try {
-          buffer = await page.screenshot({
-            fullPage: false,
-            type: 'png',
-          });
-        } catch (screenshotError) {
-          const msg =
-            screenshotError instanceof Error ? screenshotError.message : String(screenshotError);
-          return { captured: false, ref: input.ref, message: `Screenshot failed: ${msg}` };
-        }
-        const screenshotId = `ss-${shortId()}`;
-        screenshots.set(screenshotId, buffer);
-        const filename = `${screenshotId}.png`;
-        try {
-          writeFileSync(join(screenshotDir, filename), buffer);
-        } catch (writeError) {
-          const msg = writeError instanceof Error ? writeError.message : String(writeError);
-          // Screenshot was captured in memory but disk write failed
-          return {
-            captured: false,
-            ref: input.ref,
-            message: `Screenshot captured in memory but failed to write to disk: ${msg}`,
-          };
-        }
-
-        const evidenceId = `ev-${shortId()}`;
-        const ev: Evidence = {
-          id: evidenceId,
-          type: 'screenshot',
-          summary: input.annotation ?? `Screenshot: ${input.ref}`,
-          path: `screenshots/${filename}`,
-          timestamp: new Date().toISOString(),
-          areaName,
-          relatedFindingIds: [],
-        };
-        evidence.push(ev);
-        rememberBreadcrumb(`capture screenshot ${input.ref}`);
-        actionRecorder?.recordToolAction({
-          kind: 'screenshot',
-          summary: `capture screenshot ${input.ref}`,
-          source: 'worker-tool',
-          status: 'recorded',
-        });
-
-        return { captured: true, ref: input.ref, filename, evidenceId };
-      },
-    },
-
-    mark_control_exercised: {
-      description: 'Report interaction with a UI control for coverage tracking.',
-      inputSchema: MarkControlExercisedSchema,
-      execute: async (input: z.infer<typeof MarkControlExercisedSchema>) => {
-        const event: CoverageEvent = {
-          controlId: input.controlId,
-          action: input.action,
-          outcome: input.outcome,
-          timestamp: new Date().toISOString(),
-        };
-        coverageTracker.recordEvent(event);
-        rememberBreadcrumb(`${input.action} ${input.controlId} -> ${input.outcome}`);
-        actionRecorder?.recordControlAction(input.controlId, input.action, input.outcome);
-        stagnationTracker?.recordStep({ findings: 0, newControls: 1, edges: 0 });
-        return {
-          recorded: true,
-          controlId: input.controlId,
-          message: `Coverage recorded: ${input.action} on ${input.controlId} → ${input.outcome}`,
-        };
-      },
-    },
-
-    request_followup: {
-      description: 'Request additional investigation on the current page or a related area.',
-      inputSchema: RequestFollowupSchema,
-      execute: async (input: z.infer<typeof RequestFollowupSchema>) => {
-        followupRequests.push({
-          type: input.type,
-          reason: input.reason,
-          relatedFindingId: input.relatedFindingId,
-        });
-        return {
-          requested: true,
-          message: `Follow-up requested: ${input.type} — ${input.reason}`,
-        };
-      },
-    },
-
-    report_discovered_edge: {
-      description:
-        'Report a navigation target (link, button, action) leading to a different page/state.',
-      inputSchema: ReportDiscoveredEdgeSchema,
-      execute: async (input: z.infer<typeof ReportDiscoveredEdgeSchema>) => {
-        discoveredEdges.push({
-          actionLabel: input.actionLabel,
-          navigationHint: {
-            url: input.url,
-            selector: input.selector,
-            actionDescription: input.actionDescription,
-          },
-          // Placeholder — engine fills these when it actually navigates
-          targetFingerprint: {
-            normalizedPath: '',
-            signature: {
-              pathname: '',
-              query: [],
-              uiMarkers: [],
-            },
-            title: '',
-            heading: '',
-            dialogTitles: [],
-            hash: '',
-          },
-          targetPageType: 'unknown',
-        });
-        rememberBreadcrumb(`discover edge ${input.actionLabel}`);
-        actionRecorder?.recordToolAction({
-          kind: 'discover-edge',
-          selector: input.selector,
-          url: input.url,
-          summary: `discover edge ${input.actionLabel}`,
-          source: 'worker-tool',
-          status: 'recorded',
-        });
-        stagnationTracker?.recordStep({ findings: 0, newControls: 0, edges: 1 });
-        return {
-          reported: true,
-          message: `Discovered edge: ${input.actionLabel}`,
-        };
-      },
-    },
-
+    log_finding: buildLogFindingTool(toolCtx),
+    take_screenshot: buildTakeScreenshotTool(toolCtx),
+    mark_control_exercised: buildMarkControlExercisedTool(toolCtx),
+    request_followup: buildRequestFollowupTool(toolCtx),
+    report_discovered_edge: buildReportDiscoveredEdgeTool(toolCtx),
     ...(blackboard
-      ? {
-          post_to_blackboard: {
-            description:
-              'Share a signal with other agents on the team blackboard. Use this to flag suspicious behaviors, coverage gaps, or interesting patterns.',
-            inputSchema: PostToBlackboardSchema,
-            execute: async (input: z.infer<typeof PostToBlackboardSchema>) => {
-              const entry = blackboard.post(
-                input.kind as BlackboardEntryKind,
-                agentId ?? areaName,
-                { summary: input.summary, route: page.url() },
-                input.tags ?? []
-              );
-              return {
-                posted: true,
-                entryId: entry.id,
-                message: `Posted to blackboard: ${input.summary}`,
-              };
-            },
-          },
-        }
+      ? { post_to_blackboard: buildPostToBlackboardTool(toolCtx, blackboard, agentId) }
       : {}),
   };
 }

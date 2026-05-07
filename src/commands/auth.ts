@@ -4,6 +4,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { LoadedDramaturgeConfig, DramaturgeConfig } from '../config.js';
+import { isAuthProfiles, resolveAuthProfile } from '../config.js';
 import { captureAuthStateViaUserConfirmation } from '../auth/auth-state-capture.js';
 import { sanitizeProfileName } from './profile-utils.js';
 
@@ -120,16 +121,17 @@ function runAuthList(deps: AuthCommandDependencies): number {
 }
 
 function getLoginUrlFromConfig(config: DramaturgeConfig): string {
-  switch (config.auth.type) {
+  const auth = isAuthProfiles(config.auth) ? resolveAuthProfile(config.auth) : config.auth;
+  switch (auth.type) {
     case 'none':
       return config.targetUrl;
     case 'stored-state':
       return config.targetUrl;
     case 'form':
-      return config.auth.loginUrl;
+      return auth.loginUrl;
     case 'oauth-redirect':
-      return config.auth.loginUrl;
+      return auth.loginUrl;
     case 'interactive':
-      return config.auth.loginUrl;
+      return auth.loginUrl;
   }
 }

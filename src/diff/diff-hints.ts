@@ -110,7 +110,7 @@ function routeToRegex(route: string): RegExp {
     pattern += escapeRegex(route.slice(lastIndex, m.index));
     // Replace param with a wildcard
     pattern += m[0].startsWith('[...') ? '.*' : '[^/]+';
-    lastIndex = m.index! + m[0].length;
+    lastIndex = (m.index ?? lastIndex) + m[0].length;
   }
   // Escape remaining literal tail
   pattern += escapeRegex(route.slice(lastIndex));

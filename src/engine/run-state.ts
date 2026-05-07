@@ -90,26 +90,22 @@ async function proposeSeedTasks(
   useLLMPlanner: boolean
 ): Promise<FrontierItem[]> {
   if (useLLMPlanner) {
-    return ctx.planner.proposeTasksWithLLM(
-      node,
-      ctx.graph,
-      ctx.config.models.planner,
-      ctx.mission,
-      ctx.repoHints,
-      ctx.config.llm.requestTimeoutMs,
-      ctx.memoryStore?.getPlannerSignals(node),
-      ctx.diffContext
-    );
+    return ctx.planner.proposeTasksWithLLM(node, ctx.graph, {
+      plannerModel: ctx.config.models.planner,
+      mission: ctx.mission,
+      repoHints: ctx.repoHints,
+      llmRequestTimeoutMs: ctx.config.llm.requestTimeoutMs,
+      memorySignals: ctx.memoryStore?.getPlannerSignals(node),
+      diffContext: ctx.diffContext,
+    });
   }
 
-  return ctx.planner.proposeTasks(
-    node,
-    ctx.graph,
-    ctx.mission,
-    ctx.repoHints,
-    ctx.memoryStore?.getPlannerSignals(node),
-    ctx.diffContext
-  );
+  return ctx.planner.proposeTasks(node, ctx.graph, {
+    mission: ctx.mission,
+    repoHints: ctx.repoHints,
+    memorySignals: ctx.memoryStore?.getPlannerSignals(node),
+    diffContext: ctx.diffContext,
+  });
 }
 
 export async function seedFrontierIfNeeded(

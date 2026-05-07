@@ -97,7 +97,9 @@ export class StateGraph {
     }
 
     while (queue.length > 0) {
-      const { nodeId, path } = queue.shift()!;
+      const next = queue.shift();
+      if (!next) break;
+      const { nodeId, path } = next;
       const outEdges = adjacency.get(nodeId) ?? [];
 
       for (const edge of outEdges) {

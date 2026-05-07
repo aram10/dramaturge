@@ -102,8 +102,9 @@ export function buildAccessibilityArtifacts(input: {
 
 /**
  * Analyze accessibility using axe-core.
- * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param page - Page object (Playwright or Stagehand Page). Cast needed for AxeBuilder.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function analyzeAccessibilityPage(page: any): Promise<AccessibilityScanResults> {
   const module = await import("@axe-core/playwright");
   const AxeBuilder = module.AxeBuilder;
@@ -115,15 +116,17 @@ async function analyzeAccessibilityPage(page: any): Promise<AccessibilityScanRes
 
 /**
  * Run accessibility scan and produce findings + evidence.
- * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param page - Page object (Playwright or Stagehand Page). Cast needed for AxeBuilder.
  * @param areaName - Name of the area being scanned
  * @param route - Route being scanned
  * @param analyze - Optional custom analyzer function
  */
 export async function runAccessibilityScan(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   page: any,
   areaName: string,
   route: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   analyze: (page: any) => Promise<AccessibilityScanResults> = analyzeAccessibilityPage
 ): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
   try {
@@ -133,7 +136,7 @@ export async function runAccessibilityScan(
       route,
       violations: results.violations,
     });
-  } catch (error) {
+  } catch {
     // Accessibility scan is best-effort; axe-core may not be available or may fail
     return { findings: [], evidence: [] };
   }

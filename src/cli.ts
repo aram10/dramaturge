@@ -203,37 +203,219 @@ const VALID_PRESETS = new Set<string>(PRESET_NAMES);
 const VALID_FOCUS_MODES = new Set<string>(FOCUS_MODES);
 const VALID_FORMATS = new Set(['markdown', 'json', 'both', 'junit', 'sarif']);
 
+/** Mutable state accumulated while parsing CLI flags. */
+interface CliParseState {
+  command: ParsedCliArgs['command'];
+  configPath?: string;
+  resumeDir?: string;
+  diffRef?: string;
+  dashboard: boolean;
+  url?: string;
+  login?: boolean;
+  headless?: boolean;
+  provider?: ParsedCliArgs['provider'];
+  preset?: ParsedCliArgs['preset'];
+  focusModes: FocusMode[];
+  formats?: ParsedCliArgs['formats'];
+  profile?: string;
+  initTemplate?: InitTemplate;
+  initOutput?: string;
+  repoPath?: string;
+  noScan?: true;
+  triageSubcommand?: string;
+  triagePositional: string[];
+  triageSuppressedOnly?: boolean;
+  triageAll?: boolean;
+  triageReason?: string;
+  authSubcommand?: string;
+}
+
+type BoolFlagSetter = (s: CliParseState) => void;
+type ValueFlagHandler = (s: CliParseState, value: string) => void;
+
+const BOOLEAN_FLAG_HANDLERS = new Map<string, BoolFlagSetter>([
+  [
+    '--dashboard',
+    (s) => {
+      s.dashboard = true;
+    },
+  ],
+  [
+    '--login',
+    (s) => {
+      s.login = true;
+    },
+  ],
+  [
+    '--headless',
+    (s) => {
+      s.headless = true;
+    },
+  ],
+  [
+    '--no-scan',
+    (s) => {
+      s.noScan = true;
+    },
+  ],
+  [
+    '--suppressed',
+    (s) => {
+      s.triageSuppressedOnly = true;
+    },
+  ],
+  [
+    '--all',
+    (s) => {
+      s.triageAll = true;
+    },
+  ],
+]);
+
+function applyProviderFlag(s: CliParseState, value: string): void {
+  if (!VALID_PROVIDERS.has(value)) {
+    throw new Error(
+      `Invalid provider: ${value}. Must be one of: anthropic, openai, google, azure, openrouter, github`
+    );
+  }
+  s.provider = value as ParsedCliArgs['provider'];
+}
+
+function applyPresetFlag(s: CliParseState, value: string): void {
+  if (!VALID_PRESETS.has(value)) {
+    throw new Error(`Invalid preset: ${value}. Must be one of: ${[...VALID_PRESETS].join(', ')}`);
+  }
+  s.preset = value as ParsedCliArgs['preset'];
+}
+
+function applyFocusFlag(s: CliParseState, value: string): void {
+  for (const mode of parseFocusValue(value)) {
+    if (!s.focusModes.includes(mode)) s.focusModes.push(mode);
+  }
+}
+
+function applyTemplateFlag(s: CliParseState, value: string): void {
+  if (value !== 'minimal' && value !== 'full') {
+    throw new Error(`Invalid template: ${value}. Must be one of: minimal, full`);
+  }
+  s.initTemplate = value;
+}
+
+function applyRepoFlag(s: CliParseState, value: string): void {
+  if (!value || value.startsWith('-')) throw new Error('Missing value for --repo');
+  s.repoPath = value;
+}
+
+const VALUE_FLAG_HANDLERS = new Map<string, ValueFlagHandler>([
+  [
+    '--config',
+    (s, v) => {
+      s.configPath = v;
+    },
+  ],
+  [
+    '--resume',
+    (s, v) => {
+      s.resumeDir = v;
+    },
+  ],
+  [
+    '--diff',
+    (s, v) => {
+      s.diffRef = v;
+    },
+  ],
+  [
+    '--url',
+    (s, v) => {
+      s.url = v;
+    },
+  ],
+  [
+    '--output',
+    (s, v) => {
+      s.initOutput = v;
+    },
+  ],
+  [
+    '--reason',
+    (s, v) => {
+      s.triageReason = v;
+    },
+  ],
+  ['--provider', applyProviderFlag],
+  ['--preset', applyPresetFlag],
+  ['--focus', applyFocusFlag],
+  [
+    '--format',
+    (s, v) => {
+      s.formats = parseFormatValue(v);
+    },
+  ],
+  [
+    '--profile',
+    (s, v) => {
+      s.profile = v;
+    },
+  ],
+  ['--template', applyTemplateFlag],
+  ['--repo', applyRepoFlag],
+]);
+
+/** Grab the next positional arg as a required flag value, advancing the index. */
+function requireNextArg(args: readonly string[], i: number, flag: string): string {
+  const value = args[i + 1];
+  if (!value) throw new Error(`Missing value for ${flag}`);
+  return value;
+}
+
+/** Parse --focus <value> into validated FocusMode parts. */
+function parseFocusValue(value: string): FocusMode[] {
+  const parts = value
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (parts.length === 0) throw new Error('Missing value for --focus');
+  for (const part of parts) {
+    if (!VALID_FOCUS_MODES.has(part)) {
+      throw new Error(
+        `Invalid focus mode: ${part}. Must be one of: ${[...VALID_FOCUS_MODES].join(', ')}`
+      );
+    }
+  }
+  return parts as FocusMode[];
+}
+
+/** Parse --format <value> into validated format parts. */
+function parseFormatValue(value: string): NonNullable<ParsedCliArgs['formats']> {
+  const parts = value
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  if (parts.length === 0) throw new Error('Missing value for --format');
+  for (const part of parts) {
+    if (!VALID_FORMATS.has(part)) {
+      throw new Error(
+        `Invalid format: ${part}. Must be one of: markdown, json, both, junit, sarif`
+      );
+    }
+  }
+  return parts as NonNullable<ParsedCliArgs['formats']>;
+}
+
 export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
-  let command: ParsedCliArgs['command'] = 'run';
-  let configPath: string | undefined;
-  let resumeDir: string | undefined;
-  let diffRef: string | undefined;
-  let dashboard = false;
-  let url: string | undefined;
-  let login: boolean | undefined;
-  let headless: boolean | undefined;
-  let provider: ParsedCliArgs['provider'];
-  let preset: ParsedCliArgs['preset'];
-  const focusModes: FocusMode[] = [];
-  let formats: ParsedCliArgs['formats'];
-  let profile: string | undefined;
-  let initTemplate: InitTemplate | undefined;
-  let initOutput: string | undefined;
-  let repoPath: string | undefined;
-  let noScan: true | undefined;
-  let authSubcommand: string | undefined;
-  let authProfile: string | undefined;
-  let triageSubcommand: string | undefined;
-  const triagePositional: string[] = [];
-  let triageSuppressedOnly: boolean | undefined;
-  let triageAll: boolean | undefined;
-  let triageReason: string | undefined;
+  const state: CliParseState = {
+    command: 'run',
+    dashboard: false,
+    focusModes: [],
+    triagePositional: [],
+  };
 
   let i = 0;
 
   // Detect subcommand (first arg if it's a known command name)
   if (args.length > 0 && KNOWN_COMMANDS.has(args[0])) {
-    command = args[0] as ParsedCliArgs['command'];
+    state.command = args[0] as ParsedCliArgs['command'];
     i = 1;
   }
 
@@ -241,217 +423,44 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     const arg = args[i];
 
     if (arg === '--help' || arg === '-h') {
-      return {
-        command: 'help',
-        dashboard: false,
-        showHelp: true,
-      };
+      return { command: 'help', dashboard: false, showHelp: true };
     }
 
-    if (arg === '--dashboard') {
-      dashboard = true;
+    const boolHandler = BOOLEAN_FLAG_HANDLERS.get(arg);
+    if (boolHandler) {
+      boolHandler(state);
       continue;
     }
 
-    if (arg === '--login') {
-      login = true;
-      continue;
-    }
-
-    if (arg === '--headless') {
-      headless = true;
-      continue;
-    }
-
-    if (arg === '--config') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --config');
-      configPath = value;
+    const valueHandler = VALUE_FLAG_HANDLERS.get(arg);
+    if (valueHandler) {
+      const value = arg === '--repo' ? (args[i + 1] ?? '') : requireNextArg(args, i, arg);
+      valueHandler(state, value);
       i++;
       continue;
     }
 
-    if (arg === '--resume') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --resume');
-      resumeDir = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--diff') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --diff');
-      diffRef = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--provider') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --provider');
-      if (!VALID_PROVIDERS.has(value)) {
-        throw new Error(
-          `Invalid provider: ${value}. Must be one of: anthropic, openai, google, azure, openrouter, github`
-        );
-      }
-      provider = value as ParsedCliArgs['provider'];
-      i++;
-      continue;
-    }
-
-    if (arg === '--preset') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --preset');
-      if (!VALID_PRESETS.has(value)) {
-        throw new Error(
-          `Invalid preset: ${value}. Must be one of: ${[...VALID_PRESETS].join(', ')}`
-        );
-      }
-      preset = value as ParsedCliArgs['preset'];
-      i++;
-      continue;
-    }
-
-    if (arg === '--focus') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --focus');
-      const parts = value
-        .split(',')
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0);
-      if (parts.length === 0) throw new Error('Missing value for --focus');
-      for (const part of parts) {
-        if (!VALID_FOCUS_MODES.has(part)) {
-          throw new Error(
-            `Invalid focus mode: ${part}. Must be one of: ${[...VALID_FOCUS_MODES].join(', ')}`
-          );
-        }
-        if (!focusModes.includes(part as FocusMode)) {
-          focusModes.push(part as FocusMode);
-        }
-      }
-      i++;
-      continue;
-    }
-
-    if (arg === '--format') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --format');
-      const parts = value
-        .split(',')
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0);
-      if (parts.length === 0) throw new Error('Missing value for --format');
-      for (const part of parts) {
-        if (!VALID_FORMATS.has(part)) {
-          throw new Error(
-            `Invalid format: ${part}. Must be one of: markdown, json, both, junit, sarif`
-          );
-        }
-      }
-      formats = parts as NonNullable<ParsedCliArgs['formats']>;
-      i++;
-      continue;
-    }
-
-    if (arg === '--profile') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --profile');
-      profile = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--template') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --template');
-      if (value !== 'minimal' && value !== 'full') {
-        throw new Error(`Invalid template: ${value}. Must be one of: minimal, full`);
-      }
-      initTemplate = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--url') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --url');
-      url = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--repo') {
-      const value = args[i + 1];
-      if (!value || value.startsWith('-')) throw new Error('Missing value for --repo');
-      repoPath = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--no-scan') {
-      noScan = true;
-      continue;
-    }
-
-    if (arg === '--output') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --output');
-      initOutput = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--profile') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --profile');
-      authProfile = value;
-      i++;
-      continue;
-    }
-
-    if (arg === '--suppressed') {
-      triageSuppressedOnly = true;
-      continue;
-    }
-
-    if (arg === '--all') {
-      triageAll = true;
-      continue;
-    }
-
-    if (arg === '--reason') {
-      const value = args[i + 1];
-      if (!value) throw new Error('Missing value for --reason');
-      triageReason = value;
-      i++;
-      continue;
-    }
-
-    if (arg.startsWith('--')) {
-      throw new Error(`Unknown argument: ${arg}`);
-    }
+    if (arg.startsWith('--')) throw new Error(`Unknown argument: ${arg}`);
 
     // Positional argument: treat as URL for `run` command
-    if (command === 'run' && !url) {
-      url = arg;
+    if (state.command === 'run' && !state.url) {
+      state.url = arg;
       continue;
     }
 
-    // Positional arg for triage commands (signatures, baseline identifiers)
-    if (TRIAGE_COMMANDS.has(command)) {
-      if (!triageSubcommand) {
-        triageSubcommand = arg;
+    // Positional arg for triage commands
+    if (TRIAGE_COMMANDS.has(state.command)) {
+      if (!state.triageSubcommand) {
+        state.triageSubcommand = arg;
       } else {
-        triagePositional.push(arg);
+        state.triagePositional.push(arg);
       }
       continue;
     }
 
-    if (command === 'auth') {
-      if (!authSubcommand) {
-        authSubcommand = arg;
+    if (state.command === 'auth') {
+      if (!state.authSubcommand) {
+        state.authSubcommand = arg;
         continue;
       }
       throw new Error(`Unknown argument: ${arg}`);
@@ -460,42 +469,42 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  if (noScan && repoPath) {
+  if (state.noScan && state.repoPath) {
     throw new Error('--no-scan and --repo cannot be used together');
   }
 
   return {
-    command,
-    configPath,
-    resumeDir,
-    diffRef,
-    dashboard,
+    command: state.command,
+    configPath: state.configPath,
+    resumeDir: state.resumeDir,
+    diffRef: state.diffRef,
+    dashboard: state.dashboard,
     showHelp: false,
-    url,
-    login,
-    headless,
-    provider,
-    preset,
-    focusModes: focusModes.length > 0 ? focusModes : undefined,
-    formats,
-    profile,
-    initTemplate,
-    initOutput,
-    repoPath,
-    noScan,
-    ...(command === 'auth'
+    url: state.url,
+    login: state.login,
+    headless: state.headless,
+    provider: state.provider,
+    preset: state.preset,
+    focusModes: state.focusModes.length > 0 ? state.focusModes : undefined,
+    formats: state.formats,
+    profile: state.profile,
+    initTemplate: state.initTemplate,
+    initOutput: state.initOutput,
+    repoPath: state.repoPath,
+    noScan: state.noScan,
+    ...(state.command === 'auth'
       ? {
-          authSubcommand,
-          authProfile,
+          authSubcommand: state.authSubcommand,
+          authProfile: state.profile,
         }
       : {}),
-    ...(TRIAGE_COMMANDS.has(command)
+    ...(TRIAGE_COMMANDS.has(state.command)
       ? {
-          triageSubcommand,
-          triagePositional: triagePositional.length > 0 ? triagePositional : undefined,
-          triageSuppressedOnly,
-          triageAll,
-          triageReason,
+          triageSubcommand: state.triageSubcommand,
+          triagePositional: state.triagePositional.length > 0 ? state.triagePositional : undefined,
+          triageSuppressedOnly: state.triageSuppressedOnly,
+          triageAll: state.triageAll,
+          triageReason: state.triageReason,
         }
       : {}),
   };

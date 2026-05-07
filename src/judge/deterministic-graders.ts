@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { Evidence } from '../types.js';
-import type { Observation, JudgeDecision } from './types.js';
+import type { Observation } from './types.js';
 
 /**
  * Deterministic judge graders for finding validation.

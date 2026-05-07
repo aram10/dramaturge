@@ -24,14 +24,23 @@ import {
  *  3. Once authenticated, persist `context.storageState()` to `stateFile` for
  *     reuse in future runs.
  */
-export async function authenticateInteractive(
-  browser: BrowserSessionLike<StorageStatePage>,
-  targetUrl: string,
-  loginUrl: string,
-  successIndicator: string,
-  stateFile: string,
-  manualTimeoutMs: number = 120_000
-): Promise<void> {
+export interface AuthenticateInteractiveOptions {
+  browser: BrowserSessionLike<StorageStatePage>;
+  targetUrl: string;
+  loginUrl: string;
+  successIndicator: string;
+  stateFile: string;
+  manualTimeoutMs?: number;
+}
+
+export async function authenticateInteractive({
+  browser,
+  targetUrl,
+  loginUrl,
+  successIndicator,
+  stateFile,
+  manualTimeoutMs = 120_000,
+}: AuthenticateInteractiveOptions): Promise<void> {
   const indicator = parseIndicator(successIndicator);
 
   // 1. Try cached state if it exists

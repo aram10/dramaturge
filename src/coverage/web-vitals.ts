@@ -56,8 +56,9 @@ const POOR_THRESHOLD_MULTIPLIER = 2.5;
  * Uses the browser's PerformanceObserver API to read LCP and CLS entries.
  * INP is approximated from the `first-input` entry or longest event timing.
  *
- * @param page - Page object (Playwright or Stagehand Page). Uses `any` to accommodate both.
+ * @param page - Page object (Playwright or Stagehand Page). Cast needed for evaluate() API.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function collectWebVitals(page: any): Promise<WebVitalsResult> {
   try {
     const metrics = await page.evaluate(() => {
@@ -111,7 +112,7 @@ export async function collectWebVitals(page: any): Promise<WebVitalsResult> {
       return result;
     });
     return metrics as WebVitalsResult;
-  } catch (error) {
+  } catch {
     // Best-effort collection; page may not support Performance API
     return { lcp: null, cls: null, inp: null };
   }

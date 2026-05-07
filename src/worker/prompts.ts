@@ -349,23 +349,42 @@ function getAgentRoleGuidance(role: AgentRole): string {
   }
 }
 
-export function buildWorkerSystemPrompt(
-  appDescription: string,
-  areaName: string,
-  areaDescription?: string,
-  pageType?: PageType,
-  appContext?: AppContext,
-  repoHints?: RepoHints,
-  contractSummary?: string[],
-  observedApiEndpoints?: ObservedApiEndpoint[],
-  mission?: MissionConfig,
-  history?: WorkerHistoryContext,
-  workerType?: WorkerType,
-  adversarialConfig?: AdversarialConfig,
-  visionContext?: string,
-  agentRole?: AgentRole,
-  blackboardSummary?: string
-): string {
+export interface WorkerSystemPromptOptions {
+  appDescription: string;
+  areaName: string;
+  areaDescription?: string;
+  pageType?: PageType;
+  appContext?: AppContext;
+  repoHints?: RepoHints;
+  contractSummary?: string[];
+  observedApiEndpoints?: ObservedApiEndpoint[];
+  mission?: MissionConfig;
+  history?: WorkerHistoryContext;
+  workerType?: WorkerType;
+  adversarialConfig?: AdversarialConfig;
+  visionContext?: string;
+  agentRole?: AgentRole;
+  blackboardSummary?: string;
+}
+
+export function buildWorkerSystemPrompt(opts: WorkerSystemPromptOptions): string {
+  const {
+    appDescription,
+    areaName,
+    areaDescription,
+    pageType,
+    appContext,
+    repoHints,
+    contractSummary,
+    observedApiEndpoints,
+    mission,
+    history,
+    workerType,
+    adversarialConfig,
+    visionContext,
+    agentRole,
+    blackboardSummary,
+  } = opts;
   const pageTypeContext =
     pageType && pageType !== 'unknown'
       ? `\n\n## Page Type Detected: ${pageType}\n${getPageTypeGuidance(pageType)}`

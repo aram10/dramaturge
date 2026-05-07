@@ -206,7 +206,7 @@ export function detectFramework(root: string): RepoFramework {
 
     const queue = [resolve(root)];
     while (queue.length > 0) {
-      const dir = queue.pop()!;
+      const dir = queue.pop() ?? resolve(root);
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         if (ignoredDirs.has(entry.name)) continue;
         const fullPath = join(dir, entry.name);
