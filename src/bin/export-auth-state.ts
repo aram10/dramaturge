@@ -5,13 +5,9 @@
 import { pathToFileURL } from 'node:url';
 import { captureAuthStateViaSuccessUrl } from '../auth/auth-state-capture.js';
 
-export interface ExportAuthStateArgs {
-  url?: string;
-  output?: string;
-  successUrl?: string;
-  timeoutSeconds: number;
-  showHelp: boolean;
-}
+export type ExportAuthStateArgs =
+  | { showHelp: true; url?: string; output?: string; successUrl?: string; timeoutSeconds: number }
+  | { showHelp: false; url: string; output: string; successUrl: string; timeoutSeconds: number };
 
 const HELP_TEXT = `Usage: dramaturge-auth-state --url <target-url> --output <path> [options]
 
@@ -107,9 +103,9 @@ export async function runExportAuthStateCli(
     io.log('Note: dramaturge-auth-state is deprecated. Prefer: dramaturge auth capture');
     await captureAuthStateViaSuccessUrl(
       {
-        loginUrl: parsed.url!,
-        outputPath: parsed.output!,
-        successUrl: parsed.successUrl!,
+        loginUrl: parsed.url,
+        outputPath: parsed.output,
+        successUrl: parsed.successUrl,
         timeoutMs: parsed.timeoutSeconds * 1000,
       },
       {
