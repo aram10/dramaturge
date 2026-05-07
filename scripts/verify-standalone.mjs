@@ -116,9 +116,10 @@ function resolveCommandInvocation(command, args) {
       };
     }
 
-    throw new Error(
-      'Unable to locate pnpm or Corepack entrypoint for shell-free Windows execution'
-    );
+    return {
+      command: 'pnpm',
+      args,
+    };
   }
 
   return {
