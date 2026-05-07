@@ -3,289 +3,234 @@
 [![CI](https://github.com/aram10/dramaturge/actions/workflows/ci.yml/badge.svg)](https://github.com/aram10/dramaturge/actions/workflows/ci.yml)
 [![Lint](https://github.com/aram10/dramaturge/actions/workflows/lint.yml/badge.svg)](https://github.com/aram10/dramaturge/actions/workflows/lint.yml)
 [![Coverage](https://codecov.io/gh/aram10/dramaturge/branch/main/graph/badge.svg)](https://codecov.io/gh/aram10/dramaturge)
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://opensource.org/licenses/GPL-3.0)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
-[![Package Manager](https://img.shields.io/badge/package%20manager-pnpm%209-orange)](https://pnpm.io)
 
-**Dramaturge** is an agentic exploratory QA engine for web applications. It uses LLM-driven browser agents to autonomously explore, test, and report findings on live web apps—discovering bugs, accessibility issues, API contract violations, security vulnerabilities, and visual regressions without writing test scripts.
+**Autonomous QA testing for web applications.** Point Dramaturge at your app and it will explore, test, and report issues—no test scripts required.
 
-## Why Dramaturge?
+## Quick Start
 
-Traditional QA approaches require upfront investment in test suites, selectors, and expected states. Dramaturge inverts this model:
-
-- **Start testing immediately** — point it at a URL and let agents explore
-- **Discover the unexpected** — finds issues you didn't think to test for
-- **No brittle selectors** — LLM agents adapt to UI changes naturally
-- **Multi-layer coverage** — UI flows, API contracts, security probes, accessibility, visual regression
-- **Evidence-backed findings** — every issue includes screenshots, traces, and reproduction steps
-- **Memory across runs** — warm starts from previous exploration, tracks flaky pages and finding history
-
-**Perfect for:**
-- Exploratory testing of legacy applications with little documentation
-- Pre-release smoke testing to catch regressions before deployment
-- Security and accessibility audits without manual inspection
-- API contract validation against live traffic
-- Onboarding new team members to unfamiliar codebases
-
-## Features
-
-### 🤖 Specialized Worker Types
-- **Navigation workers** — discover routes, follow links, map application structure
-- **Form workers** — fill forms, test validation, explore multi-step flows
-- **CRUD workers** — create, read, update operations (delete opt-in only)
-- **API workers** — replay observed traffic, validate contracts, test auth boundaries
-- **Adversarial workers** — security probes, edge cases, OWASP scenarios (opt-in)
-
-### 🔐 Flexible Authentication
-- **Interactive** — manual login with session capture for replay
-- **Stored state** — reuse pre-captured browser state across runs
-- **Form auth** — deterministic login with explicit selectors
-- **OAuth redirect** — scripted multi-step IdP flows
-- **None** — test public-facing pages without authentication
-
-### 🔍 Comprehensive Testing
-- **Browser error capture** — console errors, uncaught exceptions, network failures
-- **Accessibility testing** — powered by axe-core via Playwright
-- **Visual regression** — deterministic baselines with pixelmatch diff detection
-- **API contract validation** — replay traffic against OpenAPI specs or discovered contracts
-- **Web vitals** — performance metrics (CLS, LCP, INP)
-- **Cost tracking** — LLM token usage per worker type
-
-### 📊 Intelligent Reporting
-- **Markdown reports** — human-readable findings with severity levels
-- **JSON reports** — structured data for CI/CD integration
-- **Screenshot evidence** — visual proof for every finding
-- **Playwright test generation** — convert findings into executable test specs with inferred assertions
-- **Reproduction metadata** — detailed traces for debugging
-
-### 🧠 Cross-Run Memory
-- **Warm starts** — resume exploration from previous state graph
-- **Finding history** — track recurrence and resolution across runs
-- **Flaky page detection** — identify unstable routes
-- **Frontier persistence** — save and restore exploration queue
-
-### 🏗️ Framework-Aware Scanning
-- **Next.js** — route analysis, API route detection, config parsing
-- **Django, Rails, Express, Nuxt, Remix** — heuristic extraction of routes, selectors, and API hints
-- **Generic web apps** — fallback adapter for any application
-- **OpenAPI support** — load external contract files (`.json`, `.jsonc`, `.yaml`, `.yml`)
-
-## Installation
-
-### Prerequisites
-- **Node.js** ≥ 20
-- **pnpm** 9 (or npm/yarn for installing only; pnpm recommended for development)
-- **LLM API keys** — Anthropic (recommended), OpenAI, or Google Generative AI
-
-### Package Installation
+Install:
 
 ```bash
-pnpm add dramaturge
-pnpm exec playwright install chromium
+npm install dramaturge
+npx playwright install chromium
 ```
 
-## Run
-
-Generate a config automatically from your repo and answer only the remaining prompts:
+Generate config:
 
 ```bash
-dramaturge auto-config
+npx dramaturge auto-config
 ```
 
-If you prefer the manual path, you can still copy the example config and customize it:
+Set your API key:
 
+```bash
+export ANTHROPIC_API_KEY="your-key-here"
+```
+
+Run:
+
+```bash
+npx dramaturge --config dramaturge.config.json
+```
+
+That's it! Dramaturge will explore your app and generate a report with any issues it finds.
+
+## What It Does
+
+Dramaturge uses AI-powered browser agents to test your web application automatically. It:
+
+- **Explores your app** — clicks links, fills forms, tests workflows
+- **Finds bugs** — catches console errors, broken pages, validation issues
+- **Checks accessibility** — runs axe-core tests on every page
+- **Tests APIs** — validates contracts and auth boundaries
+- **Provides evidence** — every finding includes screenshots and reproduction steps
+
+No test scripts. No brittle selectors. Just point it at your app and run.
+
+## Why Use Dramaturge?
+
+**For exploratory testing:**
+- Test legacy apps without documentation
+- Find edge cases you didn't think to test
+- Get coverage without writing test suites
+
+**For CI/CD:**
+- Catch regressions before deployment
+- Validate PRs automatically
+- Track issues across releases
+
+**For security & compliance:**
+- Find vulnerabilities (OWASP scenarios)
+- Audit accessibility (WCAG)
+- Validate API contracts
+
+## How It Works
+
+1. **Start exploring** — Dramaturge navigates to your app's entry point
+2. **Discover pages** — AI agents click links and fill forms to map your app
+3. **Test as it goes** — Each page is checked for errors, accessibility issues, and more
+4. **Generate report** — Get a detailed report with screenshots and reproduction steps
+
+All powered by LLM-driven browser agents that adapt to your UI naturally.
+
+## Authentication
+
+Dramaturge supports multiple auth strategies:
+
+**Interactive (easiest)** — Manually log in once, Dramaturge saves the session:
 ```json
 {
-  "targetUrl": "https://your-app.example.com",
-  "appDescription": "Your app description here",
   "auth": {
     "type": "interactive",
     "loginUrl": "/login",
-    "successIndicator": "selector:[data-testid='user-menu']",
-    "stateFile": "./.dramaturge-state/user.json",
-    "manualTimeoutSeconds": 120
-  },
-  "models": {
-    "planner": "anthropic/claude-sonnet-4-6",
-    "worker": "anthropic/claude-haiku-4-5",
-    "agentMode": "cua"
-  },
-  "output": {
-    "dir": "./dramaturge-reports/default",
-    "format": "markdown"
+    "successIndicator": "selector:[data-testid='user-menu']"
   }
 }
 ```
 
-See the [Configuration Guide](#configuration) below for detailed options.
-
-### 2. Set API Keys
-
-Export your LLM provider API key:
-
-```bash
-export ANTHROPIC_API_KEY="your-key-here"
-# OR
-export OPENAI_API_KEY="your-key-here"
-# OR
-export GOOGLE_GENERATIVE_AI_API_KEY="your-key-here"
-
-# Local / free alternatives:
-# Ollama (run `ollama serve`, then opt in by exporting the base URL)
-export OLLAMA_BASE_URL="http://localhost:11434/v1"
-# …then reference models with the `ollama/` prefix, e.g. `ollama/llama3.1:8b`.
-
-# Any OpenAI-compatible endpoint (llama.cpp, vLLM, LocalAI, corporate gateways)
-export OPENAI_COMPATIBLE_BASE_URL="https://your-endpoint/v1"
-export OPENAI_COMPATIBLE_API_KEY="optional-token"
-# …then reference models with the `custom/` prefix, e.g. `custom/llama-3-70b`.
-# For inline mode (`dramaturge run <url>`), also set explicit planner/worker model names
-# so Dramaturge does not fall back to a placeholder model.
-export OPENAI_COMPATIBLE_PLANNER_MODEL="llama-3-70b"
-export OPENAI_COMPATIBLE_WORKER_MODEL="llama-3-70b"
-# If you use a config file instead, `models.planner` / `models.worker` can override these.
+**Form auth** — Provide credentials and selectors:
+```json
+{
+  "auth": {
+    "type": "form",
+    "loginUrl": "/login",
+    "fields": [
+      { "selector": "input[name='email']", "value": "${TEST_USER_EMAIL}" },
+      { "selector": "input[name='password']", "value": "${TEST_USER_PASSWORD}", "secret": true }
+    ],
+    "submit": { "selector": "button[type='submit']" },
+    "successIndicator": "selector:[data-testid='dashboard']"
+  }
+}
 ```
 
-### 3. Run Dramaturge
-
-```bash
-pnpm exec dramaturge --config ./dramaturge.config.json
-```
-
-The engine will:
-1. Bootstrap authentication (if configured)
-2. Explore your application with specialized workers
-3. Capture findings with evidence (screenshots, traces)
-4. Generate reports in the configured output directory
-
-### 4. Review Results
-
-Check the output directory for:
-- `report.md` — human-readable findings summary
-- `report.json` — structured data for CI/CD
-- `screenshots/` — visual evidence for findings
-- `generated-tests/` — Playwright test specs (if enabled)
-
-## Capturing Authentication State
-
-For `stored-state` auth mode, capture reusable session state interactively:
-
-```bash
-pnpm exec dramaturge-auth-state \
-  --url https://your-app.example.com/login \
-  --output ./.dramaturge-state/user.json \
-  --success-url https://your-app.example.com/dashboard
-```
-
-This opens a browser where you can manually log in. Once authenticated and the success URL is reached, the browser state is saved to the output file for reuse in future runs.
-
-## GitHub Action
-
-Integrate Dramaturge into your CI/CD pipeline with the composite GitHub Action.
-
-### Basic Usage
-
-Create `.github/workflows/qa.yml`:
-
-```yaml
-name: Exploratory QA
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-
-jobs:
-  dramaturge:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Dramaturge
-        uses: aram10/dramaturge@v0.4.0
-        with:
-          config: dramaturge.config.json
-          target-url: https://staging.your-app.example.com
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          fail-on-severity: major
-          post-comment: true
-```
-
-### Action Inputs
-
-| Input | Description | Default |
-|-------|-------------|---------|
-| `config` | Path to config file | `dramaturge.config.json` |
-| `target-url` | Target URL (overrides config) | — |
-| `anthropic-api-key` | Anthropic API key | — |
-| `openai-api-key` | OpenAI API key | — |
-| `google-api-key` | Google Generative AI API key | — |
-| `fail-on-severity` | Fail if findings ≥ severity (`critical`, `major`, `minor`, `trivial`) | — |
-| `upload-report` | Upload report as artifact | `true` |
-| `post-comment` | Post PR comment with summary | `true` |
-| `report-dir` | Report directory (overrides config) | — |
-| `force-json-output` | Force JSON output for CI parsing | `true` |
-| `force-headless` | Force headless browser mode | `true` |
-| `working-directory` | Working directory | `.` |
-| `node-version` | Node.js version | `20` |
-| `dramaturge-version` | Package version to install | `latest` |
-
-### Action Outputs
-
-| Output | Description |
-|--------|-------------|
-| `report-path` | Path to generated report directory |
-| `finding-count` | Total number of findings |
-| `max-severity` | Highest severity level found (`Critical`, `Major`, `Minor`, `Trivial`, or `none`) |
-
-### Advanced Example
-
-```yaml
-- name: Run Dramaturge with custom settings
-  uses: aram10/dramaturge@v0.4.0
-  with:
-    config: .dramaturge/staging.config.json
-    target-url: https://pr-${{ github.event.pull_request.number }}.preview.example.com
-    anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-    fail-on-severity: major
-    upload-report: true
-    post-comment: true
-    force-json-output: true
-    force-headless: true
-    working-directory: ./app
-    dramaturge-version: 0.4.0
-
-- name: Process findings
-  if: always()
-  run: |
-    echo "Found ${{ steps.dramaturge.outputs.finding-count }} issues"
-    echo "Max severity: ${{ steps.dramaturge.outputs.max-severity }}"
-```
-
-### Important Notes
-
-- **`force-json-output`** — Leave enabled (default `true`) when you rely on PR comments, `fail-on-severity`, or structured outputs. JSON parsing enables machine-readable CI integration. Set to `false` only if you want markdown-only reports and don't need CI features.
-- **`force-headless`** — Defaults to `true` for CI environments. Set to `false` to preserve your config's `browser.headless` value.
-- **PR Comments** — Automatically posted when `post-comment: true` and the workflow is triggered by a pull request. Existing comments are updated instead of creating duplicates.
+**OAuth, stored state, or public pages** — See [full authentication guide](#authentication-guide) below.
 
 ## Configuration
 
-The configuration file controls all aspects of Dramaturge's behavior. The bundled [`dramaturge.config.example.json`](./dramaturge.config.example.json) is the canonical starting point.
+The minimal config:
+
+```json
+{
+  "targetUrl": "https://your-app.example.com",
+  "appDescription": "Brief description of your app",
+  "auth": {
+    "type": "interactive",
+    "loginUrl": "/login",
+    "successIndicator": "selector:[data-testid='dashboard']"
+  },
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5"
+  }
+}
+```
+
+For more options, see [`dramaturge.config.example.json`](./dramaturge.config.example.json) or [Configuration Reference](#configuration-reference) below.
+
+## GitHub Action
+
+Add to `.github/workflows/qa.yml`:
+
+```yaml
+name: QA
+
+on: [pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aram10/dramaturge@v0.4.0
+        with:
+          config: dramaturge.config.json
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          fail-on-severity: major
+```
+
+Dramaturge will post a comment on your PR with findings.
+
+## What It Finds
+
+- **Browser errors** — console errors, exceptions, network failures
+- **Broken functionality** — forms that don't submit, links that 404
+- **Accessibility issues** — powered by axe-core
+- **API problems** — contract violations, auth issues, validation errors
+- **Security vulnerabilities** — XSS, injection, broken auth (opt-in)
+- **Visual regressions** — pixel-diff comparison (opt-in)
+
+Every finding includes severity level, description, screenshot, and reproduction steps.
+
+## LLM Providers
+
+Works with:
+- **Anthropic** (recommended) — Claude Sonnet/Haiku
+- **OpenAI** — GPT-4o and GPT-4o-mini
+- **Google** — Gemini models
+- **Ollama** — Free local models
+- **Custom OpenAI-compatible** — llama.cpp, vLLM, LocalAI
+
+Set the appropriate API key:
+```bash
+export ANTHROPIC_API_KEY="..."
+# or
+export OPENAI_API_KEY="..."
+# or
+export GOOGLE_GENERATIVE_AI_API_KEY="..."
+# or
+export OLLAMA_BASE_URL="http://localhost:11434/v1"
+```
+
+## Advanced Features
+
+### Framework-Aware Testing
+Dramaturge can scan your codebase to understand routes and structure:
+- **Next.js** — extracts routes, API endpoints, config
+- **Django, Rails, Express, Nuxt, Remix** — heuristic route extraction
+- **Generic** — works with any web app
+
+### API Testing
+Automatically tests observed API traffic against OpenAPI specs or discovered contracts.
+
+### Memory Across Runs
+Warm starts from previous exploration, tracks flaky pages, remembers historical findings.
+
+### Adversarial Testing (Opt-In)
+Security probes for OWASP Top 10, injection attacks, race conditions, and more.
+
+For full feature details, see [`docs/features.md`](./docs/features.md).
+
+---
+
+## Documentation
+
+- [Configuration Reference](#configuration-reference)
+- [Authentication Guide](#authentication-guide)
+- [GitHub Action Reference](#github-action-reference)
+- [Troubleshooting](#troubleshooting)
+- [Development Guide](./CONTRIBUTING.md)
+
+## Configuration Reference
 
 ### Core Settings
 
 ```json
 {
   "targetUrl": "https://your-app.example.com",
-  "appDescription": "Describe your app: what it does, main features, user roles"
+  "appDescription": "What your app does and its main features"
 }
 ```
 
-### Authentication
+### Authentication Guide
 
-Choose from five auth strategies:
+<details>
+<summary><b>Interactive (Manual Login)</b></summary>
 
-#### Interactive (Manual Login)
+Log in manually once. Dramaturge captures and reuses the session.
+
 ```json
 {
   "auth": {
@@ -297,19 +242,13 @@ Choose from five auth strategies:
   }
 }
 ```
+</details>
 
-#### Stored State (Reuse Captured Session)
-```json
-{
-  "auth": {
-    "type": "stored-state",
-    "stateFile": "./.dramaturge-state/user.json",
-    "successIndicator": "selector:[data-testid='user-menu']"
-  }
-}
-```
+<details>
+<summary><b>Form Auth (Deterministic)</b></summary>
 
-#### Form Auth (Deterministic Selectors)
+Provide credentials and selectors for automated login.
+
 ```json
 {
   "auth": {
@@ -324,18 +263,22 @@ Choose from five auth strategies:
   }
 }
 ```
+</details>
 
-#### OAuth Redirect (Multi-Step IdP)
+<details>
+<summary><b>OAuth Redirect (Multi-Step)</b></summary>
+
+Script multi-step IdP flows.
+
 ```json
 {
   "auth": {
     "type": "oauth-redirect",
     "loginUrl": "/login",
     "steps": [
-      { "type": "click", "selector": "button[data-provider='microsoft']" },
+      { "type": "click", "selector": "button[data-provider='google']" },
       { "type": "fill", "selector": "input[type='email']", "value": "${TEST_USER_EMAIL}" },
       { "type": "click", "selector": "input[type='submit']" },
-      { "type": "wait-for-selector", "selector": "input[type='password']" },
       { "type": "fill", "selector": "input[type='password']", "value": "${TEST_USER_PASSWORD}", "secret": true },
       { "type": "click", "selector": "input[type='submit']" }
     ],
@@ -343,13 +286,41 @@ Choose from five auth strategies:
   }
 }
 ```
+</details>
 
-#### None (Public Pages Only)
+<details>
+<summary><b>Stored State (Reuse Session)</b></summary>
+
+Capture state once with `dramaturge-auth-state`, then reuse:
+
+```bash
+npx dramaturge-auth-state \
+  --url https://your-app.example.com/login \
+  --output ./.dramaturge-state/user.json
+```
+
+```json
+{
+  "auth": {
+    "type": "stored-state",
+    "stateFile": "./.dramaturge-state/user.json",
+    "successIndicator": "selector:[data-testid='user-menu']"
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>None (Public Pages)</b></summary>
+
+Test public-facing pages without authentication.
+
 ```json
 {
   "auth": { "type": "none" }
 }
 ```
+</details>
 
 ### Models
 
@@ -358,90 +329,14 @@ Choose from five auth strategies:
   "models": {
     "planner": "anthropic/claude-sonnet-4-6",
     "worker": "anthropic/claude-haiku-4-5",
-    "browserOps": "anthropic/claude-haiku-4-5",
-    "agentMode": "cua",
-    "agentModes": {
-      "navigation": "dom",
-      "form": "dom",
-      "crud": "cua"
-    }
+    "agentMode": "dom"
   }
 }
 ```
 
-- **`planner`** — Model for task planning and prioritization
-- **`worker`** — Model for worker execution
-- **`browserOps`** — Model for Stagehand operations (defaults to `planner` if omitted)
-- **`agentMode`** — Global agent mode: `cua` (computer-use, sees viewport) or `dom` (DOM inspection)
-- **`agentModes`** — Per-worker-type overrides
-
-### Mission
-
-```json
-{
-  "mission": {
-    "criticalFlows": [
-      "Create a new record",
-      "Edit an existing record",
-      "Search and filter the list"
-    ],
-    "destructiveActionsAllowed": false,
-    "focusModes": ["navigation", "form", "crud", "api"]
-  }
-}
-```
-
-### API Testing
-
-```json
-{
-  "apiTesting": {
-    "enabled": true,
-    "maxEndpointsPerNode": 4,
-    "maxProbeCasesPerEndpoint": 6,
-    "unauthenticatedProbes": true,
-    "allowMutatingProbes": false
-  }
-}
-```
-
-### Adversarial Testing (Opt-In)
-
-```json
-{
-  "adversarial": {
-    "enabled": false,
-    "maxSequencesPerNode": 3,
-    "safeMode": true,
-    "includeAuthzProbes": false,
-    "includeConcurrencyProbes": false
-  }
-}
-```
-
-### Safety Policy and Prompt Trust Boundaries
-
-SafetyGuard is enabled by default. Configure URL scope and destructive-action blocking under
-`policy.safety`; destructive requests are blocked unless `mission.destructiveActionsAllowed` is
-true or `policy.safety.blockDestructiveRequests` explicitly overrides the default.
-
-```json
-{
-  "policy": {
-    "safety": {
-      "enabled": true,
-      "allowedUrlPatterns": ["/app/**"],
-      "blockedUrlPatterns": ["/admin/danger-zone/**"],
-      "destructiveActionKeywords": ["delete", "remove", "destroy", "reset all"],
-      "maxAuditEntries": 500
-    }
-  }
-}
-```
-
-Worker prompts treat target-app, repo-derived, observed-traffic, and prior-run memory content as
-untrusted data. Those sections are labeled with `BEGIN/END UNTRUSTED` delimiters so malicious
-routes, selectors, API paths, or historical finding titles cannot silently become instructions.
+- **planner** — Model for task planning (use smarter model)
+- **worker** — Model for execution (use faster/cheaper model)
+- **agentMode** — `"dom"` (faster, cheaper) or `"cua"` (sees viewport)
 
 ### Budget & Exploration
 
@@ -450,13 +345,7 @@ routes, selectors, API paths, or historical finding titles cannot silently becom
   "budget": {
     "globalTimeLimitSeconds": 900,
     "maxStepsPerTask": 40,
-    "maxFrontierSize": 200,
     "maxStateNodes": 50
-  },
-  "exploration": {
-    "maxAreasToExplore": 10,
-    "stepsPerArea": 40,
-    "totalTimeout": 900
   }
 }
 ```
@@ -466,16 +355,60 @@ routes, selectors, API paths, or historical finding titles cannot silently becom
 ```json
 {
   "output": {
-    "dir": "./dramaturge-reports/default",
+    "dir": "./dramaturge-reports",
     "format": "markdown",
     "screenshots": true
   }
 }
 ```
 
-- **`format`** — `"markdown"`, `"json"`, or `"both"`
+Formats: `"markdown"`, `"json"`, or `"both"`
 
-### Memory
+### Optional Features
+
+<details>
+<summary><b>API Testing</b></summary>
+
+```json
+{
+  "apiTesting": {
+    "enabled": true,
+    "maxEndpointsPerNode": 4,
+    "unauthenticatedProbes": true
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Adversarial Testing</b></summary>
+
+```json
+{
+  "adversarial": {
+    "enabled": true,
+    "safeMode": true
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Visual Regression</b></summary>
+
+```json
+{
+  "visualRegression": {
+    "enabled": true,
+    "baselineDir": "./.dramaturge/visual-baselines",
+    "diffPixelRatioThreshold": 0.01
+  }
+}
+```
+</details>
+
+<details>
+<summary><b>Memory (Warm Start)</b></summary>
 
 ```json
 {
@@ -486,182 +419,100 @@ routes, selectors, API paths, or historical finding titles cannot silently becom
   }
 }
 ```
+</details>
 
-### Visual Regression
+For complete config schema, see [`dramaturge.config.example.json`](./dramaturge.config.example.json).
 
-```json
-{
-  "visualRegression": {
-    "enabled": false,
-    "baselineDir": "./.dramaturge/visual-baselines",
-    "diffPixelRatioThreshold": 0.01,
-    "maskSelectors": []
-  }
-}
+## GitHub Action Reference
+
+### Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `config` | Path to config file | `dramaturge.config.json` |
+| `target-url` | Override target URL | — |
+| `anthropic-api-key` | Anthropic API key | — |
+| `openai-api-key` | OpenAI API key | — |
+| `fail-on-severity` | Fail if findings ≥ severity | — |
+| `post-comment` | Post PR comment | `true` |
+| `upload-report` | Upload as artifact | `true` |
+
+### Outputs
+
+| Output | Description |
+|--------|-------------|
+| `report-path` | Path to report directory |
+| `finding-count` | Number of findings |
+| `max-severity` | Highest severity found |
+
+### Example
+
+```yaml
+- uses: aram10/dramaturge@v0.4.0
+  with:
+    config: dramaturge.config.json
+    anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+    fail-on-severity: major
+    post-comment: true
 ```
-
-First run captures baselines; subsequent runs compare and emit findings when threshold is exceeded.
-
-### Repository Context (Framework-Aware)
-
-```json
-{
-  "repoContext": {
-    "root": "./host-app",
-    "framework": "auto"
-  }
-}
-```
-
-- **`framework`** — `"auto"`, `"nextjs"`, `"django"`, `"rails"`, `"express"`, `"nuxt"`, `"remix"`, or `"generic"`
-
-### Browser
-
-```json
-{
-  "browser": {
-    "headless": false
-  }
-}
-```
-
-### LLM Timeouts
-
-```json
-{
-  "llm": {
-    "requestTimeoutMs": 30000
-  }
-}
-```
-
-### Auto-Capture (Browser Telemetry)
-
-```json
-{
-  "autoCapture": {
-    "consoleErrors": true,
-    "consoleWarnings": false,
-    "networkErrors": true,
-    "networkErrorMinStatus": 400
-  }
-}
-```
-
-Console warnings are **off by default** to reduce noise. Enable for broader telemetry.
-
-## Architecture
-
-Dramaturge uses a **frontier-based exploration loop**:
-
-1. **Planner** — generates tasks from state graph nodes, prioritizes by strategic value
-2. **Frontier Queue** — maintains pending tasks sorted by priority
-3. **Workers** — execute tasks via Stagehand agents with typed tools (`log_finding`, `take_screenshot`, etc.)
-4. **Graph Expansion** — discovered pages/routes become new nodes, edges capture navigation paths
-5. **Repeat** — until budget exhausted or frontier empty
-
-### Worker Types
-
-| Type | Purpose | Default Mode |
-|------|---------|--------------|
-| `navigation` | Discover routes, follow links | `dom` |
-| `form` | Fill forms, test validation | `dom` |
-| `crud` | Create, read, update operations | `cua` |
-| `api` | Replay traffic, validate contracts | — |
-| `adversarial` | Security probes, edge cases (opt-in) | `cua` |
-
-### Agent Modes
-
-- **`cua`** (computer-use agent) — sees viewport screenshots, useful for visual interactions
-- **`dom`** (DOM inspection) — sees DOM tree, faster and cheaper for form/navigation tasks
-
-### Multi-Agent Protocol (A2A)
-
-Optional advanced orchestration with:
-- **Coordinator** — delegates tasks to specialized roles
-- **Blackboard** — shared state for cross-agent communication
-- **MessageBus** — inter-agent messaging
-- **Agent roles** — Scout, Tester, Security, Reviewer, Reporter
-
-Enable with `a2a` config section (not shown in example config; see source code for details).
-
-## Support Matrix
-
-| Target Type | Support Level |
-|-------------|---------------|
-| Browser-only target (no repo) | ✅ Fully supported |
-| Generic web app with repo | ✅ Heuristic extraction of routes/selectors/API hints |
-| Next.js with repo | ✅ **Strongest support** — route analysis, API detection |
-| Django, Rails, Express, Nuxt, Remix | ✅ Framework-aware adapters |
-| External OpenAPI spec | ✅ `.json`, `.jsonc`, `.yaml`, `.yml` |
-| GraphQL contracts | ⚠️ Not first-class yet |
-| Destructive operations | ⚠️ Opt-in only (`destructiveActionsAllowed`, `adversarial.safeMode`) |
 
 ## Troubleshooting
 
 ### "Cannot find module" errors
 
-Ensure Playwright browsers are installed:
+Install Playwright browsers:
 ```bash
-pnpm exec playwright install chromium
+npx playwright install chromium
 ```
 
 ### Authentication failures
 
-- **Interactive/stored-state** — verify `successIndicator` selector matches your authenticated page
-- **Form auth** — check selector paths and environment variable interpolation (`${VAR}`)
-- **OAuth redirect** — ensure all step selectors are correct; add `wait-for-selector` between steps if needed
+Check that your `successIndicator` selector matches an element on the authenticated page.
 
-### "No findings" but issues exist
+### No findings but issues exist
 
-- Increase `budget.globalTimeLimitSeconds` or `exploration.totalTimeout` for longer runs
-- Check `mission.focusModes` includes relevant worker types
-- Enable `adversarial` or `apiTesting` if needed
-- Review `memory.dir` for flaky page tracking (may skip unstable routes)
+Increase exploration time:
+```json
+{
+  "budget": {
+    "globalTimeLimitSeconds": 1800
+  }
+}
+```
 
 ### High LLM costs
 
-- Use cheaper models for `worker` and `browserOps`: `anthropic/claude-haiku-4-5`
-- Reduce `budget.maxStepsPerTask` or `exploration.stepsPerArea`
-- Disable expensive features: `adversarial.enabled: false`, `apiTesting.enabled: false`
-- Check `coverage/cost-tracker.ts` for per-worker token usage in reports
-
-### Visual regression false positives
-
-- Increase `visualRegression.diffPixelRatioThreshold` (default `0.01` = 1%)
-- Add `maskSelectors` for dynamic content (timestamps, ads, user avatars)
-
-### GitHub Action not posting PR comments
-
-- Ensure `force-json-output: true` (default) — PR comments require `report.json`
-- Check workflow has `pull_request` trigger
-- Verify GitHub token has `write` permission for PR comments
+Use cheaper models:
+```json
+{
+  "models": {
+    "planner": "anthropic/claude-haiku-4-5",
+    "worker": "anthropic/claude-haiku-4-5"
+  }
+}
+```
 
 ## Development
 
-Contributing to Dramaturge? See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
-
 ```bash
-corepack enable          # activate pnpm
-pnpm install             # install dependencies
-pnpm test                # run tests (vitest)
-pnpm build               # compile TypeScript → dist/
-pnpm run verify:standalone  # smoke-check the packaged tarball
+corepack enable
+pnpm install
+pnpm test
+pnpm build
 ```
 
-This repository uses `pnpm-lock.yaml` as the source-of-truth lockfile for development and
-CI. Do not add npm/yarn lockfiles unless the package-manager policy changes intentionally.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-Dramaturge is licensed under the [GNU General Public License v3.0](./LICENSE).
+Apache License 2.0 — see [LICENSE](./LICENSE).
 
 ## Links
 
-- **Repository**: [https://github.com/aram10/dramaturge](https://github.com/aram10/dramaturge)
-- **Issues**: [https://github.com/aram10/dramaturge/issues](https://github.com/aram10/dramaturge/issues)
-- **Package**: [@aram10/dramaturge on GitHub Packages](https://github.com/aram10/dramaturge/pkgs/npm/dramaturge)
+- [Repository](https://github.com/aram10/dramaturge)
+- [Issues](https://github.com/aram10/dramaturge/issues)
+- [Changelog](./CHANGELOG.md)
 
 ---
 
-**Built with**: TypeScript · Node.js · Playwright · Stagehand · Zod · Vitest · React/Ink
+**Built with TypeScript, Node.js, Playwright, and Stagehand**
