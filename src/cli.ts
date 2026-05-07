@@ -34,6 +34,7 @@ export interface ParsedCliArgs {
     | 'doctor'
     | 'init'
     | 'setup'
+    | 'auth'
     | 'auto-config'
     | 'findings'
     | 'baselines'
@@ -68,6 +69,10 @@ export interface ParsedCliArgs {
   repoPath?: string;
   /** --no-scan flag for setup: disables repo scan entirely */
   noScan?: true;
+  /** Subcommand after auth (e.g. "capture", "list") */
+  authSubcommand?: string;
+  /** --profile flag for auth capture */
+  authProfile?: string;
   /** Subcommand after findings/baselines/memory (e.g. "list", "suppress") */
   triageSubcommand?: string;
   /** Positional args for triage subcommands */
@@ -92,6 +97,7 @@ const HELP_TEXT = `Usage: dramaturge <command> [options]
 Commands:
   run [url]            Run exploratory QA (default command)
   setup                Interactive first-run onboarding wizard
+  auth <sub>           Capture or list auth profiles (capture | list)
   init                 Generate a config file from a template
   auto-config          AI-assisted config generation from repo context
   doctor               Check environment and configuration
@@ -128,6 +134,11 @@ Setup options:
   --repo <path>        Scan this repo path for routes, endpoints, and auth hints
   --no-scan            Skip repo scanning (default is auto-scan when in a git repo)
 
+Auth options:
+  --config <path>      Config file to read the login URL from (default: dramaturge.config.json)
+  --profile <name>     Profile name for the saved state file (default: user)
+  --url <url>          Override login URL (skips reading from config)
+
 Triage options:
   --suppressed         findings list: only show suppressed findings
   --reason <text>      findings suppress: reason text recorded with the suppression
@@ -141,6 +152,8 @@ Examples:
   dramaturge run https://app.example.com --preset security  # Security-focused scan
   dramaturge run https://app.example.com --focus api --focus adversarial  # Ad-hoc focus mix
   dramaturge setup                                     # Interactive onboarding
+  dramaturge auth capture --profile admin               # Capture storage state to .dramaturge-state/admin.json
+  dramaturge auth list                                  # List saved profiles in .dramaturge-state
   dramaturge init --template minimal                   # Generate minimal config
   dramaturge auto-config --repo .                      # Generate config from repo context
   dramaturge doctor                                    # Check environment
@@ -177,6 +190,7 @@ const KNOWN_COMMANDS = new Set([
   'doctor',
   'init',
   'setup',
+  'auth',
   'auto-config',
   'help',
   'findings',
@@ -213,6 +227,7 @@ interface CliParseState {
   triageSuppressedOnly?: boolean;
   triageAll?: boolean;
   triageReason?: string;
+  authSubcommand?: string;
 }
 
 type BoolFlagSetter = (s: CliParseState) => void;
@@ -443,6 +458,14 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       continue;
     }
 
+    if (state.command === 'auth') {
+      if (!state.authSubcommand) {
+        state.authSubcommand = arg;
+        continue;
+      }
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+
     throw new Error(`Unknown argument: ${arg}`);
   }
 
@@ -469,6 +492,12 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     initOutput: state.initOutput,
     repoPath: state.repoPath,
     noScan: state.noScan,
+    ...(state.command === 'auth'
+      ? {
+          authSubcommand: state.authSubcommand,
+          authProfile: state.profile,
+        }
+      : {}),
     ...(TRIAGE_COMMANDS.has(state.command)
       ? {
           triageSubcommand: state.triageSubcommand,
@@ -517,6 +546,9 @@ export async function runCli(
 
       case 'setup':
         return await runSetupCommand(dependencies, parsedArgs);
+
+      case 'auth':
+        return await runAuthCommand(dependencies, parsedArgs);
 
       case 'auto-config':
         return await runAutoConfigCommand(dependencies, parsedArgs);
@@ -605,6 +637,55 @@ async function runSetupCommand(
       },
       {
         repoPath: parsedArgs.noScan ? false : parsedArgs.repoPath,
+      }
+    );
+  } finally {
+    rl.close();
+  }
+}
+
+async function runAuthCommand(
+  dependencies: CliDependencies,
+  parsedArgs: ParsedCliArgs
+): Promise<number> {
+  const { runAuthCommand: runAuthCommandInner } = await import('./commands/auth.js');
+  const readline = await import('node:readline');
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const prompt = (question: string): Promise<string> =>
+    new Promise((resolve) => {
+      rl.question(`  ${question}: `, (answer) => resolve(answer.trim()));
+    });
+
+  const confirm = (question: string, defaultValue = false): Promise<boolean> =>
+    new Promise((resolve) => {
+      const suffix = defaultValue ? ' [Y/n]' : ' [y/N]';
+      rl.question(`  ${question}${suffix}: `, (answer) => {
+        const trimmed = answer.trim().toLowerCase();
+        if (trimmed === '') resolve(defaultValue);
+        else resolve(trimmed === 'y' || trimmed === 'yes');
+      });
+    });
+
+  try {
+    return await runAuthCommandInner(
+      {
+        subcommand: parsedArgs.authSubcommand,
+        configPath: parsedArgs.configPath,
+        profile: parsedArgs.authProfile,
+        url: parsedArgs.url,
+      },
+      {
+        log: dependencies.log,
+        error: dependencies.error,
+        cwd: process.cwd(),
+        prompt,
+        confirm,
+        loadConfig: dependencies.loadConfig,
       }
     );
   } finally {

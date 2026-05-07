@@ -108,6 +108,36 @@ Dramaturge supports multiple auth strategies:
 
 **OAuth, stored state, or public pages** — See [full authentication guide](#authentication-guide) below.
 
+## Capturing Authentication State
+
+The easiest way to capture auth state is via the setup wizard:
+
+```bash
+pnpm exec dramaturge setup
+```
+
+The wizard can open a browser for manual sign-in, save the resulting storage state to `.dramaturge-state/<profile>.json`, and update your generated config to use `stored-state` auth.
+
+To capture auth state later (outside the wizard):
+
+```bash
+# Read login URL from dramaturge.config.json (default)
+pnpm exec dramaturge auth capture --profile user
+
+# Use a different config file
+pnpm exec dramaturge auth capture --config /path/to/dramaturge.config.json --profile admin
+
+# Specify the login URL directly (no config required)
+pnpm exec dramaturge auth capture --url https://my-app.example.com/login --profile user
+
+pnpm exec dramaturge auth list
+```
+
+`dramaturge auth capture` opens a browser at the login URL and asks you to confirm whether login succeeded before saving the state. When using `--config`, the state file is written alongside the config file; when using `--url`, it is written to `.dramaturge-state/<profile>.json` in the current directory.
+
+Note: the legacy helper binary `pnpm exec dramaturge-auth-state` is deprecated in favor of `dramaturge auth capture`.
+
+
 ## Configuration
 
 The minimal config:
@@ -291,12 +321,12 @@ Script multi-step IdP flows.
 <details>
 <summary><b>Stored State (Reuse Session)</b></summary>
 
-Capture state once with `dramaturge-auth-state`, then reuse:
+Capture state once with `dramaturge auth capture`, then reuse:
 
 ```bash
-npx dramaturge-auth-state \
+npx dramaturge auth capture \
   --url https://your-app.example.com/login \
-  --output ./.dramaturge-state/user.json
+  --profile user
 ```
 
 ```json
