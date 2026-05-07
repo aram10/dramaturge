@@ -5,6 +5,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 import { readTextFileWithinLimit } from './file-utils.js';
+import { isCallbackRoute, isLoginRoute, trimTrailingSlashes } from './route-utils.js';
 
 const SOURCE_EXTENSIONS = new Set(['.py', '.html']);
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -123,7 +124,7 @@ function convertPathParams(route: string): string {
 }
 
 function normalizeRoute(raw: string): string {
-  let cleaned = raw.replace(/\/+$/, '');
+  let cleaned = trimTrailingSlashes(raw);
   if (cleaned && !cleaned.startsWith('/')) {
     cleaned = `/${cleaned}`;
   }
@@ -242,10 +243,10 @@ export function scanFastApiRepo(root: string): RepoHints {
         }
 
         // Auth-related routes
-        if (/(^|\/)(login|signin|sign-in)(\/|$)/i.test(route)) {
+        if (isLoginRoute(route)) {
           loginRoutes.push(route);
         }
-        if (/(^|\/)(callback|oauth|sso)(\/|$)/i.test(route)) {
+        if (isCallbackRoute(route)) {
           callbackRoutes.push(route);
         }
       }

@@ -5,6 +5,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiEndpointHint, ExpectedHttpNoise, RepoHints } from './types.js';
 import { readTextFileWithinLimit } from './file-utils.js';
+import { isCallbackRoute, isLoginRoute, trimTrailingSlashes } from './route-utils.js';
 
 const ROUTE_FILE_RE = /\.(?:tsx?|jsx?)$/;
 const SELECTOR_RE = /\b(id|data-testid)\s*=\s*["'`]([^"'`]+)["'`]/g;
@@ -56,7 +57,7 @@ function uniqueSorted(values: string[]): string[] {
 }
 
 function normalizeRoute(routePath: string): string {
-  const normalized = routePath.replace(/\/+$/g, '');
+  const normalized = trimTrailingSlashes(routePath);
   return normalized || '/';
 }
 
@@ -259,8 +260,8 @@ export function scanRemixRepo(root: string): RepoHints {
   );
 
   // Auth hints
-  const loginRoutes = routes.filter((route) => /(^|\/)(login|signin|sign-in)(\/|$)/i.test(route));
-  const callbackRoutes = routes.filter((route) => /(^|\/)(callback|oauth|sso)(\/|$)/i.test(route));
+  const loginRoutes = routes.filter(isLoginRoute);
+  const callbackRoutes = routes.filter(isCallbackRoute);
 
   // Expected HTTP noise from route files with 401/403
   const expectedHttpNoise: ExpectedHttpNoise[] = [];
