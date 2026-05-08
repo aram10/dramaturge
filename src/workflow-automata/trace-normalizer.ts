@@ -159,12 +159,20 @@ function buildStateIndex(
   return byState;
 }
 
+function buildActionLabel(action: ReplayableAction, redactValues: boolean): string {
+  if (!action.value) {
+    return action.summary;
+  }
+  const displayValue = redactValues
+    ? String(redactSensitiveValue(action.value))
+    : String(action.value);
+  return `${action.summary} ${displayValue}`;
+}
+
 function createWorkflowAction(action: ReplayableAction, redactValues: boolean): WorkflowAction {
   return {
     kind: mapActionKind(action),
-    label: action.value
-      ? `${action.summary} ${redactValues ? String(redactSensitiveValue(action.value)) : String(action.value)}`
-      : action.summary,
+    label: buildActionLabel(action, redactValues),
     normalizedLabel: normalizeLabel(action.summary),
     destructive: isDestructive(action.summary),
     selectorHash: selectorHash(action.selector),

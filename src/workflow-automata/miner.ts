@@ -94,6 +94,7 @@ function createStateMap(
       existing.sourceNodeIds = Array.from(new Set([...existing.sourceNodeIds, node.id]));
       existing.observationCount += Math.max(node.timesVisited, 1);
       if (node.firstSeenAt > existing.lastObservedAt) {
+        // ISO 8601 timestamps are lexicographically sortable, so string comparison is correct here.
         existing.lastObservedAt = node.firstSeenAt;
       }
       existing.entityHints = Array.from(
@@ -196,7 +197,9 @@ function createTransition(input: {
     apiEndpointRefs,
   } = input;
   const transition: WorkflowTransition = {
-    id: `wf-transition-${createHash('sha256').update(tKey).digest('hex').slice(0, 12)}`,
+    // Use 16 hex chars (64 bits) — collision probability is negligible for the expected
+    // number of transitions per run (well below 2^32 birthday-bound threshold).
+    id: `wf-transition-${createHash('sha256').update(tKey).digest('hex').slice(0, 16)}`,
     fromStateId: fromState.id,
     toStateId,
     action: event.abstractAction,

@@ -147,6 +147,8 @@ function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined
   return current;
 }
 
+// Minimum number of new graph nodes required to trigger a re-mining pass. This avoids
+// O(N) mining work on every planner-loop iteration when the graph is growing slowly.
 const WORKFLOW_AUTOMATA_MINE_NODE_THRESHOLD = 5;
 
 export function updateWorkflowAutomataRuntime(ctx: EngineContext): void {
@@ -156,6 +158,9 @@ export function updateWorkflowAutomataRuntime(ctx: EngineContext): void {
   }
   // Gate: only re-mine if the graph has grown enough since the last mining pass.
   const nodeCount = ctx.graph.nodeCount();
+  // When lastMinedNodeCount is undefined (first call) we use a value that is exactly
+  // THRESHOLD below zero so that nodeCount >= threshold triggers the first mining pass
+  // as soon as there is at least one node.
   const lastMinedNodeCount =
     ctx.workflowAutomata?.lastMinedNodeCount ?? -WORKFLOW_AUTOMATA_MINE_NODE_THRESHOLD;
   if (nodeCount > 0 && nodeCount < lastMinedNodeCount + WORKFLOW_AUTOMATA_MINE_NODE_THRESHOLD) {
