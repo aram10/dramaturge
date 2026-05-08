@@ -1,0 +1,32 @@
+{
+  "targetUrl": "https://todomvc.com/examples/react/dist/",
+  "appDescription": "TodoMVC React implementation - a simple todo list application with add, edit, complete, and delete functionality. Users can mark todos as complete, filter by status (all/active/completed), and clear completed items.",
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "dom",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "dom"
+    }
+  },
+
+  "budget": {
+    "globalTimeLimitSeconds": 300,
+    "maxStepsPerTask": 40,
+    "maxStateNodes": 20
+  },
+
+  "policy": {
+    "safety": {
+      "allowedUrlPatterns": ["^https://todomvc\\.com/"]
+    }
+  },
+
+  "output": {
+    "dir": "./benchmarks/results/todomvc-react",
+    "format": ["markdown", "json"]
+  }
+}

@@ -19,6 +19,7 @@ import {
 import { runDoctor } from './commands/doctor.js';
 import { runInit, type InitTemplate } from './commands/init.js';
 import { runTriageCommand } from './commands/triage.js';
+import { runBenchmarkCommand as runBenchmarkCommandImpl } from './commands/benchmark.js';
 import type {
   ErrorEvent,
   FindingEvent,
@@ -39,6 +40,7 @@ export interface ParsedCliArgs {
     | 'findings'
     | 'baselines'
     | 'memory'
+    | 'benchmark'
     | 'help';
   configPath?: string;
   resumeDir?: string;
@@ -83,6 +85,12 @@ export interface ParsedCliArgs {
   triageAll?: boolean;
   /** --reason <text> for findings suppress */
   triageReason?: string;
+  /** Optional app ID for benchmark command */
+  benchmarkAppId?: string;
+  /** --save flag for benchmark command */
+  benchmarkSave?: boolean;
+  /** --output flag for benchmark command */
+  benchmarkOutput?: string;
 }
 
 export interface CliDependencies {
@@ -104,6 +112,7 @@ Commands:
   findings <sub>       Triage findings in memory (list | suppress | unsuppress)
   baselines <sub>      Manage visual-regression baselines (list | approve)
   memory stats         Show memory store statistics
+  benchmark [app-id]   Run signal-to-noise benchmarks against well-known apps
 
 Run options:
   --config <path>      Path to config file (default: dramaturge.config.json)
@@ -143,6 +152,10 @@ Triage options:
   --suppressed         findings list: only show suppressed findings
   --reason <text>      findings suppress: reason text recorded with the suppression
   --all                baselines approve: approve every baseline (delete all)
+
+Benchmark options:
+  --save               Save benchmark results to disk
+  --output <dir>       Output directory for benchmark results (default: ./benchmarks/results)
 
 Examples:
   dramaturge run https://my-app.example.com           # Quick run, no config needed
@@ -196,6 +209,7 @@ const KNOWN_COMMANDS = new Set([
   'findings',
   'baselines',
   'memory',
+  'benchmark',
 ]);
 const TRIAGE_COMMANDS = new Set(['findings', 'baselines', 'memory']);
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'openrouter', 'github']);
@@ -228,6 +242,9 @@ interface CliParseState {
   triageAll?: boolean;
   triageReason?: string;
   authSubcommand?: string;
+  benchmarkAppId?: string;
+  benchmarkSave?: boolean;
+  benchmarkOutput?: string;
 }
 
 type BoolFlagSetter = (s: CliParseState) => void;
@@ -268,6 +285,12 @@ const BOOLEAN_FLAG_HANDLERS = new Map<string, BoolFlagSetter>([
     '--all',
     (s) => {
       s.triageAll = true;
+    },
+  ],
+  [
+    '--save',
+    (s) => {
+      s.benchmarkSave = true;
     },
   ],
 ]);
@@ -334,7 +357,11 @@ const VALUE_FLAG_HANDLERS = new Map<string, ValueFlagHandler>([
   [
     '--output',
     (s, v) => {
-      s.initOutput = v;
+      if (s.command === 'benchmark') {
+        s.benchmarkOutput = v;
+      } else {
+        s.initOutput = v;
+      }
     },
   ],
   [
@@ -466,6 +493,15 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       throw new Error(`Unknown argument: ${arg}`);
     }
 
+    // Positional arg for benchmark command (app ID)
+    if (state.command === 'benchmark') {
+      if (!state.benchmarkAppId) {
+        state.benchmarkAppId = arg;
+        continue;
+      }
+      throw new Error(`Unknown argument: ${arg}`);
+    }
+
     throw new Error(`Unknown argument: ${arg}`);
   }
 
@@ -505,6 +541,13 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
           triageSuppressedOnly: state.triageSuppressedOnly,
           triageAll: state.triageAll,
           triageReason: state.triageReason,
+        }
+      : {}),
+    ...(state.command === 'benchmark'
+      ? {
+          benchmarkAppId: state.benchmarkAppId,
+          benchmarkSave: state.benchmarkSave,
+          benchmarkOutput: state.benchmarkOutput,
         }
       : {}),
   };
@@ -574,6 +617,9 @@ export async function runCli(
           },
           { log: dependencies.log, error: dependencies.error, cwd: process.cwd() }
         );
+
+      case 'benchmark':
+        return await runBenchmarkCommand(dependencies, parsedArgs);
 
       default:
         dependencies.error(`Unknown command: ${parsedArgs.command}`);
@@ -751,6 +797,23 @@ async function runAutoConfigCommand(
   } finally {
     rl.close();
   }
+}
+
+async function runBenchmarkCommand(
+  dependencies: CliDependencies,
+  parsedArgs: ParsedCliArgs
+): Promise<number> {
+  return runBenchmarkCommandImpl(
+    {
+      appId: parsedArgs.benchmarkAppId,
+      save: parsedArgs.benchmarkSave,
+      outputDir: parsedArgs.benchmarkOutput,
+    },
+    {
+      log: dependencies.log,
+      error: dependencies.error,
+    }
+  );
 }
 
 async function runRunCommand(

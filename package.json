@@ -41,7 +41,8 @@
     "dist",
     "README.md",
     "dramaturge.config.example.json",
-    "dramaturge.config.minimal.json"
+    "dramaturge.config.minimal.json",
+    "benchmarks"
   ],
   "engines": {
     "node": ">=20"
@@ -59,6 +60,7 @@
     "prepack": "pnpm run build && pnpm run test",
     "test": "vitest run",
     "test:watch": "vitest",
+    "benchmark": "node dist/cli.js benchmark",
     "verify:standalone": "node scripts/verify-standalone.mjs",
     "prepare": "husky",
     "lint": "eslint .",

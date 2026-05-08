@@ -1,0 +1,33 @@
+{
+  "targetUrl": "https://demo.realworld.io/",
+  "appDescription": "RealWorld Conduit - a Medium.com clone with articles, comments, tags, and user profiles. Users can browse articles, sign up/login, create and edit articles, comment on articles, favorite articles, and follow other users. The app includes pagination, filtering by tags, and user feeds.",
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "dom",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "dom",
+      "api": "dom"
+    }
+  },
+
+  "budget": {
+    "globalTimeLimitSeconds": 600,
+    "maxStepsPerTask": 40,
+    "maxStateNodes": 50
+  },
+
+  "policy": {
+    "safety": {
+      "allowedUrlPatterns": ["^https://demo\\.realworld\\.io/"]
+    }
+  },
+
+  "output": {
+    "dir": "./benchmarks/results/realworld-demo",
+    "format": ["markdown", "json"]
+  }
+}

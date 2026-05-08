@@ -1,0 +1,32 @@
+{
+  "targetUrl": "https://todomvc.com/examples/vue/",
+  "appDescription": "TodoMVC Vue implementation - a simple todo list application. Features include adding new todos, marking todos as complete, editing existing todos, deleting todos, and filtering by completion status.",
+
+  "models": {
+    "planner": "anthropic/claude-sonnet-4-6",
+    "worker": "anthropic/claude-haiku-4-5",
+    "agentMode": "dom",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "dom"
+    }
+  },
+
+  "budget": {
+    "globalTimeLimitSeconds": 300,
+    "maxStepsPerTask": 40,
+    "maxStateNodes": 20
+  },
+
+  "policy": {
+    "safety": {
+      "allowedUrlPatterns": ["^https://todomvc\\.com/"]
+    }
+  },
+
+  "output": {
+    "dir": "./benchmarks/results/todomvc-vue",
+    "format": ["markdown", "json"]
+  }
+}
