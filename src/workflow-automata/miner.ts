@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { ExplorationLedger, StateEdge, StateNode } from '../types.js';
-import { createWorkflowState, workflowStateKeyId } from './state-abstractor.js';
 import { detectWorkflowAnomalies } from './anomaly-detector.js';
+import { createWorkflowState, workflowStateKeyId } from './state-abstractor.js';
 import { normalizeWorkflowTrace } from './trace-normalizer.js';
 import type {
   WorkflowAutomaton,
@@ -96,6 +96,201 @@ function createStateMap(
   return { states: [...statesById.values()], statesByNodeId };
 }
 
+function buildApiRefs(event: ReturnType<typeof normalizeWorkflowTrace>['events'][number]): {
+  apiStatusClasses: string[];
+  apiEndpointRefs: string[];
+} {
+  const apiStatusClasses = Array.from(
+    new Set((event.apiSignals ?? []).map((signal) => signal.statusClass))
+  ).filter((value) => value !== '0xx');
+  const apiEndpointRefs = Array.from(
+    new Set(
+      (event.apiSignals ?? []).map(
+        (signal) => `${signal.method.toUpperCase()} ${signal.route} [${signal.statusClass}]`
+      )
+    )
+  );
+  return { apiStatusClasses, apiEndpointRefs };
+}
+
+function transitionKey(
+  fromStateId: string,
+  toStateId: string,
+  normalizedAction: string,
+  outcome: string,
+  authProfile: string | undefined
+): string {
+  return [fromStateId, toStateId, normalizedAction, outcome, authProfile ?? 'none'].join('::');
+}
+
+function mergeTransitionObservation(
+  transition: WorkflowTransition,
+  event: ReturnType<typeof normalizeWorkflowTrace>['events'][number],
+  apiStatusClasses: string[],
+  apiEndpointRefs: string[]
+): void {
+  transition.observationCount += 1;
+  if (event.outcome === 'success') {
+    transition.successCount += 1;
+  } else if (event.outcome !== 'unknown') {
+    transition.failureCount += 1;
+  }
+  transition.lastObservedAt = event.timestamp;
+  transition.evidenceIds = Array.from(new Set([...transition.evidenceIds, ...event.evidenceIds]));
+  transition.findingRefs = Array.from(new Set([...transition.findingRefs, ...event.findingRefs]));
+  transition.sourceEdgeIds = Array.from(
+    new Set([...transition.sourceEdgeIds, ...(event.sourceEdgeId ? [event.sourceEdgeId] : [])])
+  );
+  transition.sourceActionIds = Array.from(
+    new Set([
+      ...transition.sourceActionIds,
+      ...(event.sourceActionId ? [event.sourceActionId] : []),
+    ])
+  );
+  transition.apiEndpointRefs = Array.from(
+    new Set([...(transition.apiEndpointRefs ?? []), ...apiEndpointRefs])
+  );
+  if (!transition.guard?.apiStatusClass && apiStatusClasses.length === 1) {
+    transition.guard = {
+      ...transition.guard,
+      apiStatusClass: apiStatusClasses[0] as '2xx' | '3xx' | '4xx' | '5xx',
+    };
+  }
+  transition.confidence = transitionConfidence(transition);
+}
+
+function createTransition(input: {
+  fromState: WorkflowState;
+  toStateId: string;
+  authProfile: string | undefined;
+  event: ReturnType<typeof normalizeWorkflowTrace>['events'][number];
+  apiStatusClasses: string[];
+  apiEndpointRefs: string[];
+}): WorkflowTransition {
+  const { fromState, toStateId, authProfile, event, apiStatusClasses, apiEndpointRefs } = input;
+  const transition: WorkflowTransition = {
+    id: `wf-transition-${fromState.id}-${toStateId}-${event.abstractAction.normalizedLabel}`,
+    fromStateId: fromState.id,
+    toStateId,
+    action: event.abstractAction,
+    outcome: event.outcome,
+    guard: {
+      authProfile,
+      requiresConfirmation: event.abstractAction.destructive || undefined,
+      requiresValidForm:
+        fromState.kind === 'form' || fromState.kind === 'wizard-step' ? true : undefined,
+      apiStatusClass:
+        apiStatusClasses.length === 1
+          ? (apiStatusClasses[0] as '2xx' | '3xx' | '4xx' | '5xx')
+          : undefined,
+    },
+    sourceEdgeIds: event.sourceEdgeId ? [event.sourceEdgeId] : [],
+    sourceActionIds: event.sourceActionId ? [event.sourceActionId] : [],
+    evidenceIds: [...event.evidenceIds],
+    findingRefs: [...event.findingRefs],
+    apiEndpointRefs,
+    observationCount: 1,
+    successCount: event.outcome === 'success' ? 1 : 0,
+    failureCount: event.outcome !== 'success' && event.outcome !== 'unknown' ? 1 : 0,
+    confidence: 0.35,
+    firstObservedAt: event.timestamp,
+    lastObservedAt: event.timestamp,
+  };
+  transition.confidence = transitionConfidence(transition);
+  return transition;
+}
+
+function buildTransitionMap(
+  statesByNodeId: Map<string, WorkflowState>,
+  normalized: ReturnType<typeof normalizeWorkflowTrace>,
+  authProfile: string | undefined
+): Map<string, WorkflowTransition> {
+  const transitionsById = new Map<string, WorkflowTransition>();
+
+  for (const event of normalized.events) {
+    if (!event.sourceNodeId || !event.abstractStateBefore || !event.abstractStateAfter) {
+      continue;
+    }
+    const fromState = statesByNodeId.get(event.sourceNodeId);
+    if (!fromState) {
+      continue;
+    }
+    const toStateId = workflowStateKeyId(event.abstractStateAfter);
+    const key = transitionKey(
+      fromState.id,
+      toStateId,
+      event.abstractAction.normalizedLabel,
+      event.outcome,
+      authProfile
+    );
+    const { apiStatusClasses, apiEndpointRefs } = buildApiRefs(event);
+    const existing = transitionsById.get(key);
+    if (existing) {
+      mergeTransitionObservation(existing, event, apiStatusClasses, apiEndpointRefs);
+      continue;
+    }
+    transitionsById.set(
+      key,
+      createTransition({
+        fromState,
+        toStateId,
+        authProfile,
+        event,
+        apiStatusClasses,
+        apiEndpointRefs,
+      })
+    );
+  }
+
+  return transitionsById;
+}
+
+function buildMetrics(
+  states: WorkflowState[],
+  transitions: WorkflowTransition[],
+  lowConfidenceThreshold: number,
+  comparison: WorkflowAutomatonComparison | undefined
+): WorkflowAutomaton['metrics'] {
+  return {
+    stateCount: states.length,
+    transitionCount: transitions.length,
+    anomalyCount: 0,
+    lowConfidenceTransitionCount: transitions.filter(
+      (transition) => transition.confidence < lowConfidenceThreshold
+    ).length,
+    nondeterministicActionCount: 0,
+    crossRoleComparisonCount: comparison?.roleDifferences.length ?? 0,
+  };
+}
+
+function finalizeAutomaton(
+  automaton: WorkflowAutomaton,
+  options: Pick<
+    MineWorkflowAutomatonOptions,
+    | 'minTransitionObservations'
+    | 'nondeterminismThreshold'
+    | 'lowConfidenceThreshold'
+    | 'destructiveTransitionConfirmationRequired'
+    | 'comparison'
+    | 'authProfile'
+  >
+): WorkflowAutomaton {
+  const anomalies = detectWorkflowAnomalies(automaton, {
+    minTransitionObservations: options.minTransitionObservations,
+    nondeterminismThreshold: options.nondeterminismThreshold,
+    lowConfidenceThreshold: options.lowConfidenceThreshold,
+    destructiveTransitionConfirmationRequired: options.destructiveTransitionConfirmationRequired,
+    authProfile: options.authProfile,
+    comparison: options.comparison,
+  });
+  automaton.anomalies = anomalies;
+  automaton.metrics.anomalyCount = anomalies.length;
+  automaton.metrics.nondeterministicActionCount = anomalies.filter(
+    (anomaly) => anomaly.type === 'nondeterministic-transition'
+  ).length;
+  return automaton;
+}
+
 export function compareWorkflowAutomata(
   current: WorkflowAutomaton,
   previous: WorkflowAutomaton | undefined,
@@ -157,167 +352,43 @@ export function compareWorkflowAutomata(
 }
 
 export function mineWorkflowAutomaton(options: MineWorkflowAutomatonOptions): WorkflowAutomaton {
-  const {
-    nodes,
-    edges,
-    ledger,
-    targetUrl,
-    runId,
-    authProfile,
-    includeAuthProfile,
-    includeApiSignals,
-    redactValues,
-    maxStates,
-    maxTransitions,
-    minTransitionObservations,
-    nondeterminismThreshold,
-    lowConfidenceThreshold,
-    destructiveTransitionConfirmationRequired,
-    comparison,
-  } = options;
-  const { states, statesByNodeId } = createStateMap(
-    nodes,
-    authProfile,
-    includeAuthProfile,
-    maxStates
+  const stateMap = createStateMap(
+    options.nodes,
+    options.authProfile,
+    options.includeAuthProfile,
+    options.maxStates
   );
   const normalized = normalizeWorkflowTrace({
-    nodes,
-    edges,
-    ledger,
-    authProfile,
-    redactValues,
-    includeAuthProfile,
-    includeApiSignals,
+    nodes: options.nodes,
+    edges: options.edges,
+    ledger: options.ledger,
+    authProfile: options.authProfile,
+    redactValues: options.redactValues,
+    includeAuthProfile: options.includeAuthProfile,
+    includeApiSignals: options.includeApiSignals,
   });
-  const transitionsById = new Map<string, WorkflowTransition>();
-
-  for (const event of normalized.events) {
-    if (!event.sourceNodeId || !event.abstractStateBefore || !event.abstractStateAfter) {
-      continue;
-    }
-    const fromState = statesByNodeId.get(event.sourceNodeId);
-    const toStateId = workflowStateKeyId(event.abstractStateAfter);
-    if (!fromState) {
-      continue;
-    }
-    const transitionId = [
-      fromState.id,
-      toStateId,
-      event.abstractAction.normalizedLabel,
-      event.outcome,
-      authProfile ?? 'none',
-    ].join('::');
-    const existing = transitionsById.get(transitionId);
-    const apiStatusClasses = Array.from(
-      new Set((event.apiSignals ?? []).map((signal) => signal.statusClass))
-    ).filter((value) => value !== '0xx');
-    const apiEndpointRefs = Array.from(
-      new Set(
-        (event.apiSignals ?? []).map(
-          (signal) => `${signal.method.toUpperCase()} ${signal.route} [${signal.statusClass}]`
-        )
-      )
-    );
-    if (existing) {
-      existing.observationCount += 1;
-      if (event.outcome === 'success') {
-        existing.successCount += 1;
-      } else if (event.outcome !== 'unknown') {
-        existing.failureCount += 1;
-      }
-      existing.lastObservedAt = event.timestamp;
-      existing.evidenceIds = Array.from(new Set([...existing.evidenceIds, ...event.evidenceIds]));
-      existing.findingRefs = Array.from(new Set([...existing.findingRefs, ...event.findingRefs]));
-      existing.sourceEdgeIds = Array.from(
-        new Set([...existing.sourceEdgeIds, ...(event.sourceEdgeId ? [event.sourceEdgeId] : [])])
-      );
-      existing.sourceActionIds = Array.from(
-        new Set([
-          ...existing.sourceActionIds,
-          ...(event.sourceActionId ? [event.sourceActionId] : []),
-        ])
-      );
-      existing.apiEndpointRefs = Array.from(
-        new Set([...(existing.apiEndpointRefs ?? []), ...apiEndpointRefs])
-      );
-      if (!existing.guard?.apiStatusClass && apiStatusClasses.length === 1) {
-        existing.guard = {
-          ...existing.guard,
-          apiStatusClass: apiStatusClasses[0],
-        };
-      }
-      existing.confidence = transitionConfidence(existing);
-      continue;
-    }
-
-    const transition: WorkflowTransition = {
-      id: `wf-transition-${transitionsById.size + 1}`,
-      fromStateId: fromState.id,
-      toStateId,
-      action: event.abstractAction,
-      outcome: event.outcome,
-      guard: {
-        authProfile,
-        requiresConfirmation: event.abstractAction.destructive || undefined,
-        requiresValidForm:
-          fromState.kind === 'form' || fromState.kind === 'wizard-step' ? true : undefined,
-        apiStatusClass: apiStatusClasses.length === 1 ? apiStatusClasses[0] : undefined,
-      },
-      sourceEdgeIds: event.sourceEdgeId ? [event.sourceEdgeId] : [],
-      sourceActionIds: event.sourceActionId ? [event.sourceActionId] : [],
-      evidenceIds: [...event.evidenceIds],
-      findingRefs: [...event.findingRefs],
-      apiEndpointRefs,
-      observationCount: 1,
-      successCount: event.outcome === 'success' ? 1 : 0,
-      failureCount: event.outcome !== 'success' && event.outcome !== 'unknown' ? 1 : 0,
-      confidence: 0.35,
-      firstObservedAt: event.timestamp,
-      lastObservedAt: event.timestamp,
-    };
-    transition.confidence = transitionConfidence(transition);
-    transitionsById.set(transitionId, transition);
-  }
-
-  const transitions = [...transitionsById.values()].slice(0, maxTransitions);
+  const transitions = [
+    ...buildTransitionMap(stateMap.statesByNodeId, normalized, options.authProfile).values(),
+  ].slice(0, options.maxTransitions);
   const automaton: WorkflowAutomaton = {
     version: 1,
     createdAt: new Date().toISOString(),
-    targetUrl,
-    runId,
-    authProfile,
-    states: states.map((state) => ({
+    targetUrl: options.targetUrl,
+    runId: options.runId,
+    authProfile: options.authProfile,
+    states: stateMap.states.map((state) => ({
       ...state,
       confidence: stateConfidence(state),
     })),
     transitions,
     anomalies: [],
-    metrics: {
-      stateCount: states.length,
-      transitionCount: transitions.length,
-      anomalyCount: 0,
-      lowConfidenceTransitionCount: transitions.filter(
-        (transition) => transition.confidence < lowConfidenceThreshold
-      ).length,
-      nondeterministicActionCount: 0,
-      crossRoleComparisonCount: comparison?.roleDifferences.length ?? 0,
-    },
+    metrics: buildMetrics(
+      stateMap.states,
+      transitions,
+      options.lowConfidenceThreshold,
+      options.comparison
+    ),
   };
 
-  const anomalies = detectWorkflowAnomalies(automaton, {
-    minTransitionObservations,
-    nondeterminismThreshold,
-    lowConfidenceThreshold,
-    destructiveTransitionConfirmationRequired,
-    authProfile,
-    comparison,
-  });
-  automaton.anomalies = anomalies;
-  automaton.metrics.anomalyCount = anomalies.length;
-  automaton.metrics.nondeterministicActionCount = anomalies.filter(
-    (anomaly) => anomaly.type === 'nondeterministic-transition'
-  ).length;
-
-  return automaton;
+  return finalizeAutomaton(automaton, options);
 }

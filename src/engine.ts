@@ -50,6 +50,7 @@ import { attachSafetyRequestGuard, createSafetyGuardForConfig } from './engine/s
 import { Blackboard } from './a2a/blackboard.js';
 import { MessageBus } from './a2a/message-bus.js';
 import { Coordinator } from './a2a/coordinator.js';
+import type { WorkflowAutomataRuntimeState } from './workflow-automata/types.js';
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
   return {
@@ -138,6 +139,25 @@ function loadDiffContext(
   return buildDiffContext(baseRef, repoRoot, repoHints);
 }
 
+function resolveActiveAuthProfile(
+  config: DramaturgeConfig,
+  profile: string | undefined
+): string | undefined {
+  return 'profiles' in config.auth ? (profile ?? config.auth.default) : undefined;
+}
+
+function createWorkflowAutomataRuntime(
+  config: DramaturgeConfig
+): WorkflowAutomataRuntimeState | undefined {
+  if (!config.experimental?.workflowAutomata?.enabled) {
+    return undefined;
+  }
+  return {
+    generatedFollowups: 0,
+    generatedFollowupKeys: new Set(),
+  };
+}
+
 export interface RunEngineOptions {
   resumeDir?: string;
   /** Optional event emitter for streaming engine progress. */
@@ -166,8 +186,7 @@ export async function runEngine(
   const mission = buildMission(config);
   const concurrency = config.concurrency.workers;
   const useLLMPlanner = hasLLMApiKey(config.models.planner);
-  const activeAuthProfile =
-    'profiles' in config.auth ? (options.profile ?? config.auth.default) : undefined;
+  const activeAuthProfile = resolveActiveAuthProfile(config, options.profile);
   const repoHints = loadRepoHints(config);
   const contractIndex = loadContractIndex(config, repoHints);
   const diffContext = loadDiffContext(config, repoHints, options.diffRef);
@@ -281,12 +300,7 @@ export async function runEngine(
     blackboard,
     messageBus,
     coordinator,
-    workflowAutomata: config.experimental.workflowAutomata.enabled
-      ? {
-          generatedFollowups: 0,
-          generatedFollowupKeys: new Set(),
-        }
-      : undefined,
+    workflowAutomata: createWorkflowAutomataRuntime(config),
     createIsolatedApiRequestContext: () =>
       playwrightRequest.newContext({
         baseURL: config.targetUrl,

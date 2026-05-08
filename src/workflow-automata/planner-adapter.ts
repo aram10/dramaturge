@@ -107,8 +107,8 @@ function toFrontierItem(
 }
 
 function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined {
-  const workflowConfig = ctx.config.experimental.workflowAutomata;
-  if (!workflowConfig.enabled || ctx.graph.nodeCount() === 0) {
+  const workflowConfig = ctx.config.experimental?.workflowAutomata;
+  if (!workflowConfig?.enabled || ctx.graph.nodeCount() === 0) {
     return undefined;
   }
   const previous = loadPreviousWorkflowAutomaton(ctx.config.output.dir, ctx.activeAuthProfile);
@@ -161,8 +161,8 @@ function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined
 }
 
 export function updateWorkflowAutomataRuntime(ctx: EngineContext): void {
-  const workflowConfig = ctx.config.experimental.workflowAutomata;
-  if (!workflowConfig.enabled) {
+  const workflowConfig = ctx.config.experimental?.workflowAutomata;
+  if (!workflowConfig?.enabled) {
     return;
   }
   try {
@@ -198,8 +198,8 @@ export function updateWorkflowAutomataRuntime(ctx: EngineContext): void {
 }
 
 export function finalizeWorkflowAutomata(ctx: EngineContext): void {
-  const workflowConfig = ctx.config.experimental.workflowAutomata;
-  if (!workflowConfig.enabled) {
+  const workflowConfig = ctx.config.experimental?.workflowAutomata;
+  if (!workflowConfig?.enabled) {
     return;
   }
   try {

@@ -108,7 +108,7 @@ export function writeReports(
         memoryEnabled: config.memory.enabled,
         visualRegressionEnabled: config.visualRegression.enabled,
         warmStartEnabled: config.memory.enabled && config.memory.warmStart,
-        workflowAutomataEnabled: config.experimental.workflowAutomata.enabled,
+        workflowAutomataEnabled: config.experimental?.workflowAutomata?.enabled ?? false,
       },
       runMemory: ctx.runMemory,
       diffSummary,

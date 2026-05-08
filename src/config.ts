@@ -653,6 +653,23 @@ const ExperimentalSchema = z
   .default({
     workflowAutomata: {
       enabled: false,
+      outputJson: true,
+      outputMermaid: true,
+      persistAcrossRuns: true,
+      includeAuthProfile: true,
+      includeApiSignals: true,
+      includeModalState: true,
+      includeFormValidity: true,
+      maxStates: 200,
+      maxTransitions: 1000,
+      minTransitionObservations: 1,
+      nondeterminismThreshold: 0.25,
+      lowConfidenceThreshold: 0.5,
+      generateFollowups: true,
+      maxFollowupsPerRun: 20,
+      priorityBoost: 0.2,
+      redactValues: true,
+      destructiveTransitionConfirmationRequired: true,
     },
   });
 
