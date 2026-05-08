@@ -166,6 +166,8 @@ export async function runEngine(
   const mission = buildMission(config);
   const concurrency = config.concurrency.workers;
   const useLLMPlanner = hasLLMApiKey(config.models.planner);
+  const activeAuthProfile =
+    'profiles' in config.auth ? (options.profile ?? config.auth.default) : undefined;
   const repoHints = loadRepoHints(config);
   const contractIndex = loadContractIndex(config, repoHints);
   const diffContext = loadDiffContext(config, repoHints, options.diffRef);
@@ -262,6 +264,7 @@ export async function runEngine(
     findingsByNode: new Map(),
     evidenceByNode: new Map(),
     actionsByNode: new Map(),
+    activeAuthProfile,
     costLedgerCursor: 0,
     errorCollector,
     pageNodeOwners: new Map(),
@@ -278,6 +281,12 @@ export async function runEngine(
     blackboard,
     messageBus,
     coordinator,
+    workflowAutomata: config.experimental.workflowAutomata.enabled
+      ? {
+          generatedFollowups: 0,
+          generatedFollowupKeys: new Set(),
+        }
+      : undefined,
     createIsolatedApiRequestContext: () =>
       playwrightRequest.newContext({
         baseURL: config.targetUrl,

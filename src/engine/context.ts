@@ -33,6 +33,7 @@ import type { MessageBus } from '../a2a/message-bus.js';
 import type { Coordinator } from '../a2a/coordinator.js';
 import type { EngineLogger } from './logger.js';
 import type { ExplorationLedger } from '../types.js';
+import type { WorkflowAutomataRuntimeState } from '../workflow-automata/types.js';
 
 export interface EngineContext {
   config: DramaturgeConfig;
@@ -56,6 +57,7 @@ export interface EngineContext {
   evidenceByNode: Map<string, Evidence[]>;
   actionsByNode: Map<string, ReplayableAction[]>;
   runLedger?: ExplorationLedger;
+  activeAuthProfile?: string;
   /** Index into CostTracker records marking the start of records not yet appended to runLedger. */
   costLedgerCursor: number;
   errorCollector: BrowserErrorCollector;
@@ -77,4 +79,5 @@ export interface EngineContext {
   blackboard?: Blackboard;
   messageBus?: MessageBus;
   coordinator?: Coordinator;
+  workflowAutomata?: WorkflowAutomataRuntimeState;
 }

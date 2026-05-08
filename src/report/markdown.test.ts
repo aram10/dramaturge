@@ -103,6 +103,7 @@ describe('renderMarkdown', () => {
           memoryEnabled: true,
           visualRegressionEnabled: true,
           warmStartEnabled: true,
+          workflowAutomataEnabled: true,
         },
       })
     );
@@ -115,6 +116,7 @@ describe('renderMarkdown', () => {
     expect(md).toContain('LLM planner:** disabled');
     expect(md).toContain('Memory:** enabled');
     expect(md).toContain('Visual regression:** enabled');
+    expect(md).toContain('Workflow automata:** enabled');
   });
 
   it('omits run configuration section when not provided', () => {
@@ -144,6 +146,67 @@ describe('renderMarkdown', () => {
     expect(md).toContain('Blocked actions: 1');
     expect(md).toContain('DELETE request');
     expect(md).toContain('Destructive HTTP method');
+  });
+
+  it('includes workflow automata sections when present', () => {
+    const md = renderMarkdown(
+      makeResult({
+        workflowAutomaton: {
+          version: 1,
+          createdAt: '2026-05-08T21:00:00.000Z',
+          targetUrl: 'https://example.com',
+          states: [
+            {
+              id: 'wf-state-1',
+              key: { routeFamily: '/orders/:id/edit', pageType: 'form' },
+              label: 'form · /orders/:id/edit',
+              kind: 'form',
+              routeFamily: '/orders/:id/edit',
+              pageType: 'form',
+              sourceNodeIds: ['node-1'],
+              firstObservedAt: '2026-05-08T21:00:00.000Z',
+              lastObservedAt: '2026-05-08T21:00:00.000Z',
+              observationCount: 1,
+              confidence: 0.7,
+            },
+          ],
+          transitions: [],
+          anomalies: [
+            {
+              id: 'wf-anomaly-1',
+              type: 'dead-end',
+              severity: 'medium',
+              confidence: 0.6,
+              summary: 'form · /orders/:id/edit had no observed outgoing transitions.',
+              stateIds: ['wf-state-1'],
+              transitionIds: [],
+              evidenceIds: [],
+            },
+          ],
+          metrics: {
+            stateCount: 1,
+            transitionCount: 0,
+            anomalyCount: 1,
+            lowConfidenceTransitionCount: 0,
+            nondeterministicActionCount: 0,
+            crossRoleComparisonCount: 0,
+          },
+        },
+        workflowComparison: {
+          previousRunFound: false,
+          addedStateLabels: ['form · /orders/:id/edit'],
+          removedStateLabels: [],
+          addedTransitionLabels: [],
+          removedTransitionLabels: [],
+          peerProfiles: [],
+          roleDifferences: [],
+        },
+      })
+    );
+
+    expect(md).toContain('## Workflow Automata');
+    expect(md).toContain('## Workflow Comparison');
+    expect(md).toContain('form · /orders/:id/edit');
   });
 
   it('includes run memory summary when present', () => {

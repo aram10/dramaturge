@@ -108,12 +108,15 @@ export function writeReports(
         memoryEnabled: config.memory.enabled,
         visualRegressionEnabled: config.visualRegression.enabled,
         warmStartEnabled: config.memory.enabled && config.memory.warmStart,
+        workflowAutomataEnabled: config.experimental.workflowAutomata.enabled,
       },
       runMemory: ctx.runMemory,
       diffSummary,
       crossRunClassification: ctx.crossRunClassification,
       safetyAudit,
       explorationLedger: ctx.runLedger,
+      workflowAutomaton: ctx.workflowAutomata?.current,
+      workflowComparison: ctx.workflowAutomata?.comparison,
     }
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);

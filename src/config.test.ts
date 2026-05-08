@@ -126,6 +126,38 @@ describe('loadConfig', () => {
     });
   });
 
+  it('parses experimental workflow automata settings with defaults', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": { "type": "none" },
+        "experimental": {
+          "workflowAutomata": {
+            "enabled": true,
+            "maxFollowupsPerRun": 5,
+            "priorityBoost": 0.4
+          }
+        }
+      }`,
+      'utf-8'
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.experimental.workflowAutomata).toMatchObject({
+      enabled: true,
+      maxFollowupsPerRun: 5,
+      priorityBoost: 0.4,
+      outputJson: true,
+      outputMermaid: true,
+      persistAcrossRuns: true,
+    });
+  });
+
   it('accepts safe-mode bootstrap with structured command and args', () => {
     const dir = createTempDir();
     const configPath = join(dir, 'dramaturge.config.json');

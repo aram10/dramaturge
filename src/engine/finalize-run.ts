@@ -8,6 +8,7 @@ import type { FrontierItem } from '../types.js';
 import type { EngineContext } from './context.js';
 import { emitEngineEvent } from './event-stream.js';
 import { buildAreaResults, writeReports } from './reports.js';
+import { finalizeWorkflowAutomata } from '../workflow-automata/planner-adapter.js';
 
 export interface FinalizeRunOptions {
   startTime: Date;
@@ -82,6 +83,7 @@ export function finalizeRun(ctx: EngineContext, options: FinalizeRunOptions): vo
     ctx.runMemory = ctx.memoryStore.getSummary(warmStartApplied, warmStartRestoredStateCount);
   }
 
+  finalizeWorkflowAutomata(ctx);
   writeReports(ctx, startTime, areaResults, remaining);
 
   const blindSpots = ctx.globalCoverage.getBlindSpots();

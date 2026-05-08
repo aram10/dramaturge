@@ -169,6 +169,7 @@ describe('buildRunResult', () => {
         memoryEnabled: true,
         visualRegressionEnabled: true,
         warmStartEnabled: true,
+        workflowAutomataEnabled: true,
       },
     });
     expect(result.runConfig?.concurrency).toBe(2);

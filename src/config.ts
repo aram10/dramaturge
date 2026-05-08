@@ -604,6 +604,58 @@ const A2ASchema = z
     maxMessageHistory: 500,
   });
 
+const WorkflowAutomataSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    outputJson: z.boolean().default(true),
+    outputMermaid: z.boolean().default(true),
+    persistAcrossRuns: z.boolean().default(true),
+    includeAuthProfile: z.boolean().default(true),
+    includeApiSignals: z.boolean().default(true),
+    includeModalState: z.boolean().default(true),
+    includeFormValidity: z.boolean().default(true),
+    maxStates: z.number().int().min(5).default(200),
+    maxTransitions: z.number().int().min(10).default(1000),
+    minTransitionObservations: z.number().int().min(1).default(1),
+    nondeterminismThreshold: z.number().min(0).max(1).default(0.25),
+    lowConfidenceThreshold: z.number().min(0).max(1).default(0.5),
+    generateFollowups: z.boolean().default(true),
+    maxFollowupsPerRun: z.number().int().min(0).default(20),
+    priorityBoost: z.number().min(0).max(1).default(0.2),
+    redactValues: z.boolean().default(true),
+    destructiveTransitionConfirmationRequired: z.boolean().default(true),
+  })
+  .default({
+    enabled: false,
+    outputJson: true,
+    outputMermaid: true,
+    persistAcrossRuns: true,
+    includeAuthProfile: true,
+    includeApiSignals: true,
+    includeModalState: true,
+    includeFormValidity: true,
+    maxStates: 200,
+    maxTransitions: 1000,
+    minTransitionObservations: 1,
+    nondeterminismThreshold: 0.25,
+    lowConfidenceThreshold: 0.5,
+    generateFollowups: true,
+    maxFollowupsPerRun: 20,
+    priorityBoost: 0.2,
+    redactValues: true,
+    destructiveTransitionConfirmationRequired: true,
+  });
+
+const ExperimentalSchema = z
+  .object({
+    workflowAutomata: WorkflowAutomataSchema,
+  })
+  .default({
+    workflowAutomata: {
+      enabled: false,
+    },
+  });
+
 export const ConfigSchema = z.object({
   targetUrl: z.string().url(),
   appDescription: z.string().min(1),
@@ -632,6 +684,7 @@ export const ConfigSchema = z.object({
   bootstrap: BootstrapSchema,
   policy: PolicySchema,
   a2a: A2ASchema,
+  experimental: ExperimentalSchema,
 });
 
 export type DramaturgeConfig = z.infer<typeof ConfigSchema>;
@@ -640,6 +693,7 @@ export type ApiTestingConfig = z.infer<typeof ApiTestingSchema>;
 export type AdversarialConfig = z.infer<typeof AdversarialSchema>;
 export type JudgeConfig = z.infer<typeof JudgeSchema>;
 export type VisionAnalysisConfig = z.infer<typeof VisionAnalysisSchema>;
+export type WorkflowAutomataConfig = z.infer<typeof WorkflowAutomataSchema>;
 export type { ConfigFileContext, LoadedConfigMeta } from './config-paths.js';
 export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 export type AuthProfiles = z.infer<typeof AuthProfilesSchema>;
