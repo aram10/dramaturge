@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runEngine } from '../engine.js';
 import { loadConfig } from '../config.js';
-import type { Finding, RawFinding } from '../types.js';
+import type { Finding } from '../types.js';
 import { BENCHMARK_APPS, getBenchmarkApp } from './apps.js';
 import { generateBenchmarkResult, formatMetrics } from './metrics.js';
 import type { BenchmarkResult } from './types.js';
@@ -50,26 +50,26 @@ export async function runBenchmark(appId: string): Promise<BenchmarkResult> {
     const reportContent = readFileSync(jsonReportPath, 'utf-8');
     const report: unknown = JSON.parse(reportContent);
 
-    // Extract findings from the report
-    if (report && typeof report === 'object' && 'areas' in report && Array.isArray(report.areas)) {
-      findings = report.areas.flatMap((area: unknown) => {
-        if (!area || typeof area !== 'object') {
-          return [];
-        }
-        const areaObj = area as { name?: string; findings?: RawFinding[] };
-        return (areaObj.findings ?? []).map((f: RawFinding) => ({
-          ...f,
-          id: f.ref ?? `${areaObj.name ?? 'unknown'}-${f.title}`,
-          area: areaObj.name ?? 'unknown',
-          occurrenceCount: 1,
-          impactedAreas: [areaObj.name ?? 'unknown'],
-          occurrences: [],
-        }));
-      });
+    // Extract findings from the report (JSON report has top-level findings array)
+    if (
+      report &&
+      typeof report === 'object' &&
+      'findings' in report &&
+      Array.isArray(report.findings)
+    ) {
+      findings = report.findings as Finding[];
     }
 
     // Try to determine first finding time from the report
-    if (report && typeof report === 'object' && 'startTime' in report && findings.length > 0) {
+    if (
+      report &&
+      typeof report === 'object' &&
+      'meta' in report &&
+      report.meta &&
+      typeof report.meta === 'object' &&
+      'startTime' in report.meta &&
+      findings.length > 0
+    ) {
       firstFindingTime = startTime + 10000; // Approximate
     }
   } catch (error) {
@@ -131,7 +131,7 @@ export function saveBenchmarkResult(result: BenchmarkResult, outputDir: string):
   const metricsPath = resolve(appDir, 'metrics.json');
   writeFileSync(metricsPath, JSON.stringify(result.metrics, null, 2));
 
-  // Save full result as JSON
+  // Save full result as JSON (including classifications and raw findings)
   const resultPath = resolve(appDir, 'result.json');
   writeFileSync(
     resultPath,
@@ -139,8 +139,8 @@ export function saveBenchmarkResult(result: BenchmarkResult, outputDir: string):
       {
         app: result.app,
         metrics: result.metrics,
-        findingsCount: result.rawFindings.length,
-        classificationsCount: result.classifications.length,
+        classifications: result.classifications,
+        rawFindings: result.rawFindings,
       },
       null,
       2

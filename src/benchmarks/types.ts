@@ -30,7 +30,7 @@ export interface BenchmarkMetrics {
   knownIssuesMissed: number;
   precision: number;
   recall: number;
-  categoriesFound: Record<FindingCategory, number>;
+  categoriesFound: Partial<Record<FindingCategory, number>>;
   timeToFirstFinding: number;
   totalRuntime: number;
   timestamp: string;

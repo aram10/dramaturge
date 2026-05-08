@@ -27,10 +27,13 @@ export function calculateMetrics(
   const recall =
     (app.knownIssues?.length ?? 0) === 0 ? 0 : knownIssuesCaught / (app.knownIssues?.length ?? 1);
 
-  const categoriesFound = findings.reduce<Record<string, number>>((acc, finding) => {
-    acc[finding.category] = (acc[finding.category] ?? 0) + 1;
-    return acc;
-  }, {}) as Record<FindingCategory, number>;
+  const categoriesFound = findings.reduce<Partial<Record<FindingCategory, number>>>(
+    (acc, finding) => {
+      acc[finding.category] = (acc[finding.category] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
 
   const timeToFirstFinding = runtime.firstFindingTime
     ? runtime.firstFindingTime - runtime.startTime
@@ -78,7 +81,7 @@ export function classifyFinding(
 
   return {
     finding,
-    isRealIssue: Boolean(matchedKnownIssue) || finding.meta?.confidence !== 'low',
+    isRealIssue: Boolean(matchedKnownIssue) || (finding.meta?.confidence ?? 'low') !== 'low',
     matchesKnownIssue: Boolean(matchedKnownIssue),
     knownIssueId: matchedKnownIssue?.id,
     notes: matchedKnownIssue ? `Matches known issue: ${matchedKnownIssue.description}` : undefined,

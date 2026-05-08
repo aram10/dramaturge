@@ -46,8 +46,8 @@ export async function runBenchmarkCommand(
       saveBenchmarkResult(result, outputDir);
     }
 
-    // Return success if precision is acceptable (>50%)
-    return result.metrics.precision >= 0.5 ? 0 : 1;
+    // Return success if precision is acceptable (≥70% per benchmark docs)
+    return result.metrics.precision >= 0.7 ? 0 : 1;
   } catch (err) {
     error(`Benchmark failed: ${err instanceof Error ? err.message : String(err)}`);
     return 1;

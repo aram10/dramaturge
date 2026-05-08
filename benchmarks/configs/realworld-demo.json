@@ -15,13 +15,15 @@
   },
 
   "budget": {
-    "maxTasks": 50,
-    "timeLimitSeconds": 600
+    "globalTimeLimitSeconds": 600,
+    "maxStepsPerTask": 40,
+    "maxStateNodes": 50
   },
 
   "policy": {
-    "maxNavigationDepth": 4,
-    "allowOffSite": false
+    "safety": {
+      "allowedUrlPatterns": ["^https://demo\\.realworld\\.io/"]
+    }
   },
 
   "output": {

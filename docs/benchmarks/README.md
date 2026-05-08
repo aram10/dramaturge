@@ -176,4 +176,4 @@ We continuously refine suppression rules based on FP patterns.
 
 See individual result files in `benchmarks/results/` for detailed metrics from each run.
 
-For a summary of current signal-to-noise performance, see the main [README.md](../../README.md#benchmark-results).
+For usage and details on running benchmarks, see the [benchmark command documentation](../../README.md) (search for "benchmark" in the main README).

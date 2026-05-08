@@ -14,13 +14,15 @@
   },
 
   "budget": {
-    "maxTasks": 20,
-    "timeLimitSeconds": 300
+    "globalTimeLimitSeconds": 300,
+    "maxStepsPerTask": 40,
+    "maxStateNodes": 20
   },
 
   "policy": {
-    "maxNavigationDepth": 3,
-    "allowOffSite": false
+    "safety": {
+      "allowedUrlPatterns": ["^https://todomvc\\.com/"]
+    }
   },
 
   "output": {

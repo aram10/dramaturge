@@ -188,7 +188,7 @@ describe('formatMetrics', () => {
         Bug: 5,
         'Accessibility Issue': 3,
         'UX Concern': 2,
-      } as any,
+      },
       timeToFirstFinding: 2500,
       totalRuntime: 30000,
       timestamp: '2026-05-08T12:00:00.000Z',
