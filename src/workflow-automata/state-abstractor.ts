@@ -97,15 +97,17 @@ function buildEntityHints(node: StateNode, routeFamily: string | undefined): str
 export function buildWorkflowStateKey(
   node: StateNode,
   authProfile: string | undefined,
-  includeAuthProfile: boolean
+  includeAuthProfile: boolean,
+  includeModalState = true,
+  includeFormValidity = true
 ): WorkflowStateKey {
   const routeFamily = collapseRouteFamily(node.fingerprint.normalizedPath ?? node.url);
   return {
     authProfile: includeAuthProfile ? authProfile : undefined,
     routeFamily,
     pageType: node.pageType,
-    modalLabel: normalizeHeading(node.fingerprint.dialogTitles[0]),
-    formSignature: buildFormSignature(node),
+    modalLabel: includeModalState ? normalizeHeading(node.fingerprint.dialogTitles[0]) : undefined,
+    formSignature: includeFormValidity ? buildFormSignature(node) : undefined,
     entityStateHint: buildEntityHints(node, routeFamily).join('|') || undefined,
     dominantHeading: normalizeHeading(node.fingerprint.heading || node.title),
     controlClusterSignature: buildControlSignature(node),
@@ -135,9 +137,17 @@ function buildStateLabel(
 export function createWorkflowState(
   node: StateNode,
   authProfile: string | undefined,
-  includeAuthProfile: boolean
+  includeAuthProfile: boolean,
+  includeModalState = true,
+  includeFormValidity = true
 ): WorkflowState {
-  const key = buildWorkflowStateKey(node, authProfile, includeAuthProfile);
+  const key = buildWorkflowStateKey(
+    node,
+    authProfile,
+    includeAuthProfile,
+    includeModalState,
+    includeFormValidity
+  );
   const kind = inferStateKind(node, authProfile);
   const timestamp = node.firstSeenAt ?? new Date().toISOString();
   return {

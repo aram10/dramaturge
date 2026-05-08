@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EngineContext } from '../engine/context.js';
 import type { FrontierItem } from '../types.js';
-import { compareWorkflowAutomata, mineWorkflowAutomaton } from './miner.js';
+import { compareWorkflowAutomata, finalizeAutomaton, mineWorkflowAutomaton } from './miner.js';
 import {
   listPeerWorkflowAutomata,
   loadPreviousWorkflowAutomaton,
@@ -36,7 +36,8 @@ function workerTypeForStateKind(
 
 export function generateWorkflowFollowups(
   automaton: WorkflowAutomaton,
-  priorityBoost: number
+  priorityBoost: number,
+  lowConfidenceThreshold: number
 ): WorkflowFollowupCandidate[] {
   const candidates: WorkflowFollowupCandidate[] = [];
   for (const anomaly of automaton.anomalies) {
@@ -64,7 +65,7 @@ export function generateWorkflowFollowups(
   }
 
   for (const transition of automaton.transitions.filter(
-    (candidate) => candidate.confidence < 0.5
+    (candidate) => candidate.confidence < lowConfidenceThreshold
   )) {
     const state = automaton.states.find((candidate) => candidate.id === transition.fromStateId);
     if (!state) {
@@ -122,6 +123,8 @@ function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined
     authProfile: ctx.activeAuthProfile,
     includeAuthProfile: workflowConfig.includeAuthProfile,
     includeApiSignals: workflowConfig.includeApiSignals,
+    includeModalState: workflowConfig.includeModalState,
+    includeFormValidity: workflowConfig.includeFormValidity,
     redactValues: workflowConfig.redactValues,
     maxStates: workflowConfig.maxStates,
     maxTransitions: workflowConfig.maxTransitions,
@@ -133,10 +136,8 @@ function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined
   } as const;
   const provisional = mineWorkflowAutomaton(mineOptions);
   const comparison = compareWorkflowAutomata(provisional, previous, peers);
-  const current = mineWorkflowAutomaton({
-    ...mineOptions,
-    comparison,
-  });
+  // Re-finalize with comparison data without re-mining states/transitions
+  const current = finalizeAutomaton(provisional, { ...mineOptions, comparison });
   ctx.workflowAutomata = ctx.workflowAutomata ?? {
     generatedFollowups: 0,
     generatedFollowupKeys: new Set<string>(),
@@ -146,13 +147,25 @@ function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined
   return current;
 }
 
+const WORKFLOW_AUTOMATA_MINE_NODE_THRESHOLD = 5;
+
 export function updateWorkflowAutomataRuntime(ctx: EngineContext): void {
   const workflowConfig = ctx.config.experimental?.workflowAutomata;
   if (!workflowConfig?.enabled) {
     return;
   }
+  // Gate: only re-mine if the graph has grown enough since the last mining pass.
+  const nodeCount = ctx.graph.nodeCount();
+  const lastMinedNodeCount =
+    ctx.workflowAutomata?.lastMinedNodeCount ?? -WORKFLOW_AUTOMATA_MINE_NODE_THRESHOLD;
+  if (nodeCount > 0 && nodeCount < lastMinedNodeCount + WORKFLOW_AUTOMATA_MINE_NODE_THRESHOLD) {
+    return;
+  }
   try {
     const automaton = mineCurrentAutomaton(ctx);
+    if (ctx.workflowAutomata) {
+      ctx.workflowAutomata.lastMinedNodeCount = nodeCount;
+    }
     if (!automaton || !workflowConfig.generateFollowups) {
       return;
     }
@@ -164,7 +177,11 @@ export function updateWorkflowAutomataRuntime(ctx: EngineContext): void {
     if (remainingSlots <= 0) {
       return;
     }
-    const frontierItems = generateWorkflowFollowups(automaton, workflowConfig.priorityBoost)
+    const frontierItems = generateWorkflowFollowups(
+      automaton,
+      workflowConfig.priorityBoost,
+      workflowConfig.lowConfidenceThreshold
+    )
       .filter((candidate) => !runtime.generatedFollowupKeys.has(candidate.dedupeKey))
       .slice(0, remainingSlots)
       .map((candidate) => {

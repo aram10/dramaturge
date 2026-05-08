@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
+import { createHash } from 'node:crypto';
 import type { ExplorationLedger, StateEdge, StateNode } from '../types.js';
 import { detectWorkflowAnomalies } from './anomaly-detector.js';
 import { createWorkflowState, workflowStateKeyId } from './state-abstractor.js';
@@ -22,6 +23,8 @@ export interface MineWorkflowAutomatonOptions {
   authProfile?: string;
   includeAuthProfile: boolean;
   includeApiSignals: boolean;
+  includeModalState?: boolean;
+  includeFormValidity?: boolean;
   redactValues: boolean;
   maxStates: number;
   maxTransitions: number;
@@ -60,17 +63,29 @@ function buildTransitionLabel(transition: WorkflowTransition): string {
   return `${transition.fromStateId}:${transition.action.normalizedLabel}:${transition.toStateId}:${transition.outcome}:${transition.guard?.authProfile ?? 'none'}`;
 }
 
+interface StateMapFlags {
+  includeAuthProfile: boolean;
+  includeModalState: boolean;
+  includeFormValidity: boolean;
+}
+
 function createStateMap(
   nodes: StateNode[],
   authProfile: string | undefined,
-  includeAuthProfile: boolean,
-  maxStates: number
+  maxStates: number,
+  flags: StateMapFlags
 ): { states: WorkflowState[]; statesByNodeId: Map<string, WorkflowState> } {
   const statesById = new Map<string, WorkflowState>();
   const statesByNodeId = new Map<string, WorkflowState>();
 
   for (const node of nodes) {
-    const candidate = createWorkflowState(node, authProfile, includeAuthProfile);
+    const candidate = createWorkflowState(
+      node,
+      authProfile,
+      flags.includeAuthProfile,
+      flags.includeModalState,
+      flags.includeFormValidity
+    );
     const existing = statesById.get(candidate.id);
     if (!existing && statesById.size >= maxStates) {
       continue;
@@ -78,7 +93,9 @@ function createStateMap(
     if (existing) {
       existing.sourceNodeIds = Array.from(new Set([...existing.sourceNodeIds, node.id]));
       existing.observationCount += Math.max(node.timesVisited, 1);
-      existing.lastObservedAt = node.firstSeenAt;
+      if (node.firstSeenAt > existing.lastObservedAt) {
+        existing.lastObservedAt = node.firstSeenAt;
+      }
       existing.entityHints = Array.from(
         new Set([...(existing.entityHints ?? []), ...(candidate.entityHints ?? [])])
       );
@@ -163,14 +180,23 @@ function mergeTransitionObservation(
 function createTransition(input: {
   fromState: WorkflowState;
   toStateId: string;
+  transitionKey: string;
   authProfile: string | undefined;
   event: ReturnType<typeof normalizeWorkflowTrace>['events'][number];
   apiStatusClasses: string[];
   apiEndpointRefs: string[];
 }): WorkflowTransition {
-  const { fromState, toStateId, authProfile, event, apiStatusClasses, apiEndpointRefs } = input;
+  const {
+    fromState,
+    toStateId,
+    transitionKey: tKey,
+    authProfile,
+    event,
+    apiStatusClasses,
+    apiEndpointRefs,
+  } = input;
   const transition: WorkflowTransition = {
-    id: `wf-transition-${fromState.id}-${toStateId}-${event.abstractAction.normalizedLabel}`,
+    id: `wf-transition-${createHash('sha256').update(tKey).digest('hex').slice(0, 12)}`,
     fromStateId: fromState.id,
     toStateId,
     action: event.abstractAction,
@@ -235,6 +261,7 @@ function buildTransitionMap(
       createTransition({
         fromState,
         toStateId,
+        transitionKey: key,
         authProfile,
         event,
         apiStatusClasses,
@@ -264,7 +291,7 @@ function buildMetrics(
   };
 }
 
-function finalizeAutomaton(
+export function finalizeAutomaton(
   automaton: WorkflowAutomaton,
   options: Pick<
     MineWorkflowAutomatonOptions,
@@ -276,6 +303,9 @@ function finalizeAutomaton(
     | 'authProfile'
   >
 ): WorkflowAutomaton {
+  if (options.comparison) {
+    automaton.metrics.crossRoleComparisonCount = options.comparison.roleDifferences.length;
+  }
   const anomalies = detectWorkflowAnomalies(automaton, {
     minTransitionObservations: options.minTransitionObservations,
     nondeterminismThreshold: options.nondeterminismThreshold,
@@ -353,12 +383,13 @@ export function compareWorkflowAutomata(
 }
 
 export function mineWorkflowAutomaton(options: MineWorkflowAutomatonOptions): WorkflowAutomaton {
-  const stateMap = createStateMap(
-    options.nodes,
-    options.authProfile,
-    options.includeAuthProfile,
-    options.maxStates
-  );
+  const includeModalState = options.includeModalState ?? true;
+  const includeFormValidity = options.includeFormValidity ?? true;
+  const stateMap = createStateMap(options.nodes, options.authProfile, options.maxStates, {
+    includeAuthProfile: options.includeAuthProfile,
+    includeModalState,
+    includeFormValidity,
+  });
   const normalized = normalizeWorkflowTrace({
     nodes: options.nodes,
     edges: options.edges,
@@ -367,6 +398,8 @@ export function mineWorkflowAutomaton(options: MineWorkflowAutomatonOptions): Wo
     redactValues: options.redactValues,
     includeAuthProfile: options.includeAuthProfile,
     includeApiSignals: options.includeApiSignals,
+    includeModalState,
+    includeFormValidity,
   });
   const transitions = [
     ...buildTransitionMap(stateMap.statesByNodeId, normalized, options.authProfile).values(),

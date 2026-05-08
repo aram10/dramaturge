@@ -224,7 +224,7 @@ describe('workflow automata mining', () => {
     expect(comparison.peerProfiles).toContain('admin');
     expect(comparison.roleDifferences.length).toBeGreaterThanOrEqual(0);
 
-    const followups = generateWorkflowFollowups(current, 0.2);
+    const followups = generateWorkflowFollowups(current, 0.2, 0.6);
     expect(followups.length).toBeGreaterThan(0);
     expect(followups[0].priorityBoost).toBe(0.2);
   });

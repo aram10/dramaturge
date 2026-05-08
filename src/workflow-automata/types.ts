@@ -203,4 +203,6 @@ export interface WorkflowAutomataRuntimeState {
   comparison?: WorkflowAutomatonComparison;
   generatedFollowups: number;
   generatedFollowupKeys: Set<string>;
+  /** Node count at the time of the last automata mining pass; used to gate re-mining frequency. */
+  lastMinedNodeCount?: number;
 }

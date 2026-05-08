@@ -27,6 +27,8 @@ export interface NormalizeWorkflowTraceOptions {
   redactValues: boolean;
   includeAuthProfile: boolean;
   includeApiSignals: boolean;
+  includeModalState?: boolean;
+  includeFormValidity?: boolean;
 }
 
 interface LedgerStateIndex {
@@ -160,10 +162,9 @@ function buildStateIndex(
 function createWorkflowAction(action: ReplayableAction, redactValues: boolean): WorkflowAction {
   return {
     kind: mapActionKind(action),
-    label:
-      action.value && !redactValues
-        ? `${action.summary} ${String(redactSensitiveValue(action.value))}`
-        : action.summary,
+    label: action.value
+      ? `${action.summary} ${redactValues ? String(redactSensitiveValue(action.value)) : String(action.value)}`
+      : action.summary,
     normalizedLabel: normalizeLabel(action.summary),
     destructive: isDestructive(action.summary),
     selectorHash: selectorHash(action.selector),
@@ -205,12 +206,31 @@ export function normalizeWorkflowTrace(options: NormalizeWorkflowTraceOptions): 
   events: WorkflowTraceEvent[];
   stateKeysByNodeId: Map<string, WorkflowTraceEvent['abstractStateBefore']>;
 } {
-  const { nodes, edges, ledger, authProfile, redactValues, includeAuthProfile, includeApiSignals } =
-    options;
+  const {
+    nodes,
+    edges,
+    ledger,
+    authProfile,
+    redactValues,
+    includeAuthProfile,
+    includeApiSignals,
+    includeModalState = true,
+    includeFormValidity = true,
+  } = options;
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const stateIndex = buildStateIndex(ledger, includeApiSignals);
+  const resolvedAuthProfile = includeAuthProfile ? authProfile : undefined;
   const stateKeysByNodeId = new Map(
-    nodes.map((node) => [node.id, buildWorkflowStateKey(node, authProfile, includeAuthProfile)])
+    nodes.map((node) => [
+      node.id,
+      buildWorkflowStateKey(
+        node,
+        authProfile,
+        includeAuthProfile,
+        includeModalState,
+        includeFormValidity
+      ),
+    ])
   );
   const usedActionIds = new Set<string>();
   const events: WorkflowTraceEvent[] = [];
@@ -249,7 +269,7 @@ export function normalizeWorkflowTrace(options: NormalizeWorkflowTraceOptions): 
       outcome: mapOutcome(edge.outcome),
       routeFamily: collapseRouteFamily(fromNode.fingerprint.normalizedPath ?? fromNode.url),
       pageType: fromNode.pageType,
-      authProfile,
+      authProfile: resolvedAuthProfile,
       apiSignals: fromIndex?.apiSignals,
     });
   }
@@ -275,7 +295,7 @@ export function normalizeWorkflowTrace(options: NormalizeWorkflowTraceOptions): 
         outcome: mapOutcome(actionEvent.action.status),
         routeFamily: collapseRouteFamily(node.fingerprint.normalizedPath ?? node.url),
         pageType: node.pageType,
-        authProfile,
+        authProfile: resolvedAuthProfile,
         apiSignals: index.apiSignals,
       });
     }

@@ -5,6 +5,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { request as playwrightRequest } from 'playwright';
 import type { LoadedDramaturgeConfig, DramaturgeConfig } from './config.js';
+import { isAuthProfiles } from './config.js';
 import { resolveResumeDir } from './config-paths.js';
 import type { BudgetConfig, MissionConfig, WorkerType } from './types.js';
 import { authenticate } from './auth/authenticator.js';
@@ -143,7 +144,7 @@ function resolveActiveAuthProfile(
   config: DramaturgeConfig,
   profile: string | undefined
 ): string | undefined {
-  return 'profiles' in config.auth ? (profile ?? config.auth.default) : undefined;
+  return isAuthProfiles(config.auth) ? (profile ?? config.auth.default) : undefined;
 }
 
 function createWorkflowAutomataRuntime(
