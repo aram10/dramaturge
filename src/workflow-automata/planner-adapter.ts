@@ -113,7 +113,7 @@ function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined
   }
   const previous = loadPreviousWorkflowAutomaton(ctx.config.output.dir, ctx.activeAuthProfile);
   const peers = listPeerWorkflowAutomata(ctx.config.output.dir, ctx.activeAuthProfile);
-  const provisional = mineWorkflowAutomaton({
+  const mineOptions = {
     nodes: ctx.graph.getAllNodes(),
     edges: ctx.graph.getAllEdges(),
     ledger: ctx.runLedger,
@@ -130,25 +130,11 @@ function mineCurrentAutomaton(ctx: EngineContext): WorkflowAutomaton | undefined
     lowConfidenceThreshold: workflowConfig.lowConfidenceThreshold,
     destructiveTransitionConfirmationRequired:
       workflowConfig.destructiveTransitionConfirmationRequired,
-  });
+  } as const;
+  const provisional = mineWorkflowAutomaton(mineOptions);
   const comparison = compareWorkflowAutomata(provisional, previous, peers);
   const current = mineWorkflowAutomaton({
-    nodes: ctx.graph.getAllNodes(),
-    edges: ctx.graph.getAllEdges(),
-    ledger: ctx.runLedger,
-    targetUrl: ctx.config.targetUrl,
-    runId: ctx.outputDir,
-    authProfile: ctx.activeAuthProfile,
-    includeAuthProfile: workflowConfig.includeAuthProfile,
-    includeApiSignals: workflowConfig.includeApiSignals,
-    redactValues: workflowConfig.redactValues,
-    maxStates: workflowConfig.maxStates,
-    maxTransitions: workflowConfig.maxTransitions,
-    minTransitionObservations: workflowConfig.minTransitionObservations,
-    nondeterminismThreshold: workflowConfig.nondeterminismThreshold,
-    lowConfidenceThreshold: workflowConfig.lowConfidenceThreshold,
-    destructiveTransitionConfirmationRequired:
-      workflowConfig.destructiveTransitionConfirmationRequired,
+    ...mineOptions,
     comparison,
   });
   ctx.workflowAutomata = ctx.workflowAutomata ?? {

@@ -34,6 +34,8 @@ export type WorkflowActionKind =
   | 'api'
   | 'unknown';
 
+export const BASE_WORKFLOW_CONFIDENCE = 0.35;
+
 export interface WorkflowAction {
   kind: WorkflowActionKind;
   label: string;

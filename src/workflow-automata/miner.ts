@@ -5,6 +5,7 @@ import type { ExplorationLedger, StateEdge, StateNode } from '../types.js';
 import { detectWorkflowAnomalies } from './anomaly-detector.js';
 import { createWorkflowState, workflowStateKeyId } from './state-abstractor.js';
 import { normalizeWorkflowTrace } from './trace-normalizer.js';
+import { BASE_WORKFLOW_CONFIDENCE } from './types.js';
 import type {
   WorkflowAutomaton,
   WorkflowAutomatonComparison,
@@ -192,7 +193,7 @@ function createTransition(input: {
     observationCount: 1,
     successCount: event.outcome === 'success' ? 1 : 0,
     failureCount: event.outcome !== 'success' && event.outcome !== 'unknown' ? 1 : 0,
-    confidence: 0.35,
+    confidence: BASE_WORKFLOW_CONFIDENCE,
     firstObservedAt: event.timestamp,
     lastObservedAt: event.timestamp,
   };

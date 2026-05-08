@@ -3,6 +3,7 @@
 
 import { createHash } from 'node:crypto';
 import type { StateNode } from '../types.js';
+import { BASE_WORKFLOW_CONFIDENCE } from './types.js';
 import type { WorkflowState, WorkflowStateKey, WorkflowStateKind } from './types.js';
 
 function collapseRouteSegment(segment: string): string {
@@ -155,6 +156,6 @@ export function createWorkflowState(
     firstObservedAt: timestamp,
     lastObservedAt: timestamp,
     observationCount: Math.max(node.timesVisited, 1),
-    confidence: 0.35,
+    confidence: BASE_WORKFLOW_CONFIDENCE,
   };
 }
