@@ -270,13 +270,12 @@ function assertValueFlagsHaveValues(args: readonly string[]): void {
   }
 }
 
-function parseFocusModes(values: readonly string[] | string | undefined): FocusMode[] | undefined {
+function parseFocusModes(values: readonly string[] | undefined): FocusMode[] | undefined {
   if (!values || values.length === 0) {
     return undefined;
   }
-  const normalizedValues = Array.isArray(values) ? values : [values];
   const focusModes: FocusMode[] = [];
-  for (const value of normalizedValues) {
+  for (const value of values) {
     for (const mode of parseFocusValue(value)) {
       if (!focusModes.includes(mode)) {
         focusModes.push(mode);
@@ -416,7 +415,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
 
   assertValueFlagsHaveValues(args);
   const argv = parseWithYargs(args);
-  const positionals = argv._.map((value: string | number) => String(value));
+  const positionals = argv._.map((value) => String(value));
   const positionalArgs = parsePositionals(positionals, argv.url);
   const provider = argv.provider as ParsedCliArgs['provider'] | undefined;
   const preset = argv.preset as ParsedCliArgs['preset'] | undefined;
@@ -424,7 +423,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   const formats = argv.format as ParsedCliArgs['formats'] | undefined;
   const initTemplate = argv.template as InitTemplate | undefined;
   const repoPath = argv.repo;
-  const noScan = argv.noScan ? true : undefined;
+  const noScan = argv.noScan || undefined;
 
   if (noScan && repoPath) {
     throw new Error('--no-scan and --repo cannot be used together');
