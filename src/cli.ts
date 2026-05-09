@@ -3,7 +3,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { pathToFileURL } from 'node:url';
-import yargs from 'yargs/yargs';
+import yargs from 'yargs';
 import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from './config.js';
 import { resolveResumeDir } from './config-paths.js';
 import { runEngine, type RunEngineOptions } from './engine.js';
@@ -297,11 +297,9 @@ function parsePositionals(
   benchmarkAppId?: string;
 } {
   const [firstPositional] = positionals;
-  const command =
-    firstPositional && KNOWN_COMMANDS.has(firstPositional)
-      ? (firstPositional as ParsedCliArgs['command'])
-      : 'run';
-  let index = command === 'run' ? 0 : 1;
+  const hasExplicitCommand = !!firstPositional && KNOWN_COMMANDS.has(firstPositional);
+  const command = hasExplicitCommand ? (firstPositional as ParsedCliArgs['command']) : 'run';
+  let index = hasExplicitCommand ? 1 : 0;
   let url = parsedUrl;
 
   if (command === 'run' && !url && positionals[index]) {
@@ -350,7 +348,7 @@ function parseWithYargs(args: readonly string[]) {
     .parserConfiguration({
       'boolean-negation': false,
     })
-    .fail((message, error) => {
+    .fail((message: string, error?: Error) => {
       throw error ?? new Error(message);
     })
     .option('config', { type: 'string' })
@@ -417,7 +415,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
 
   assertValueFlagsHaveValues(args);
   const argv = parseWithYargs(args);
-  const positionals = argv._.map((value) => String(value));
+  const positionals = argv._.map((value: string | number) => String(value));
   const positionalArgs = parsePositionals(positionals, argv.url);
   const provider = argv.provider ? parseProvider(argv.provider) : undefined;
   const preset = argv.preset ? parsePreset(argv.preset) : undefined;
@@ -443,13 +441,13 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     headless: argv.headless || undefined,
     provider,
     preset,
-    focusModes,
-    formats,
-    profile: argv.profile,
     initTemplate,
     initOutput: positionalArgs.command === 'benchmark' ? undefined : argv.output,
     repoPath,
     noScan,
+    ...(focusModes ? { focusModes } : {}),
+    ...(formats ? { formats } : {}),
+    ...(argv.profile ? { profile: argv.profile } : {}),
     ...(positionalArgs.command === 'auth'
       ? {
           authSubcommand: positionalArgs.authSubcommand,
