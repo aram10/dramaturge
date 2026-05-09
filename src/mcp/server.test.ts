@@ -5,8 +5,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PassThrough } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDramaturgeMcpServer } from './server.js';
+import { createDramaturgeMcpServer, runMcpServer } from './server.js';
 import type { AddressInfo } from 'node:net';
 import type { DramaturgeConfig } from '../config.js';
 import type { RunEngineOptions } from '../engine.js';
@@ -279,5 +280,238 @@ describe('createDramaturgeMcpServer', () => {
       status: 200,
       body: { ok: true },
     });
+  });
+
+  it('returns a validation error from probe_api when endpoint is relative and baseUrl is absent', async () => {
+    const server = createDramaturgeMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+    });
+
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'probe_api',
+        arguments: {
+          endpoint: '/health',
+        },
+      },
+    });
+
+    expect(isRecord(response)).toBe(true);
+    expect(isRecord(response) && isRecord(response.result)).toBe(true);
+    if (isRecord(response) && isRecord(response.result)) {
+      expect(response.result.isError).toBe(true);
+      const content = response.result.content;
+      const text = Array.isArray(content) && isRecord(content[0]) ? content[0].text : '';
+      expect(typeof text === 'string' && text).toContain('absolute URL');
+    }
+  });
+
+  it('rejects unknown fields in run_exploration arguments', async () => {
+    const server = createDramaturgeMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+    });
+
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'run_exploration',
+        arguments: {
+          targetUrl: 'https://example.com',
+          unknownField: true,
+        },
+      },
+    });
+
+    expect(isRecord(response) && isRecord(response.result)).toBe(true);
+    if (isRecord(response) && isRecord(response.result)) {
+      expect(response.result.isError).toBe(true);
+    }
+  });
+
+  it('does not reply to MCP notifications (requests without id)', async () => {
+    const server = createDramaturgeMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+    });
+
+    const notificationResponse = await server.handleRequest({
+      jsonrpc: '2.0',
+      method: 'notifications/initialized',
+    });
+    const unknownNotificationResponse = await server.handleRequest({
+      jsonrpc: '2.0',
+      method: 'notifications/custom',
+    });
+
+    expect(notificationResponse).toBeUndefined();
+    expect(unknownNotificationResponse).toBeUndefined();
+  });
+
+  it('reads an empty registry when the registry file is corrupted', async () => {
+    const registryPath = join(testDir, '.dramaturge', 'mcp-runs.json');
+    mkdirSync(join(testDir, '.dramaturge'), { recursive: true });
+    writeFileSync(registryPath, 'CORRUPTED JSON {{{{', 'utf-8');
+
+    const server = createDramaturgeMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+    });
+
+    // get_findings against an unknown runId should throw a clear error, not JSON.parse crash
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'get_findings',
+        arguments: { runId: 'run-does-not-exist' },
+      },
+    });
+
+    expect(isRecord(response) && isRecord(response.result)).toBe(true);
+    if (isRecord(response) && isRecord(response.result)) {
+      expect(response.result.isError).toBe(true);
+      const content = response.result.content;
+      const text = Array.isArray(content) && isRecord(content[0]) ? content[0].text : '';
+      // Should report unknown run, not a JSON syntax error
+      expect(typeof text === 'string' && text).toContain('Unknown Dramaturge MCP run');
+    }
+  });
+
+  it('sources version from package.json in the initialize response', async () => {
+    const server = createDramaturgeMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+    });
+
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+    });
+
+    expect(isRecord(response) && isRecord(response.result)).toBe(true);
+    if (isRecord(response) && isRecord(response.result)) {
+      const info = response.result.serverInfo;
+      expect(isRecord(info) && typeof info.version).toBe('string');
+      if (isRecord(info)) {
+        expect(String(info.version)).toMatch(/^\d+\.\d+\.\d+/);
+      }
+    }
+  });
+});
+
+describe('runMcpServer — stdio framing', () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    testDir = mkdtempSync(join(tmpdir(), 'dramaturge-mcp-stdio-'));
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function frame(message: Record<string, unknown>): Buffer {
+    const body = JSON.stringify(message);
+    const header = `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n`;
+    return Buffer.from(header + body, 'utf8');
+  }
+
+  it('handles two back-to-back messages sent in one chunk', async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const chunks: Buffer[] = [];
+    stdout.on('data', (c: Buffer) => chunks.push(c));
+
+    const serverDone = runMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+      stdin,
+      stdout,
+      stderr: new PassThrough(),
+      generateRunId: () => 'test-run',
+    });
+
+    // Concatenate two messages and send in one write
+    const combined = Buffer.concat([
+      frame({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+      frame({ jsonrpc: '2.0', id: 2, method: 'tools/list' }),
+    ]);
+    stdin.write(combined);
+    stdin.end();
+
+    await serverDone;
+
+    const output = Buffer.concat(chunks).toString('utf8');
+    // Should contain both responses
+    expect(output).toContain('"id":1');
+    expect(output).toContain('"protocolVersion"');
+    expect(output).toContain('"id":2');
+    expect(output).toContain('"run_exploration"');
+  });
+
+  it('assembles a single message split across multiple chunks', async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const chunks: Buffer[] = [];
+    stdout.on('data', (c: Buffer) => chunks.push(c));
+
+    const serverDone = runMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+      stdin,
+      stdout,
+      stderr: new PassThrough(),
+      generateRunId: () => 'test-run',
+    });
+
+    const full = frame({ jsonrpc: '2.0', id: 1, method: 'ping' });
+    // Split between header and body
+    const splitAt = full.indexOf('\r\n\r\n') + 2;
+    stdin.write(full.subarray(0, splitAt));
+    stdin.write(full.subarray(splitAt));
+    stdin.end();
+
+    await serverDone;
+
+    const output = Buffer.concat(chunks).toString('utf8');
+    const parsed = JSON.parse(output.slice(output.indexOf('{'))) as unknown;
+    expect(isRecord(parsed)).toBe(true);
+    if (isRecord(parsed)) {
+      expect(parsed.id).toBe(1);
+      expect(isRecord(parsed.result)).toBe(true);
+    }
+  });
+
+  it('does not write any output for a notification sent over stdio', async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const chunks: Buffer[] = [];
+    stdout.on('data', (c: Buffer) => chunks.push(c));
+
+    const serverDone = runMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+      stdin,
+      stdout,
+      stderr: new PassThrough(),
+      generateRunId: () => 'test-run',
+    });
+
+    stdin.write(frame({ jsonrpc: '2.0', method: 'notifications/initialized' }));
+    stdin.end();
+
+    await serverDone;
+
+    expect(chunks).toHaveLength(0);
   });
 });

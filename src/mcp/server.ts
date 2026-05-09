@@ -3,6 +3,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { request as playwrightRequest } from 'playwright';
 import { z } from 'zod';
@@ -23,42 +24,67 @@ import { createContractIndex, validateOperationResponse } from '../spec/contract
 import { buildOpenApiSpec } from '../spec/openapi-spec.js';
 import { loadOpenApiSpec } from '../spec/openapi-loader.js';
 
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json') as { version: string };
+const SERVER_VERSION = pkg.version;
+
 const MCP_PROTOCOL_VERSION = '2024-11-05';
 const REGISTRY_DIR = '.dramaturge';
 const REGISTRY_FILE = 'mcp-runs.json';
 const FOCUS_MODE_ENUM = z.enum(FOCUS_MODES);
 
-const RunExplorationArgsSchema = z.object({
-  targetUrl: z.string().url(),
-  configPath: z.string().min(1).optional(),
-  config: z.record(z.string(), z.unknown()).optional(),
-  profile: z.string().min(1).optional(),
-  diffRef: z.string().min(1).optional(),
-  runId: z.string().min(1).optional(),
-});
+const RunExplorationArgsSchema = z
+  .object({
+    targetUrl: z.string().url(),
+    configPath: z.string().min(1).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+    profile: z.string().min(1).optional(),
+    diffRef: z.string().min(1).optional(),
+    runId: z.string().min(1).optional(),
+  })
+  .strict();
 
-const TestPageArgsSchema = z.object({
-  url: z.string().url(),
-  focusAreas: z.array(FOCUS_MODE_ENUM).min(1).optional(),
-  configPath: z.string().min(1).optional(),
-  config: z.record(z.string(), z.unknown()).optional(),
-  profile: z.string().min(1).optional(),
-  runId: z.string().min(1).optional(),
-});
+const TestPageArgsSchema = z
+  .object({
+    url: z.string().url(),
+    focusAreas: z.array(FOCUS_MODE_ENUM).min(1).optional(),
+    configPath: z.string().min(1).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+    profile: z.string().min(1).optional(),
+    runId: z.string().min(1).optional(),
+  })
+  .strict();
 
-const ReadRunArgsSchema = z.object({
-  runId: z.string().min(1),
-});
+const ReadRunArgsSchema = z
+  .object({
+    runId: z.string().min(1),
+  })
+  .strict();
 
-const ProbeApiArgsSchema = z.object({
-  endpoint: z.string().min(1),
-  baseUrl: z.string().url().optional(),
-  method: z.string().min(1).default('GET'),
-  headers: z.record(z.string(), z.string()).optional(),
-  body: z.unknown().optional(),
-  specPath: z.string().min(1).optional(),
-  spec: z.record(z.string(), z.unknown()).optional(),
-});
+const ProbeApiArgsSchema = z
+  .object({
+    endpoint: z.string().min(1),
+    baseUrl: z.string().url().optional(),
+    method: z.string().min(1).default('GET'),
+    headers: z.record(z.string(), z.string()).optional(),
+    body: z.unknown().optional(),
+    specPath: z.string().min(1).optional(),
+    spec: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
+  .superRefine((args, ctx) => {
+    if (!args.baseUrl) {
+      try {
+        new URL(args.endpoint);
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['endpoint'],
+          message: 'endpoint must be an absolute URL when baseUrl is not provided',
+        });
+      }
+    }
+  });
 
 interface ToolDescriptor {
   name: string;
@@ -230,7 +256,13 @@ function readRegistry(cwd: string): RunRegistry {
     return {};
   }
 
-  const parsed = JSON.parse(readFileSync(registryPath, 'utf-8')) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(registryPath, 'utf-8'));
+  } catch {
+    return {};
+  }
+
   if (!isRecord(parsed)) {
     return {};
   }
@@ -620,7 +652,12 @@ async function handleStandardRequest(
   deps: McpServerDependencies,
   request: JsonRpcRequest
 ): Promise<JsonRpcSuccessResponse | JsonRpcErrorResponse | undefined> {
-  const requestId = request.id ?? null;
+  // Notifications omit `id` entirely; JSON-RPC 2.0 forbids replies to them.
+  if (request.id === undefined) {
+    return undefined;
+  }
+
+  const requestId = request.id;
 
   switch (request.method) {
     case 'initialize':
@@ -629,12 +666,9 @@ async function handleStandardRequest(
         capabilities: { tools: {} },
         serverInfo: {
           name: 'dramaturge',
-          version: '0.6.0',
+          version: SERVER_VERSION,
         },
       });
-    case 'notifications/initialized':
-    case 'notifications/cancelled':
-      return undefined;
     case 'ping':
       return buildSuccessResponse(requestId, {});
     case 'resources/list':
@@ -668,11 +702,15 @@ export function createDramaturgeMcpServer(
       try {
         return await handleStandardRequest(deps, request);
       } catch (error) {
+        // Never reply to notifications even on unexpected errors.
+        if (request.id === undefined) {
+          return undefined;
+        }
         const message = error instanceof Error ? error.message : String(error);
         if (request.method === 'tools/call') {
-          return buildSuccessResponse(request.id ?? null, createToolResult({ message }, true));
+          return buildSuccessResponse(request.id, createToolResult({ message }, true));
         }
-        return buildErrorResponse(request.id ?? null, -32000, message);
+        return buildErrorResponse(request.id, -32000, message);
       }
     },
   };
