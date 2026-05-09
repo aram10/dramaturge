@@ -172,6 +172,11 @@ describe('parseCliArgs', () => {
     expect(result.command).toBe('doctor');
   });
 
+  it('parses mcp command', () => {
+    const result = parseCliArgs(['mcp']);
+    expect(result.command).toBe('mcp');
+  });
+
   it('parses init command with --template', () => {
     const result = parseCliArgs(['init', '--template', 'full']);
     expect(result.command).toBe('init');
@@ -287,6 +292,7 @@ describe('buildHelpText', () => {
     expect(helpText).toContain('--dashboard');
     expect(helpText).toContain('both (legacy alias)');
     expect(helpText).toContain('doctor');
+    expect(helpText).toContain('mcp');
     expect(helpText).toContain('setup');
     expect(helpText).toContain('init');
     expect(helpText).toContain('auto-config');
@@ -449,6 +455,21 @@ describe('runCli', () => {
     // Doctor should run and return a code
     expect(typeof exitCode).toBe('number');
     expect(output.some((m) => m.includes('Dramaturge Doctor'))).toBe(true);
+  });
+
+  it('runs the MCP server command', async () => {
+    const runMcpServer = vi.fn().mockResolvedValue(undefined);
+
+    const exitCode = await runCli(['mcp'], {
+      loadConfig: vi.fn(),
+      runEngine: vi.fn(),
+      runMcpServer,
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(runMcpServer).toHaveBeenCalledTimes(1);
   });
 });
 
