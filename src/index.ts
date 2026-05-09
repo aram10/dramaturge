@@ -11,6 +11,7 @@ export type {
   OAuthRedirectStep,
   DramaturgeConfig,
   LoadedDramaturgeConfig,
+  WorkflowAutomataConfig,
 } from './config.js';
 export {
   resolveProvider,
@@ -128,6 +129,24 @@ export type {
   WorkerTask,
   WorkerType,
 } from './types.js';
+export {
+  compareWorkflowAutomata,
+  generateWorkflowFollowups,
+  mineWorkflowAutomaton,
+  renderWorkflowAutomatonMermaid,
+} from './workflow-automata/index.js';
+export type {
+  WorkflowAction,
+  WorkflowAnomaly,
+  WorkflowAutomaton,
+  WorkflowAutomatonComparison,
+  WorkflowFollowupCandidate,
+  WorkflowGuard,
+  WorkflowState,
+  WorkflowStateKey,
+  WorkflowTraceEvent,
+  WorkflowTransition,
+} from './workflow-automata/index.js';
 export type {
   ApiProbeTarget,
   ApiReplayRequest,

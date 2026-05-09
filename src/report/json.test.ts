@@ -307,4 +307,54 @@ describe('renderJson', () => {
       ],
     });
   });
+
+  it('serializes workflow automata summaries when present', () => {
+    const report = JSON.parse(
+      renderJson({
+        ...makeResult([]),
+        workflowAutomaton: {
+          version: 1,
+          createdAt: '2026-05-08T21:00:00.000Z',
+          targetUrl: 'https://example.com',
+          states: [
+            {
+              id: 'wf-state-1',
+              key: { routeFamily: '/orders/:id/edit', pageType: 'form' },
+              label: 'form · /orders/:id/edit',
+              kind: 'form',
+              routeFamily: '/orders/:id/edit',
+              pageType: 'form',
+              sourceNodeIds: ['node-1'],
+              firstObservedAt: '2026-05-08T21:00:00.000Z',
+              lastObservedAt: '2026-05-08T21:00:00.000Z',
+              observationCount: 1,
+              confidence: 0.7,
+            },
+          ],
+          transitions: [],
+          anomalies: [],
+          metrics: {
+            stateCount: 1,
+            transitionCount: 0,
+            anomalyCount: 0,
+            lowConfidenceTransitionCount: 0,
+            nondeterministicActionCount: 0,
+            crossRoleComparisonCount: 0,
+          },
+        },
+        workflowComparison: {
+          previousRunFound: false,
+          addedStateLabels: ['form · /orders/:id/edit'],
+          removedStateLabels: [],
+          addedTransitionLabels: [],
+          removedTransitionLabels: [],
+          peerProfiles: [],
+          roleDifferences: [],
+        },
+      })
+    );
+
+    expect(report.workflowAutomaton.metrics.stateCount).toBe(1);
+    expect(report.workflowComparison.addedStateLabels).toEqual(['form · /orders/:id/edit']);
+  });
 });

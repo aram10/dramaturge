@@ -147,6 +147,8 @@ export function buildRunResult(
     crossRunClassification?: CrossRunClassification;
     safetyAudit?: RunResult['safetyAudit'];
     explorationLedger?: RunResult['explorationLedger'];
+    workflowAutomaton?: RunResult['workflowAutomaton'];
+    workflowComparison?: RunResult['workflowComparison'];
   }
 ): RunResult {
   const {
@@ -159,6 +161,8 @@ export function buildRunResult(
     crossRunClassification,
     safetyAudit,
     explorationLedger,
+    workflowAutomaton,
+    workflowComparison,
   } = options;
 
   return {
@@ -176,5 +180,7 @@ export function buildRunResult(
     crossRunClassification,
     safetyAudit,
     explorationLedger,
+    workflowAutomaton,
+    workflowComparison,
   };
 }

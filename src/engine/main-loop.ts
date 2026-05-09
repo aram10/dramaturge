@@ -17,6 +17,7 @@ import {
 } from './graph-ops.js';
 import { emitEngineEvent } from './event-stream.js';
 import type { WorkerSession } from './worker-pool.js';
+import { updateWorkflowAutomataRuntime } from '../workflow-automata/planner-adapter.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
@@ -282,6 +283,7 @@ export async function runPlannerLoop(
 
       await expandGraph(ctx, item.nodeId, result, useLLMPlanner);
       routeFollowups(ctx, item.nodeId, result);
+      updateWorkflowAutomataRuntime(ctx);
 
       item.status = 'completed';
       ctx.completedTaskIds.add(item.id);

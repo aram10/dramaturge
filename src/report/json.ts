@@ -137,6 +137,8 @@ export function renderJson(result: RunResult): string {
           events: result.explorationLedger.events,
         }
       : null,
+    workflowAutomaton: result.workflowAutomaton ?? null,
+    workflowComparison: result.workflowComparison ?? null,
   };
 
   return JSON.stringify(report, null, 2);

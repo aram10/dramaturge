@@ -351,6 +351,59 @@ function renderBlindSpotsSection(result: RunResult): string[] {
   return lines;
 }
 
+function renderWorkflowAutomataSection(result: RunResult): string[] {
+  if (!result.workflowAutomaton) return [];
+  const automaton = result.workflowAutomaton;
+  const lines: string[] = [
+    '## Workflow Automata',
+    '',
+    `- **States:** ${automaton.metrics.stateCount}`,
+    `- **Transitions:** ${automaton.metrics.transitionCount}`,
+    `- **Anomalies:** ${automaton.metrics.anomalyCount}`,
+    `- **Low-confidence transitions:** ${automaton.metrics.lowConfidenceTransitionCount}`,
+  ];
+  if (automaton.anomalies.length > 0) {
+    lines.push('', '### Workflow anomalies', '');
+    for (const anomaly of automaton.anomalies.slice(0, 12)) {
+      lines.push(
+        `- **${escapeMarkdownInline(anomaly.severity)}** ${escapeMarkdownInline(anomaly.summary)}`
+      );
+    }
+  }
+  lines.push('');
+  return lines;
+}
+
+function renderWorkflowComparisonSection(result: RunResult): string[] {
+  if (!result.workflowComparison) return [];
+  const comparison = result.workflowComparison;
+  const lines: string[] = [
+    '## Workflow Comparison',
+    '',
+    `- **Previous run available:** ${comparison.previousRunFound ? 'yes' : 'no'}`,
+  ];
+  if (comparison.previousCreatedAt) {
+    lines.push(`- **Previous automaton:** ${escapeMarkdownInline(comparison.previousCreatedAt)}`);
+  }
+  if (comparison.addedStateLabels.length > 0) {
+    lines.push(
+      `- **New states:** ${comparison.addedStateLabels.map((value) => escapeMarkdownInline(value)).join(' | ')}`
+    );
+  }
+  if (comparison.removedStateLabels.length > 0) {
+    lines.push(
+      `- **Removed states:** ${comparison.removedStateLabels.map((value) => escapeMarkdownInline(value)).join(' | ')}`
+    );
+  }
+  if (comparison.roleDifferences.length > 0) {
+    lines.push(
+      `- **Role differences:** ${comparison.roleDifferences.map((value) => escapeMarkdownInline(value)).join(' | ')}`
+    );
+  }
+  lines.push('');
+  return lines;
+}
+
 function renderStateGraphSection(result: RunResult): string[] {
   if (!result.stateGraphMermaid) return [];
   return ['## State Graph', '', '```mermaid', result.stateGraphMermaid, '```', ''];
@@ -415,6 +468,7 @@ function renderRunConfigSection(result: RunResult): string[] {
     `- **Memory:** ${rc.memoryEnabled ? 'enabled' : 'disabled'}`,
     `- **Warm start:** ${rc.warmStartEnabled ? 'enabled' : 'disabled'}`,
     `- **Visual regression:** ${rc.visualRegressionEnabled ? 'enabled' : 'disabled'}`,
+    `- **Workflow automata:** ${rc.workflowAutomataEnabled ? 'enabled' : 'disabled'}`,
     '',
   ];
 }
@@ -480,6 +534,8 @@ export function renderMarkdown(result: RunResult): string {
     renderActionTraceSection(result),
     renderUnexploredAreasSection(result),
     renderBlindSpotsSection(result),
+    renderWorkflowAutomataSection(result),
+    renderWorkflowComparisonSection(result),
     renderStateGraphSection(result),
     renderDiffSummarySection(result, diffScope),
     renderRunMemorySection(result),

@@ -4,6 +4,7 @@
 import type { CrossRunClassification } from './report/cross-run-classification.js';
 import type { CostRecord } from './coverage/cost-tracker.js';
 import type { ObservedApiEndpoint } from './network/traffic-observer.js';
+import type { WorkflowAutomaton, WorkflowAutomatonComparison } from './workflow-automata/types.js';
 export type { CrossRunClassification };
 
 export type FindingCategory =
@@ -208,6 +209,10 @@ export interface RunResult {
   safetyAudit?: SafetyAuditSummary;
   /** Canonical timeline of exploration events for the full run. */
   explorationLedger?: ExplorationLedger;
+  /** Experimental workflow automaton mined from observed traces. */
+  workflowAutomaton?: WorkflowAutomaton;
+  /** Comparison summary against prior role/run workflow automata. */
+  workflowComparison?: WorkflowAutomatonComparison;
 }
 
 export interface ExplorationLedger {
@@ -288,6 +293,7 @@ export interface RunConfigMeta {
   memoryEnabled: boolean;
   visualRegressionEnabled: boolean;
   warmStartEnabled: boolean;
+  workflowAutomataEnabled: boolean;
 }
 
 export interface RunMemoryMeta {
