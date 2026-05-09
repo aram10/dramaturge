@@ -357,12 +357,12 @@ function parseWithYargs(args: readonly string[]) {
     .option('dashboard', { type: 'boolean' })
     .option('login', { type: 'boolean' })
     .option('headless', { type: 'boolean' })
-    .option('provider', { type: 'string' })
-    .option('preset', { type: 'string' })
-    .option('focus', { type: 'string', array: true })
-    .option('format', { type: 'string' })
+    .option('provider', { type: 'string', coerce: parseProvider })
+    .option('preset', { type: 'string', coerce: parsePreset })
+    .option('focus', { type: 'string', array: true, coerce: parseFocusModes })
+    .option('format', { type: 'string', coerce: parseFormatValue })
     .option('profile', { type: 'string' })
-    .option('template', { type: 'string' })
+    .option('template', { type: 'string', coerce: parseTemplate })
     .option('url', { type: 'string' })
     .option('output', { type: 'string' })
     .option('repo', { type: 'string' })
@@ -417,11 +417,11 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   const argv = parseWithYargs(args);
   const positionals = argv._.map((value: string | number) => String(value));
   const positionalArgs = parsePositionals(positionals, argv.url);
-  const provider = argv.provider ? parseProvider(argv.provider) : undefined;
-  const preset = argv.preset ? parsePreset(argv.preset) : undefined;
-  const focusModes = parseFocusModes(argv.focus);
-  const formats = argv.format ? parseFormatValue(argv.format) : undefined;
-  const initTemplate = argv.template ? parseTemplate(argv.template) : undefined;
+  const provider = argv.provider as ParsedCliArgs['provider'] | undefined;
+  const preset = argv.preset as ParsedCliArgs['preset'] | undefined;
+  const focusModes = argv.focus as FocusMode[] | undefined;
+  const formats = argv.format as ParsedCliArgs['formats'] | undefined;
+  const initTemplate = argv.template as InitTemplate | undefined;
   const repoPath = argv.repo;
   const noScan = argv.noScan ? true : undefined;
 
@@ -437,8 +437,8 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     dashboard: argv.dashboard ?? false,
     showHelp: false,
     url: positionalArgs.url,
-    login: argv.login || undefined,
-    headless: argv.headless || undefined,
+    login: argv.login ?? undefined,
+    headless: argv.headless ?? undefined,
     provider,
     preset,
     initTemplate,
@@ -458,15 +458,15 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
       ? {
           triageSubcommand: positionalArgs.triageSubcommand,
           triagePositional: positionalArgs.triagePositional,
-          triageSuppressedOnly: argv.suppressed || undefined,
-          triageAll: argv.all || undefined,
+          triageSuppressedOnly: argv.suppressed ?? undefined,
+          triageAll: argv.all ?? undefined,
           triageReason: argv.reason,
         }
       : {}),
     ...(positionalArgs.command === 'benchmark'
       ? {
           benchmarkAppId: positionalArgs.benchmarkAppId,
-          benchmarkSave: argv.save || undefined,
+          benchmarkSave: argv.save ?? undefined,
           benchmarkOutput: argv.output,
         }
       : {}),
