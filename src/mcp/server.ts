@@ -12,6 +12,7 @@ import {
   resolveOutputFormats,
   type DramaturgeConfig,
   type LoadedDramaturgeConfig,
+  type OutputFormatValue,
 } from '../config.js';
 import { normalizeConfigPaths, type ConfigFileContext } from '../config-paths.js';
 import { buildSmokePreset, FOCUS_MODES, resolveProviderDefaults } from '../config-inline.js';
@@ -287,7 +288,7 @@ function mergeRecords(
 
 function ensureJsonReport(config: DramaturgeConfig): DramaturgeConfig {
   const formats = resolveOutputFormats(config.output.format);
-  const nextFormats: Array<'markdown' | 'json' | 'junit' | 'sarif'> = formats.includes('json')
+  const nextFormats: Array<Exclude<OutputFormatValue, 'both'>> = formats.includes('json')
     ? formats
     : [...formats, 'json'];
   return {
@@ -683,8 +684,8 @@ function encodeMessage(message: JsonRpcSuccessResponse | JsonRpcErrorResponse): 
 }
 
 function tryParseMessage(
-  buffer: Buffer
-): { message: JsonRpcRequest; remaining: Buffer } | undefined {
+  buffer: Buffer<ArrayBufferLike>
+): { message: JsonRpcRequest; remaining: Buffer<ArrayBufferLike> } | undefined {
   const headerEnd = buffer.indexOf('\r\n\r\n');
   if (headerEnd === -1) {
     return undefined;
@@ -712,14 +713,14 @@ function tryParseMessage(
   const rawBody = buffer.subarray(bodyStart, bodyEnd).toString('utf8');
   return {
     message: JSON.parse(rawBody) as JsonRpcRequest,
-    remaining: buffer.subarray(bodyEnd),
+    remaining: Buffer.from(buffer.subarray(bodyEnd)),
   };
 }
 
 export async function runMcpServer(overrides: Partial<McpServerDependencies> = {}): Promise<void> {
   const deps = { ...DEFAULT_MCP_DEPENDENCIES, ...overrides };
   const server = createDramaturgeMcpServer(deps);
-  let buffer = Buffer.alloc(0) as Buffer<ArrayBufferLike>;
+  let buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
 
   for await (const chunk of deps.stdin) {
     buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
