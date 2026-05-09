@@ -25,8 +25,15 @@ import { buildOpenApiSpec } from '../spec/openapi-spec.js';
 import { loadOpenApiSpec } from '../spec/openapi-loader.js';
 
 const require = createRequire(import.meta.url);
-const pkg = require('../../package.json') as { version: string };
-const SERVER_VERSION = pkg.version;
+let SERVER_VERSION = '0.0.0';
+try {
+  const pkg = require('../../package.json') as { version?: unknown };
+  if (typeof pkg.version === 'string' && pkg.version) {
+    SERVER_VERSION = pkg.version;
+  }
+} catch {
+  // package.json unavailable at runtime; fall back to placeholder
+}
 
 const MCP_PROTOCOL_VERSION = '2024-11-05';
 const REGISTRY_DIR = '.dramaturge';

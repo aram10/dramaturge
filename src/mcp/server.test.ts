@@ -47,6 +47,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Encode a JSON-RPC message with Content-Length framing (used in stdio MCP transport). */
+function frame(message: Record<string, unknown>): Buffer {
+  const body = JSON.stringify(message);
+  const header = `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n`;
+  return Buffer.from(header + body, 'utf8');
+}
+
 describe('createDramaturgeMcpServer', () => {
   let testDir: string;
   let apiServer: Server | undefined;
@@ -419,12 +426,6 @@ describe('runMcpServer — stdio framing', () => {
   afterEach(() => {
     rmSync(testDir, { recursive: true, force: true });
   });
-
-  function frame(message: Record<string, unknown>): Buffer {
-    const body = JSON.stringify(message);
-    const header = `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n`;
-    return Buffer.from(header + body, 'utf8');
-  }
 
   it('handles two back-to-back messages sent in one chunk', async () => {
     const stdin = new PassThrough();
