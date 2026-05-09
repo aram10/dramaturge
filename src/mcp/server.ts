@@ -684,8 +684,9 @@ function encodeMessage(message: JsonRpcSuccessResponse | JsonRpcErrorResponse): 
 }
 
 function tryParseMessage(
-  buffer: Buffer<ArrayBufferLike>
-): { message: JsonRpcRequest; remaining: Buffer<ArrayBufferLike> } | undefined {
+  rawBuffer: Uint8Array<ArrayBufferLike>
+): { message: JsonRpcRequest; remaining: Uint8Array<ArrayBufferLike> } | undefined {
+  const buffer = Buffer.from(rawBuffer);
   const headerEnd = buffer.indexOf('\r\n\r\n');
   if (headerEnd === -1) {
     return undefined;
@@ -720,10 +721,13 @@ function tryParseMessage(
 export async function runMcpServer(overrides: Partial<McpServerDependencies> = {}): Promise<void> {
   const deps = { ...DEFAULT_MCP_DEPENDENCIES, ...overrides };
   const server = createDramaturgeMcpServer(deps);
-  let buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  let buffer: Uint8Array<ArrayBufferLike> = new Uint8Array();
 
   for await (const chunk of deps.stdin) {
-    buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+    buffer = Buffer.concat([
+      Buffer.from(buffer),
+      Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
+    ]);
 
     while (true) {
       const parsed = tryParseMessage(buffer);
