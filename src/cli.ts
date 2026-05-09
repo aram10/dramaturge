@@ -270,12 +270,13 @@ function assertValueFlagsHaveValues(args: readonly string[]): void {
   }
 }
 
-function parseFocusModes(values: readonly string[] | undefined): FocusMode[] | undefined {
+function parseFocusModes(values: readonly string[] | string | undefined): FocusMode[] | undefined {
   if (!values || values.length === 0) {
     return undefined;
   }
+  const normalizedValues = Array.isArray(values) ? values : [values];
   const focusModes: FocusMode[] = [];
-  for (const value of values) {
+  for (const value of normalizedValues) {
     for (const mode of parseFocusValue(value)) {
       if (!focusModes.includes(mode)) {
         focusModes.push(mode);
