@@ -27,9 +27,15 @@ import { loadOpenApiSpec } from '../spec/openapi-loader.js';
 const require = createRequire(import.meta.url);
 let SERVER_VERSION = '0.0.0';
 try {
-  const pkg = require('../../package.json') as { version?: unknown };
-  if (typeof pkg.version === 'string' && pkg.version) {
-    SERVER_VERSION = pkg.version;
+  const raw: unknown = require('../../package.json');
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    'version' in raw &&
+    typeof (raw as Record<string, unknown>).version === 'string' &&
+    (raw as Record<string, unknown>).version
+  ) {
+    SERVER_VERSION = (raw as Record<string, string>).version;
   }
 } catch {
   // package.json unavailable at runtime; fall back to placeholder

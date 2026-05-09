@@ -409,7 +409,7 @@ describe('createDramaturgeMcpServer', () => {
       const info = response.result.serverInfo;
       expect(isRecord(info) && typeof info.version).toBe('string');
       if (isRecord(info)) {
-        expect(String(info.version)).toMatch(/^\d+\.\d+\.\d+/);
+        expect(String(info.version)).toMatch(/^\d+\.\d+\.\d+$/);
       }
     }
   });
