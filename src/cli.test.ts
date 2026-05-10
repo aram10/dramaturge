@@ -279,6 +279,51 @@ describe('parseCliArgs', () => {
   it('throws when --profile has no value', () => {
     expect(() => parseCliArgs(['run', '--profile'])).toThrow('Missing value for --profile');
   });
+
+  it.each([
+    {
+      name: '--config',
+      args: ['run', '--config', '--dashboard'],
+      message: 'Missing value for --config',
+    },
+    {
+      name: '--url',
+      args: ['init', '--url', '--output', 'dramaturge.config.json'],
+      message: 'Missing value for --url',
+    },
+    {
+      name: '--output',
+      args: ['benchmark', '--output', '--save'],
+      message: 'Missing value for --output',
+    },
+    {
+      name: '--profile',
+      args: ['auth', 'capture', '--profile', '--url', 'https://example.com'],
+      message: 'Missing value for --profile',
+    },
+  ])('rejects another flag as the value for $name', ({ args, message }) => {
+    expect(() => parseCliArgs(args)).toThrow(message);
+  });
+
+  it.each([
+    {
+      name: '--config=',
+      args: ['run', '--config='],
+      message: 'Missing value for --config',
+    },
+    {
+      name: '--url=',
+      args: ['init', '--url='],
+      message: 'Missing value for --url',
+    },
+    {
+      name: '--output=',
+      args: ['benchmark', '--output='],
+      message: 'Missing value for --output',
+    },
+  ])('rejects empty equals-sign form for $name', ({ args, message }) => {
+    expect(() => parseCliArgs(args)).toThrow(message);
+  });
 });
 
 describe('buildHelpText', () => {

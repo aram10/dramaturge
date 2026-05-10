@@ -3,6 +3,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { pathToFileURL } from 'node:url';
+import yargs from 'yargs';
 import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from './config.js';
 import { resolveResumeDir } from './config-paths.js';
 import { runEngine, type RunEngineOptions } from './engine.js';
@@ -221,184 +222,170 @@ const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'open
 const VALID_PRESETS = new Set<string>(PRESET_NAMES);
 const VALID_FOCUS_MODES = new Set<string>(FOCUS_MODES);
 const VALID_FORMATS = new Set(['markdown', 'json', 'both', 'junit', 'sarif']);
-
-/** Mutable state accumulated while parsing CLI flags. */
-interface CliParseState {
-  command: ParsedCliArgs['command'];
-  configPath?: string;
-  resumeDir?: string;
-  diffRef?: string;
-  dashboard: boolean;
-  url?: string;
-  login?: boolean;
-  headless?: boolean;
-  provider?: ParsedCliArgs['provider'];
-  preset?: ParsedCliArgs['preset'];
-  focusModes: FocusMode[];
-  formats?: ParsedCliArgs['formats'];
-  profile?: string;
-  initTemplate?: InitTemplate;
-  initOutput?: string;
-  repoPath?: string;
-  noScan?: true;
-  triageSubcommand?: string;
-  triagePositional: string[];
-  triageSuppressedOnly?: boolean;
-  triageAll?: boolean;
-  triageReason?: string;
-  authSubcommand?: string;
-  benchmarkAppId?: string;
-  benchmarkSave?: boolean;
-  benchmarkOutput?: string;
-}
-
-type BoolFlagSetter = (s: CliParseState) => void;
-type ValueFlagHandler = (s: CliParseState, value: string) => void;
-
-const BOOLEAN_FLAG_HANDLERS = new Map<string, BoolFlagSetter>([
-  [
-    '--dashboard',
-    (s) => {
-      s.dashboard = true;
-    },
-  ],
-  [
-    '--login',
-    (s) => {
-      s.login = true;
-    },
-  ],
-  [
-    '--headless',
-    (s) => {
-      s.headless = true;
-    },
-  ],
-  [
-    '--no-scan',
-    (s) => {
-      s.noScan = true;
-    },
-  ],
-  [
-    '--suppressed',
-    (s) => {
-      s.triageSuppressedOnly = true;
-    },
-  ],
-  [
-    '--all',
-    (s) => {
-      s.triageAll = true;
-    },
-  ],
-  [
-    '--save',
-    (s) => {
-      s.benchmarkSave = true;
-    },
-  ],
+const VALUE_FLAGS = new Set([
+  '--config',
+  '--resume',
+  '--diff',
+  '--url',
+  '--output',
+  '--reason',
+  '--provider',
+  '--preset',
+  '--focus',
+  '--format',
+  '--profile',
+  '--template',
+  '--repo',
 ]);
 
-function applyProviderFlag(s: CliParseState, value: string): void {
+function parseProvider(value: string): ParsedCliArgs['provider'] {
   if (!VALID_PROVIDERS.has(value)) {
     throw new Error(
       `Invalid provider: ${value}. Must be one of: anthropic, openai, google, azure, openrouter, github`
     );
   }
-  s.provider = value as ParsedCliArgs['provider'];
+  return value as ParsedCliArgs['provider'];
 }
 
-function applyPresetFlag(s: CliParseState, value: string): void {
+function parsePreset(value: string): ParsedCliArgs['preset'] {
   if (!VALID_PRESETS.has(value)) {
     throw new Error(`Invalid preset: ${value}. Must be one of: ${[...VALID_PRESETS].join(', ')}`);
   }
-  s.preset = value as ParsedCliArgs['preset'];
+  return value as ParsedCliArgs['preset'];
 }
 
-function applyFocusFlag(s: CliParseState, value: string): void {
-  for (const mode of parseFocusValue(value)) {
-    if (!s.focusModes.includes(mode)) s.focusModes.push(mode);
-  }
-}
-
-function applyTemplateFlag(s: CliParseState, value: string): void {
+function parseTemplate(value: string): InitTemplate {
   if (value !== 'minimal' && value !== 'full') {
     throw new Error(`Invalid template: ${value}. Must be one of: minimal, full`);
   }
-  s.initTemplate = value;
-}
-
-function applyRepoFlag(s: CliParseState, value: string): void {
-  if (!value || value.startsWith('-')) throw new Error('Missing value for --repo');
-  s.repoPath = value;
-}
-
-const VALUE_FLAG_HANDLERS = new Map<string, ValueFlagHandler>([
-  [
-    '--config',
-    (s, v) => {
-      s.configPath = v;
-    },
-  ],
-  [
-    '--resume',
-    (s, v) => {
-      s.resumeDir = v;
-    },
-  ],
-  [
-    '--diff',
-    (s, v) => {
-      s.diffRef = v;
-    },
-  ],
-  [
-    '--url',
-    (s, v) => {
-      s.url = v;
-    },
-  ],
-  [
-    '--output',
-    (s, v) => {
-      if (s.command === 'benchmark') {
-        s.benchmarkOutput = v;
-      } else {
-        s.initOutput = v;
-      }
-    },
-  ],
-  [
-    '--reason',
-    (s, v) => {
-      s.triageReason = v;
-    },
-  ],
-  ['--provider', applyProviderFlag],
-  ['--preset', applyPresetFlag],
-  ['--focus', applyFocusFlag],
-  [
-    '--format',
-    (s, v) => {
-      s.formats = parseFormatValue(v);
-    },
-  ],
-  [
-    '--profile',
-    (s, v) => {
-      s.profile = v;
-    },
-  ],
-  ['--template', applyTemplateFlag],
-  ['--repo', applyRepoFlag],
-]);
-
-/** Grab the next positional arg as a required flag value, advancing the index. */
-function requireNextArg(args: readonly string[], i: number, flag: string): string {
-  const value = args[i + 1];
-  if (!value) throw new Error(`Missing value for ${flag}`);
   return value;
+}
+
+function assertValueFlagsHaveValues(args: readonly string[]): void {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    const eqIndex = arg.indexOf('=');
+    const flagName = eqIndex === -1 ? arg : arg.slice(0, eqIndex);
+    if (!VALUE_FLAGS.has(flagName)) {
+      continue;
+    }
+    if (eqIndex !== -1) {
+      // --flag=value form: only reject when the value part is empty (--flag=)
+      if (arg.slice(eqIndex + 1).length === 0) {
+        throw new Error(`Missing value for ${flagName}`);
+      }
+      continue;
+    }
+    // --flag form: next arg must exist and must not look like another flag
+    const nextArg = args[index + 1];
+    if (!nextArg || nextArg.startsWith('-')) {
+      throw new Error(`Missing value for ${flagName}`);
+    }
+  }
+}
+
+function parseFocusModes(values: readonly string[] | undefined): FocusMode[] | undefined {
+  if (!values || values.length === 0) {
+    return undefined;
+  }
+  const focusModes: FocusMode[] = [];
+  for (const value of values) {
+    for (const mode of parseFocusValue(value)) {
+      if (!focusModes.includes(mode)) {
+        focusModes.push(mode);
+      }
+    }
+  }
+  return focusModes;
+}
+
+function parsePositionals(
+  positionals: readonly string[],
+  parsedUrl?: string
+): {
+  command: ParsedCliArgs['command'];
+  url?: string;
+  authSubcommand?: string;
+  triageSubcommand?: string;
+  triagePositional?: string[];
+  benchmarkAppId?: string;
+} {
+  const [firstPositional] = positionals;
+  const hasExplicitCommand = !!firstPositional && KNOWN_COMMANDS.has(firstPositional);
+  const command = hasExplicitCommand ? (firstPositional as ParsedCliArgs['command']) : 'run';
+  let index = hasExplicitCommand ? 1 : 0;
+  let url = parsedUrl;
+
+  if (command === 'run' && !url && positionals[index]) {
+    url = positionals[index];
+    index++;
+  }
+
+  if (command === 'auth') {
+    const authSubcommand = positionals[index];
+    index += authSubcommand ? 1 : 0;
+    if (positionals[index]) {
+      throw new Error(`Unknown argument: ${positionals[index]}`);
+    }
+    return { command, url, authSubcommand };
+  }
+
+  if (TRIAGE_COMMANDS.has(command)) {
+    const triageSubcommand = positionals[index];
+    const triagePositional =
+      positionals.length > index + 1 ? [...positionals.slice(index + 1)] : undefined;
+    return { command, url, triageSubcommand, triagePositional };
+  }
+
+  if (command === 'benchmark') {
+    const benchmarkAppId = positionals[index];
+    index += benchmarkAppId ? 1 : 0;
+    if (positionals[index]) {
+      throw new Error(`Unknown argument: ${positionals[index]}`);
+    }
+    return { command, url, benchmarkAppId };
+  }
+
+  if (positionals[index]) {
+    throw new Error(`Unknown argument: ${positionals[index]}`);
+  }
+
+  return { command, url };
+}
+
+function parseWithYargs(args: readonly string[]) {
+  return yargs(args)
+    .exitProcess(false)
+    .help(false)
+    .version(false)
+    .strictOptions()
+    .parserConfiguration({
+      'boolean-negation': false,
+    })
+    .fail((message: string, error?: Error) => {
+      throw error ?? new Error(message);
+    })
+    .option('config', { type: 'string' })
+    .option('resume', { type: 'string' })
+    .option('diff', { type: 'string' })
+    .option('dashboard', { type: 'boolean' })
+    .option('login', { type: 'boolean' })
+    .option('headless', { type: 'boolean' })
+    .option('provider', { type: 'string', coerce: parseProvider })
+    .option('preset', { type: 'string', coerce: parsePreset })
+    .option('focus', { type: 'string', array: true, coerce: parseFocusModes })
+    .option('format', { type: 'string', coerce: parseFormatValue })
+    .option('profile', { type: 'string' })
+    .option('template', { type: 'string', coerce: parseTemplate })
+    .option('url', { type: 'string' })
+    .option('output', { type: 'string' })
+    .option('repo', { type: 'string' })
+    .option('no-scan', { type: 'boolean' })
+    .option('suppressed', { type: 'boolean' })
+    .option('all', { type: 'boolean' })
+    .option('reason', { type: 'string' })
+    .option('save', { type: 'boolean' })
+    .parseSync();
 }
 
 /** Parse --focus <value> into validated FocusMode parts. */
@@ -436,123 +423,65 @@ function parseFormatValue(value: string): NonNullable<ParsedCliArgs['formats']> 
 }
 
 export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
-  const state: CliParseState = {
-    command: 'run',
-    dashboard: false,
-    focusModes: [],
-    triagePositional: [],
-  };
-
-  let i = 0;
-
-  // Detect subcommand (first arg if it's a known command name)
-  if (args.length > 0 && KNOWN_COMMANDS.has(args[0])) {
-    state.command = args[0] as ParsedCliArgs['command'];
-    i = 1;
+  if (args.includes('--help') || args.includes('-h')) {
+    return { command: 'help', dashboard: false, showHelp: true };
   }
 
-  for (; i < args.length; i++) {
-    const arg = args[i];
+  assertValueFlagsHaveValues(args);
+  const argv = parseWithYargs(args);
+  const positionals = argv._.map((value) => String(value));
+  const positionalArgs = parsePositionals(positionals, argv.url);
+  const provider = argv.provider as ParsedCliArgs['provider'] | undefined;
+  const preset = argv.preset as ParsedCliArgs['preset'] | undefined;
+  const focusModes = argv.focus as FocusMode[] | undefined;
+  const formats = argv.format as ParsedCliArgs['formats'] | undefined;
+  const initTemplate = argv.template as InitTemplate | undefined;
+  const repoPath = argv.repo;
+  const noScan = argv.noScan || undefined;
 
-    if (arg === '--help' || arg === '-h') {
-      return { command: 'help', dashboard: false, showHelp: true };
-    }
-
-    const boolHandler = BOOLEAN_FLAG_HANDLERS.get(arg);
-    if (boolHandler) {
-      boolHandler(state);
-      continue;
-    }
-
-    const valueHandler = VALUE_FLAG_HANDLERS.get(arg);
-    if (valueHandler) {
-      const value = arg === '--repo' ? (args[i + 1] ?? '') : requireNextArg(args, i, arg);
-      valueHandler(state, value);
-      i++;
-      continue;
-    }
-
-    if (arg.startsWith('--')) throw new Error(`Unknown argument: ${arg}`);
-
-    // Positional argument: treat as URL for `run` command
-    if (state.command === 'run' && !state.url) {
-      state.url = arg;
-      continue;
-    }
-
-    // Positional arg for triage commands
-    if (TRIAGE_COMMANDS.has(state.command)) {
-      if (!state.triageSubcommand) {
-        state.triageSubcommand = arg;
-      } else {
-        state.triagePositional.push(arg);
-      }
-      continue;
-    }
-
-    if (state.command === 'auth') {
-      if (!state.authSubcommand) {
-        state.authSubcommand = arg;
-        continue;
-      }
-      throw new Error(`Unknown argument: ${arg}`);
-    }
-
-    // Positional arg for benchmark command (app ID)
-    if (state.command === 'benchmark') {
-      if (!state.benchmarkAppId) {
-        state.benchmarkAppId = arg;
-        continue;
-      }
-      throw new Error(`Unknown argument: ${arg}`);
-    }
-
-    throw new Error(`Unknown argument: ${arg}`);
-  }
-
-  if (state.noScan && state.repoPath) {
+  if (noScan && repoPath) {
     throw new Error('--no-scan and --repo cannot be used together');
   }
 
   return {
-    command: state.command,
-    configPath: state.configPath,
-    resumeDir: state.resumeDir,
-    diffRef: state.diffRef,
-    dashboard: state.dashboard,
+    command: positionalArgs.command,
+    configPath: argv.config,
+    resumeDir: argv.resume,
+    diffRef: argv.diff,
+    dashboard: argv.dashboard ?? false,
     showHelp: false,
-    url: state.url,
-    login: state.login,
-    headless: state.headless,
-    provider: state.provider,
-    preset: state.preset,
-    focusModes: state.focusModes.length > 0 ? state.focusModes : undefined,
-    formats: state.formats,
-    profile: state.profile,
-    initTemplate: state.initTemplate,
-    initOutput: state.initOutput,
-    repoPath: state.repoPath,
-    noScan: state.noScan,
-    ...(state.command === 'auth'
+    url: positionalArgs.url,
+    login: argv.login ?? undefined,
+    headless: argv.headless ?? undefined,
+    provider,
+    preset,
+    initTemplate,
+    initOutput: positionalArgs.command === 'benchmark' ? undefined : argv.output,
+    repoPath,
+    noScan,
+    ...(focusModes ? { focusModes } : {}),
+    ...(formats ? { formats } : {}),
+    ...(argv.profile ? { profile: argv.profile } : {}),
+    ...(positionalArgs.command === 'auth'
       ? {
-          authSubcommand: state.authSubcommand,
-          authProfile: state.profile,
+          authSubcommand: positionalArgs.authSubcommand,
+          authProfile: argv.profile,
         }
       : {}),
-    ...(TRIAGE_COMMANDS.has(state.command)
+    ...(TRIAGE_COMMANDS.has(positionalArgs.command)
       ? {
-          triageSubcommand: state.triageSubcommand,
-          triagePositional: state.triagePositional.length > 0 ? state.triagePositional : undefined,
-          triageSuppressedOnly: state.triageSuppressedOnly,
-          triageAll: state.triageAll,
-          triageReason: state.triageReason,
+          triageSubcommand: positionalArgs.triageSubcommand,
+          triagePositional: positionalArgs.triagePositional,
+          triageSuppressedOnly: argv.suppressed ?? undefined,
+          triageAll: argv.all ?? undefined,
+          triageReason: argv.reason,
         }
       : {}),
-    ...(state.command === 'benchmark'
+    ...(positionalArgs.command === 'benchmark'
       ? {
-          benchmarkAppId: state.benchmarkAppId,
-          benchmarkSave: state.benchmarkSave,
-          benchmarkOutput: state.benchmarkOutput,
+          benchmarkAppId: positionalArgs.benchmarkAppId,
+          benchmarkSave: argv.save ?? undefined,
+          benchmarkOutput: argv.output,
         }
       : {}),
   };
