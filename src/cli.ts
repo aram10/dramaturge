@@ -32,6 +32,7 @@ import type {
 export interface ParsedCliArgs {
   command:
     | 'run'
+    | 'mcp'
     | 'doctor'
     | 'init'
     | 'setup'
@@ -96,6 +97,7 @@ export interface ParsedCliArgs {
 export interface CliDependencies {
   loadConfig: (configPath?: string) => LoadedDramaturgeConfig;
   runEngine: (config: DramaturgeConfig, options?: RunEngineOptions) => Promise<void>;
+  runMcpServer?: () => Promise<void>;
   log: (message: string) => void;
   error: (message: string) => void;
 }
@@ -104,6 +106,7 @@ const HELP_TEXT = `Usage: dramaturge <command> [options]
 
 Commands:
   run [url]            Run exploratory QA (default command)
+  mcp                  Start the Dramaturge MCP server over stdio
   setup                Interactive first-run onboarding wizard
   auth <sub>           Capture or list auth profiles (capture | list)
   init                 Generate a config file from a template
@@ -164,6 +167,7 @@ Examples:
   dramaturge run https://app.example.com --preset smoke  # Quick smoke test
   dramaturge run https://app.example.com --preset security  # Security-focused scan
   dramaturge run https://app.example.com --focus api --focus adversarial  # Ad-hoc focus mix
+  dramaturge mcp                                       # Expose Dramaturge as an MCP server
   dramaturge setup                                     # Interactive onboarding
   dramaturge auth capture --profile admin               # Capture storage state to .dramaturge-state/admin.json
   dramaturge auth list                                  # List saved profiles in .dramaturge-state
@@ -200,6 +204,7 @@ export function buildHelpText(): string {
 
 const KNOWN_COMMANDS = new Set([
   'run',
+  'mcp',
   'doctor',
   'init',
   'setup',
@@ -577,6 +582,9 @@ export async function runCli(
       case 'doctor':
         return runDoctor({ log: dependencies.log, cwd: process.cwd() });
 
+      case 'mcp':
+        return await runMcpCommand(dependencies);
+
       case 'init':
         return runInit(
           {
@@ -688,6 +696,17 @@ async function runSetupCommand(
   } finally {
     rl.close();
   }
+}
+
+async function runMcpCommand(dependencies: CliDependencies): Promise<number> {
+  if (dependencies.runMcpServer) {
+    await dependencies.runMcpServer();
+    return 0;
+  }
+
+  const { runMcpServer } = await import('./mcp/server.js');
+  await runMcpServer();
+  return 0;
 }
 
 async function runAuthCommand(
