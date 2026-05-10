@@ -299,6 +299,26 @@ describe('parseCliArgs', () => {
   ])('rejects another flag as the value for $name', ({ args, message }) => {
     expect(() => parseCliArgs(args)).toThrow(message);
   });
+
+  it.each([
+    {
+      name: '--config=',
+      args: ['run', '--config='],
+      message: 'Missing value for --config',
+    },
+    {
+      name: '--url=',
+      args: ['init', '--url='],
+      message: 'Missing value for --url',
+    },
+    {
+      name: '--output=',
+      args: ['benchmark', '--output='],
+      message: 'Missing value for --output',
+    },
+  ])('rejects empty equals-sign form for $name', ({ args, message }) => {
+    expect(() => parseCliArgs(args)).toThrow(message);
+  });
 });
 
 describe('buildHelpText', () => {

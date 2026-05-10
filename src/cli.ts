@@ -259,10 +259,19 @@ function parseTemplate(value: string): InitTemplate {
 function assertValueFlagsHaveValues(args: readonly string[]): void {
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
-    const [flagName] = arg.split('=', 1);
-    if (!VALUE_FLAGS.has(flagName) || arg.includes('=')) {
+    const eqIndex = arg.indexOf('=');
+    const flagName = eqIndex === -1 ? arg : arg.slice(0, eqIndex);
+    if (!VALUE_FLAGS.has(flagName)) {
       continue;
     }
+    if (eqIndex !== -1) {
+      // --flag=value form: only reject when the value part is empty (--flag=)
+      if (arg.slice(eqIndex + 1).length === 0) {
+        throw new Error(`Missing value for ${flagName}`);
+      }
+      continue;
+    }
+    // --flag form: next arg must exist and must not look like another flag
     const nextArg = args[index + 1];
     if (!nextArg || nextArg.startsWith('-')) {
       throw new Error(`Missing value for ${flagName}`);
