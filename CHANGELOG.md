@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.7.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.6.0...dramaturge-v0.7.0) (2026-05-10)
+
+
+### Features
+
+* add benchmark infrastructure for signal-to-noise testing ([a01ea02](https://github.com/aram10/dramaturge/commit/a01ea025780caff0bf834393c78f7cb18d856645))
+* add Dramaturge MCP server ([f917f55](https://github.com/aram10/dramaturge/commit/f917f55f8e61e3baabf7580968496167f80a4501))
+* add workflow automata miner scaffolding ([7f8bf3b](https://github.com/aram10/dramaturge/commit/7f8bf3bdd5849ca3c565fb675360ed882dd1939b))
+
+
+### Bug Fixes
+
+* address all PR review feedback on benchmark infrastructure ([e984ff1](https://github.com/aram10/dramaturge/commit/e984ff156c13272afe8e6f1716646651998e8ae0))
+* address all review feedback on workflow automata PR ([ee53f1a](https://github.com/aram10/dramaturge/commit/ee53f1af0eccaf72af0e76ed8f4ef50625e74b13))
+* address MCP PR review feedback ([9b6b97c](https://github.com/aram10/dramaturge/commit/9b6b97c928b70f75dee8fff13de5d9af23fe7dbb))
+* clean up MCP server typing ([9520da6](https://github.com/aram10/dramaturge/commit/9520da69f6d1325d75567df69c8ecf388deb7004))
+* force publish workflow onto OIDC auth ([4722f50](https://github.com/aram10/dramaturge/commit/4722f504343e1afb02a7ba1d5fa3f3caca8a14e7))
+* guard package.json load and hoist frame helper in MCP tests ([061c1f8](https://github.com/aram10/dramaturge/commit/061c1f8bd954448660a871ed7475b79639f81018))
+* harden yargs focus coercion ([14688ea](https://github.com/aram10/dramaturge/commit/14688ea3e547cbe85f09a4d3e769fef56031448f))
+* publish npm with OIDC and scoped GitHub package ([aa8a161](https://github.com/aram10/dramaturge/commit/aa8a161d4887d8bd6acc81182720cbe752023c91))
+* reject empty --flag= form in value flag validation ([290eb5f](https://github.com/aram10/dramaturge/commit/290eb5fef4e7cf9c9a6e91c0d7487947877ecf7a))
+* simplify MCP transport buffer typing ([5b37dc9](https://github.com/aram10/dramaturge/commit/5b37dc90ab346858fd6e915af246a9b3b56df2b6))
+* stabilize workflow automata integration ([583aa3b](https://github.com/aram10/dramaturge/commit/583aa3b653e52ecad1772ff6bacf058770c4c853))
+* tighten version validation and test regex anchor ([5d1a399](https://github.com/aram10/dramaturge/commit/5d1a399d7db0f7a277bae18c13ba1a4dd394693c))
+* tighten yargs cli option validation ([96383a9](https://github.com/aram10/dramaturge/commit/96383a951607b339dd036d58967f92a19026707d))
+
 ## [0.6.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.5.0...dramaturge-v0.6.0) (2026-05-07)
 
 
