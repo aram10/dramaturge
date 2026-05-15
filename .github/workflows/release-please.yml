@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish current package.json version to npm/GitHub Packages'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: write
@@ -23,7 +33,11 @@ jobs:
 
   publish-npm:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: >-
+      ${{
+        needs.release-please.outputs.release_created == 'true' ||
+        (github.event.inputs.publish == 'true' && github.ref == 'refs/heads/main')
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -60,7 +74,11 @@ jobs:
 
   publish-github-packages:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: >-
+      ${{
+        needs.release-please.outputs.release_created == 'true' ||
+        (github.event.inputs.publish == 'true' && github.ref == 'refs/heads/main')
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
