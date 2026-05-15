@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.1](https://github.com/aram10/dramaturge/compare/dramaturge-v0.7.0...dramaturge-v0.7.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* consolidate npm publishing into release-please.yml and fix broken release trigger ([6a5a3fd](https://github.com/aram10/dramaturge/commit/6a5a3fddbf22e78a22b35ba01ca54cdfa3460502))
+* consolidate npm publishing into release-please.yml; remove broken release trigger ([d810c3a](https://github.com/aram10/dramaturge/commit/d810c3ac476598efc00e9164609e121cb4d6e173))
+* scope id-token and packages permissions to publish jobs only in release-please.yml ([b138968](https://github.com/aram10/dramaturge/commit/b138968d66cb7fe20726d4ab555ae279cccd61a0))
+
 ## [0.7.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.6.0...dramaturge-v0.7.0) (2026-05-10)
 
 

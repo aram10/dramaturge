@@ -1,6 +1,6 @@
 {
   "name": "dramaturge",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Exploratory QA engine for web applications with UI, API, and evidence-backed replay",
   "repository": {
     "type": "git",
