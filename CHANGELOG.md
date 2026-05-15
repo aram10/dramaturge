@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2](https://github.com/aram10/dramaturge/compare/dramaturge-v0.7.1...dramaturge-v0.7.2) (2026-05-15)
+
+
+### Bug Fixes
+
+* upgrade langsmith transitive dep to 0.6.3 (CVE) ([7e9c484](https://github.com/aram10/dramaturge/commit/7e9c4844248446a83c7b9a248c0912ac4b9c6eac))
+* upgrade langsmith transitive dep to 0.6.3 to address CVE ([7b6f14c](https://github.com/aram10/dramaturge/commit/7b6f14c4ffaf487f48c594cfad31c213660517d7))
+
 ## [0.7.1](https://github.com/aram10/dramaturge/compare/dramaturge-v0.7.0...dramaturge-v0.7.1) (2026-05-15)
 
 
