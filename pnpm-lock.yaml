@@ -5404,8 +5404,6 @@ snapshots:
 
   y18n@5.0.8: {}
 
-  yaml@2.8.4: {}
-
   yaml@2.8.4:
     optional: true
 
