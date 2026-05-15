@@ -2,17 +2,12 @@ name: Publish Dramaturge
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
 
 permissions:
   contents: read
 
 jobs:
   publish-npm:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (!github.event.release.prerelease && startsWith(github.event.release.tag_name, 'v'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,8 +26,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Update npm CLI for trusted publishing
-        run: npm install --global npm@latest
+      - name: Update npm CLI
+        run: npm install --global npm@11.5.1
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -44,17 +39,9 @@ jobs:
         run: pnpm run build
 
       - name: Publish package to npm with OIDC
-        run: |
-          npm config delete //registry.npmjs.org/:_authToken --location=user || true
-          unset NODE_AUTH_TOKEN
-          npm publish --provenance --access public --registry https://registry.npmjs.org
-        env:
-          NODE_AUTH_TOKEN: ''
+        run: npm publish --provenance --access public --registry https://registry.npmjs.org
 
   publish-github-packages:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (!github.event.release.prerelease && startsWith(github.event.release.tag_name, 'v'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
