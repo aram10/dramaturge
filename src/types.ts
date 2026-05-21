@@ -215,6 +215,39 @@ export interface RunResult {
   workflowComparison?: WorkflowAutomatonComparison;
 }
 
+export type ConfirmationVerdict =
+  | 'fixed'
+  | 'still_reproducible'
+  | 'cannot_confirm'
+  | 'changed_surface'
+  | 'new_related_issue';
+
+export interface ConfirmationResult {
+  findingId: string;
+  signature: string;
+  verdict: ConfirmationVerdict;
+  confidence: FindingConfidence;
+  origin: { runStartedAt: string; targetUrl: string };
+  replay: {
+    actionsRequested: number;
+    actionsCompleted: number;
+    stoppedReason?: string;
+  };
+  oracleComparison: {
+    consoleErrorsOriginal: number;
+    consoleErrorsCurrent: number;
+    networkFailuresOriginal: number;
+    networkFailuresCurrent: number;
+    a11yViolationsOriginal: number;
+    a11yViolationsCurrent: number;
+    visualDiffRatio?: number;
+  };
+  observedNow: { expected?: string; actual?: string };
+  evidence: { screenshotRef?: string; consoleErrors: string[] };
+  suggestedNextAction?: string;
+  durationMs: number;
+}
+
 export interface ExplorationLedger {
   version: 1;
   events: ExplorationLedgerEvent[];

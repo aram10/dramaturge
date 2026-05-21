@@ -21,6 +21,7 @@ import { runDoctor } from './commands/doctor.js';
 import { runInit, type InitTemplate } from './commands/init.js';
 import { runTriageCommand } from './commands/triage.js';
 import { runBenchmarkCommand as runBenchmarkCommandImpl } from './commands/benchmark.js';
+import { runConfirmCommand, type ConfirmOutputFormat } from './commands/confirm.js';
 import type {
   ErrorEvent,
   FindingEvent,
@@ -43,6 +44,7 @@ export interface ParsedCliArgs {
     | 'baselines'
     | 'memory'
     | 'benchmark'
+    | 'confirm'
     | 'help';
   configPath?: string;
   resumeDir?: string;
@@ -93,6 +95,12 @@ export interface ParsedCliArgs {
   benchmarkSave?: boolean;
   /** --output flag for benchmark command */
   benchmarkOutput?: string;
+  /** --finding flag for confirm command */
+  confirmFinding?: string;
+  /** --from-report flag for confirm command */
+  confirmFromReport?: string;
+  /** --format flag for confirm command */
+  confirmFormat?: ConfirmOutputFormat;
 }
 
 export interface CliDependencies {
@@ -117,6 +125,7 @@ Commands:
   baselines <sub>      Manage visual-regression baselines (list | approve)
   memory stats         Show memory store statistics
   benchmark [app-id]   Run signal-to-noise benchmarks against well-known apps
+  confirm              Confirm whether a previous finding still reproduces
 
 Run options:
   --config <path>      Path to config file (default: dramaturge.config.json)
@@ -161,6 +170,11 @@ Benchmark options:
   --save               Save benchmark results to disk
   --output <dir>       Output directory for benchmark results (default: ./benchmarks/results)
 
+Confirm options:
+  --finding <id>       Finding ID to confirm (for example BUG-0042)
+  --from-report <dir>  Report directory containing findings/<id>.json
+  --format <format>    Output format: markdown, json, or short
+
 Examples:
   dramaturge run https://my-app.example.com           # Quick run, no config needed
   dramaturge run https://my-app.example.com --login    # Run with interactive auth
@@ -179,6 +193,7 @@ Examples:
   dramaturge findings suppress abc123 --reason "known issue"
   dramaturge baselines approve --all                   # Recapture all visual baselines
   dramaturge memory stats                              # Summarize memory store
+  dramaturge confirm --finding BUG-0042 --from-report ./dramaturge-reports/latest
 
 Environment variables:
   ANTHROPIC_API_KEY              API key for Anthropic models
@@ -216,6 +231,7 @@ const KNOWN_COMMANDS = new Set([
   'baselines',
   'memory',
   'benchmark',
+  'confirm',
 ]);
 const TRIAGE_COMMANDS = new Set(['findings', 'baselines', 'memory']);
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'openrouter', 'github']);
@@ -228,6 +244,8 @@ const VALUE_FLAGS = new Set([
   '--diff',
   '--url',
   '--output',
+  '--from-report',
+  '--finding',
   '--reason',
   '--provider',
   '--preset',
@@ -374,11 +392,13 @@ function parseWithYargs(args: readonly string[]) {
     .option('provider', { type: 'string', coerce: parseProvider })
     .option('preset', { type: 'string', coerce: parsePreset })
     .option('focus', { type: 'string', array: true, coerce: parseFocusModes })
-    .option('format', { type: 'string', coerce: parseFormatValue })
+    .option('format', { type: 'string' })
     .option('profile', { type: 'string' })
     .option('template', { type: 'string', coerce: parseTemplate })
     .option('url', { type: 'string' })
     .option('output', { type: 'string' })
+    .option('from-report', { type: 'string' })
+    .option('finding', { type: 'string' })
     .option('repo', { type: 'string' })
     .option('no-scan', { type: 'boolean' })
     .option('suppressed', { type: 'boolean' })
@@ -422,6 +442,13 @@ function parseFormatValue(value: string): NonNullable<ParsedCliArgs['formats']> 
   return parts as NonNullable<ParsedCliArgs['formats']>;
 }
 
+function parseConfirmFormatValue(value: string): ConfirmOutputFormat {
+  if (value === 'markdown' || value === 'json' || value === 'short') {
+    return value;
+  }
+  throw new Error(`Invalid confirm format: ${value}. Must be one of: markdown, json, short`);
+}
+
 export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   if (args.includes('--help') || args.includes('-h')) {
     return { command: 'help', dashboard: false, showHelp: true };
@@ -429,12 +456,19 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
 
   assertValueFlagsHaveValues(args);
   const argv = parseWithYargs(args);
-  const positionals = argv._.map((value) => String(value));
+  const positionals = argv._.map((value: unknown) => String(value));
   const positionalArgs = parsePositionals(positionals, argv.url);
   const provider = argv.provider as ParsedCliArgs['provider'] | undefined;
   const preset = argv.preset as ParsedCliArgs['preset'] | undefined;
   const focusModes = argv.focus as FocusMode[] | undefined;
-  const formats = argv.format as ParsedCliArgs['formats'] | undefined;
+  const formats =
+    positionalArgs.command === 'confirm' || !argv.format
+      ? undefined
+      : parseFormatValue(String(argv.format));
+  const confirmFormat =
+    positionalArgs.command === 'confirm' && argv.format
+      ? parseConfirmFormatValue(String(argv.format))
+      : undefined;
   const initTemplate = argv.template as InitTemplate | undefined;
   const repoPath = argv.repo;
   const noScan = argv.noScan || undefined;
@@ -482,6 +516,13 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
           benchmarkAppId: positionalArgs.benchmarkAppId,
           benchmarkSave: argv.save ?? undefined,
           benchmarkOutput: argv.output,
+        }
+      : {}),
+    ...(positionalArgs.command === 'confirm'
+      ? {
+          confirmFinding: argv.finding,
+          confirmFromReport: argv.fromReport,
+          confirmFormat,
         }
       : {}),
   };
@@ -557,6 +598,23 @@ export async function runCli(
 
       case 'benchmark':
         return await runBenchmarkCommand(dependencies, parsedArgs);
+
+      case 'confirm':
+        return await runConfirmCommand(
+          {
+            finding: parsedArgs.confirmFinding,
+            fromReport: parsedArgs.confirmFromReport,
+            format: parsedArgs.confirmFormat,
+            configPath: parsedArgs.configPath,
+            profile: parsedArgs.profile,
+          },
+          {
+            log: dependencies.log,
+            error: dependencies.error,
+            cwd: process.cwd(),
+            loadConfig: dependencies.loadConfig,
+          }
+        );
 
       default:
         dependencies.error(`Unknown command: ${parsedArgs.command}`);

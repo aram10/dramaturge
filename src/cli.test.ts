@@ -265,6 +265,30 @@ describe('parseCliArgs', () => {
     });
   });
 
+  it('parses confirm command arguments', () => {
+    const result = parseCliArgs([
+      'confirm',
+      '--finding',
+      'BUG-0042',
+      '--from-report',
+      './reports/run-1',
+      '--format',
+      'short',
+    ]);
+    expect(result).toMatchObject({
+      command: 'confirm',
+      confirmFinding: 'BUG-0042',
+      confirmFromReport: './reports/run-1',
+      confirmFormat: 'short',
+    });
+  });
+
+  it('throws for invalid confirm format', () => {
+    expect(() => parseCliArgs(['confirm', '--finding', 'BUG-0042', '--format', 'sarif'])).toThrow(
+      'Invalid confirm format'
+    );
+  });
+
   it('parses --profile flag', () => {
     const result = parseCliArgs(['run', 'https://example.com', '--profile', 'admin']);
     expect(result.profile).toBe('admin');
@@ -515,6 +539,22 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(0);
     expect(runMcpServer).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes confirm command without loading run config', async () => {
+    const output: string[] = [];
+    const errors: string[] = [];
+
+    const exitCode = await runCli(['confirm', '--finding', 'BUG-4042', '--from-report', '.'], {
+      loadConfig: vi.fn(),
+      runEngine: vi.fn(),
+      log: (message) => output.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(output).toEqual([]);
+    expect(errors.join('\n')).toContain('No replay manifest found for BUG-4042');
   });
 });
 
