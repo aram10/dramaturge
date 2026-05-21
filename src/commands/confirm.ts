@@ -4,8 +4,10 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { ConfirmationResult } from '../types.js';
+import type { DramaturgeConfig } from '../config.js';
 import { loadFindingReplayManifest, type FindingReplayManifest } from '../repro/manifest.js';
 import { confirmManifest } from '../repro/replayer.js';
+import { createLiveReplayAdapter } from '../repro/live-replay.js';
 
 export type ConfirmOutputFormat = 'markdown' | 'json' | 'short';
 
@@ -19,7 +21,7 @@ export interface ConfirmCommandArgs {
 
 export interface ConfirmReplayContext {
   manifest: FindingReplayManifest;
-  config?: unknown;
+  config?: DramaturgeConfig;
   profile?: string;
 }
 
@@ -27,7 +29,7 @@ export interface ConfirmDependencies {
   log: (message: string) => void;
   error: (message: string) => void;
   cwd: string;
-  loadConfig?: (configPath?: string) => unknown;
+  loadConfig?: (configPath?: string) => DramaturgeConfig;
   replayManifest?: (context: ConfirmReplayContext) => Promise<ConfirmationResult>;
 }
 
@@ -126,7 +128,7 @@ export async function runConfirmCommand(
     const manifest = loadFindingReplayManifest(reportDir, args.finding);
     const result = deps.replayManifest
       ? await deps.replayManifest({ manifest, config, profile: args.profile })
-      : await confirmManifest(manifest);
+      : await confirmManifest(manifest, createLiveReplayAdapter({ config, profile: args.profile }));
     deps.log(renderResult(result, args.format ?? 'markdown'));
     return resultExitCode(result);
   } catch (error) {
