@@ -96,6 +96,7 @@ describe('runConfirmCommand', () => {
   let h: Harness;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     h = makeHarness();
   });
 

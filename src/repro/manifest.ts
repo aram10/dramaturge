@@ -3,6 +3,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { z } from 'zod';
 import type { Evidence, Finding, ReplayableAction, RunResult } from '../types.js';
 import { buildFindingGroupKey, collectFindings } from '../report/collector.js';
 
@@ -103,7 +104,7 @@ function extractNetworkFailure(
   };
 }
 
-function buildOracles(evidence: Evidence[]): FindingReplayManifest['oracles'] {
+function buildOracles(finding: Finding, evidence: Evidence[]): FindingReplayManifest['oracles'] {
   const consoleErrorFragments = uniqueValues(
     evidence
       .filter((item) => item.type === 'console-error')
@@ -114,11 +115,15 @@ function buildOracles(evidence: Evidence[]): FindingReplayManifest['oracles'] {
     .filter((item) => item.type === 'network-error')
     .map((item) => extractNetworkFailure(item.summary))
     .filter((item): item is { urlPattern: string; status: number } => Boolean(item));
+  const findingA11yRuleId = /accessibility rule ([\w-]+)/i.exec(finding.expected)?.[1];
   const a11yRuleIds = uniqueValues(
-    evidence
-      .filter((item) => item.type === 'accessibility-scan')
-      .map((item) => /accessibility rule ([\w-]+)/i.exec(item.summary)?.[1])
-      .filter((ruleId): ruleId is string => Boolean(ruleId))
+    [
+      ...evidence
+        .filter((item) => item.type === 'accessibility-scan')
+        .map((item) => /accessibility rule ([\w-]+)/i.exec(item.summary)?.[1])
+        .filter((ruleId): ruleId is string => Boolean(ruleId)),
+      ...(findingA11yRuleId ? [findingA11yRuleId] : []),
+    ].filter((ruleId): ruleId is string => Boolean(ruleId))
   );
   const visualBaselineRef = evidence.find((item) => item.type === 'visual-diff')?.path;
   return {
@@ -162,7 +167,7 @@ export function buildFindingReplayManifest(
       objective: finding.meta?.repro?.objective ?? `Confirm ${finding.id}: ${finding.title}`,
       maxStepsBudget: Math.max(actions.length, 1),
     },
-    oracles: buildOracles(evidence),
+    oracles: buildOracles(finding, evidence),
   };
 }
 
@@ -194,23 +199,81 @@ export function writeFindingReplayManifests(
   return paths;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
+const ReplayActionSchema = z.object({
+  id: z.string().min(1),
+  kind: z.string().min(1),
+  summary: z.string(),
+  source: z.enum(['page', 'worker-tool']),
+  status: z.string().min(1),
+  timestamp: z.string().min(1),
+  selector: z.string().optional(),
+  url: z.string().optional(),
+  value: z.string().optional(),
+  redacted: z.boolean().optional(),
+  key: z.string().optional(),
+});
 
-function isString(value: unknown): value is string {
-  return typeof value === 'string';
+const FindingReplayManifestSchema = z.object({
+  schemaVersion: z.literal(1),
+  finding: z.object({
+    id: z.string().min(1),
+    signature: z.string().min(1),
+    category: z.string().min(1),
+    severity: z.string().min(1),
+    title: z.string(),
+    expected: z.string(),
+    actual: z.string(),
+    evidenceTypes: z.array(z.string().min(1)),
+  }),
+  origin: z.object({
+    runStartedAt: z.string().min(1),
+    targetUrl: z.string().min(1),
+    route: z.string().optional(),
+    authProfile: z.string().optional(),
+  }),
+  replay: z.object({
+    actions: z.array(ReplayActionSchema),
+    breadcrumbs: z.array(z.string()),
+    objective: z.string().min(1),
+    maxStepsBudget: z.number().int().nonnegative(),
+  }),
+  oracles: z.object({
+    consoleErrorFragments: z.array(z.string()).optional(),
+    networkFailures: z
+      .array(
+        z.object({
+          urlPattern: z.string().min(1),
+          status: z.number().int(),
+        })
+      )
+      .optional(),
+    a11yRuleIds: z.array(z.string().min(1)).optional(),
+    visualBaselineRef: z.string().min(1).optional(),
+  }),
+});
+
+function formatZodIssuePath(path: PropertyKey[]): string {
+  return path
+    .map((segment) =>
+      typeof segment === 'number'
+        ? `[${segment}]`
+        : typeof segment === 'string'
+          ? segment
+          : String(segment)
+    )
+    .join('.');
 }
 
 function parseManifest(value: unknown): FindingReplayManifest {
-  if (!isObject(value) || value.schemaVersion !== 1 || !isObject(value.finding)) {
-    throw new Error('Invalid finding replay manifest: expected schemaVersion 1');
+  const parsed = FindingReplayManifestSchema.safeParse(value);
+  if (!parsed.success) {
+    const firstIssue = parsed.error.issues[0];
+    const path = formatZodIssuePath(firstIssue.path);
+    throw new Error(
+      `Invalid finding replay manifest: ${path ? `${path}: ` : ''}${firstIssue.message}`
+    );
   }
-  const id = value.finding.id;
-  if (!isString(id) || id.length === 0) {
-    throw new Error('Invalid finding replay manifest: missing finding.id');
-  }
-  return value as unknown as FindingReplayManifest;
+  return parsed.data as FindingReplayManifest;
 }
 
 export function readFindingReplayManifest(path: string): FindingReplayManifest {

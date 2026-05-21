@@ -7,6 +7,7 @@ import type {
   FindingConfidence,
   ReplayableAction,
 } from '../types.js';
+import { VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD } from '../constants.js';
 import type { FindingReplayManifest } from './manifest.js';
 import { compareReplayOracles } from './oracles.js';
 
@@ -86,7 +87,10 @@ function deriveVerdict(options: {
   observedNow?: { expected?: string; actual?: string };
 }): ConfirmationVerdict {
   if (options.blockingStep) return 'cannot_confirm';
-  if (options.visualDiffRatio !== undefined && options.visualDiffRatio > 0.05) {
+  if (
+    options.visualDiffRatio !== undefined &&
+    options.visualDiffRatio >= VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD
+  ) {
     return 'changed_surface';
   }
   if (options.oracleSummary.allOriginalMatched) return 'still_reproducible';

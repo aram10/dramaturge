@@ -114,7 +114,9 @@ export async function runConfirmCommand(
   deps: ConfirmDependencies
 ): Promise<number> {
   if (!args.finding) {
-    deps.error('Usage: dramaturge confirm --finding <id> --from-report <report-dir>');
+    deps.error(
+      'Usage: dramaturge confirm --finding <id> [--from-report <report-dir>] (defaults to newest ./dramaturge-reports/*)'
+    );
     return 1;
   }
 

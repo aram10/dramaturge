@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Evidence, RawFinding, ReplayableAction, RunResult } from '../types.js';
@@ -180,14 +180,19 @@ describe('finding replay manifests', () => {
             name: 'Checkout',
             url: 'https://example.com/checkout',
             steps: 2,
-            findings: [makeFinding({ evidenceIds: ['ev-a11y', 'ev-visual'] })],
+            findings: [
+              makeFinding({
+                expected: 'The page should satisfy accessibility rule color-contrast.',
+                evidenceIds: ['ev-a11y', 'ev-visual'],
+              }),
+            ],
             replayableActions: [makeAction()],
             screenshots: new Map(),
             evidence: [
               makeEvidence({
                 id: 'ev-a11y',
                 type: 'accessibility-scan',
-                summary: 'Accessibility rule color-contrast failed',
+                summary: 'serious: Elements must have sufficient color contrast',
               }),
               makeEvidence({
                 id: 'ev-visual',
@@ -206,6 +211,24 @@ describe('finding replay manifests', () => {
 
     expect(manifest.oracles.a11yRuleIds).toEqual(['color-contrast']);
     expect(manifest.oracles.visualBaselineRef).toBe('visual-diffs/abc.png');
+  });
+
+  it('throws a targeted validation error when a manifest has an invalid shape', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'dramaturge-manifest-'));
+    const findingsDir = join(tempDir, 'findings');
+    mkdirSync(findingsDir, { recursive: true });
+    writeFileSync(
+      join(findingsDir, 'BUG-0001.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        finding: { id: 'BUG-0001' },
+      }),
+      'utf-8'
+    );
+
+    expect(() => loadFindingReplayManifest(tempDir, 'BUG-0001')).toThrow(
+      'Invalid finding replay manifest: finding.signature'
+    );
   });
 
   it('throws a clear error when a manifest is missing', () => {
