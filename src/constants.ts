@@ -82,3 +82,6 @@ export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
 
 /** LLM judge request timeout in milliseconds. */
 export const JUDGE_LLM_TIMEOUT_MS = 15_000;
+
+/** Visual diff ratio threshold used to classify changed surfaces. */
+export const VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD = 0.05;

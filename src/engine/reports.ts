@@ -11,6 +11,7 @@ import { renderJson } from '../report/json.js';
 import { renderJunit } from '../report/junit.js';
 import { renderSarif } from '../report/sarif.js';
 import { writeGeneratedPlaywrightTests } from '../report/test-gen.js';
+import { writeFindingReplayManifests } from '../repro/manifest.js';
 import { resolveOutputFormats } from '../config.js';
 import { hasLLMApiKey } from '../llm.js';
 import type { DiffSummary } from '../types.js';
@@ -120,6 +121,9 @@ export function writeReports(
     }
   );
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);
+  const replayManifestPaths = writeFindingReplayManifests(ctx.outputDir, runResult, {
+    authProfile: ctx.activeAuthProfile,
+  });
 
   const formats = resolveOutputFormats(config.output.format);
   let firstFormatLogged = false;
@@ -138,6 +142,12 @@ export function writeReports(
     ctx.logger?.info('Generated Playwright tests', {
       count: generatedTests.length,
       path: join(ctx.outputDir, 'generated-tests'),
+    });
+  }
+  if (replayManifestPaths.length > 0) {
+    ctx.logger?.info('Wrote finding replay manifests', {
+      count: replayManifestPaths.length,
+      path: join(ctx.outputDir, 'findings'),
     });
   }
 }

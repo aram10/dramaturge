@@ -2,9 +2,12 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { describe, expect, it } from 'vitest';
-import { buildAreaResults } from './reports.js';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildAreaResults, writeReports } from './reports.js';
 import type { EngineContext } from './context.js';
-import type { StateNode, RawFinding, Evidence, ReplayableAction } from '../types.js';
+import type { AreaResult, StateNode, RawFinding, Evidence, ReplayableAction } from '../types.js';
 
 function makeNode(overrides: Partial<StateNode> = {}): StateNode {
   return {
@@ -180,5 +183,117 @@ describe('buildAreaResults', () => {
 
     expect(results[0].pageType).toBe('dashboard');
     expect(results[0].fingerprint).toEqual(node.fingerprint);
+  });
+});
+
+function makeAreaResultForReport(): AreaResult {
+  const action: ReplayableAction = {
+    id: 'act-1',
+    kind: 'click',
+    summary: 'Click submit button',
+    source: 'page',
+    status: 'recorded',
+    timestamp: '2026-05-20T18:00:00.000Z',
+    selector: 'button.submit',
+  };
+  return {
+    name: 'Checkout',
+    url: 'https://example.com/checkout',
+    steps: 1,
+    findings: [
+      makeFinding({
+        evidenceIds: ['ev-1'],
+        meta: {
+          source: 'agent',
+          confidence: 'high',
+          repro: {
+            route: '/checkout',
+            objective: 'Submit checkout form',
+            breadcrumbs: ['checkout', 'submit'],
+            actionIds: ['act-1'],
+            evidenceIds: ['ev-1'],
+          },
+        },
+      }),
+    ],
+    replayableActions: [action],
+    screenshots: new Map(),
+    evidence: [
+      makeEvidence({
+        id: 'ev-1',
+        type: 'console-error',
+        summary: 'Cannot read properties of null',
+      }),
+    ],
+    coverage: { controlsDiscovered: 1, controlsExercised: 1, events: [] },
+    pageType: 'form',
+    status: 'explored',
+  };
+}
+
+function makeReportContext(outputDir: string): EngineContext {
+  return {
+    outputDir,
+    config: {
+      targetUrl: 'https://example.com',
+      appDescription: 'Example app',
+      models: { planner: 'anthropic/test-planner', worker: 'anthropic/test-worker' },
+      concurrency: { workers: 1 },
+      budget: {
+        globalTimeLimitSeconds: 60,
+        maxStepsPerTask: 3,
+        maxFrontierSize: 10,
+        maxStateNodes: 10,
+      },
+      checkpoint: { intervalTasks: 0 },
+      autoCapture: {
+        consoleErrors: false,
+        consoleWarnings: false,
+        networkErrors: false,
+      },
+      memory: { enabled: false, warmStart: false },
+      visualRegression: { enabled: false },
+      output: { format: 'json' },
+    },
+    budget: {
+      globalTimeLimitSeconds: 60,
+      maxStepsPerTask: 3,
+      maxFrontierSize: 10,
+      maxStateNodes: 10,
+    },
+    globalCoverage: { getBlindSpots: () => [] },
+    graph: { nodeCount: () => 0, toMermaid: () => '' },
+    activeAuthProfile: 'admin',
+    logger: { info: () => undefined },
+  } as unknown as EngineContext;
+}
+
+describe('writeReports', () => {
+  it('emits replay manifests alongside existing report artifacts', () => {
+    const outputDir = mkdtempSync(join(tmpdir(), 'dramaturge-reports-'));
+    try {
+      writeReports(
+        makeReportContext(outputDir),
+        new Date('2026-05-20T18:00:00.000Z'),
+        [makeAreaResultForReport()],
+        []
+      );
+
+      const reportPath = join(outputDir, 'report.json');
+      const manifestPath = join(outputDir, 'findings', 'BUG-001.json');
+      expect(existsSync(reportPath)).toBe(true);
+      expect(existsSync(manifestPath)).toBe(true);
+
+      const report = JSON.parse(readFileSync(reportPath, 'utf-8')) as { findings: unknown[] };
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as {
+        origin: { authProfile?: string };
+        replay: { actions: ReplayableAction[] };
+      };
+      expect(report.findings).toHaveLength(1);
+      expect(manifest.origin.authProfile).toBe('admin');
+      expect(manifest.replay.actions.map((action) => action.id)).toEqual(['act-1']);
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
   });
 });
