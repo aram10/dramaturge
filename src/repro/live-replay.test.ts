@@ -324,6 +324,24 @@ describe('createLiveReplayAdapter', () => {
     expect(harness.calls.fill).toEqual([]);
   });
 
+  it('closes the browser agent when initialization fails', async () => {
+    const harness = makeFakePage();
+    const initError = new Error('browser failed to start');
+
+    const adapter = createLiveReplayAdapter({
+      createBrowserAgent: () =>
+        makeFakeBrowserAgent(harness, {
+          init: async () => {
+            harness.calls.init += 1;
+            throw initError;
+          },
+        }),
+    });
+
+    await expect(adapter.replay(makeManifest())).rejects.toThrow('browser failed to start');
+    expect(harness.calls.close).toBe(1);
+  });
+
   it('captures network and page-error oracles during live replay', async () => {
     const harness = makeFakePage({
       pageErrorOnClick: 'checkout exploded',

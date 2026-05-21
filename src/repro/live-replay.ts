@@ -169,13 +169,13 @@ export function createLiveReplayAdapter(options: LiveReplayOptions = {}): Replay
     replay: async (manifest) => {
       const startedAt = Date.now();
       const agent = options.createBrowserAgent?.() ?? createStagehandAgent();
-      await agent.init({
-        headless: options.config?.browser.headless ?? true,
-        modelName: options.config?.models.browserOps ?? options.config?.models.planner,
-        verbose: 0,
-      });
-
       try {
+        await agent.init({
+          headless: options.config?.browser.headless ?? true,
+          modelName: options.config?.models.browserOps ?? options.config?.models.planner,
+          verbose: 0,
+        });
+
         if (options.config) {
           await (options.authenticateBrowser ?? defaultAuthenticateBrowser)(
             agent,

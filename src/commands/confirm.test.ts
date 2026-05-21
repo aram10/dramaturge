@@ -211,6 +211,41 @@ describe('runConfirmCommand', () => {
     expect(loadConfig).toHaveBeenCalledWith('custom.json');
   });
 
+  it('attempts to load the default config when no --config path is provided', async () => {
+    const loadConfig = vi.fn().mockReturnValue({ targetUrl: 'https://example.com' });
+    h.deps.loadConfig = loadConfig;
+
+    const code = await runConfirmCommand(
+      {
+        finding: 'BUG-0001',
+        fromReport: h.reportDir,
+        format: 'short',
+      },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(loadConfig).toHaveBeenCalledWith(undefined);
+  });
+
+  it('falls back to manifest-only replay when implicit default config loading fails', async () => {
+    h.deps.loadConfig = vi.fn().mockImplementation(() => {
+      throw new Error('Config file not found');
+    });
+
+    const code = await runConfirmCommand(
+      {
+        finding: 'BUG-0001',
+        fromReport: h.reportDir,
+        format: 'short',
+      },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(h.logs.join('\n')).toContain('BUG-0001 fixed');
+  });
+
   it('passes loaded config and selected profile into replay context', async () => {
     const config = { targetUrl: 'https://example.com' } as DramaturgeConfig;
     const replayManifest = vi.fn().mockResolvedValue(makeResult('fixed'));

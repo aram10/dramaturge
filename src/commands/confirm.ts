@@ -33,6 +33,25 @@ export interface ConfirmDependencies {
   replayManifest?: (context: ConfirmReplayContext) => Promise<ConfirmationResult>;
 }
 
+function loadReplayConfig(
+  args: ConfirmCommandArgs,
+  deps: ConfirmDependencies
+): DramaturgeConfig | undefined {
+  if (!deps.loadConfig) {
+    return undefined;
+  }
+
+  if (args.configPath) {
+    return deps.loadConfig(args.configPath);
+  }
+
+  try {
+    return deps.loadConfig(undefined);
+  } catch {
+    return undefined;
+  }
+}
+
 function resultExitCode(result: ConfirmationResult): number {
   switch (result.verdict) {
     case 'fixed':
@@ -124,7 +143,7 @@ export async function runConfirmCommand(
 
   const reportDir = resolveReportDir(deps.cwd, args.fromReport);
   try {
-    const config = args.configPath ? deps.loadConfig?.(args.configPath) : undefined;
+    const config = loadReplayConfig(args, deps);
     const manifest = loadFindingReplayManifest(reportDir, args.finding);
     const result = deps.replayManifest
       ? await deps.replayManifest({ manifest, config, profile: args.profile })
