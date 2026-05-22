@@ -2,12 +2,22 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runConfirmCommand, type ConfirmDependencies } from './confirm.js';
+import type { DramaturgeConfig } from '../config.js';
 import type { ConfirmationResult } from '../types.js';
 import type { FindingReplayManifest } from '../repro/manifest.js';
+import type { ManifestReplayResult, ReplayAdapter } from '../repro/replayer.js';
+
+const mocks = vi.hoisted(() => ({
+  createLiveReplayAdapter: vi.fn(),
+}));
+
+vi.mock('../repro/live-replay.js', () => ({
+  createLiveReplayAdapter: mocks.createLiveReplayAdapter,
+}));
 
 function makeManifest(): FindingReplayManifest {
   return {
@@ -43,7 +53,11 @@ function makeResult(verdict: ConfirmationResult['verdict']): ConfirmationResult 
     verdict,
     confidence: verdict === 'cannot_confirm' ? 'low' : 'high',
     origin: { runStartedAt: '2026-05-20T18:00:00.000Z', targetUrl: 'https://example.com' },
-    replay: { actionsRequested: 1, actionsCompleted: verdict === 'cannot_confirm' ? 0 : 1 },
+    replay: {
+      actionsRequested: 1,
+      actionsCompleted: verdict === 'cannot_confirm' ? 0 : 1,
+      ...(verdict === 'cannot_confirm' ? { stoppedReason: 'selector not found' } : {}),
+    },
     oracleComparison: {
       consoleErrorsOriginal: 1,
       consoleErrorsCurrent: verdict === 'still_reproducible' ? 1 : 0,
@@ -55,6 +69,14 @@ function makeResult(verdict: ConfirmationResult['verdict']): ConfirmationResult 
     observedNow: {},
     evidence: { consoleErrors: [] },
     durationMs: 0,
+  };
+}
+
+function makeReplayResult(): ManifestReplayResult {
+  return {
+    stepOutcomes: [],
+    observed: { consoleErrors: [], networkFailures: [], a11yRuleIds: [] },
+    durationMs: 1,
   };
 }
 
@@ -97,6 +119,9 @@ describe('runConfirmCommand', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.createLiveReplayAdapter.mockReturnValue({
+      replay: vi.fn().mockResolvedValue(makeReplayResult()),
+    } satisfies ReplayAdapter);
     h = makeHarness();
   });
 
@@ -133,7 +158,23 @@ describe('runConfirmCommand', () => {
 
     expect(code).toBe(2);
     expect(h.logs.join('\n')).toContain('cannot_confirm');
+    expect(h.logs.join('\n')).toContain('selector not found');
   });
+
+  it.each(['changed_surface', 'new_related_issue'] as const)(
+    'returns 3 for %s',
+    async (verdict) => {
+      h = makeHarness(makeResult(verdict));
+
+      const code = await runConfirmCommand(
+        { finding: 'BUG-0001', fromReport: h.reportDir, format: 'short' },
+        h.deps
+      );
+
+      expect(code).toBe(3);
+      expect(h.logs.join('\n')).toContain('BUG-0001');
+    }
+  );
 
   it('loads the newest report with findings when --from-report is omitted', async () => {
     const reportsRoot = join(h.cwd, 'dramaturge-reports');
@@ -141,6 +182,10 @@ describe('runConfirmCommand', () => {
     const newer = join(reportsRoot, '2026-05-20T00-00-00');
     writeManifest(older);
     writeManifest(newer);
+    const oldTime = new Date('2026-05-19T00:00:00.000Z');
+    const newTime = new Date('2026-05-20T00:00:00.000Z');
+    utimesSync(older, oldTime, oldTime);
+    utimesSync(newer, newTime, newTime);
 
     const code = await runConfirmCommand({ finding: 'BUG-0001', format: 'short' }, h.deps);
 
@@ -166,8 +211,43 @@ describe('runConfirmCommand', () => {
     expect(loadConfig).toHaveBeenCalledWith('custom.json');
   });
 
+  it('attempts to load the default config when no --config path is provided', async () => {
+    const loadConfig = vi.fn().mockReturnValue({ targetUrl: 'https://example.com' });
+    h.deps.loadConfig = loadConfig;
+
+    const code = await runConfirmCommand(
+      {
+        finding: 'BUG-0001',
+        fromReport: h.reportDir,
+        format: 'short',
+      },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(loadConfig).toHaveBeenCalledWith(undefined);
+  });
+
+  it('falls back to manifest-only replay when implicit default config loading fails', async () => {
+    h.deps.loadConfig = vi.fn().mockImplementation(() => {
+      throw new Error('Config file not found');
+    });
+
+    const code = await runConfirmCommand(
+      {
+        finding: 'BUG-0001',
+        fromReport: h.reportDir,
+        format: 'short',
+      },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(h.logs.join('\n')).toContain('BUG-0001 fixed');
+  });
+
   it('passes loaded config and selected profile into replay context', async () => {
-    const config = { targetUrl: 'https://example.com' };
+    const config = { targetUrl: 'https://example.com' } as DramaturgeConfig;
     const replayManifest = vi.fn().mockResolvedValue(makeResult('fixed'));
     h.deps.loadConfig = vi.fn().mockReturnValue(config);
     h.deps.replayManifest = replayManifest;
@@ -188,6 +268,27 @@ describe('runConfirmCommand', () => {
       config,
       profile: 'admin',
     });
+  });
+
+  it('uses the live replay adapter by default', async () => {
+    h.deps.replayManifest = undefined;
+    const config = { targetUrl: 'https://example.com' } as DramaturgeConfig;
+    h.deps.loadConfig = vi.fn().mockReturnValue(config);
+
+    const code = await runConfirmCommand(
+      {
+        finding: 'BUG-0001',
+        fromReport: h.reportDir,
+        configPath: 'custom.json',
+        format: 'short',
+        profile: 'admin',
+      },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(mocks.createLiveReplayAdapter).toHaveBeenCalledWith({ config, profile: 'admin' });
+    expect(h.logs.join('\n')).toContain('BUG-0001 fixed');
   });
 
   it('returns usage error when finding is missing', async () => {
