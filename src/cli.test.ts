@@ -312,15 +312,20 @@ describe('parseCliArgs', () => {
       'promote',
       'BUG-0042',
       '--dry-run',
+      '--force',
       '--from-report',
       './reports/run-1',
+      '--output',
+      './tests/dramaturge',
     ]);
     expect(result).toMatchObject({
       command: 'regress',
       regressSubcommand: 'promote',
       regressPositional: ['BUG-0042'],
       regressDryRun: true,
+      regressForce: true,
       regressFromReport: './reports/run-1',
+      regressOutput: './tests/dramaturge',
     });
   });
 

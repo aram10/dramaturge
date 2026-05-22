@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { scoreFindingQuality } from '../judge/quality-score.js';
+import { buildFindingGroupKey } from '../report/collector.js';
 import { buildTestFileContent } from '../report/test-gen.js';
 import type {
   AreaResult,
@@ -26,6 +27,7 @@ export interface RegressCommandArgs {
   fromReport?: string;
   dryRun?: boolean;
   output?: string;
+  force?: boolean;
 }
 
 interface SerializedReportFinding {
@@ -58,6 +60,9 @@ interface GeneratedTestPreview {
   finding: Finding;
   generated: ReturnType<typeof buildTestFileContent>;
 }
+
+const DEFAULT_REGRESSION_OUTPUT_DIR = 'tests/dramaturge';
+const REGRESSION_SPEC_VERSION = 1;
 
 function resolveReportDir(cwd: string, fromReport?: string): string {
   if (fromReport) return resolve(cwd, fromReport);
@@ -234,18 +239,67 @@ function findGeneratedTest(
   return { finding, generated };
 }
 
+function relativeDisplayPath(cwd: string, path: string): string {
+  const displayPath = relative(cwd, path);
+  if (!displayPath || displayPath.startsWith('..') || isAbsolute(displayPath)) {
+    return path.replace(/\\/g, '/');
+  }
+  return displayPath.replace(/\\/g, '/');
+}
+
+function slugifyTitle(title: string): string {
+  const slug = title
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return (slug || 'regression').slice(0, 80).replace(/-+$/g, '') || 'regression';
+}
+
+function sanitizeFindingId(findingId: string): string {
+  return findingId.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'finding';
+}
+
+function promotedSpecFilename(finding: Finding): string {
+  return `${sanitizeFindingId(finding.id)}__${slugifyTitle(finding.title)}.spec.ts`;
+}
+
+function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').replace(/\*\//g, '*\\/');
+}
+
+function promotedSpecContent(options: {
+  finding: Finding;
+  generatedContent: string;
+  report: SerializedReport;
+  sourceReport: string;
+}): string {
+  const { finding, generatedContent, report, sourceReport } = options;
+  const header = [
+    '/**',
+    ` * @dramaturge-spec-version ${REGRESSION_SPEC_VERSION}`,
+    ` * @dramaturge-finding ${sanitizeHeaderValue(finding.id)}`,
+    ` * @dramaturge-signature ${sanitizeHeaderValue(buildFindingGroupKey(finding))}`,
+    ` * @dramaturge-origin-run ${sanitizeHeaderValue(report.meta?.startTime ?? 'unknown')}`,
+    ` * @dramaturge-source-report ${sanitizeHeaderValue(sourceReport)}`,
+    ' *',
+    ` * To re-generate: npx dramaturge regress promote ${sanitizeHeaderValue(finding.id)} --force`,
+    ' */',
+    '',
+  ];
+  return `${header.join('\n')}${generatedContent}`;
+}
+
 function promoteFinding(
   args: RegressCommandArgs,
   report: SerializedReport,
+  reportDir: string,
   deps: RegressDependencies
 ): number {
   const findingId = args.positional[0];
   if (!findingId) {
-    deps.error('Usage: dramaturge regress promote <finding-id> --dry-run');
-    return 1;
-  }
-  if (!args.dryRun) {
-    deps.error('Only --dry-run promotion is supported in this first slice.');
+    deps.error('Usage: dramaturge regress promote <finding-id> [--dry-run] [--output <dir>]');
     return 1;
   }
 
@@ -262,8 +316,33 @@ function promoteFinding(
     return 1;
   }
 
-  deps.log(`// filename: ${match.generated.filename}`);
-  deps.log(match.generated.content);
+  const outputDir = resolve(deps.cwd, args.output ?? DEFAULT_REGRESSION_OUTPUT_DIR);
+  const filename = promotedSpecFilename(match.finding);
+  const outputPath = join(outputDir, filename);
+  const content = promotedSpecContent({
+    finding: match.finding,
+    generatedContent: match.generated.content,
+    report,
+    sourceReport: relativeDisplayPath(deps.cwd, reportDir),
+  });
+
+  if (args.dryRun) {
+    deps.log(`// filename: ${filename}`);
+    deps.log(content);
+    return 0;
+  }
+
+  if (existsSync(outputPath) && !args.force) {
+    deps.error(
+      `Refusing to overwrite existing regression spec: ${relativeDisplayPath(deps.cwd, outputPath)}`
+    );
+    deps.error('Re-run with --force to replace it.');
+    return 1;
+  }
+
+  mkdirSync(outputDir, { recursive: true });
+  writeFileSync(outputPath, content);
+  deps.log(`Wrote ${relativeDisplayPath(deps.cwd, outputPath)}`);
   return 0;
 }
 
@@ -277,7 +356,7 @@ export function runRegressCommand(args: RegressCommandArgs, deps: RegressDepende
         deps.log(renderList(report));
         return 0;
       case 'promote':
-        return promoteFinding(args, report, deps);
+        return promoteFinding(args, report, reportDir, deps);
       default:
         deps.error(`Unknown regress subcommand: ${args.subcommand}`);
         return 1;
