@@ -95,9 +95,12 @@ function deserializeRunResult(report: SerializedReport): RunResult {
   const evidenceByArea = new Map<string, Evidence[]>();
   for (const item of evidence) {
     if (item.areaName) {
-      const perAreaEvidence = evidenceByArea.get(item.areaName) ?? [];
+      let perAreaEvidence = evidenceByArea.get(item.areaName);
+      if (!perAreaEvidence) {
+        perAreaEvidence = [];
+        evidenceByArea.set(item.areaName, perAreaEvidence);
+      }
       perAreaEvidence.push(item);
-      evidenceByArea.set(item.areaName, perAreaEvidence);
       continue;
     }
     globalEvidence.push(item);
