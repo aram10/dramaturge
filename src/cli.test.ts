@@ -306,6 +306,24 @@ describe('parseCliArgs', () => {
     );
   });
 
+  it('parses regress promote dry-run arguments', () => {
+    const result = parseCliArgs([
+      'regress',
+      'promote',
+      'BUG-0042',
+      '--dry-run',
+      '--from-report',
+      './reports/run-1',
+    ]);
+    expect(result).toMatchObject({
+      command: 'regress',
+      regressSubcommand: 'promote',
+      regressPositional: ['BUG-0042'],
+      regressDryRun: true,
+      regressFromReport: './reports/run-1',
+    });
+  });
+
   it('parses --profile flag', () => {
     const result = parseCliArgs(['run', 'https://example.com', '--profile', 'admin']);
     expect(result.profile).toBe('admin');

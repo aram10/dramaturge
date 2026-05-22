@@ -17,6 +17,9 @@ export interface GeneratedPlaywrightTest {
   content: string;
 }
 
+type CollectedFinding = ReturnType<typeof collectFindings>[number];
+type InferredAssertion = ReturnType<typeof inferAssertions>[number];
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -65,26 +68,37 @@ function isLedgerActionEvent(event: ExplorationLedgerEvent): event is Exploratio
   return event.kind === 'action';
 }
 
+function selectActionsById(
+  actions: ReplayableAction[],
+  actionIds: ReadonlySet<string>
+): ReplayableAction[] {
+  if (actionIds.size === 0) {
+    return actions;
+  }
+
+  return actions.filter((action) => actionIds.has(action.id));
+}
+
+function sanitizeCommentText(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ');
+}
+
 interface TestFileContext {
   result: RunResult;
   areaActions: Map<string, ReplayableAction[]>;
   ledgerActions: ReplayableAction[];
 }
 
-function buildTestFileContent(
-  finding: ReturnType<typeof collectFindings>[number],
+export function buildTestFileContent(
+  finding: CollectedFinding,
   ctx: TestFileContext
 ): GeneratedPlaywrightTest {
   const { result, areaActions, ledgerActions } = ctx;
   const area = result.areaResults.find((candidate) => candidate.name === finding.area);
   const availableActions = areaActions.get(finding.area) ?? [];
   const actionIds = new Set(finding.meta?.repro?.actionIds ?? []);
-  const selectedActions =
-    actionIds.size > 0
-      ? availableActions.filter((action) => actionIds.has(action.id))
-      : availableActions;
-  const selectedLedgerActions =
-    actionIds.size > 0 ? ledgerActions.filter((action) => actionIds.has(action.id)) : ledgerActions;
+  const selectedActions = selectActionsById(availableActions, actionIds);
+  const selectedLedgerActions = selectActionsById(ledgerActions, actionIds);
   const actionsToRender = selectedActions.length > 0 ? selectedActions : selectedLedgerActions;
   const renderedActions = actionsToRender
     .map((action) => renderAction(action))
@@ -105,6 +119,7 @@ function buildTestFileContent(
         .filter(
           (e) =>
             findingEvidenceIds.has(e.id) ||
+            e.relatedFindingIds.includes(finding.id) ||
             (finding.ref != null && e.relatedFindingIds.includes(finding.ref))
         )
         .map((e) => e.type)
@@ -119,7 +134,9 @@ function buildTestFileContent(
     evidenceTypes,
   });
 
-  const preambles = assertions.filter((a) => a.preamble).map((a) => a.preamble as string);
+  const preambles = assertions.flatMap((assertion) =>
+    assertion.preamble ? [assertion.preamble] : []
+  );
   const lines = buildTestBodyLines({
     finding,
     route,
@@ -132,12 +149,12 @@ function buildTestFileContent(
 }
 
 interface TestBodyOptions {
-  finding: ReturnType<typeof collectFindings>[number];
+  finding: CollectedFinding;
   route: string;
   preambles: string[];
   renderedActions: string[];
   breadcrumbs: string[];
-  assertions: ReturnType<typeof inferAssertions>;
+  assertions: InferredAssertion[];
 }
 
 function buildTestBodyLines(opts: TestBodyOptions): string[] {
@@ -146,8 +163,8 @@ function buildTestBodyLines(opts: TestBodyOptions): string[] {
     'import { test, expect } from "@playwright/test";',
     '',
     `test(${escapeString(`${finding.id}: ${finding.title}`)}, async ({ page }) => {`,
-    `  // Expected: ${finding.expected.replace(/[\r\n]+/g, ' ')}`,
-    `  // Actual: ${finding.actual.replace(/[\r\n]+/g, ' ')}`,
+    `  // Expected: ${sanitizeCommentText(finding.expected)}`,
+    `  // Actual: ${sanitizeCommentText(finding.actual)}`,
   ];
   for (const preamble of preambles) {
     lines.push(`  ${preamble}`);
@@ -160,7 +177,7 @@ function buildTestBodyLines(opts: TestBodyOptions): string[] {
   } else if (breadcrumbs.length > 0) {
     lines.push('  // Breadcrumbs:');
     for (const breadcrumb of breadcrumbs) {
-      lines.push(`  // - ${breadcrumb.replace(/[\r\n]+/g, ' ')}`);
+      lines.push(`  // - ${sanitizeCommentText(breadcrumb)}`);
     }
   }
   if (assertions.length > 0) {

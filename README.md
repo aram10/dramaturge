@@ -63,6 +63,28 @@ means at least one still reproduces, `2` means confirmation infrastructure could
 verdict, and `3` means a changed surface or related new issue needs human review. Older report
 directories without `findings/<id>.json` manifests fail with a clear re-run message.
 
+## Building a Regression Suite
+
+Dramaturge can score findings for promotion into durable Playwright regression specs. The first
+workflow slice is intentionally review-first: list promotable findings, then dry-run the generated
+spec before writing anything into your repo.
+
+```bash
+# Show quality scores for findings in the latest report
+npx dramaturge regress list
+
+# Use a specific report directory
+npx dramaturge regress list --from-report ./dramaturge-reports/2026-05-20T18-46-40
+
+# Preview the Playwright spec for a promotable finding
+npx dramaturge regress promote BUG-0042 --dry-run
+```
+
+Quality scores consider URL context, replay actions, expected/actual detail, screenshots,
+console/network evidence, accessibility evidence, and confidence. Findings must have replay actions
+and differing expected/actual behavior before they are promotable. Non-dry-run promotion is reserved
+for the next slice, so this command never writes tests into your repo yet.
+
 ## What It Does
 
 Dramaturge uses AI-powered browser agents to test your web application automatically. It:

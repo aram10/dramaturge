@@ -3,9 +3,11 @@
 
 import type { CrossRunClassification } from './report/cross-run-classification.js';
 import type { CostRecord } from './coverage/cost-tracker.js';
+import type { FindingQualityScore } from './judge/quality-score.js';
 import type { ObservedApiEndpoint } from './network/traffic-observer.js';
 import type { WorkflowAutomaton, WorkflowAutomatonComparison } from './workflow-automata/types.js';
 export type { CrossRunClassification };
+export type { FindingQualityScore };
 
 export type FindingCategory =
   | 'Bug'
