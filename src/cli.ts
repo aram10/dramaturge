@@ -22,6 +22,7 @@ import { runInit, type InitTemplate } from './commands/init.js';
 import { runTriageCommand } from './commands/triage.js';
 import { runBenchmarkCommand as runBenchmarkCommandImpl } from './commands/benchmark.js';
 import { runConfirmCommand, type ConfirmOutputFormat } from './commands/confirm.js';
+import { runRegressCommand } from './commands/regress.js';
 import type {
   ErrorEvent,
   FindingEvent,
@@ -45,6 +46,7 @@ export interface ParsedCliArgs {
     | 'memory'
     | 'benchmark'
     | 'confirm'
+    | 'regress'
     | 'help';
   configPath?: string;
   resumeDir?: string;
@@ -105,6 +107,16 @@ export interface ParsedCliArgs {
   confirmFromReport?: string;
   /** --format flag for confirm command */
   confirmFormat?: ConfirmOutputFormat;
+  /** Subcommand after regress (e.g. "list", "promote") */
+  regressSubcommand?: string;
+  /** Positional args for regress subcommands */
+  regressPositional?: string[];
+  /** --from-report flag for regress command */
+  regressFromReport?: string;
+  /** --dry-run flag for regress promote */
+  regressDryRun?: boolean;
+  /** --output flag for regress promote */
+  regressOutput?: string;
 }
 
 export interface CliDependencies {
@@ -130,6 +142,7 @@ Commands:
   memory stats         Show memory store statistics
   benchmark [app-id]   Run signal-to-noise benchmarks against well-known apps
   confirm              Confirm whether a previous finding still reproduces
+  regress <sub>        Manage durable regression specs (list | promote)
 
 Run options:
   --config <path>      Path to config file (default: dramaturge.config.json)
@@ -181,6 +194,11 @@ Confirm options:
   --from-report <dir>  Report directory containing findings/<id>.json
   --format <format>    Output format: markdown, json, or short
 
+Regress options:
+  --from-report <dir>  Report directory containing report.json
+  --dry-run            regress promote: print the generated spec without writing
+  --output <dir>       regress promote: output directory for future non-dry-run writes
+
 Examples:
   dramaturge run https://my-app.example.com           # Quick run, no config needed
   dramaturge run https://my-app.example.com --login    # Run with interactive auth
@@ -200,6 +218,8 @@ Examples:
   dramaturge baselines approve --all                   # Recapture all visual baselines
   dramaturge memory stats                              # Summarize memory store
   dramaturge confirm --finding BUG-0042 --from-report ./dramaturge-reports/latest
+  dramaturge regress list --from-report ./dramaturge-reports/latest
+  dramaturge regress promote BUG-0042 --dry-run
 
 Environment variables:
   ANTHROPIC_API_KEY              API key for Anthropic models
@@ -238,6 +258,7 @@ const KNOWN_COMMANDS = new Set([
   'memory',
   'benchmark',
   'confirm',
+  'regress',
 ]);
 const TRIAGE_COMMANDS = new Set(['findings', 'baselines', 'memory']);
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google', 'azure', 'openrouter', 'github']);
@@ -324,6 +345,16 @@ function parseFocusModes(values: readonly string[] | undefined): FocusMode[] | u
   return focusModes;
 }
 
+function parseSubcommandPositionals(
+  positionals: readonly string[],
+  index: number
+): { subcommand?: string; positional?: string[] } {
+  return {
+    subcommand: positionals[index],
+    positional: positionals.length > index + 1 ? [...positionals.slice(index + 1)] : undefined,
+  };
+}
+
 function parsePositionals(
   positionals: readonly string[],
   parsedUrl?: string
@@ -334,6 +365,8 @@ function parsePositionals(
   triageSubcommand?: string;
   triagePositional?: string[];
   benchmarkAppId?: string;
+  regressSubcommand?: string;
+  regressPositional?: string[];
 } {
   const [firstPositional] = positionals;
   const hasExplicitCommand = !!firstPositional && KNOWN_COMMANDS.has(firstPositional);
@@ -356,9 +389,8 @@ function parsePositionals(
   }
 
   if (TRIAGE_COMMANDS.has(command)) {
-    const triageSubcommand = positionals[index];
-    const triagePositional =
-      positionals.length > index + 1 ? [...positionals.slice(index + 1)] : undefined;
+    const { subcommand: triageSubcommand, positional: triagePositional } =
+      parseSubcommandPositionals(positionals, index);
     return { command, url, triageSubcommand, triagePositional };
   }
 
@@ -369,6 +401,12 @@ function parsePositionals(
       throw new Error(`Unknown argument: ${positionals[index]}`);
     }
     return { command, url, benchmarkAppId };
+  }
+
+  if (command === 'regress') {
+    const { subcommand: regressSubcommand, positional: regressPositional } =
+      parseSubcommandPositionals(positionals, index);
+    return { command, url, regressSubcommand, regressPositional };
   }
 
   if (positionals[index]) {
@@ -411,6 +449,7 @@ function parseWithYargs(args: readonly string[]) {
     .option('no-scan', { type: 'boolean' })
     .option('suppressed', { type: 'boolean' })
     .option('all', { type: 'boolean' })
+    .option('dry-run', { type: 'boolean' })
     .option('reason', { type: 'string' })
     .option('save', { type: 'boolean' })
     .parseSync();
@@ -535,6 +574,15 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
           confirmFormat,
         }
       : {}),
+    ...(positionalArgs.command === 'regress'
+      ? {
+          regressSubcommand: positionalArgs.regressSubcommand,
+          regressPositional: positionalArgs.regressPositional,
+          regressFromReport: argv.fromReport,
+          regressDryRun: argv.dryRun ?? undefined,
+          regressOutput: argv.output,
+        }
+      : {}),
   };
 }
 
@@ -626,6 +674,18 @@ export async function runCli(
             cwd: process.cwd(),
             loadConfig: dependencies.loadConfig,
           }
+        );
+
+      case 'regress':
+        return runRegressCommand(
+          {
+            subcommand: parsedArgs.regressSubcommand,
+            positional: parsedArgs.regressPositional ?? [],
+            fromReport: parsedArgs.regressFromReport,
+            dryRun: parsedArgs.regressDryRun,
+            output: parsedArgs.regressOutput,
+          },
+          { log: dependencies.log, error: dependencies.error, cwd: process.cwd() }
         );
 
       default:

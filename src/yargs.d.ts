@@ -27,6 +27,7 @@ declare module 'yargs' {
     fromReport?: string;
     finding?: string;
     severity?: string;
+    dryRun?: boolean;
   }
 
   interface DramaturgeYargsInstance {
