@@ -97,6 +97,10 @@ export interface ParsedCliArgs {
   benchmarkOutput?: string;
   /** --finding flag for confirm command */
   confirmFinding?: string;
+  /** --all flag for confirm command */
+  confirmAll?: boolean;
+  /** --severity flag for confirm command */
+  confirmSeverity?: string;
   /** --from-report flag for confirm command */
   confirmFromReport?: string;
   /** --format flag for confirm command */
@@ -172,6 +176,8 @@ Benchmark options:
 
 Confirm options:
   --finding <id>       Finding ID to confirm (for example BUG-0042)
+  --all                Confirm every finding manifest in the selected report
+  --severity <level>   Confirm findings at a severity (for example major+)
   --from-report <dir>  Report directory containing findings/<id>.json
   --format <format>    Output format: markdown, json, or short
 
@@ -246,6 +252,7 @@ const VALUE_FLAGS = new Set([
   '--output',
   '--from-report',
   '--finding',
+  '--severity',
   '--reason',
   '--provider',
   '--preset',
@@ -399,6 +406,7 @@ function parseWithYargs(args: readonly string[]) {
     .option('output', { type: 'string' })
     .option('from-report', { type: 'string' })
     .option('finding', { type: 'string' })
+    .option('severity', { type: 'string' })
     .option('repo', { type: 'string' })
     .option('no-scan', { type: 'boolean' })
     .option('suppressed', { type: 'boolean' })
@@ -521,6 +529,8 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     ...(positionalArgs.command === 'confirm'
       ? {
           confirmFinding: argv.finding,
+          confirmAll: argv.all ?? undefined,
+          confirmSeverity: argv.severity,
           confirmFromReport: argv.fromReport,
           confirmFormat,
         }
@@ -603,6 +613,8 @@ export async function runCli(
         return await runConfirmCommand(
           {
             finding: parsedArgs.confirmFinding,
+            all: parsedArgs.confirmAll,
+            severity: parsedArgs.confirmSeverity,
             fromReport: parsedArgs.confirmFromReport,
             format: parsedArgs.confirmFormat,
             configPath: parsedArgs.configPath,

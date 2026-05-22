@@ -283,6 +283,23 @@ describe('parseCliArgs', () => {
     });
   });
 
+  it('parses confirm batch targeting arguments', () => {
+    const result = parseCliArgs([
+      'confirm',
+      '--all',
+      '--severity',
+      'major+',
+      '--from-report',
+      './reports/run-1',
+    ]);
+    expect(result).toMatchObject({
+      command: 'confirm',
+      confirmAll: true,
+      confirmSeverity: 'major+',
+      confirmFromReport: './reports/run-1',
+    });
+  });
+
   it('throws for invalid confirm format', () => {
     expect(() => parseCliArgs(['confirm', '--finding', 'BUG-0042', '--format', 'sarif'])).toThrow(
       'Invalid confirm format'

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runConfirmCommand, type ConfirmDependencies } from './confirm.js';
 import type { DramaturgeConfig } from '../config.js';
-import type { ConfirmationResult } from '../types.js';
+import type { ConfirmationResult, FindingSeverity } from '../types.js';
 import type { FindingReplayManifest } from '../repro/manifest.js';
 import type { ManifestReplayResult, ReplayAdapter } from '../repro/replayer.js';
 
@@ -19,15 +19,23 @@ vi.mock('../repro/live-replay.js', () => ({
   createLiveReplayAdapter: mocks.createLiveReplayAdapter,
 }));
 
-function makeManifest(): FindingReplayManifest {
+function makeManifest(
+  overrides: {
+    id?: string;
+    severity?: FindingSeverity;
+    title?: string;
+  } = {}
+): FindingReplayManifest {
+  const id = overrides.id ?? 'BUG-0001';
+  const title = overrides.title ?? 'Submit fails';
   return {
     schemaVersion: 1,
     finding: {
-      id: 'BUG-0001',
-      signature: '["Bug","Major","Submit fails","ok","bad"]',
+      id,
+      signature: `["Bug","${overrides.severity ?? 'Major'}","${title}","ok","bad"]`,
       category: 'Bug',
-      severity: 'Major',
-      title: 'Submit fails',
+      severity: overrides.severity ?? 'Major',
+      title,
       expected: 'ok',
       actual: 'bad',
       evidenceTypes: ['console-error'],
@@ -46,9 +54,12 @@ function makeManifest(): FindingReplayManifest {
   };
 }
 
-function makeResult(verdict: ConfirmationResult['verdict']): ConfirmationResult {
+function makeResult(
+  verdict: ConfirmationResult['verdict'],
+  overrides: { findingId?: string } = {}
+): ConfirmationResult {
   return {
-    findingId: 'BUG-0001',
+    findingId: overrides.findingId ?? 'BUG-0001',
     signature: 'sig',
     verdict,
     confidence: verdict === 'cannot_confirm' ? 'low' : 'high',
@@ -88,10 +99,13 @@ interface Harness {
   deps: ConfirmDependencies;
 }
 
-function writeManifest(reportDir: string): void {
+function writeManifest(reportDir: string, manifest: FindingReplayManifest = makeManifest()): void {
   const findingsDir = join(reportDir, 'findings');
   mkdirSync(findingsDir, { recursive: true });
-  writeFileSync(join(findingsDir, 'BUG-0001.json'), JSON.stringify(makeManifest(), null, 2));
+  writeFileSync(
+    join(findingsDir, `${manifest.finding.id}.json`),
+    JSON.stringify(manifest, null, 2)
+  );
 }
 
 function makeHarness(result: ConfirmationResult = makeResult('fixed')): Harness {
@@ -191,6 +205,73 @@ describe('runConfirmCommand', () => {
 
     expect(code).toBe(0);
     expect(h.logs.join('\n')).toContain('BUG-0001 fixed');
+  });
+
+  it('confirms every manifest when --all is passed', async () => {
+    writeManifest(
+      h.reportDir,
+      makeManifest({ id: 'BUG-0002', severity: 'Critical', title: 'Checkout fails' })
+    );
+    const replayManifest = vi.fn(({ manifest }: { manifest: FindingReplayManifest }) =>
+      Promise.resolve(makeResult('fixed', { findingId: manifest.finding.id }))
+    );
+    h.deps.replayManifest = replayManifest;
+
+    const code = await runConfirmCommand(
+      { all: true, fromReport: h.reportDir, format: 'short' },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(replayManifest).toHaveBeenCalledTimes(2);
+    expect(h.logs.join('\n')).toContain('BUG-0001 fixed');
+    expect(h.logs.join('\n')).toContain('BUG-0002 fixed');
+  });
+
+  it('filters manifests by severity threshold', async () => {
+    writeManifest(h.reportDir, makeManifest({ id: 'BUG-0002', severity: 'Minor' }));
+    writeManifest(h.reportDir, makeManifest({ id: 'BUG-0003', severity: 'Critical' }));
+    const replayManifest = vi.fn(({ manifest }: { manifest: FindingReplayManifest }) =>
+      Promise.resolve(makeResult('fixed', { findingId: manifest.finding.id }))
+    );
+    h.deps.replayManifest = replayManifest;
+
+    const code = await runConfirmCommand(
+      { severity: 'major+', fromReport: h.reportDir, format: 'json' },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(replayManifest).toHaveBeenCalledTimes(2);
+    expect(replayManifest).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        manifest: expect.objectContaining({ finding: expect.objectContaining({ id: 'BUG-0001' }) }),
+      })
+    );
+    expect(replayManifest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        manifest: expect.objectContaining({ finding: expect.objectContaining({ id: 'BUG-0003' }) }),
+      })
+    );
+    expect(JSON.parse(h.logs.join('\n'))).toHaveLength(2);
+  });
+
+  it('returns the highest review-needed exit code across batch results', async () => {
+    writeManifest(h.reportDir, makeManifest({ id: 'BUG-0002', severity: 'Major' }));
+    h.deps.replayManifest = vi.fn(({ manifest }: { manifest: FindingReplayManifest }) => {
+      const verdict = manifest.finding.id === 'BUG-0002' ? 'new_related_issue' : 'fixed';
+      return Promise.resolve(makeResult(verdict, { findingId: manifest.finding.id }));
+    });
+
+    const code = await runConfirmCommand(
+      { all: true, fromReport: h.reportDir, format: 'markdown' },
+      h.deps
+    );
+
+    expect(code).toBe(3);
+    expect(h.logs.join('\n')).toContain('1 new_related_issue');
   });
 
   it('loads an explicit config path for future auth-capable replay adapters', async () => {

@@ -37,6 +37,32 @@ npx dramaturge --config dramaturge.config.json
 
 That's it! Dramaturge will explore your app and generate a report with any issues it finds.
 
+## Confirming a Fix
+
+Every run emits per-finding replay manifests under
+`dramaturge-reports/<timestamp>/findings/<id>.json`. After you fix a bug, replay the saved actions
+against the new build:
+
+```bash
+# Confirm one finding from the latest report
+npx dramaturge confirm --finding BUG-0042 --format short
+
+# Confirm one finding from a specific report directory
+npx dramaturge confirm --finding BUG-0042 --from-report ./dramaturge-reports/2026-05-20T18-46-40
+
+# Confirm all major-or-higher findings from the selected report
+npx dramaturge confirm --severity major+ --from-report ./dramaturge-reports/2026-05-20T18-46-40
+
+# Confirm every finding manifest
+npx dramaturge confirm --all
+```
+
+Verdicts are `fixed`, `still_reproducible`, `cannot_confirm`, `changed_surface`, and
+`new_related_issue`. Exit codes are scriptable: `0` means all confirmed findings are fixed, `1`
+means at least one still reproduces, `2` means confirmation infrastructure could not produce a
+verdict, and `3` means a changed surface or related new issue needs human review. Older report
+directories without `findings/<id>.json` manifests fail with a clear re-run message.
+
 ## What It Does
 
 Dramaturge uses AI-powered browser agents to test your web application automatically. It:
