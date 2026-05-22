@@ -266,7 +266,18 @@ function promotedSpecFilename(finding: Finding): string {
 }
 
 function sanitizeHeaderValue(value: string): string {
-  return value.replace(/[\r\n]+/g, ' ').replace(/\*\//g, '*\\/');
+  return value.replace(/[\r\n\u2028\u2029]+/g, ' ').replace(/\*\//g, '*\\/');
+}
+
+function buildRegenerateCommand(options: {
+  findingId: string;
+  sourceReport: string;
+  outputDir: string;
+}): string {
+  const { findingId, sourceReport, outputDir } = options;
+  return `npx dramaturge regress promote ${sanitizeHeaderValue(findingId)} --from-report ${sanitizeHeaderValue(
+    sourceReport
+  )} --output ${sanitizeHeaderValue(outputDir)} --force`;
 }
 
 function promotedSpecContent(options: {
@@ -274,8 +285,14 @@ function promotedSpecContent(options: {
   generatedContent: string;
   report: SerializedReport;
   sourceReport: string;
+  outputDir: string;
 }): string {
-  const { finding, generatedContent, report, sourceReport } = options;
+  const { finding, generatedContent, report, sourceReport, outputDir } = options;
+  const regenerateCommand = buildRegenerateCommand({
+    findingId: finding.id,
+    sourceReport,
+    outputDir,
+  });
   const header = [
     '/**',
     ` * @dramaturge-spec-version ${REGRESSION_SPEC_VERSION}`,
@@ -284,7 +301,7 @@ function promotedSpecContent(options: {
     ` * @dramaturge-origin-run ${sanitizeHeaderValue(report.meta?.startTime ?? 'unknown')}`,
     ` * @dramaturge-source-report ${sanitizeHeaderValue(sourceReport)}`,
     ' *',
-    ` * To re-generate: npx dramaturge regress promote ${sanitizeHeaderValue(finding.id)} --force`,
+    ` * To re-generate: ${regenerateCommand}`,
     ' */',
     '',
   ];
@@ -299,7 +316,9 @@ function promoteFinding(
 ): number {
   const findingId = args.positional[0];
   if (!findingId) {
-    deps.error('Usage: dramaturge regress promote <finding-id> [--dry-run] [--output <dir>]');
+    deps.error(
+      'Usage: dramaturge regress promote <finding-id> [--dry-run] [--output <dir>] [--force]'
+    );
     return 1;
   }
 
@@ -317,13 +336,16 @@ function promoteFinding(
   }
 
   const outputDir = resolve(deps.cwd, args.output ?? DEFAULT_REGRESSION_OUTPUT_DIR);
+  const sourceReport = relativeDisplayPath(deps.cwd, reportDir);
+  const outputDirDisplay = relativeDisplayPath(deps.cwd, outputDir);
   const filename = promotedSpecFilename(match.finding);
   const outputPath = join(outputDir, filename);
   const content = promotedSpecContent({
     finding: match.finding,
     generatedContent: match.generated.content,
     report,
-    sourceReport: relativeDisplayPath(deps.cwd, reportDir),
+    sourceReport,
+    outputDir: outputDirDisplay,
   });
 
   if (args.dryRun) {

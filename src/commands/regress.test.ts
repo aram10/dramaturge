@@ -268,7 +268,9 @@ describe('runRegressCommand', () => {
       'Wrote tests/dramaturge/BUG-001__create-dialog-never-opens.spec.ts'
     );
     expect(content).toContain('@dramaturge-finding BUG-001');
-    expect(content).toContain('To re-generate: npx dramaturge regress promote BUG-001 --force');
+    expect(content).toContain(
+      'To re-generate: npx dramaturge regress promote BUG-001 --from-report dramaturge-reports/run-1 --output tests/dramaturge --force'
+    );
     expect(content).toContain('import { test, expect } from "@playwright/test";');
   });
 
@@ -335,7 +337,8 @@ describe('runRegressCommand', () => {
             findings: [
               makeFinding({
                 title: 'Create dialog */ closes\nwith comment terminator',
-                actual: 'Nothing happens */ and a newline\nis present',
+                actual:
+                  'Nothing happens */ and a newline\nis present\u2028with unicode separator\u2029',
               }),
             ],
           }),
@@ -361,6 +364,17 @@ describe('runRegressCommand', () => {
     expect(header).toContain('*\\/');
     expect(header).not.toContain('*/ closes');
     expect(header).not.toContain('newline\nis present');
+    expect(header).not.toContain('\u2028');
+    expect(header).not.toContain('\u2029');
+  });
+
+  it('includes --force in promote usage text', () => {
+    const code = runRegressCommand({ subcommand: 'promote', positional: [] }, h.deps);
+
+    expect(code).toBe(1);
+    expect(h.errors.join('\n')).toContain(
+      'Usage: dramaturge regress promote <finding-id> [--dry-run] [--output <dir>] [--force]'
+    );
   });
 
   it('refuses to promote low-quality findings', () => {
