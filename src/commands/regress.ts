@@ -91,6 +91,17 @@ function deserializeRunResult(report: SerializedReport): RunResult {
   const evidence = report.evidence ?? [];
   const actions = report.actions ?? [];
   const findings = report.findings ?? [];
+  const globalEvidence: Evidence[] = [];
+  const evidenceByArea = new Map<string, Evidence[]>();
+  for (const item of evidence) {
+    if (item.areaName) {
+      const perAreaEvidence = evidenceByArea.get(item.areaName) ?? [];
+      perAreaEvidence.push(item);
+      evidenceByArea.set(item.areaName, perAreaEvidence);
+      continue;
+    }
+    globalEvidence.push(item);
+  }
   const areaNames = Array.from(
     new Set([
       ...(report.coverage?.map((area) => area.name) ?? []),
@@ -98,31 +109,34 @@ function deserializeRunResult(report: SerializedReport): RunResult {
       ...actions.map((action) => action.areaName).filter((name): name is string => Boolean(name)),
     ])
   );
-  const areaResults: AreaResult[] = areaNames.map((name) => ({
-    name,
-    url: areaUrl(report, name),
-    steps: 0,
-    findings: findings
-      .filter((finding) => finding.area === name)
-      .map((finding) => ({
-        ref: finding.id,
-        category: finding.category,
-        severity: finding.severity,
-        title: finding.title,
-        stepsToReproduce: finding.stepsToReproduce,
-        expected: finding.expected,
-        actual: finding.actual,
-        ...(finding.screenshot ? { screenshotRef: finding.screenshot } : {}),
-        evidenceIds: finding.evidenceIds ?? [],
-        ...(finding.meta ? { meta: finding.meta } : {}),
-      })),
-    replayableActions: actions.filter((action) => action.areaName === name),
-    screenshots: new Map(),
-    evidence: evidence.filter((item) => item.areaName === name || !item.areaName),
-    coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
-    pageType: 'unknown',
-    status: 'explored',
-  }));
+  const areaResults: AreaResult[] = areaNames.map((name) => {
+    const areaEvidence = evidenceByArea.get(name) ?? [];
+    return {
+      name,
+      url: areaUrl(report, name),
+      steps: 0,
+      findings: findings
+        .filter((finding) => finding.area === name)
+        .map((finding) => ({
+          ref: finding.id,
+          category: finding.category,
+          severity: finding.severity,
+          title: finding.title,
+          stepsToReproduce: finding.stepsToReproduce,
+          expected: finding.expected,
+          actual: finding.actual,
+          ...(finding.screenshot ? { screenshotRef: finding.screenshot } : {}),
+          evidenceIds: finding.evidenceIds ?? [],
+          ...(finding.meta ? { meta: finding.meta } : {}),
+        })),
+      replayableActions: actions.filter((action) => action.areaName === name),
+      screenshots: new Map(),
+      evidence: areaEvidence.length > 0 ? [...areaEvidence, ...globalEvidence] : globalEvidence,
+      coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+      pageType: 'unknown',
+      status: 'explored',
+    };
+  });
 
   return {
     targetUrl: report.meta?.targetUrl ?? '',
