@@ -75,7 +75,7 @@ Dramaturge supports multiple providers via model-string prefixes (e.g., `anthrop
 | Prefix | Provider | Environment Variables |
 |--------|----------|----------------------|
 | `anthropic/…` | Anthropic | `ANTHROPIC_API_KEY` |
-| `openai/…` | OpenAI | `OPENAI_API_KEY` |
+| `openai/…` | OpenAI | `OPENAI_API_KEY`, `OPENAI_BASE_URL` (optional) |
 | `google/…` | Google Generative AI | `GOOGLE_GENERATIVE_AI_API_KEY` |
 | `azure/…` | Azure AI Foundry | `AZURE_AI_ENDPOINT`, `AZURE_AI_API_KEY` |
 | `openrouter/…` | OpenRouter | `OPENROUTER_API_KEY` |
