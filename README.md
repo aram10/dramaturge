@@ -13,7 +13,14 @@
 ```bash
 # Install
 npm install dramaturge
+
+# Install Playwright's Chromium browser (one-time, if needed).
+# You may already have Playwright browsers installed, but you'll typically need this in CI/Docker
+# images or if your environment disables install scripts (e.g. npm/pnpm --ignore-scripts).
 npx playwright install chromium
+
+# Optional: sanity-check prerequisites
+npx dramaturge doctor
 
 # Generate config
 npx dramaturge auto-config
@@ -400,11 +407,17 @@ Test public-facing pages without authentication.
 
 ## Troubleshooting
 
-### "Cannot find module" errors
+### Playwright browser not installed
 
+This usually means Playwright's browser binaries aren't installed on the machine yet.
 Install Playwright browsers:
 ```bash
 npx playwright install chromium
+```
+
+In some Linux containers you may also need OS dependencies:
+```bash
+npx playwright install --with-deps chromium
 ```
 
 ### Authentication failures
