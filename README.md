@@ -80,8 +80,8 @@ Dramaturge supports multiple providers via model-string prefixes (e.g., `anthrop
 | `azure/…` | Azure AI Foundry | `AZURE_AI_ENDPOINT`, `AZURE_AI_API_KEY` |
 | `openrouter/…` | OpenRouter | `OPENROUTER_API_KEY` |
 | `github/…` | GitHub Models | `GITHUB_TOKEN` |
-| `ollama/…` | Ollama | `OLLAMA_BASE_URL` |
-| `custom/…` | OpenAI-compatible | `OPENAI_COMPATIBLE_BASE_URL` |
+| `ollama/…` | Ollama | `OLLAMA_BASE_URL`, optional: `OLLAMA_API_KEY` |
+| `custom/…` | OpenAI-compatible | `OPENAI_COMPATIBLE_BASE_URL`, optional: `OPENAI_COMPATIBLE_API_KEY` |
 
 **Agent modes:** `"dom"` (DOM inspection, portable) or `"cua"` (computer-use, requires vision model).
 
