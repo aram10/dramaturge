@@ -83,7 +83,7 @@ Dramaturge supports multiple providers via model-string prefixes (e.g., `anthrop
 | `ollama/…` | Ollama | `OLLAMA_BASE_URL`, optional: `OLLAMA_API_KEY` |
 | `custom/…` | OpenAI-compatible | `OPENAI_COMPATIBLE_BASE_URL`, optional: `OPENAI_COMPATIBLE_API_KEY` |
 
-**Agent modes:** `"dom"` (DOM inspection, portable) or `"cua"` (computer-use, requires vision model).
+**Agent modes:** `"dom"` (DOM inspection, portable) or `"cua"` (computer-use, typically works best with a vision-capable model).
 
 **Note:** AWS Bedrock, Cohere, and Mistral native APIs require OpenAI-compatible proxies via `custom/…`.
 
