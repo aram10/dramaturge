@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runRegressCommand, type RegressDependencies } from './regress.js';
@@ -152,22 +152,30 @@ describe('runRegressCommand', () => {
   });
 
   it('prints a generated Playwright spec for promotable findings in dry-run mode', () => {
+    const outputDir = join(h.cwd, 'tests', 'dramaturge');
     const code = runRegressCommand(
       {
         subcommand: 'promote',
         positional: ['BUG-001'],
         fromReport: h.reportDir,
         dryRun: true,
+        output: outputDir,
       },
       h.deps
     );
 
     expect(code).toBe(0);
     const output = h.logs.join('\n');
-    expect(output).toContain('// filename: bug-001-create-dialog-never-opens.spec.ts');
+    expect(output).toContain('// filename: BUG-001__create-dialog-never-opens.spec.ts');
+    expect(output).toContain('@dramaturge-spec-version 1');
+    expect(output).toContain('@dramaturge-finding BUG-001');
+    expect(output).toContain('@dramaturge-signature ["Bug","Major"');
+    expect(output).toContain('@dramaturge-origin-run 2026-05-20T18:00:00.000Z');
+    expect(output).toContain('@dramaturge-source-report dramaturge-reports');
     expect(output).toContain('import { test, expect } from "@playwright/test";');
     expect(output).toContain('await page.goto("https://example.com/checkout");');
     expect(output).toContain('button[data-testid');
+    expect(existsSync(outputDir)).toBe(false);
   });
 
   it('uses exploration ledger actions when report action rows are unavailable', () => {
@@ -236,14 +244,137 @@ describe('runRegressCommand', () => {
     );
   });
 
-  it('refuses non-dry-run promotion in the first slice', () => {
+  it('writes a generated Playwright spec for promotable findings', () => {
+    const code = runRegressCommand(
+      {
+        subcommand: 'promote',
+        positional: ['BUG-001'],
+        fromReport: h.reportDir,
+        output: 'tests/dramaturge',
+      },
+      h.deps
+    );
+
+    const outputPath = join(
+      h.cwd,
+      'tests',
+      'dramaturge',
+      'BUG-001__create-dialog-never-opens.spec.ts'
+    );
+    const content = readFileSync(outputPath, 'utf-8');
+
+    expect(code).toBe(0);
+    expect(h.logs.join('\n')).toContain(
+      'Wrote tests/dramaturge/BUG-001__create-dialog-never-opens.spec.ts'
+    );
+    expect(content).toContain('@dramaturge-finding BUG-001');
+    expect(content).toContain(
+      'To re-generate: npx dramaturge regress promote BUG-001 --from-report dramaturge-reports/run-1 --output tests/dramaturge --force'
+    );
+    expect(content).toContain('import { test, expect } from "@playwright/test";');
+  });
+
+  it('defaults non-dry-run writes to tests/dramaturge', () => {
+    const code = runRegressCommand(
+      { subcommand: 'promote', positional: ['BUG-001'], fromReport: h.reportDir },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    expect(
+      existsSync(join(h.cwd, 'tests', 'dramaturge', 'BUG-001__create-dialog-never-opens.spec.ts'))
+    ).toBe(true);
+  });
+
+  it('refuses to overwrite an existing promoted spec without force', () => {
+    const outputPath = join(
+      h.cwd,
+      'tests',
+      'dramaturge',
+      'BUG-001__create-dialog-never-opens.spec.ts'
+    );
+
+    expect(
+      runRegressCommand(
+        { subcommand: 'promote', positional: ['BUG-001'], fromReport: h.reportDir },
+        h.deps
+      )
+    ).toBe(0);
+
     const code = runRegressCommand(
       { subcommand: 'promote', positional: ['BUG-001'], fromReport: h.reportDir },
       h.deps
     );
 
     expect(code).toBe(1);
-    expect(h.errors.join('\n')).toContain('Only --dry-run promotion is supported');
+    expect(h.errors.join('\n')).toContain('Refusing to overwrite existing regression spec');
+    expect(readFileSync(outputPath, 'utf-8')).toContain('@dramaturge-finding BUG-001');
+  });
+
+  it('overwrites an existing promoted spec with force', () => {
+    const outputDir = join(h.cwd, 'tests', 'dramaturge');
+    const outputPath = join(outputDir, 'BUG-001__create-dialog-never-opens.spec.ts');
+    mkdirSync(outputDir, { recursive: true });
+    writeFileSync(outputPath, 'stale content');
+
+    const code = runRegressCommand(
+      { subcommand: 'promote', positional: ['BUG-001'], fromReport: h.reportDir, force: true },
+      h.deps
+    );
+
+    expect(code).toBe(0);
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toContain('@dramaturge-finding BUG-001');
+    expect(content).not.toBe('stale content');
+  });
+
+  it('escapes provenance header values before writing specs', () => {
+    rmSync(h.cwd, { recursive: true, force: true });
+    h = makeHarness(
+      makeRunResult({
+        areaResults: [
+          makeArea({
+            findings: [
+              makeFinding({
+                title: 'Create dialog */ closes\nwith comment terminator',
+                actual:
+                  'Nothing happens */ and a newline\nis present\u2028with unicode separator\u2029',
+              }),
+            ],
+          }),
+        ],
+      })
+    );
+
+    const code = runRegressCommand(
+      { subcommand: 'promote', positional: ['BUG-001'], fromReport: h.reportDir },
+      h.deps
+    );
+
+    const outputPath = join(
+      h.cwd,
+      'tests',
+      'dramaturge',
+      'BUG-001__create-dialog-closes-with-comment-terminator.spec.ts'
+    );
+    const content = readFileSync(outputPath, 'utf-8');
+    const header = content.slice(0, content.indexOf(' */') + 3);
+
+    expect(code).toBe(0);
+    expect(header).toContain('*\\/');
+    expect(header).not.toContain('*/ closes');
+    expect(header).not.toContain('newline\nis present');
+    expect(header).not.toContain('\u2028');
+    expect(header).not.toContain('\u2029');
+  });
+
+  it('includes --force in promote usage text', () => {
+    const code = runRegressCommand({ subcommand: 'promote', positional: [] }, h.deps);
+
+    expect(code).toBe(1);
+    expect(h.errors.join('\n')).toContain(
+      'Usage: dramaturge regress promote <finding-id> [--dry-run] [--output <dir>] [--force]'
+    );
   });
 
   it('refuses to promote low-quality findings', () => {

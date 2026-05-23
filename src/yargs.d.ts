@@ -28,6 +28,7 @@ declare module 'yargs' {
     finding?: string;
     severity?: string;
     dryRun?: boolean;
+    force?: boolean;
   }
 
   interface DramaturgeYargsInstance {

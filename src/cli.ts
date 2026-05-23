@@ -117,6 +117,8 @@ export interface ParsedCliArgs {
   regressDryRun?: boolean;
   /** --output flag for regress promote */
   regressOutput?: string;
+  /** --force flag for regress promote overwrite */
+  regressForce?: boolean;
 }
 
 export interface CliDependencies {
@@ -197,7 +199,8 @@ Confirm options:
 Regress options:
   --from-report <dir>  Report directory containing report.json
   --dry-run            regress promote: print the generated spec without writing
-  --output <dir>       regress promote: output directory for future non-dry-run writes
+  --output <dir>       regress promote: output directory (default: ./tests/dramaturge)
+  --force              regress promote: overwrite an existing promoted spec
 
 Examples:
   dramaturge run https://my-app.example.com           # Quick run, no config needed
@@ -220,6 +223,7 @@ Examples:
   dramaturge confirm --finding BUG-0042 --from-report ./dramaturge-reports/latest
   dramaturge regress list --from-report ./dramaturge-reports/latest
   dramaturge regress promote BUG-0042 --dry-run
+  dramaturge regress promote BUG-0042 --output tests/dramaturge
 
 Environment variables:
   ANTHROPIC_API_KEY              API key for Anthropic models
@@ -450,6 +454,7 @@ function parseWithYargs(args: readonly string[]) {
     .option('suppressed', { type: 'boolean' })
     .option('all', { type: 'boolean' })
     .option('dry-run', { type: 'boolean' })
+    .option('force', { type: 'boolean' })
     .option('reason', { type: 'string' })
     .option('save', { type: 'boolean' })
     .parseSync();
@@ -581,6 +586,7 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
           regressFromReport: argv.fromReport,
           regressDryRun: argv.dryRun ?? undefined,
           regressOutput: argv.output,
+          regressForce: argv.force ?? undefined,
         }
       : {}),
   };
@@ -684,6 +690,7 @@ export async function runCli(
             fromReport: parsedArgs.regressFromReport,
             dryRun: parsedArgs.regressDryRun,
             output: parsedArgs.regressOutput,
+            force: parsedArgs.regressForce,
           },
           { log: dependencies.log, error: dependencies.error, cwd: process.cwd() }
         );

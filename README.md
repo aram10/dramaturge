@@ -65,9 +65,9 @@ directories without `findings/<id>.json` manifests fail with a clear re-run mess
 
 ## Building a Regression Suite
 
-Dramaturge can score findings for promotion into durable Playwright regression specs. The first
-workflow slice is intentionally review-first: list promotable findings, then dry-run the generated
-spec before writing anything into your repo.
+Dramaturge can score findings for promotion into durable Playwright regression specs. Review
+promotable findings first, dry-run the generated spec when you want to inspect it, then write the
+spec into your regression-test directory.
 
 ```bash
 # Show quality scores for findings in the latest report
@@ -78,12 +78,19 @@ npx dramaturge regress list --from-report ./dramaturge-reports/2026-05-20T18-46-
 
 # Preview the Playwright spec for a promotable finding
 npx dramaturge regress promote BUG-0042 --dry-run
+
+# Write the spec to ./tests/dramaturge (the default output directory)
+npx dramaturge regress promote BUG-0042
+
+# Or choose an explicit output directory
+npx dramaturge regress promote BUG-0042 --output tests/dramaturge/
 ```
 
 Quality scores consider URL context, replay actions, expected/actual detail, screenshots,
 console/network evidence, accessibility evidence, and confidence. Findings must have replay actions
-and differing expected/actual behavior before they are promotable. Non-dry-run promotion is reserved
-for the next slice, so this command never writes tests into your repo yet.
+and differing expected/actual behavior before they are promotable. Promoted specs use stable
+`<finding-id>__<title-slug>.spec.ts` filenames, include Dramaturge provenance headers, and refuse to
+overwrite existing files unless you pass `--force`.
 
 ## What It Does
 
