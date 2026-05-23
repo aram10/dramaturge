@@ -47,6 +47,7 @@ Minimal example:
 ```json
 {
   "targetUrl": "https://your-app.example.com",
+  "appDescription": "Your application's purpose",
   "auth": {
     "type": "interactive",
     "loginUrl": "/login",
