@@ -26,7 +26,23 @@ npx dramaturge auto-config
 Set your API key:
 
 ```bash
+# Set the API key(s) for the provider you plan to use.
 export ANTHROPIC_API_KEY="your-key-here"
+# or
+export OPENAI_API_KEY="your-key-here"
+# or
+export GOOGLE_GENERATIVE_AI_API_KEY="your-key-here"
+# or (Azure AI Foundry)
+export AZURE_AI_ENDPOINT="https://my-project.services.ai.azure.com"
+export AZURE_AI_API_KEY="your-key-here"
+# or (OpenRouter)
+export OPENROUTER_API_KEY="your-key-here"
+# or (GitHub Models)
+export GITHUB_TOKEN="your-token-here"
+# or (Ollama / local OpenAI-compatible)
+export OLLAMA_BASE_URL="http://localhost:11434/v1"
+# or (Custom OpenAI-compatible)
+export OPENAI_COMPATIBLE_BASE_URL="http://llama-cpp.local:8080/v1"
 ```
 
 Run:
@@ -251,12 +267,22 @@ Every finding includes severity level, description, screenshot, and reproduction
 
 ## LLM Providers
 
-Works with:
-- **Anthropic** (recommended) — Claude Sonnet/Haiku
-- **OpenAI** — GPT-4o and GPT-4o-mini
-- **Google** — Gemini models
-- **Ollama** — Free local models
-- **Custom OpenAI-compatible** — llama.cpp, vLLM, LocalAI
+Dramaturge supports multiple inference providers via model-string prefixes.
+
+**Built-in provider adapters (planner/judge/vision):**
+
+| Prefix | Provider | Environment variables |
+|--------|----------|-----------------------|
+| `anthropic/…` | Anthropic | `ANTHROPIC_API_KEY` |
+| `openai/…` | OpenAI | `OPENAI_API_KEY` (optional: `OPENAI_BASE_URL`) |
+| `google/…` | Google Generative AI (Gemini) | `GOOGLE_GENERATIVE_AI_API_KEY` |
+| `azure/…` | Azure AI Foundry | `AZURE_AI_ENDPOINT`, `AZURE_AI_API_KEY` |
+| `openrouter/…` | OpenRouter | `OPENROUTER_API_KEY` |
+| `github/…` | GitHub Models | `GITHUB_TOKEN` (`models:read` scope) |
+| `ollama/…` | Ollama | `OLLAMA_BASE_URL` (optional: `OLLAMA_API_KEY`) |
+| `custom/…` | Custom OpenAI-compatible | `OPENAI_COMPATIBLE_BASE_URL` (optional: `OPENAI_COMPATIBLE_API_KEY`) |
+
+If you omit the prefix (e.g. `"claude-sonnet-4-6"`), Dramaturge defaults to Anthropic routing.
 
 Set the appropriate API key:
 ```bash
@@ -265,9 +291,36 @@ export ANTHROPIC_API_KEY="..."
 export OPENAI_API_KEY="..."
 # or
 export GOOGLE_GENERATIVE_AI_API_KEY="..."
-# or
+# or (Azure AI Foundry)
+export AZURE_AI_ENDPOINT="https://my-project.services.ai.azure.com"
+export AZURE_AI_API_KEY="..."
+# or (OpenRouter)
+export OPENROUTER_API_KEY="..."
+# or (GitHub Models)
+export GITHUB_TOKEN="..."
+# or (Ollama)
 export OLLAMA_BASE_URL="http://localhost:11434/v1"
+# or (Custom OpenAI-compatible)
+export OPENAI_COMPATIBLE_BASE_URL="http://llama-cpp.local:8080/v1"
 ```
+
+### Model Support Notes
+
+- **Planner/judge models** (`models.planner`, `models.worker`) use text chat completions. Any model
+  supported by the chosen provider's chat endpoint should work.
+- **Vision analysis** (`visionAnalysis.enabled`) calls the provider's image-capable endpoint and
+  requires a model that accepts image input. If the provider/model rejects image payloads, vision
+  analysis is skipped with a warning (the engine does not crash).
+- **Browser agent mode** (`models.agentMode`):
+  - `"dom"` is the most portable option (no screenshot/vision requirement).
+  - `"cua"` relies on Stagehand "computer use" capabilities and typically requires a vision-capable
+    model; some providers/models will not support `"cua"` reliably.
+
+### Notable Missing Providers
+
+We do not currently have first-class adapters for providers like AWS Bedrock, Cohere, or Mistral's
+native API. If they expose an OpenAI-compatible `POST /chat/completions` interface, you can often
+use them via `custom/…` (or via `openrouter/…` if available there).
 
 ## Advanced Features
 
@@ -414,14 +467,23 @@ Test public-facing pages without authentication.
   "models": {
     "planner": "anthropic/claude-sonnet-4-6",
     "worker": "anthropic/claude-haiku-4-5",
-    "agentMode": "dom"
+    "browserOps": "anthropic/claude-sonnet-4-6",
+    "agentMode": "dom",
+    "agentModes": {
+      "navigation": "dom",
+      "form": "dom",
+      "crud": "dom",
+      "adversarial": "dom"
+    }
   }
 }
 ```
 
 - **planner** — Model for task planning (use smarter model)
 - **worker** — Model for execution (use faster/cheaper model)
+- **browserOps** — Model used by the browser agent runtime (defaults to `planner` when omitted)
 - **agentMode** — `"dom"` (faster, cheaper) or `"cua"` (sees viewport)
+- **agentModes** — Optional per-worker overrides (`navigation`, `form`, `crud`, `adversarial`)
 
 ### Budget & Exploration
 
@@ -518,6 +580,7 @@ For complete config schema, see [`dramaturge.config.example.json`](./dramaturge.
 | `target-url` | Override target URL | — |
 | `anthropic-api-key` | Anthropic API key | — |
 | `openai-api-key` | OpenAI API key | — |
+| `google-api-key` | Google Generative AI API key | — |
 | `fail-on-severity` | Fail if findings ≥ severity | — |
 | `post-comment` | Post PR comment | `true` |
 | `upload-report` | Upload as artifact | `true` |
