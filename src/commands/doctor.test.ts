@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import { runDoctorChecks, printDoctorResults, runDoctor } from './doctor.js';
 import type { DoctorCheckResult, DoctorDependencies } from './doctor.js';
 
@@ -85,16 +90,157 @@ describe('printDoctorResults', () => {
 });
 
 describe('runDoctor', () => {
-  it('returns 0 or 1 based on checks', () => {
+  let originalPlaywrightBrowsersPath: string | undefined;
+  let tempDirs: string[];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    originalPlaywrightBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+    delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+    tempDirs = [];
+  });
+
+  afterEach(() => {
+    if (originalPlaywrightBrowsersPath === undefined) {
+      delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+    } else {
+      process.env.PLAYWRIGHT_BROWSERS_PATH = originalPlaywrightBrowsersPath;
+    }
+
+    for (const dir of tempDirs) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns 0 or 1 based on checks', async () => {
     const messages: string[] = [];
     const deps: DoctorDependencies = {
       log: (msg) => messages.push(msg),
       cwd: process.cwd(),
     };
 
-    const exitCode = runDoctor(deps);
+    const exitCode = await runDoctor(deps);
     expect(typeof exitCode).toBe('number');
     expect(exitCode === 0 || exitCode === 1).toBe(true);
     expect(messages.some((m) => m.includes('Dramaturge Doctor'))).toBe(true);
+  });
+
+  it('prompts to install Chromium and runs install when confirmed', async () => {
+    const originalCi = process.env.CI;
+    delete process.env.CI;
+    const browsersPath = mkdtempSync(resolve(tmpdir(), 'dramaturge-doctor-'));
+    tempDirs.push(browsersPath);
+    process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
+
+    const messages: string[] = [];
+    const confirms: string[] = [];
+    const spawnCalls: Array<{ command: string; args: string[]; cwd?: string }> = [];
+
+    const spawnImpl = ((command: string, args: string[], options?: { cwd?: string }): unknown => {
+      spawnCalls.push({ command, args, cwd: options?.cwd });
+      const child = new EventEmitter();
+      queueMicrotask(() => {
+        mkdirSync(resolve(browsersPath, 'chromium-9999'), { recursive: true });
+        child.emit('exit', 0);
+      });
+      return child;
+    }) as unknown as DoctorDependencies['spawnImpl'];
+
+    const deps: DoctorDependencies = {
+      log: (msg) => messages.push(msg),
+      cwd: process.cwd(),
+      confirm: async (question) => {
+        confirms.push(question);
+        return true;
+      },
+      spawnImpl,
+      stdin: { isTTY: true } as unknown as NodeJS.ReadStream,
+      stdout: { isTTY: true } as unknown as NodeJS.WriteStream,
+    };
+
+    try {
+      await runDoctor(deps);
+    } finally {
+      if (originalCi === undefined) {
+        delete process.env.CI;
+      } else {
+        process.env.CI = originalCi;
+      }
+    }
+
+    expect(confirms).toEqual(['Playwright Chromium is not installed. Install it now?']);
+    expect(spawnCalls).toHaveLength(1);
+    expect(spawnCalls[0].args).toEqual(['playwright', 'install', 'chromium']);
+    expect(spawnCalls[0].cwd).toBe(process.cwd());
+    expect(messages.some((m) => m.includes('Installing Playwright Chromium'))).toBe(true);
+    expect(messages.some((m) => m.includes('Playwright Chromium') && m.includes('✓'))).toBe(true);
+  });
+
+  it('does not run install when user declines', async () => {
+    const originalCi = process.env.CI;
+    delete process.env.CI;
+    const browsersPath = mkdtempSync(resolve(tmpdir(), 'dramaturge-doctor-'));
+    tempDirs.push(browsersPath);
+    process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
+
+    const confirms: string[] = [];
+    const spawnCalls: Array<{ command: string; args: string[] }> = [];
+
+    const spawnImpl = ((command: string, args: string[]): unknown => {
+      spawnCalls.push({ command, args });
+      return new EventEmitter();
+    }) as unknown as DoctorDependencies['spawnImpl'];
+
+    try {
+      await runDoctor({
+        log: () => undefined,
+        cwd: process.cwd(),
+        confirm: async (question) => {
+          confirms.push(question);
+          return false;
+        },
+        spawnImpl,
+        stdin: { isTTY: true } as unknown as NodeJS.ReadStream,
+        stdout: { isTTY: true } as unknown as NodeJS.WriteStream,
+      });
+    } finally {
+      if (originalCi === undefined) {
+        delete process.env.CI;
+      } else {
+        process.env.CI = originalCi;
+      }
+    }
+
+    expect(confirms).toEqual(['Playwright Chromium is not installed. Install it now?']);
+    expect(spawnCalls).toHaveLength(0);
+  });
+
+  it('does not prompt in non-interactive environments', async () => {
+    const browsersPath = mkdtempSync(resolve(tmpdir(), 'dramaturge-doctor-'));
+    tempDirs.push(browsersPath);
+    process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
+
+    const confirms: string[] = [];
+    const spawnCalls: Array<{ command: string; args: string[] }> = [];
+
+    const spawnImpl = ((command: string, args: string[]): unknown => {
+      spawnCalls.push({ command, args });
+      return new EventEmitter();
+    }) as unknown as DoctorDependencies['spawnImpl'];
+
+    await runDoctor({
+      log: () => undefined,
+      cwd: process.cwd(),
+      confirm: async (question) => {
+        confirms.push(question);
+        return true;
+      },
+      spawnImpl,
+      stdin: { isTTY: false } as unknown as NodeJS.ReadStream,
+      stdout: { isTTY: false } as unknown as NodeJS.WriteStream,
+    });
+
+    expect(confirms).toHaveLength(0);
+    expect(spawnCalls).toHaveLength(0);
   });
 });

@@ -614,7 +614,7 @@ export async function runCli(
         return 0;
 
       case 'doctor':
-        return runDoctor({ log: dependencies.log, cwd: process.cwd() });
+        return await runDoctorCommand(dependencies);
 
       case 'mcp':
         return await runMcpCommand(dependencies);
@@ -759,6 +759,37 @@ async function runSetupCommand(
         repoPath: parsedArgs.noScan ? false : parsedArgs.repoPath,
       }
     );
+  } finally {
+    rl.close();
+  }
+}
+
+async function runDoctorCommand(dependencies: CliDependencies): Promise<number> {
+  const readline = await import('node:readline');
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const confirm = (question: string, defaultValue = false): Promise<boolean> =>
+    new Promise((resolvePromise) => {
+      const suffix = defaultValue ? ' [Y/n]' : ' [y/N]';
+      rl.question(`  ${question}${suffix}: `, (answer) => {
+        const trimmed = answer.trim().toLowerCase();
+        if (trimmed === '') resolvePromise(defaultValue);
+        else resolvePromise(trimmed === 'y' || trimmed === 'yes');
+      });
+    });
+
+  try {
+    return await runDoctor({
+      log: dependencies.log,
+      cwd: process.cwd(),
+      confirm,
+      stdin: process.stdin,
+      stdout: process.stdout,
+    });
   } finally {
     rl.close();
   }

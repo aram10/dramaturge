@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { accessSync, constants, existsSync } from 'node:fs';
+import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { isAbsolute, resolve } from 'node:path';
 
 export interface DoctorCheckResult {
   label: string;
@@ -15,6 +16,10 @@ export interface DoctorCheckResult {
 export interface DoctorDependencies {
   log: (message: string) => void;
   cwd: string;
+  confirm?: (question: string, defaultValue?: boolean) => Promise<boolean>;
+  spawnImpl?: typeof spawn;
+  stdin?: NodeJS.ReadStream;
+  stdout?: NodeJS.WriteStream;
 }
 
 function checkNodeVersion(): DoctorCheckResult {
@@ -28,14 +33,52 @@ function checkNodeVersion(): DoctorCheckResult {
   };
 }
 
-function checkPlaywrightBrowser(): DoctorCheckResult {
-  const browsersPath =
-    process.env.PLAYWRIGHT_BROWSERS_PATH ?? resolve(homedir(), '.cache', 'ms-playwright');
-  const exists = existsSync(browsersPath);
+function resolvePlaywrightBrowsersPath(cwd: string): string {
+  const configured = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (!configured) {
+    if (process.platform === 'win32') {
+      return resolve(
+        process.env.LOCALAPPDATA ?? resolve(homedir(), 'AppData', 'Local'),
+        'ms-playwright'
+      );
+    }
+    if (process.platform === 'darwin') {
+      return resolve(homedir(), 'Library', 'Caches', 'ms-playwright');
+    }
+    return resolve(homedir(), '.cache', 'ms-playwright');
+  }
+
+  if (configured === '0') {
+    return resolve(cwd, 'node_modules', 'playwright', '.local-browsers');
+  }
+
+  return isAbsolute(configured) ? configured : resolve(cwd, configured);
+}
+
+function hasChromiumInstalled(browsersPath: string): boolean {
+  if (!existsSync(browsersPath)) {
+    return false;
+  }
+
+  try {
+    const entries = readdirSync(browsersPath, { withFileTypes: true });
+    return entries.some(
+      (entry) =>
+        entry.isDirectory() &&
+        (entry.name.startsWith('chromium-') || entry.name.startsWith('chromium_headless_shell-'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function checkPlaywrightChromium(cwd: string): DoctorCheckResult {
+  const browsersPath = resolvePlaywrightBrowsersPath(cwd);
+  const exists = hasChromiumInstalled(browsersPath);
   return {
-    label: 'Playwright browsers',
+    label: 'Playwright Chromium',
     ok: exists,
-    message: exists ? `Found at ${browsersPath}` : 'Not found',
+    message: exists ? `Found in ${browsersPath}` : `Not found in ${browsersPath}`,
     fix: !exists ? 'Run: npx playwright install chromium' : undefined,
   };
 }
@@ -143,7 +186,7 @@ function checkOutputDir(cwd: string): DoctorCheckResult {
 export function runDoctorChecks(cwd: string): DoctorCheckResult[] {
   return [
     checkNodeVersion(),
-    checkPlaywrightBrowser(),
+    checkPlaywrightChromium(cwd),
     checkConfigFile(cwd),
     checkAnyApiKey(),
     checkApiKey('ANTHROPIC_API_KEY', 'Anthropic'),
@@ -186,12 +229,70 @@ export function printDoctorResults(
   return allOk;
 }
 
+function canPrompt(deps: DoctorDependencies): boolean {
+  if (!deps.confirm) {
+    return false;
+  }
+
+  if (process.env.CI) {
+    return false;
+  }
+
+  const stdin = deps.stdin ?? process.stdin;
+  const stdout = deps.stdout ?? process.stdout;
+  return Boolean(stdin.isTTY && stdout.isTTY);
+}
+
+function runPlaywrightInstallChromium(
+  deps: DoctorDependencies
+): Promise<{ ok: boolean; exitCode: number | null }> {
+  const spawnImpl = deps.spawnImpl ?? spawn;
+  const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+
+  deps.log('\nInstalling Playwright Chromium (npx playwright install chromium)...\n');
+
+  return new Promise((resolvePromise) => {
+    let child: ChildProcess;
+    try {
+      child = spawnImpl(npxCommand, ['playwright', 'install', 'chromium'], {
+        stdio: 'inherit',
+        env: process.env,
+        cwd: deps.cwd,
+      });
+    } catch {
+      resolvePromise({ ok: false, exitCode: null });
+      return;
+    }
+
+    child.once('error', () => resolvePromise({ ok: false, exitCode: null }));
+    child.once('exit', (code) => resolvePromise({ ok: code === 0, exitCode: code }));
+  });
+}
+
 /**
  * Run the doctor command: execute checks and print results.
  * Returns 0 for all-pass, 1 if any check fails.
  */
-export function runDoctor(deps: DoctorDependencies): number {
-  const results = runDoctorChecks(deps.cwd);
-  const allOk = printDoctorResults(results, deps);
+export async function runDoctor(deps: DoctorDependencies): Promise<number> {
+  let results = runDoctorChecks(deps.cwd);
+  let allOk = printDoctorResults(results, deps);
+
+  const chromiumCheck = results.find((result) => result.label === 'Playwright Chromium');
+  const confirm = deps.confirm;
+  if (chromiumCheck && !chromiumCheck.ok && confirm && canPrompt(deps)) {
+    const confirmed = await confirm('Playwright Chromium is not installed. Install it now?', true);
+    if (confirmed) {
+      const install = await runPlaywrightInstallChromium(deps);
+      if (!install.ok) {
+        deps.log(
+          `\nPlaywright install failed${install.exitCode === null ? '' : ` (exit ${install.exitCode})`}.\n`
+        );
+      }
+
+      results = runDoctorChecks(deps.cwd);
+      allOk = printDoctorResults(results, deps);
+    }
+  }
+
   return allOk ? 0 : 1;
 }

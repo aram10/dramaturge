@@ -14,13 +14,12 @@
 # Install
 npm install dramaturge
 
-# Install Playwright's Chromium browser (one-time, if needed).
-# You may already have Playwright browsers installed, but you'll typically need this in CI/Docker
-# images or if your environment disables install scripts (e.g. npm/pnpm --ignore-scripts).
-npx playwright install chromium
-
-# Optional: sanity-check prerequisites
+# Always run this after first install to sanity-check prerequisites.
+# If Playwright's Chromium browser is missing, doctor will prompt you and can install it automatically.
 npx dramaturge doctor
+
+# If you're in CI/Docker (non-interactive) or prompts are disabled, install Chromium manually:
+# npx playwright install chromium
 
 # Generate config
 npx dramaturge auto-config
