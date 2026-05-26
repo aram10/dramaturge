@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.7.2...dramaturge-v0.8.0) (2026-05-26)
+
+
+### Features
+
+* add confirm replay manifest foundation ([2bb1735](https://github.com/aram10/dramaturge/commit/2bb1735a63bb9b0bdd31264bc4e94b095aa6790a))
+* add regression promotion dry-run foundation ([a4d4982](https://github.com/aram10/dramaturge/commit/a4d49822015fd740ee7dd5515527e2d3a69cf5f8))
+* close the confirm workflow loop for batch verification ([ad162eb](https://github.com/aram10/dramaturge/commit/ad162eb5aa5be96ebed0bb7d46571f65b62a5179)), closes [#180](https://github.com/aram10/dramaturge/issues/180)
+* enable confirm live replay ([ee83cb5](https://github.com/aram10/dramaturge/commit/ee83cb5a190f55105de823cc9c4eed22abb00aa3))
+* enable confirm to build on stable replay manifests ([3ee1c71](https://github.com/aram10/dramaturge/commit/3ee1c71bd025463f4da2d6a426471624056823fe)), closes [#180](https://github.com/aram10/dramaturge/issues/180)
+* enable confirm to verify fixes through live replay ([ba9dfb8](https://github.com/aram10/dramaturge/commit/ba9dfb865835060d7330ab4ec93422acebdcd237)), closes [#180](https://github.com/aram10/dramaturge/issues/180)
+* make regression promotion reviewable before repo writes ([afd8554](https://github.com/aram10/dramaturge/commit/afd8554842505dd48c4cea9707dfdb8b75c2d9f6)), closes [#181](https://github.com/aram10/dramaturge/issues/181)
+* make regression promotion write specs safely ([e41e186](https://github.com/aram10/dramaturge/commit/e41e1867da38bdbce81f4f1a961307da4d92c6f7))
+* make regression promotion write specs safely ([45d783a](https://github.com/aram10/dramaturge/commit/45d783a11aeb6ebcbf771ac05ef7e6bd14189833)), closes [#181](https://github.com/aram10/dramaturge/issues/181)
+
+
+### Bug Fixes
+
+* avoid repeated full evidence scans in regress report deserialization ([354ceed](https://github.com/aram10/dramaturge/commit/354ceede907cd93e1d357a6856a6ace26c0dfae7))
+
 ## [0.7.2](https://github.com/aram10/dramaturge/compare/dramaturge-v0.7.1...dramaturge-v0.7.2) (2026-05-15)
 
 
