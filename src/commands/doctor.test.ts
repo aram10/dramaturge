@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -91,11 +91,13 @@ describe('printDoctorResults', () => {
 
 describe('runDoctor', () => {
   let originalPlaywrightBrowsersPath: string | undefined;
+  let tempDirs: string[];
 
   beforeEach(() => {
     vi.clearAllMocks();
     originalPlaywrightBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
     delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+    tempDirs = [];
   });
 
   afterEach(() => {
@@ -103,6 +105,10 @@ describe('runDoctor', () => {
       delete process.env.PLAYWRIGHT_BROWSERS_PATH;
     } else {
       process.env.PLAYWRIGHT_BROWSERS_PATH = originalPlaywrightBrowsersPath;
+    }
+
+    for (const dir of tempDirs) {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 
@@ -123,14 +129,15 @@ describe('runDoctor', () => {
     const originalCi = process.env.CI;
     delete process.env.CI;
     const browsersPath = mkdtempSync(resolve(tmpdir(), 'dramaturge-doctor-'));
+    tempDirs.push(browsersPath);
     process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
 
     const messages: string[] = [];
     const confirms: string[] = [];
-    const spawnCalls: Array<{ command: string; args: string[] }> = [];
+    const spawnCalls: Array<{ command: string; args: string[]; cwd?: string }> = [];
 
-    const spawnImpl = ((command: string, args: string[]): unknown => {
-      spawnCalls.push({ command, args });
+    const spawnImpl = ((command: string, args: string[], options?: { cwd?: string }): unknown => {
+      spawnCalls.push({ command, args, cwd: options?.cwd });
       const child = new EventEmitter();
       queueMicrotask(() => {
         mkdirSync(resolve(browsersPath, 'chromium-9999'), { recursive: true });
@@ -164,6 +171,7 @@ describe('runDoctor', () => {
     expect(confirms).toEqual(['Playwright Chromium is not installed. Install it now?']);
     expect(spawnCalls).toHaveLength(1);
     expect(spawnCalls[0].args).toEqual(['playwright', 'install', 'chromium']);
+    expect(spawnCalls[0].cwd).toBe(process.cwd());
     expect(messages.some((m) => m.includes('Installing Playwright Chromium'))).toBe(true);
     expect(messages.some((m) => m.includes('Playwright Chromium') && m.includes('✓'))).toBe(true);
   });
@@ -172,6 +180,7 @@ describe('runDoctor', () => {
     const originalCi = process.env.CI;
     delete process.env.CI;
     const browsersPath = mkdtempSync(resolve(tmpdir(), 'dramaturge-doctor-'));
+    tempDirs.push(browsersPath);
     process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
 
     const confirms: string[] = [];
@@ -208,6 +217,7 @@ describe('runDoctor', () => {
 
   it('does not prompt in non-interactive environments', async () => {
     const browsersPath = mkdtempSync(resolve(tmpdir(), 'dramaturge-doctor-'));
+    tempDirs.push(browsersPath);
     process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
 
     const confirms: string[] = [];

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { accessSync, constants, existsSync } from 'node:fs';
-import { readdirSync } from 'node:fs';
+import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';
@@ -258,6 +257,7 @@ function runPlaywrightInstallChromium(
       child = spawnImpl(npxCommand, ['playwright', 'install', 'chromium'], {
         stdio: 'inherit',
         env: process.env,
+        cwd: deps.cwd,
       });
     } catch {
       resolvePromise({ ok: false, exitCode: null });
