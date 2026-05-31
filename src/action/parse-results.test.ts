@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -11,6 +11,7 @@ import {
   buildSummary,
   formatDuration,
   checkSeverityThreshold,
+  writeStepSummary,
 } from '../../action/parse-results.js';
 
 describe('parse-results', () => {
@@ -289,6 +290,24 @@ describe('parse-results', () => {
       const result = buildSummary(report);
       expect(result.markdown).toContain('https://example.com/@\u200Bteam?tab=\\[prod\\]');
       expect(result.markdown).toContain('Breaks \\[link\\]\\(x\\) @\u200Bops');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // writeStepSummary
+  // ---------------------------------------------------------------------------
+
+  describe('writeStepSummary', () => {
+    it('appends the generated markdown to the GitHub step summary file', () => {
+      const summaryPath = join(tempDir, 'step-summary.md');
+
+      writeStepSummary('## Dramaturge\n\nNo findings\n', summaryPath);
+
+      expect(readFileSync(summaryPath, 'utf-8')).toBe('## Dramaturge\n\nNo findings\n');
+    });
+
+    it('does nothing when no step summary file is configured', () => {
+      expect(() => writeStepSummary('## Dramaturge\n', '')).not.toThrow();
     });
   });
 
