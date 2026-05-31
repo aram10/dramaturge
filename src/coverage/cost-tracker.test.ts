@@ -31,6 +31,15 @@ describe("estimateCallCost", () => {
     const withoutPrefix = estimateCallCost("claude-haiku-4-5", 1000, 500);
     expect(withPrefix).toBe(withoutPrefix);
   });
+
+  it("prices Anthropic cache tokens at cache-specific rates", () => {
+    const cost = estimateCallCost("anthropic/claude-sonnet-4-6", 0, 0, {
+      cacheReadInputTokens: 1_000_000,
+      cacheCreationInputTokens: 1_000_000,
+    });
+
+    expect(cost).toBeCloseTo(4.05, 2);
+  });
 });
 
 describe("approximateTokenCount", () => {
@@ -95,6 +104,8 @@ describe("CostTracker", () => {
     expect(Object.keys(summary.byModel)).toHaveLength(2);
     expect(summary.byModel["claude-haiku-4-5"].calls).toBe(2);
     expect(summary.byModel["claude-sonnet-4-6"].calls).toBe(1);
+    expect(summary.byLabel["call-1"].calls).toBe(1);
+    expect(summary.budgetLimitUsd).toBe(50);
     expect(summary.overBudget).toBe(false);
   });
 
@@ -113,6 +124,20 @@ describe("CostTracker", () => {
     expect(record.outputTokens).toBe(2000);
     expect(record.costUsd).toBeGreaterThan(0);
     expect(record.label).toBe("test-label");
+    expect(record.source).toBe("estimated");
     expect(record.timestamp).toBeTruthy();
+  });
+
+  it("records provider-reported cache token metadata", () => {
+    const tracker = new CostTracker();
+    const record = tracker.record("anthropic/claude-sonnet-4-6", 5000, 2000, "test-label", {
+      cacheReadInputTokens: 1000,
+      cacheCreationInputTokens: 500,
+      source: "reported",
+    });
+
+    expect(record.cacheReadInputTokens).toBe(1000);
+    expect(record.cacheCreationInputTokens).toBe(500);
+    expect(record.source).toBe("reported");
   });
 });

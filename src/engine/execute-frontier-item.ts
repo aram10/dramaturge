@@ -189,6 +189,7 @@ async function runPreflightScans(
         fullPage: ctx.config.visionAnalysis.fullPage,
         maxResponseTokens: ctx.config.visionAnalysis.maxResponseTokens,
         requestTimeoutMs: ctx.config.visionAnalysis.requestTimeoutMs,
+        costTracker: ctx.costTracker,
       });
       preflightFindings.push(...visionResult.findings);
       preflightEvidence.push(...visionResult.evidence);
@@ -256,6 +257,7 @@ async function runMainWorkerTask(
       judgeConfig: ctx.config.judge,
       visionContext,
       safetyGuard: ctx.safetyGuard,
+      costTracker: ctx.costTracker,
       a2aContext,
     }
   );
@@ -294,6 +296,28 @@ function appendApiContractResults(deps: ApiContractDeps): void {
     });
     ctx.runLedger = appendToLedger(ctx.runLedger, contractLedger);
   }
+}
+
+function appendNewCostRecords(
+  ctx: EngineContext,
+  context: { areaName: string; stateId: string; taskId: string }
+): void {
+  const allCostRecords = ctx.costTracker?.getRecords() ?? [];
+  const newCostRecords = allCostRecords.slice(ctx.costLedgerCursor);
+  if (newCostRecords.length === 0) {
+    return;
+  }
+  ctx.costLedgerCursor = allCostRecords.length;
+  ctx.runLedger = appendToLedger(
+    ctx.runLedger,
+    mergeLedgerEntries({
+      actionRecorderActions: [],
+      evidence: [],
+      findings: [],
+      costRecords: newCostRecords,
+      context,
+    })
+  );
 }
 
 export async function executeFrontierItem(
@@ -358,6 +382,7 @@ export async function executeFrontierItem(
 
   if (item.workerType === 'api') {
     const result = await runApiWorkerPath({ ctx, page, item, node, observedApiEndpoints });
+    appendNewCostRecords(ctx, { areaName, stateId: node.id, taskId: item.id });
     return { item, result };
   }
 
@@ -393,6 +418,7 @@ export async function executeFrontierItem(
     stateId: node.id,
     taskId: item.id,
   });
+  appendNewCostRecords(ctx, { areaName, stateId: node.id, taskId: item.id });
 
   return { item, result };
 }

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { CrossRunClassification } from './report/cross-run-classification.js';
-import type { CostRecord } from './coverage/cost-tracker.js';
+import type { CostRecord, CostSummary } from './coverage/cost-tracker.js';
 import type { FindingQualityScore } from './judge/quality-score.js';
 import type { ObservedApiEndpoint } from './network/traffic-observer.js';
 import type { WorkflowAutomaton, WorkflowAutomatonComparison } from './workflow-automata/types.js';
@@ -195,6 +195,7 @@ export interface RunResult {
   areaResults: AreaResult[];
   unexploredAreas: Array<{ name: string; reason: string }>;
   partial: boolean;
+  partialReason?: RunPartialReason;
   /** Blind spots from coverage tracker. */
   blindSpots: BlindSpot[];
   /** Mermaid graph source for state graph visualization. */
@@ -209,6 +210,8 @@ export interface RunResult {
   crossRunClassification?: CrossRunClassification;
   /** SafetyGuard audit summary for blocked/allowed guarded actions. */
   safetyAudit?: SafetyAuditSummary;
+  /** Approximate LLM/model cost summary for the run. */
+  costSummary?: CostSummary;
   /** Canonical timeline of exploration events for the full run. */
   explorationLedger?: ExplorationLedger;
   /** Experimental workflow automaton mined from observed traces. */
@@ -216,6 +219,11 @@ export interface RunResult {
   /** Comparison summary against prior role/run workflow automata. */
   workflowComparison?: WorkflowAutomatonComparison;
 }
+
+export type RunPartialReason =
+  | 'frontier-remaining'
+  | 'cost-budget-exceeded'
+  | 'time-budget-exceeded';
 
 export type ConfirmationVerdict =
   | 'fixed'
@@ -321,7 +329,12 @@ export interface RunConfigMeta {
   appDescription: string;
   models: { planner: string; worker: string };
   concurrency: number;
-  budget: { timeLimitSeconds: number; maxStepsPerTask: number; maxStateNodes: number };
+  budget: {
+    timeLimitSeconds: number;
+    maxStepsPerTask: number;
+    maxStateNodes: number;
+    costLimitUsd?: number;
+  };
   checkpointInterval: number;
   autoCaptureEnabled: boolean;
   llmPlannerEnabled: boolean;
@@ -467,7 +480,7 @@ export interface ReplayableAction {
 export interface BlindSpot {
   nodeId?: string;
   summary: string;
-  reason: 'blocked' | 'time-budget' | 'pruned' | 'state-unreachable' | 'unknown';
+  reason: 'blocked' | 'time-budget' | 'cost-budget' | 'pruned' | 'state-unreachable' | 'unknown';
   severity: 'low' | 'medium' | 'high';
 }
 
@@ -489,12 +502,7 @@ export interface BudgetConfig {
   maxStepsPerTask: number;
   maxFrontierSize: number;
   maxStateNodes: number;
-  /**
-   * Maximum estimated LLM cost in USD before stopping the run (0 = unlimited).
-   *
-   * Experimental — cost tracking is approximate and based on published per-token rates.
-   * Wire a `CostTracker` from `src/coverage/cost-tracker.ts` into the engine loop to enforce.
-   */
+  /** Maximum approximate model cost in USD before stopping the run (0 = unlimited). */
   costLimitUsd?: number;
 }
 

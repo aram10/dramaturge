@@ -16,9 +16,12 @@ export interface CostRecord {
   readonly model: string;
   readonly inputTokens: number;
   readonly outputTokens: number;
+  readonly cacheReadInputTokens?: number;
+  readonly cacheCreationInputTokens?: number;
   readonly costUsd: number;
   readonly timestamp: string;
   readonly label: string;
+  readonly source: 'reported' | 'estimated';
 }
 
 export interface CostSummary {
@@ -26,23 +29,57 @@ export interface CostSummary {
   totalInputTokens: number;
   totalOutputTokens: number;
   callCount: number;
+  budgetLimitUsd?: number;
   byModel: Record<string, { costUsd: number; calls: number }>;
+  byLabel: Record<string, { costUsd: number; calls: number }>;
   overBudget: boolean;
+}
+
+export interface CostTrackingOptions {
+  costTracker?: CostTracker;
+  costLabel?: string;
 }
 
 /** Per-million-token pricing for known models. */
 interface ModelPricing {
   inputPerMillion: number;
   outputPerMillion: number;
+  cacheReadPerMillion?: number;
+  cacheWritePerMillion?: number;
 }
 
 const MODEL_PRICING: Record<string, ModelPricing> = {
   // Anthropic
-  "claude-haiku-4-5": { inputPerMillion: 0.80, outputPerMillion: 4.00 },
-  "claude-haiku-4-5-20251001": { inputPerMillion: 0.80, outputPerMillion: 4.00 },
-  "claude-sonnet-4-6": { inputPerMillion: 3.00, outputPerMillion: 15.00 },
-  "claude-sonnet-4-20250514": { inputPerMillion: 3.00, outputPerMillion: 15.00 },
-  "claude-opus-4-5": { inputPerMillion: 15.00, outputPerMillion: 75.00 },
+  "claude-haiku-4-5": {
+    inputPerMillion: 0.80,
+    outputPerMillion: 4.00,
+    cacheReadPerMillion: 0.08,
+    cacheWritePerMillion: 1.00,
+  },
+  "claude-haiku-4-5-20251001": {
+    inputPerMillion: 0.80,
+    outputPerMillion: 4.00,
+    cacheReadPerMillion: 0.08,
+    cacheWritePerMillion: 1.00,
+  },
+  "claude-sonnet-4-6": {
+    inputPerMillion: 3.00,
+    outputPerMillion: 15.00,
+    cacheReadPerMillion: 0.30,
+    cacheWritePerMillion: 3.75,
+  },
+  "claude-sonnet-4-20250514": {
+    inputPerMillion: 3.00,
+    outputPerMillion: 15.00,
+    cacheReadPerMillion: 0.30,
+    cacheWritePerMillion: 3.75,
+  },
+  "claude-opus-4-5": {
+    inputPerMillion: 15.00,
+    outputPerMillion: 75.00,
+    cacheReadPerMillion: 1.50,
+    cacheWritePerMillion: 18.75,
+  },
   // OpenAI
   "gpt-4o": { inputPerMillion: 2.50, outputPerMillion: 10.00 },
   "gpt-4o-mini": { inputPerMillion: 0.15, outputPerMillion: 0.60 },
@@ -86,12 +123,20 @@ function lookupPricing(model: string): ModelPricing {
 export function estimateCallCost(
   model: string,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
+  options: {
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+  } = {}
 ): number {
   const pricing = lookupPricing(model);
   return (
     (inputTokens / 1_000_000) * pricing.inputPerMillion +
-    (outputTokens / 1_000_000) * pricing.outputPerMillion
+    (outputTokens / 1_000_000) * pricing.outputPerMillion +
+    ((options.cacheReadInputTokens ?? 0) / 1_000_000) *
+      (pricing.cacheReadPerMillion ?? pricing.inputPerMillion) +
+    ((options.cacheCreationInputTokens ?? 0) / 1_000_000) *
+      (pricing.cacheWritePerMillion ?? pricing.inputPerMillion)
   );
 }
 
@@ -118,16 +163,27 @@ export class CostTracker {
     model: string,
     inputTokens: number,
     outputTokens: number,
-    label: string
+    label: string,
+    options: {
+      cacheReadInputTokens?: number;
+      cacheCreationInputTokens?: number;
+      source?: 'reported' | 'estimated';
+    } = {}
   ): CostRecord {
-    const costUsd = estimateCallCost(model, inputTokens, outputTokens);
+    const costUsd = estimateCallCost(model, inputTokens, outputTokens, {
+      cacheReadInputTokens: options.cacheReadInputTokens,
+      cacheCreationInputTokens: options.cacheCreationInputTokens,
+    });
     const entry: CostRecord = {
       model: stripProviderPrefix(model),
       inputTokens,
       outputTokens,
+      cacheReadInputTokens: options.cacheReadInputTokens,
+      cacheCreationInputTokens: options.cacheCreationInputTokens,
       costUsd,
       timestamp: new Date().toISOString(),
       label,
+      source: options.source ?? 'estimated',
     };
     this.records.push(entry);
     return entry;
@@ -146,6 +202,7 @@ export class CostTracker {
   /** Get a summary of all tracked costs. */
   getSummary(): CostSummary {
     const byModel: Record<string, { costUsd: number; calls: number }> = {};
+    const byLabel: Record<string, { costUsd: number; calls: number }> = {};
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
@@ -160,6 +217,14 @@ export class CostTracker {
       } else {
         byModel[record.model] = { costUsd: record.costUsd, calls: 1 };
       }
+
+      const existingLabel = byLabel[record.label];
+      if (existingLabel) {
+        existingLabel.costUsd += record.costUsd;
+        existingLabel.calls += 1;
+      } else {
+        byLabel[record.label] = { costUsd: record.costUsd, calls: 1 };
+      }
     }
 
     return {
@@ -167,7 +232,12 @@ export class CostTracker {
       totalInputTokens,
       totalOutputTokens,
       callCount: this.records.length,
+      budgetLimitUsd:
+        Number.isFinite(this.budgetLimitUsd) && this.budgetLimitUsd >= 0
+          ? this.budgetLimitUsd
+          : undefined,
       byModel,
+      byLabel,
       overBudget: this.overBudget,
     };
   }

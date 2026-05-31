@@ -5,6 +5,7 @@ import { shortId } from '../constants.js';
 import { hasLLMApiKey } from '../llm.js';
 import { sendVisionCompletion } from '../llm/index.js';
 import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from '../prompt-safety.js';
+import type { CostTracker } from './cost-tracker.js';
 import type { Evidence, RawFinding, FindingSeverity, FindingCategory, PageType } from '../types.js';
 
 export interface VisionAnalysisOptions {
@@ -15,6 +16,7 @@ export interface VisionAnalysisOptions {
   fullPage: boolean;
   maxResponseTokens: number;
   requestTimeoutMs: number;
+  costTracker?: CostTracker;
 }
 
 export interface VisionAnalysisResult {
@@ -156,6 +158,8 @@ ${wrapUntrustedPromptContent(
     pageContext,
     maxTokens: options.maxResponseTokens,
     requestTimeoutMs: options.requestTimeoutMs,
+    costTracker: options.costTracker,
+    costLabel: 'vision:page-analysis',
   });
 
   const analysis = parseVisionResponse(raw);

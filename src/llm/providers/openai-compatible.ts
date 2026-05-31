@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import type { LLMProviderAdapter, ChatMessage, ProviderId, ProviderRequest } from '../types.js';
+import type {
+  LLMProviderAdapter,
+  ChatMessage,
+  LlmUsage,
+  ProviderId,
+  ProviderRequest,
+} from '../types.js';
 
 /**
  * Configuration for creating an OpenAI-compatible provider adapter.
@@ -45,6 +51,37 @@ function extractText(data: unknown): string {
     (data as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message
       ?.content ?? ''
   );
+}
+
+function firstNumber(...values: unknown[]): number | undefined {
+  return values.find((value): value is number => typeof value === 'number');
+}
+
+function extractUsage(data: unknown): LlmUsage | null {
+  const usage = (
+    data as {
+      usage?: {
+        prompt_tokens?: unknown;
+        completion_tokens?: unknown;
+        input_tokens?: unknown;
+        output_tokens?: unknown;
+      };
+    }
+  ).usage;
+  if (!usage) {
+    return null;
+  }
+
+  const inputTokens = firstNumber(usage.prompt_tokens, usage.input_tokens);
+  const outputTokens = firstNumber(usage.completion_tokens, usage.output_tokens);
+  if (inputTokens === undefined && outputTokens === undefined) {
+    return null;
+  }
+
+  return {
+    inputTokens: inputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+  };
 }
 
 /**
@@ -162,6 +199,8 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
     },
 
     extractVisionResponse: extractText,
+
+    extractUsage,
   };
 }
 

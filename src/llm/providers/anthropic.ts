@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import type { LLMProviderAdapter, ChatMessage, ProviderRequest } from '../types.js';
+import type { LLMProviderAdapter, ChatMessage, LlmUsage, ProviderRequest } from '../types.js';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const ENV_KEY = 'ANTHROPIC_API_KEY';
@@ -25,6 +25,39 @@ function extractText(data: unknown): string {
       .map((c) => c.text)
       .join('') ?? ''
   );
+}
+
+function extractUsage(data: unknown): LlmUsage | null {
+  const usage = (
+    data as {
+      usage?: {
+        input_tokens?: unknown;
+        output_tokens?: unknown;
+        cache_read_input_tokens?: unknown;
+        cache_creation_input_tokens?: unknown;
+      };
+    }
+  ).usage;
+  if (!usage) {
+    return null;
+  }
+
+  const inputTokens = typeof usage.input_tokens === 'number' ? usage.input_tokens : undefined;
+  const outputTokens = typeof usage.output_tokens === 'number' ? usage.output_tokens : undefined;
+  if (inputTokens === undefined && outputTokens === undefined) {
+    return null;
+  }
+
+  return {
+    inputTokens: inputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+    cacheReadInputTokens:
+      typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : undefined,
+    cacheCreationInputTokens:
+      typeof usage.cache_creation_input_tokens === 'number'
+        ? usage.cache_creation_input_tokens
+        : undefined,
+  };
 }
 
 export const anthropicProvider: LLMProviderAdapter = {
@@ -93,4 +126,6 @@ export const anthropicProvider: LLMProviderAdapter = {
   },
 
   extractVisionResponse: extractText,
+
+  extractUsage,
 };

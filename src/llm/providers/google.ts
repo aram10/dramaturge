@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import type { LLMProviderAdapter, ChatMessage, ProviderRequest } from '../types.js';
+import type { LLMProviderAdapter, ChatMessage, LlmUsage, ProviderRequest } from '../types.js';
 
 const ENV_KEY = 'GOOGLE_GENERATIVE_AI_API_KEY';
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -27,6 +27,33 @@ function extractText(data: unknown): string {
       .map((p) => p.text)
       .join('') ?? ''
   );
+}
+
+function extractUsage(data: unknown): LlmUsage | null {
+  const usage = (
+    data as {
+      usageMetadata?: {
+        promptTokenCount?: unknown;
+        candidatesTokenCount?: unknown;
+      };
+    }
+  ).usageMetadata;
+  if (!usage) {
+    return null;
+  }
+
+  const inputTokens =
+    typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : undefined;
+  const outputTokens =
+    typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : undefined;
+  if (inputTokens === undefined && outputTokens === undefined) {
+    return null;
+  }
+
+  return {
+    inputTokens: inputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+  };
 }
 
 export const googleProvider: LLMProviderAdapter = {
@@ -91,4 +118,6 @@ export const googleProvider: LLMProviderAdapter = {
   },
 
   extractVisionResponse: extractText,
+
+  extractUsage,
 };

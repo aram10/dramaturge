@@ -3,9 +3,27 @@
 
 import type { LLMTaskProposal, WorkerType } from './types.js';
 import type { JudgeDecision } from './judge/types.js';
+import type { CostTrackingOptions } from './coverage/cost-tracker.js';
 import { DEFAULT_LLM_TIMEOUT_MS, JUDGE_LLM_TIMEOUT_MS } from './constants.js';
 import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from './prompt-safety.js';
 import { hasConfiguredProvider, sendChatCompletion } from './llm/index.js';
+
+type ChatCompletionMessage = {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+};
+
+interface CallLLMOptions extends CostTrackingOptions {
+  model: string;
+  system: string;
+  messages: ChatCompletionMessage[];
+  maxTokens?: number;
+  requestTimeoutMs?: number;
+}
+
+interface ProposeLLMTasksOptions extends CostTrackingOptions {
+  requestTimeoutMs?: number;
+}
 
 /**
  * Check whether the given model's provider (or any provider, if no model
@@ -21,14 +39,25 @@ function extractJsonFromResponse(raw: string): string {
   return fenceMatch ? fenceMatch[1].trim() : raw.trim();
 }
 
-async function callLLM(
-  model: string,
-  system: string,
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
-  maxTokens = 1024,
-  requestTimeoutMs = DEFAULT_LLM_TIMEOUT_MS
-): Promise<string> {
-  return sendChatCompletion({ model, system, messages, maxTokens, requestTimeoutMs });
+async function callLLM(options: CallLLMOptions): Promise<string> {
+  return sendChatCompletion({
+    model: options.model,
+    system: options.system,
+    messages: options.messages,
+    maxTokens: options.maxTokens ?? 1024,
+    requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_LLM_TIMEOUT_MS,
+    costTracker: options.costTracker,
+    costLabel: options.costLabel,
+  });
+}
+
+function normalizeProposeOptions(
+  options: number | ProposeLLMTasksOptions | undefined
+): ProposeLLMTasksOptions {
+  if (typeof options === 'number') {
+    return { requestTimeoutMs: options };
+  }
+  return options ?? {};
 }
 
 export async function proposeLLMTasks(
@@ -36,8 +65,9 @@ export async function proposeLLMTasks(
   graphSummary: string,
   nodeDescription: string,
   allowedWorkerTypes: WorkerType[],
-  requestTimeoutMs = 30_000
+  options?: number | ProposeLLMTasksOptions
 ): Promise<LLMTaskProposal[] | null> {
+  const { requestTimeoutMs = 30_000, ...costOptions } = normalizeProposeOptions(options);
   const system = `You are a QA test planner analyzing a web application's state graph.
 Your job is to propose focused testing tasks for a specific page.
 
@@ -63,13 +93,15 @@ ${wrapUntrustedPromptContent('PAGE DESCRIPTION', nodeDescription)}
 Propose testing tasks for this page.`;
 
   try {
-    const raw = await callLLM(
+    const raw = await callLLM({
       model,
       system,
-      [{ role: 'user', content: userPrompt }],
-      1024,
-      requestTimeoutMs
-    );
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 1024,
+      requestTimeoutMs,
+      costLabel: 'planner:propose-tasks',
+      ...costOptions,
+    });
 
     // Extract JSON from response (handle possible markdown code fences)
     const jsonStr = extractJsonFromResponse(raw);
@@ -114,7 +146,8 @@ Propose testing tasks for this page.`;
 export async function judgeObservationWithLLM(
   model: string,
   prompt: string,
-  requestTimeoutMs = JUDGE_LLM_TIMEOUT_MS
+  requestTimeoutMs = JUDGE_LLM_TIMEOUT_MS,
+  costOptions: CostTrackingOptions = {}
 ): Promise<JudgeDecision> {
   const system = `You are a QA evidence judge.
 Return a single JSON object with exactly these keys:
@@ -130,13 +163,15 @@ Return ONLY JSON. No markdown fences, no explanation.`;
 
 ${wrapUntrustedPromptContent('JUDGE INPUT', prompt)}`;
 
-  const raw = await callLLM(
+  const raw = await callLLM({
     model,
     system,
-    [{ role: 'user', content: safePrompt }],
-    512,
-    requestTimeoutMs
-  );
+    messages: [{ role: 'user', content: safePrompt }],
+    maxTokens: 512,
+    requestTimeoutMs,
+    costLabel: 'judge:observation',
+    ...costOptions,
+  });
   const jsonStr = extractJsonFromResponse(raw);
   let parsed: Partial<JudgeDecision> & { confidence?: 'low' | 'medium' | 'high' };
   try {

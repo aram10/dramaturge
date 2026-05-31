@@ -95,6 +95,7 @@ async function proposeSeedTasks(
       mission: ctx.mission,
       repoHints: ctx.repoHints,
       llmRequestTimeoutMs: ctx.config.llm.requestTimeoutMs,
+      costTracker: ctx.costTracker,
       memorySignals: ctx.memoryStore?.getPlannerSignals(node),
       diffContext: ctx.diffContext,
     });

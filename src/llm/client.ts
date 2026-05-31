@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { TRUNCATE_GROUP_KEY } from '../constants.js';
+import { approximateTokenCount, type CostTrackingOptions } from '../coverage/cost-tracker.js';
 import type { ChatMessage, LLMProviderAdapter } from './types.js';
 import { resolveProvider, stripProviderPrefix } from './registry.js';
 
@@ -10,6 +11,29 @@ import { resolveProvider, stripProviderPrefix } from './registry.js';
  */
 export function redactApiKey(text: string, apiKey: string): string {
   return text.replaceAll(apiKey, '[REDACTED]');
+}
+
+function recordCompletionCost(options: {
+  adapter: LLMProviderAdapter;
+  response: unknown;
+  model: string;
+  inputText: string;
+  outputText: string;
+  costTracker?: CostTrackingOptions['costTracker'];
+  costLabel?: string;
+}): void {
+  const usage = options.adapter.extractUsage(options.response);
+  options.costTracker?.record(
+    options.model,
+    usage?.inputTokens ?? approximateTokenCount(options.inputText),
+    usage?.outputTokens ?? approximateTokenCount(options.outputText),
+    options.costLabel ?? 'chat-completion',
+    {
+      cacheReadInputTokens: usage?.cacheReadInputTokens,
+      cacheCreationInputTokens: usage?.cacheCreationInputTokens,
+      source: usage ? 'reported' : 'estimated',
+    }
+  );
 }
 
 /**
@@ -21,6 +45,8 @@ export async function sendChatCompletion(options: {
   messages: ChatMessage[];
   maxTokens: number;
   requestTimeoutMs: number;
+  costTracker?: CostTrackingOptions['costTracker'];
+  costLabel?: string;
 }): Promise<string> {
   const adapter = resolveProvider(options.model);
   const modelId = stripProviderPrefix(options.model);
@@ -33,7 +59,17 @@ export async function sendChatCompletion(options: {
   });
 
   const data = await executeProviderRequest(req, adapter, options.requestTimeoutMs);
-  return adapter.extractChatResponse(data);
+  const text = adapter.extractChatResponse(data);
+  recordCompletionCost({
+    adapter,
+    response: data,
+    model: options.model,
+    inputText: [options.system, ...options.messages.map((message) => message.content)].join('\n'),
+    outputText: text,
+    costTracker: options.costTracker,
+    costLabel: options.costLabel,
+  });
+  return text;
 }
 
 /**
@@ -46,6 +82,8 @@ export async function sendVisionCompletion(options: {
   pageContext: string;
   maxTokens: number;
   requestTimeoutMs: number;
+  costTracker?: CostTrackingOptions['costTracker'];
+  costLabel?: string;
 }): Promise<string> {
   const adapter = resolveProvider(options.model);
   const modelId = stripProviderPrefix(options.model);
@@ -59,7 +97,17 @@ export async function sendVisionCompletion(options: {
   });
 
   const data = await executeProviderRequest(req, adapter, options.requestTimeoutMs);
-  return adapter.extractVisionResponse(data);
+  const text = adapter.extractVisionResponse(data);
+  recordCompletionCost({
+    adapter,
+    response: data,
+    model: options.model,
+    inputText: `${options.system}\n${options.pageContext}`,
+    outputText: text,
+    costTracker: options.costTracker,
+    costLabel: options.costLabel ?? 'vision-completion',
+  });
+  return text;
 }
 
 /**

@@ -60,6 +60,7 @@ export interface RunPlannerLoopResult {
   tasksExecuted: number;
   totalFindingsCount: number;
   finalFrontierSnapshot: FrontierItem[] | undefined;
+  partialReason?: EngineContext['partialReason'];
 }
 
 function findRootNode(ctx: EngineContext): { id: string } | undefined {
@@ -106,6 +107,10 @@ function resolveTaskTimeoutMs(ctx: EngineContext, startMs: number): number {
     Math.max(MIN_DERIVED_TASK_TIMEOUT_MS, derived)
   );
   return Math.max(1, Math.min(remainingMs, bounded));
+}
+
+function costBudgetExceeded(ctx: EngineContext): boolean {
+  return ctx.costTracker?.overBudget === true;
 }
 
 async function processTaskBatch(
@@ -212,12 +217,23 @@ export async function runPlannerLoop(
   let totalFindingsCount = 0;
 
   while (ctx.frontier.hasItems()) {
+    if (costBudgetExceeded(ctx)) {
+      const summary = ctx.costTracker?.getSummary();
+      ctx.logger?.warn('Cost budget exhausted', {
+        totalCostUsd: summary?.totalCostUsd,
+        costLimitUsd: ctx.budget.costLimitUsd,
+      });
+      ctx.partialReason = 'cost-budget-exceeded';
+      break;
+    }
+
     const elapsedMs = Date.now() - startMs;
     if (elapsedMs > ctx.budget.globalTimeLimitSeconds * 1000) {
       ctx.logger?.warn('Time budget exhausted', {
         elapsedMs,
         timeLimitMs: ctx.budget.globalTimeLimitSeconds * 1000,
       });
+      ctx.partialReason = 'time-budget-exceeded';
       break;
     }
 
@@ -353,5 +369,6 @@ export async function runPlannerLoop(
     tasksExecuted,
     totalFindingsCount,
     finalFrontierSnapshot: checkpointInterval > 0 ? ctx.frontier.snapshot() : undefined,
+    partialReason: ctx.partialReason,
   };
 }

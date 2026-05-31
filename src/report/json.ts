@@ -1,8 +1,60 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import type { RunResult } from '../types.js';
+import type { CrossRunClassification, Finding, RunResult } from '../types.js';
 import { collectFindings } from './collector.js';
+
+function renderFindingTrace(
+  finding: Finding
+): { actionIds: string[]; evidenceIds: string[] } | null {
+  const hasTrace =
+    (finding.meta?.repro?.actionIds?.length ?? 0) > 0 ||
+    (finding.meta?.repro?.evidenceIds?.length ?? 0) > 0;
+  if (!hasTrace) {
+    return null;
+  }
+  return {
+    actionIds: finding.meta?.repro?.actionIds ?? [],
+    evidenceIds: finding.meta?.repro?.evidenceIds ?? [],
+  };
+}
+
+function renderCrossRunStatus(
+  finding: Finding,
+  classification: CrossRunClassification | undefined
+): Omit<NonNullable<CrossRunClassification['byFindingId'][string]>, 'signature'> | null {
+  const status = classification?.byFindingId[finding.id];
+  if (!status) {
+    return null;
+  }
+  const { signature: _signature, ...sanitizedStatus } = status;
+  return sanitizedStatus;
+}
+
+function renderFinding(
+  finding: Finding,
+  classification: CrossRunClassification | undefined
+): Record<string, unknown> {
+  return {
+    id: finding.id,
+    category: finding.category,
+    severity: finding.severity,
+    area: finding.area,
+    title: finding.title,
+    stepsToReproduce: finding.stepsToReproduce,
+    expected: finding.expected,
+    actual: finding.actual,
+    screenshot: finding.screenshot ?? null,
+    evidenceIds: finding.evidenceIds ?? [],
+    verdict: finding.verdict ?? null,
+    trace: renderFindingTrace(finding),
+    occurrenceCount: finding.occurrenceCount,
+    impactedAreas: finding.impactedAreas,
+    occurrences: finding.occurrences,
+    meta: finding.meta ?? null,
+    crossRunStatus: renderCrossRunStatus(finding, classification),
+  };
+}
 
 export function renderJson(result: RunResult): string {
   const findings = collectFindings(result.areaResults);
@@ -22,6 +74,7 @@ export function renderJson(result: RunResult): string {
       endTime: result.endTime.toISOString(),
       durationMs: duration,
       partial: result.partial,
+      partialReason: result.partialReason ?? null,
     },
     summary: {
       areasExplored: result.areaResults.filter((a) => a.status === 'explored').length,
@@ -45,38 +98,7 @@ export function renderJson(result: RunResult): string {
         ])
       ),
     },
-    findings: findings.map((f) => ({
-      id: f.id,
-      category: f.category,
-      severity: f.severity,
-      area: f.area,
-      title: f.title,
-      stepsToReproduce: f.stepsToReproduce,
-      expected: f.expected,
-      actual: f.actual,
-      screenshot: f.screenshot ?? null,
-      evidenceIds: f.evidenceIds ?? [],
-      verdict: f.verdict ?? null,
-      trace:
-        (f.meta?.repro?.actionIds?.length ?? 0) > 0 || (f.meta?.repro?.evidenceIds?.length ?? 0) > 0
-          ? {
-              actionIds: f.meta?.repro?.actionIds ?? [],
-              evidenceIds: f.meta?.repro?.evidenceIds ?? [],
-            }
-          : null,
-      occurrenceCount: f.occurrenceCount,
-      impactedAreas: f.impactedAreas,
-      occurrences: f.occurrences,
-      meta: f.meta ?? null,
-      crossRunStatus: (() => {
-        const status = result.crossRunClassification?.byFindingId[f.id];
-        if (!status) {
-          return null;
-        }
-        const { signature: _signature, ...sanitizedStatus } = status;
-        return sanitizedStatus;
-      })(),
-    })),
+    findings: findings.map((finding) => renderFinding(finding, result.crossRunClassification)),
     crossRunSummary: result.crossRunClassification
       ? {
           ...result.crossRunClassification.summary,
@@ -131,6 +153,7 @@ export function renderJson(result: RunResult): string {
     runConfig: result.runConfig ?? null,
     runMemory: result.runMemory ?? null,
     safetyAudit: result.safetyAudit ?? null,
+    costSummary: result.costSummary ?? null,
     explorationLedger: result.explorationLedger
       ? {
           version: result.explorationLedger.version,

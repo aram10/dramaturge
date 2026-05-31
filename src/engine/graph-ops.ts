@@ -92,6 +92,7 @@ export async function expandGraph(
             mission: ctx.mission,
             repoHints: ctx.repoHints,
             llmRequestTimeoutMs: ctx.config.llm.requestTimeoutMs,
+            costTracker: ctx.costTracker,
             memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
             diffContext: ctx.diffContext,
           })

@@ -23,6 +23,7 @@ import { computePriority, type PriorityContext } from './priority.js';
 import { proposeLLMTasks } from '../llm.js';
 import type { PlannerMemorySignals } from '../memory/types.js';
 import type { DiffContext } from '../diff/types.js';
+import type { CostTracker } from '../coverage/cost-tracker.js';
 
 /** Default page-type → worker-type mapping. */
 const PAGE_TYPE_WORKER_MAP: Record<PageType, WorkerType> = {
@@ -129,6 +130,7 @@ export interface ProposeTasksOptions {
 export interface ProposeTasksWithLLMOptions extends ProposeTasksOptions {
   plannerModel: string;
   llmRequestTimeoutMs?: number;
+  costTracker?: CostTracker;
 }
 
 const ADVERSARIAL_PAGE_TYPES = new Set<PageType>([
@@ -279,7 +281,10 @@ export class Planner {
       graph.summary(),
       nodeDesc,
       allowedTypes,
-      llmRequestTimeoutMs
+      {
+        requestTimeoutMs: llmRequestTimeoutMs,
+        costTracker: options.costTracker,
+      }
     );
 
     if (!llmProposals) {

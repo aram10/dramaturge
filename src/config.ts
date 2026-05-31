@@ -334,9 +334,8 @@ const BudgetSchema = z
     stagnationThreshold: z.number().int().min(0).default(8),
     /**
      * Maximum estimated LLM cost in USD before stopping the run (0 = unlimited).
-     * Experimental — the engine does not yet enforce this automatically.
-     * Use `CostTracker` from `src/coverage/cost-tracker.ts` to track spend and
-     * check `overBudget` in a custom integration.
+     * Experimental — enforcement is approximate because some provider SDK calls
+     * do not expose authoritative token usage.
      */
     costLimitUsd: z.number().min(0).default(0),
   })

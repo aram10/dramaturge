@@ -143,4 +143,69 @@ describe('runPlannerLoop', () => {
       ])
     );
   });
+
+  it('stops before dequeuing more work when the cost budget is exhausted', async () => {
+    const item = {
+      id: 'task-1',
+      nodeId: 'node-1',
+      workerType: 'navigation',
+      objective: 'Explore home',
+      priority: 1,
+      reason: 'test',
+      retryCount: 0,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+    } as const;
+    const frontier = {
+      hasItems: () => true,
+      dequeueHighest: vi.fn(() => item),
+      requeue: vi.fn(),
+      size: () => 1,
+    };
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+    };
+    const ctx = {
+      frontier,
+      eventStream: new EngineEventEmitter(),
+      config: {
+        concurrency: { workers: 1 },
+        budget: {},
+      },
+      budget: {
+        globalTimeLimitSeconds: 60,
+        maxStepsPerTask: 5,
+        maxFrontierSize: 200,
+        maxStateNodes: 50,
+      },
+      costTracker: {
+        overBudget: true,
+        getSummary: () => ({ totalCostUsd: 1.23 }),
+      },
+      graph: {
+        nodeCount: () => 0,
+      },
+      logger,
+      globalCoverage: {
+        addBlindSpot: vi.fn(),
+      },
+    } as any;
+
+    const result = await runPlannerLoop(ctx, {
+      initialTasksExecuted: 0,
+      useLLMPlanner: false,
+      checkpointInterval: 0,
+      startMs: Date.now(),
+    });
+
+    expect(result.tasksExecuted).toBe(0);
+    expect(result.partialReason).toBe('cost-budget-exceeded');
+    expect(frontier.dequeueHighest).not.toHaveBeenCalled();
+    expect(executeFrontierItem).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith('Cost budget exhausted', {
+      totalCostUsd: 1.23,
+      costLimitUsd: undefined,
+    });
+  });
 });
