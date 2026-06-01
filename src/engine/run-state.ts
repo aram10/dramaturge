@@ -8,6 +8,7 @@ import { classifyPage } from '../planner/page-classifier.js';
 import type { FrontierItem, StateNode } from '../types.js';
 import type { EngineContext } from './context.js';
 import { assignPageNodeOwner } from './graph-ops.js';
+import { appendNewCostRecords } from './cost-ledger.js';
 
 export interface WarmStartState {
   warmStartApplied: boolean;
@@ -128,6 +129,7 @@ export async function seedFrontierIfNeeded(
 
     const seedTasks = await proposeSeedTasks(ctx, rootNode, useLLMPlanner);
     ctx.frontier.enqueueMany(seedTasks);
+    appendNewCostRecords(ctx, { areaName: rootNode.title ?? rootNode.id, stateId: rootNode.id });
     ctx.logger?.info('Seeded frontier from root state', {
       pageType: rootPageType,
       fingerprint: rootFingerprint.hash,
@@ -139,6 +141,7 @@ export async function seedFrontierIfNeeded(
       assignPageNodeOwner(ctx, 'primary', rootNode.id);
       const seedTasks = await proposeSeedTasks(ctx, rootNode, useLLMPlanner);
       ctx.frontier.enqueueMany(seedTasks);
+      appendNewCostRecords(ctx, { areaName: rootNode.title ?? rootNode.id, stateId: rootNode.id });
       ctx.logger?.info('Seeded frontier from existing root state', {
         nodeId: rootNode.id,
         tasks: seedTasks.length,

@@ -17,6 +17,7 @@ import { buildApiContractArtifacts } from '../api/contract-oracle.js';
 import { summarizeContractIndex } from '../spec/contract-index.js';
 import { appendToLedger, mergeLedgerEntries } from '../ledger.js';
 import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
+import { appendNewCostRecords } from './cost-ledger.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
@@ -296,28 +297,6 @@ function appendApiContractResults(deps: ApiContractDeps): void {
     });
     ctx.runLedger = appendToLedger(ctx.runLedger, contractLedger);
   }
-}
-
-function appendNewCostRecords(
-  ctx: EngineContext,
-  context: { areaName: string; stateId: string; taskId: string }
-): void {
-  const allCostRecords = ctx.costTracker?.getRecords() ?? [];
-  const newCostRecords = allCostRecords.slice(ctx.costLedgerCursor);
-  if (newCostRecords.length === 0) {
-    return;
-  }
-  ctx.costLedgerCursor = allCostRecords.length;
-  ctx.runLedger = appendToLedger(
-    ctx.runLedger,
-    mergeLedgerEntries({
-      actionRecorderActions: [],
-      evidence: [],
-      findings: [],
-      costRecords: newCostRecords,
-      context,
-    })
-  );
 }
 
 export async function executeFrontierItem(

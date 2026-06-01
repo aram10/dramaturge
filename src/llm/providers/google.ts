@@ -35,6 +35,7 @@ function extractUsage(data: unknown): LlmUsage | null {
       usageMetadata?: {
         promptTokenCount?: unknown;
         candidatesTokenCount?: unknown;
+        thoughtsTokenCount?: unknown;
       };
     }
   ).usageMetadata;
@@ -44,8 +45,14 @@ function extractUsage(data: unknown): LlmUsage | null {
 
   const inputTokens =
     typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : undefined;
-  const outputTokens =
+  const candidateTokens =
     typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : undefined;
+  const thoughtsTokens =
+    typeof usage.thoughtsTokenCount === 'number' ? usage.thoughtsTokenCount : undefined;
+  const outputTokens =
+    candidateTokens === undefined && thoughtsTokens === undefined
+      ? undefined
+      : (candidateTokens ?? 0) + (thoughtsTokens ?? 0);
   if (inputTokens === undefined && outputTokens === undefined) {
     return null;
   }

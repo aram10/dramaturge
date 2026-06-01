@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EngineEventEmitter } from './event-stream.js';
 import { runPlannerLoop } from './main-loop.js';
 import { executeFrontierItem } from './execute-frontier-item.js';
+import { appendNewCostRecords } from './cost-ledger.js';
 import {
   collectResults,
   flushOwnedBrowserErrors,
@@ -25,6 +26,10 @@ vi.mock('./graph-ops.js', () => ({
   flushOwnedBrowserErrors: vi.fn(),
   maintainFrontier: vi.fn(),
   routeFollowups: vi.fn(),
+}));
+
+vi.mock('./cost-ledger.js', () => ({
+  appendNewCostRecords: vi.fn(),
 }));
 
 describe('runPlannerLoop', () => {
@@ -134,6 +139,7 @@ describe('runPlannerLoop', () => {
     expect(vi.mocked(flushOwnedBrowserErrors)).toHaveBeenCalledTimes(2);
     expect(vi.mocked(collectResults)).toHaveBeenCalledTimes(2);
     expect(vi.mocked(expandGraph)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(appendNewCostRecords)).toHaveBeenCalledTimes(2);
     expect(vi.mocked(routeFollowups)).toHaveBeenCalledTimes(2);
     expect(vi.mocked(maintainFrontier)).toHaveBeenCalledTimes(1);
     expect(completes).toEqual(

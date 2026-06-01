@@ -7,6 +7,7 @@ import { MAX_NAV_RETRIES } from '../constants.js';
 import type { FrontierItem, WorkerResult } from '../types.js';
 import { executeFrontierItem } from './execute-frontier-item.js';
 import type { EngineContext } from './context.js';
+import { appendNewCostRecords } from './cost-ledger.js';
 import {
   assignPageNodeOwner,
   collectResults,
@@ -298,6 +299,11 @@ export async function runPlannerLoop(
       totalFindingsCount += result.findings.length;
 
       await expandGraph(ctx, item.nodeId, result, useLLMPlanner);
+      appendNewCostRecords(ctx, {
+        areaName: item.objective,
+        stateId: item.nodeId,
+        taskId: item.id,
+      });
       routeFollowups(ctx, item.nodeId, result);
       updateWorkflowAutomataRuntime(ctx);
 
