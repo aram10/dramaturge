@@ -70,7 +70,14 @@ jobs:
         run: pnpm run build
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --loglevel verbose
+
+      - name: Upload npm debug logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-debug-logs
+          path: ~/.npm/_logs
 
   publish-github-packages:
     needs: release-please
