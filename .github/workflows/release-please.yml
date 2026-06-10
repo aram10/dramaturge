@@ -21,6 +21,8 @@ permissions:
 
 jobs:
   release-please:
+    if: >-
+      ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish != 'true' }}
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -35,8 +37,11 @@ jobs:
     needs: release-please
     if: >-
       ${{
-        needs.release-please.outputs.release_created == 'true' ||
-        (github.event.inputs.publish == 'true' && github.ref == 'refs/heads/main')
+        always() &&
+        (
+          needs.release-please.outputs.release_created == 'true' ||
+          (github.event.inputs.publish == 'true' && github.ref == 'refs/heads/main')
+        )
       }}
     runs-on: ubuntu-latest
     permissions:
@@ -83,8 +88,11 @@ jobs:
     needs: release-please
     if: >-
       ${{
-        needs.release-please.outputs.release_created == 'true' ||
-        (github.event.inputs.publish == 'true' && github.ref == 'refs/heads/main')
+        always() &&
+        (
+          needs.release-please.outputs.release_created == 'true' ||
+          (github.event.inputs.publish == 'true' && github.ref == 'refs/heads/main')
+        )
       }}
     runs-on: ubuntu-latest
     permissions:
