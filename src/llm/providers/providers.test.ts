@@ -186,6 +186,17 @@ describe('provider adapters', () => {
       };
       expect(googleProvider.extractChatResponse(data)).toBe('Google says hi');
     });
+
+    it('includes thoughts tokens in extracted output usage', () => {
+      const usage = googleProvider.extractUsage({
+        usageMetadata: {
+          promptTokenCount: 7,
+          candidatesTokenCount: 11,
+          thoughtsTokenCount: 5,
+        },
+      });
+      expect(usage).toEqual({ inputTokens: 7, outputTokens: 16 });
+    });
   });
 
   describe('azureFoundryProvider', () => {

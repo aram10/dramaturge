@@ -9,12 +9,61 @@ vi.mock('../llm.js', () => ({
 
 import { executeWorkerTask } from './worker.js';
 import { hasLLMApiKey, judgeObservationWithLLM } from '../llm.js';
+import { CostTracker } from '../coverage/cost-tracker.js';
+import type { ExecuteWorkerTaskOptions } from './worker.js';
+import type { WorkerTask } from '../types.js';
 
 function createMockPage() {
   return {
     url: () => 'https://example.com/manage/knowledge-bases',
     screenshot: vi.fn().mockResolvedValue(Buffer.from('png')),
   };
+}
+
+function createTask(overrides: Partial<WorkerTask> = {}): WorkerTask {
+  return {
+    id: 'task-cost-1',
+    workerType: 'navigation',
+    nodeId: 'node-1',
+    objective: 'Inspect the knowledge bases page',
+    maxSteps: 5,
+    pageType: 'list',
+    missionContext: 'Example app',
+    ...overrides,
+  };
+}
+
+function createOptions(
+  overrides: Partial<ExecuteWorkerTaskOptions> = {}
+): ExecuteWorkerTaskOptions {
+  return {
+    model: 'anthropic/claude-haiku-4-5',
+    screenshotDir: 'C:/tmp/screenshots',
+    agentMode: 'dom',
+    screenshotsEnabled: false,
+    stagnationThreshold: 0,
+    mission: {
+      appDescription: 'Example app',
+      destructiveActionsAllowed: false,
+    },
+    judgeConfig: {
+      enabled: true,
+      requestTimeoutMs: 10_000,
+    },
+    ...overrides,
+  };
+}
+
+function createStagehandReturning(result: unknown) {
+  const page = createMockPage();
+  return {
+    context: {
+      pages: () => [page],
+    },
+    agent: vi.fn(() => ({
+      execute: async () => result,
+    })),
+  } as any;
 }
 
 describe('executeWorkerTask', () => {
@@ -204,5 +253,122 @@ describe('executeWorkerTask', () => {
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0]?.verdict?.hypothesis).toContain('should');
     expect(result.findings[0]?.meta?.source).toBe('agent');
+  });
+
+  it('records Stagehand prompt/completion usage when the result reports camelCase tokens', async () => {
+    const costTracker = new CostTracker();
+    const stagehand = createStagehandReturning({
+      actions: [],
+      usage: {
+        promptTokens: 123,
+        completionTokens: 45,
+      },
+    });
+
+    const result = await executeWorkerTask(
+      stagehand,
+      createTask({ id: 'task-cost-camel' }),
+      createOptions({ costTracker })
+    );
+
+    expect(result.outcome).toBe('completed');
+    expect(costTracker.getRecords()).toEqual([
+      expect.objectContaining({
+        label: 'worker:task-cost-camel:stagehand',
+        inputTokens: 123,
+        outputTokens: 45,
+        source: 'reported',
+      }),
+    ]);
+  });
+
+  it('records Stagehand snake_case usage when providers expose OpenAI-style tokens', async () => {
+    const costTracker = new CostTracker();
+    const stagehand = createStagehandReturning({
+      actions: [],
+      usage: {
+        prompt_tokens: 77,
+        completion_tokens: 11,
+      },
+    });
+
+    await executeWorkerTask(
+      stagehand,
+      createTask({ id: 'task-cost-snake' }),
+      createOptions({ costTracker })
+    );
+
+    expect(costTracker.getRecords()[0]).toEqual(
+      expect.objectContaining({
+        label: 'worker:task-cost-snake:stagehand',
+        inputTokens: 77,
+        outputTokens: 11,
+        source: 'reported',
+      })
+    );
+  });
+
+  it('records Stagehand input/output usage when generic token names are reported', async () => {
+    const costTracker = new CostTracker();
+    const stagehand = createStagehandReturning({
+      actions: [],
+      usage: {
+        inputTokens: 31,
+        outputTokens: 9,
+      },
+    });
+
+    await executeWorkerTask(
+      stagehand,
+      createTask({ id: 'task-cost-generic' }),
+      createOptions({ costTracker })
+    );
+
+    expect(costTracker.getRecords()[0]).toEqual(
+      expect.objectContaining({
+        label: 'worker:task-cost-generic:stagehand',
+        inputTokens: 31,
+        outputTokens: 9,
+        source: 'reported',
+      })
+    );
+  });
+
+  it('falls back to estimated Stagehand usage when no usage object is present', async () => {
+    const costTracker = new CostTracker();
+    const stagehand = createStagehandReturning({ actions: [] });
+
+    await executeWorkerTask(
+      stagehand,
+      createTask({ id: 'task-cost-estimated' }),
+      createOptions({ costTracker })
+    );
+
+    expect(costTracker.getRecords()[0]).toEqual(
+      expect.objectContaining({
+        label: 'worker:task-cost-estimated:stagehand',
+        inputTokens: expect.any(Number),
+        outputTokens: expect.any(Number),
+        source: 'estimated',
+      })
+    );
+  });
+
+  it('does not record Stagehand cost when no tracker is configured', async () => {
+    const stagehand = createStagehandReturning({
+      actions: [],
+      usage: {
+        promptTokens: 123,
+        completionTokens: 45,
+      },
+    });
+
+    const result = await executeWorkerTask(
+      stagehand,
+      createTask({ id: 'task-cost-disabled' }),
+      createOptions()
+    );
+
+    expect(result.outcome).toBe('completed');
   });
 });

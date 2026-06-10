@@ -17,6 +17,7 @@ import { buildApiContractArtifacts } from '../api/contract-oracle.js';
 import { summarizeContractIndex } from '../spec/contract-index.js';
 import { appendToLedger, mergeLedgerEntries } from '../ledger.js';
 import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
+import { appendNewCostRecords } from './cost-ledger.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
@@ -189,6 +190,7 @@ async function runPreflightScans(
         fullPage: ctx.config.visionAnalysis.fullPage,
         maxResponseTokens: ctx.config.visionAnalysis.maxResponseTokens,
         requestTimeoutMs: ctx.config.visionAnalysis.requestTimeoutMs,
+        costTracker: ctx.costTracker,
       });
       preflightFindings.push(...visionResult.findings);
       preflightEvidence.push(...visionResult.evidence);
@@ -256,6 +258,7 @@ async function runMainWorkerTask(
       judgeConfig: ctx.config.judge,
       visionContext,
       safetyGuard: ctx.safetyGuard,
+      costTracker: ctx.costTracker,
       a2aContext,
     }
   );
@@ -358,6 +361,7 @@ export async function executeFrontierItem(
 
   if (item.workerType === 'api') {
     const result = await runApiWorkerPath({ ctx, page, item, node, observedApiEndpoints });
+    appendNewCostRecords(ctx, { areaName, stateId: node.id, taskId: item.id });
     return { item, result };
   }
 
@@ -393,6 +397,7 @@ export async function executeFrontierItem(
     stateId: node.id,
     taskId: item.id,
   });
+  appendNewCostRecords(ctx, { areaName, stateId: node.id, taskId: item.id });
 
   return { item, result };
 }

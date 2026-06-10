@@ -10,6 +10,7 @@ import type {
   RawFinding,
   Evidence,
   ReplayableAction,
+  RunPartialReason,
 } from '../types.js';
 import type { StateGraph } from '../graph/state-graph.js';
 import type { FrontierQueue } from '../graph/frontier.js';
@@ -63,6 +64,7 @@ export interface EngineContext {
   errorCollector: BrowserErrorCollector;
   pageNodeOwners: Map<string, string>;
   completedTaskIds: Set<string>;
+  partialReason?: RunPartialReason;
   workerPool: WorkerSession[];
   repoHints?: RepoHints;
   contractIndex?: ContractIndex;

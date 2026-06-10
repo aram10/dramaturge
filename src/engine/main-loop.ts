@@ -7,6 +7,7 @@ import { MAX_NAV_RETRIES } from '../constants.js';
 import type { FrontierItem, WorkerResult } from '../types.js';
 import { executeFrontierItem } from './execute-frontier-item.js';
 import type { EngineContext } from './context.js';
+import { appendNewCostRecords } from './cost-ledger.js';
 import {
   assignPageNodeOwner,
   collectResults,
@@ -60,6 +61,7 @@ export interface RunPlannerLoopResult {
   tasksExecuted: number;
   totalFindingsCount: number;
   finalFrontierSnapshot: FrontierItem[] | undefined;
+  partialReason?: EngineContext['partialReason'];
 }
 
 function findRootNode(ctx: EngineContext): { id: string } | undefined {
@@ -106,6 +108,10 @@ function resolveTaskTimeoutMs(ctx: EngineContext, startMs: number): number {
     Math.max(MIN_DERIVED_TASK_TIMEOUT_MS, derived)
   );
   return Math.max(1, Math.min(remainingMs, bounded));
+}
+
+function costBudgetExceeded(ctx: EngineContext): boolean {
+  return ctx.costTracker?.overBudget === true;
 }
 
 async function processTaskBatch(
@@ -212,12 +218,23 @@ export async function runPlannerLoop(
   let totalFindingsCount = 0;
 
   while (ctx.frontier.hasItems()) {
+    if (costBudgetExceeded(ctx)) {
+      const summary = ctx.costTracker?.getSummary();
+      ctx.logger?.warn('Cost budget exhausted', {
+        totalCostUsd: summary?.totalCostUsd,
+        costLimitUsd: ctx.budget.costLimitUsd,
+      });
+      ctx.partialReason = 'cost-budget-exceeded';
+      break;
+    }
+
     const elapsedMs = Date.now() - startMs;
     if (elapsedMs > ctx.budget.globalTimeLimitSeconds * 1000) {
       ctx.logger?.warn('Time budget exhausted', {
         elapsedMs,
         timeLimitMs: ctx.budget.globalTimeLimitSeconds * 1000,
       });
+      ctx.partialReason = 'time-budget-exceeded';
       break;
     }
 
@@ -282,6 +299,11 @@ export async function runPlannerLoop(
       totalFindingsCount += result.findings.length;
 
       await expandGraph(ctx, item.nodeId, result, useLLMPlanner);
+      appendNewCostRecords(ctx, {
+        areaName: item.objective,
+        stateId: item.nodeId,
+        taskId: item.id,
+      });
       routeFollowups(ctx, item.nodeId, result);
       updateWorkflowAutomataRuntime(ctx);
 
@@ -353,5 +375,6 @@ export async function runPlannerLoop(
     tasksExecuted,
     totalFindingsCount,
     finalFrontierSnapshot: checkpointInterval > 0 ? ctx.frontier.snapshot() : undefined,
+    partialReason: ctx.partialReason,
   };
 }

@@ -53,6 +53,13 @@ export function buildAreaResults(ctx: EngineContext): AreaResult[] {
   return results;
 }
 
+function resolvePartialReason(
+  ctx: EngineContext,
+  remaining: FrontierItem[]
+): RunResult['partialReason'] {
+  return ctx.partialReason ?? (remaining.length > 0 ? 'frontier-remaining' : undefined);
+}
+
 export function writeReports(
   ctx: EngineContext,
   startTime: Date,
@@ -89,6 +96,7 @@ export function writeReports(
     })),
     {
       partial: remaining.length > 0,
+      partialReason: resolvePartialReason(ctx, remaining),
       blindSpots,
       stateGraphMermaid,
       runConfig: {
@@ -99,6 +107,7 @@ export function writeReports(
           timeLimitSeconds: ctx.budget.globalTimeLimitSeconds,
           maxStepsPerTask: ctx.budget.maxStepsPerTask,
           maxStateNodes: ctx.budget.maxStateNodes,
+          costLimitUsd: ctx.budget.costLimitUsd,
         },
         checkpointInterval: config.checkpoint.intervalTasks,
         autoCaptureEnabled:
@@ -115,6 +124,7 @@ export function writeReports(
       diffSummary,
       crossRunClassification: ctx.crossRunClassification,
       safetyAudit,
+      costSummary: ctx.costTracker?.getSummary(),
       explorationLedger: ctx.runLedger,
       workflowAutomaton: ctx.workflowAutomata?.current,
       workflowComparison: ctx.workflowAutomata?.comparison,

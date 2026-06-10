@@ -139,6 +139,7 @@ export function buildRunResult(
   unexploredAreas: Array<{ name: string; reason: string }>,
   options: {
     partial: boolean;
+    partialReason?: RunResult['partialReason'];
     blindSpots?: BlindSpot[];
     stateGraphMermaid?: string;
     runConfig?: RunConfigMeta;
@@ -146,6 +147,7 @@ export function buildRunResult(
     diffSummary?: DiffSummary;
     crossRunClassification?: CrossRunClassification;
     safetyAudit?: RunResult['safetyAudit'];
+    costSummary?: RunResult['costSummary'];
     explorationLedger?: RunResult['explorationLedger'];
     workflowAutomaton?: RunResult['workflowAutomaton'];
     workflowComparison?: RunResult['workflowComparison'];
@@ -153,6 +155,7 @@ export function buildRunResult(
 ): RunResult {
   const {
     partial,
+    partialReason,
     blindSpots = [],
     stateGraphMermaid,
     runConfig,
@@ -160,6 +163,7 @@ export function buildRunResult(
     diffSummary,
     crossRunClassification,
     safetyAudit,
+    costSummary,
     explorationLedger,
     workflowAutomaton,
     workflowComparison,
@@ -172,6 +176,7 @@ export function buildRunResult(
     areaResults,
     unexploredAreas,
     partial,
+    partialReason,
     blindSpots,
     stateGraphMermaid,
     runConfig,
@@ -179,6 +184,7 @@ export function buildRunResult(
     diffSummary,
     crossRunClassification,
     safetyAudit,
+    costSummary,
     explorationLedger,
     workflowAutomaton,
     workflowComparison,

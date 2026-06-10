@@ -3,6 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { sendChatCompletion, sendVisionCompletion, redactApiKey } from './client.js';
+import { CostTracker } from '../coverage/cost-tracker.js';
 
 describe('client', () => {
   const originalFetch = globalThis.fetch;
@@ -64,6 +65,80 @@ describe('client', () => {
       );
       const body = JSON.parse((init as RequestInit).body as string);
       expect(body.model).toBe('claude-sonnet-4-6');
+    });
+
+    it('records provider-reported usage for successful chat completions', async () => {
+      process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+      const costTracker = new CostTracker();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          content: [{ type: 'text', text: 'Hello from Anthropic' }],
+          usage: {
+            input_tokens: 123,
+            output_tokens: 45,
+            cache_read_input_tokens: 20,
+            cache_creation_input_tokens: 10,
+          },
+        }),
+      }) as unknown as typeof fetch;
+
+      await sendChatCompletion({
+        model: 'anthropic/claude-sonnet-4-6',
+        system: 'You are helpful.',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+        requestTimeoutMs: 5000,
+        costTracker,
+        costLabel: 'test-chat',
+      });
+
+      expect(costTracker.getRecords()).toEqual([
+        expect.objectContaining({
+          model: 'claude-sonnet-4-6',
+          label: 'test-chat',
+          inputTokens: 123,
+          outputTokens: 45,
+          cacheReadInputTokens: 20,
+          cacheCreationInputTokens: 10,
+          source: 'reported',
+        }),
+      ]);
+    });
+
+    it('records OpenAI-compatible usage from provider responses', async () => {
+      process.env.OPENAI_API_KEY = 'test-openai-key';
+      delete process.env.OPENAI_BASE_URL;
+      const costTracker = new CostTracker();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'Hello from OpenAI' } }],
+          usage: { prompt_tokens: 55, completion_tokens: 12 },
+        }),
+      }) as unknown as typeof fetch;
+
+      await sendChatCompletion({
+        model: 'openai/gpt-4.1',
+        system: 'You are helpful.',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+        requestTimeoutMs: 5000,
+        costTracker,
+        costLabel: 'openai-usage',
+      });
+
+      expect(costTracker.getRecords()[0]).toEqual(
+        expect.objectContaining({
+          model: 'gpt-4.1',
+          label: 'openai-usage',
+          inputTokens: 55,
+          outputTokens: 12,
+          source: 'reported',
+        })
+      );
     });
 
     it('routes openai model to OpenAI API', async () => {
@@ -289,6 +364,73 @@ describe('client', () => {
       const body = JSON.parse((init as RequestInit).body as string);
       expect(body.messages[1].content[0].type).toBe('image_url');
       expect(body.messages[1].content[0].image_url.url).toContain('data:image/png;base64,');
+    });
+
+    it('records fallback estimated usage when providers omit usage data', async () => {
+      process.env.OPENAI_API_KEY = 'test-openai-key';
+      const costTracker = new CostTracker();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'I see a form' } }],
+        }),
+      }) as unknown as typeof fetch;
+
+      await sendVisionCompletion({
+        model: 'openai/gpt-4o',
+        system: 'Analyze this.',
+        base64Image: 'base64data',
+        pageContext: 'Page context',
+        maxTokens: 512,
+        requestTimeoutMs: 5000,
+        costTracker,
+        costLabel: 'test-vision',
+      });
+
+      expect(costTracker.getRecords()).toEqual([
+        expect.objectContaining({
+          model: 'gpt-4o',
+          label: 'test-vision',
+          inputTokens: expect.any(Number),
+          outputTokens: expect.any(Number),
+          source: 'estimated',
+        }),
+      ]);
+    });
+
+    it('records Google usage metadata for vision completions', async () => {
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-google-key';
+      const costTracker = new CostTracker();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: 'I see a form' }] } }],
+          usageMetadata: { promptTokenCount: 88, candidatesTokenCount: 21 },
+        }),
+      }) as unknown as typeof fetch;
+
+      await sendVisionCompletion({
+        model: 'google/gemini-2.5-pro',
+        system: 'Analyze this.',
+        base64Image: 'base64data',
+        pageContext: 'Page context',
+        maxTokens: 512,
+        requestTimeoutMs: 5000,
+        costTracker,
+        costLabel: 'google-vision',
+      });
+
+      expect(costTracker.getRecords()[0]).toEqual(
+        expect.objectContaining({
+          model: 'gemini-2.5-pro',
+          label: 'google-vision',
+          inputTokens: 88,
+          outputTokens: 21,
+          source: 'reported',
+        })
+      );
     });
   });
 });

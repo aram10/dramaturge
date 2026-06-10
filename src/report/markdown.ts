@@ -43,6 +43,9 @@ function renderHeader(
   lines.push(`# Dramaturge Report — ${timestamp}`);
   if (result.partial) {
     lines.push('> **Warning:** This run was incomplete. Some areas may not have been explored.');
+    if (result.partialReason) {
+      lines.push(`> Reason: \`${result.partialReason}\`.`);
+    }
     lines.push('');
   }
   lines.push(`**Target:** ${escapeMarkdownInline(result.targetUrl)}`);
@@ -473,6 +476,51 @@ function renderRunConfigSection(result: RunResult): string[] {
   ];
 }
 
+function renderCostSummarySection(result: RunResult): string[] {
+  if (!result.costSummary) return [];
+  const summary = result.costSummary;
+  const lines = [
+    '## Cost Summary',
+    '',
+    `- **Estimated cost:** $${summary.totalCostUsd.toFixed(6)}`,
+    `- **Budget:** ${
+      summary.budgetLimitUsd === undefined ? 'unlimited' : `$${summary.budgetLimitUsd.toFixed(2)}`
+    }`,
+    `- **Model calls:** ${summary.callCount}`,
+    `- **Input tokens:** ${summary.totalInputTokens}`,
+    `- **Output tokens:** ${summary.totalOutputTokens}`,
+    `- **Over budget:** ${summary.overBudget ? 'yes' : 'no'}`,
+  ];
+  const modelEntries = Object.entries(summary.byModel);
+  if (modelEntries.length > 0) {
+    lines.push(
+      '',
+      '**By model**',
+      '',
+      '| Model | Calls | Estimated cost |',
+      '|-------|-------|----------------|'
+    );
+    for (const [model, item] of modelEntries) {
+      lines.push(`| ${escapeTableCell(model)} | ${item.calls} | $${item.costUsd.toFixed(6)} |`);
+    }
+  }
+  const labelEntries = Object.entries(summary.byLabel);
+  if (labelEntries.length > 0) {
+    lines.push(
+      '',
+      '**By call label**',
+      '',
+      '| Label | Calls | Estimated cost |',
+      '|-------|-------|----------------|'
+    );
+    for (const [label, item] of labelEntries) {
+      lines.push(`| ${escapeTableCell(label)} | ${item.calls} | $${item.costUsd.toFixed(6)} |`);
+    }
+  }
+  lines.push('');
+  return lines;
+}
+
 function renderSafetyAuditSection(result: RunResult): string[] {
   if (!result.safetyAudit) return [];
   const lines: string[] = [
@@ -540,6 +588,7 @@ export function renderMarkdown(result: RunResult): string {
     renderDiffSummarySection(result, diffScope),
     renderRunMemorySection(result),
     renderRunConfigSection(result),
+    renderCostSummarySection(result),
     renderSafetyAuditSection(result),
   ];
 

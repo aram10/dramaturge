@@ -13,6 +13,14 @@ export interface ChatMessage {
   content: string;
 }
 
+/** Provider-reported model usage, normalized across backends. */
+export interface LlmUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+}
+
 /** Provider identifiers used as model-string prefixes. */
 export type ProviderId =
   | 'anthropic'
@@ -74,4 +82,7 @@ export interface LLMProviderAdapter {
 
   /** Extract the assistant text from a vision response. */
   extractVisionResponse(data: unknown): string;
+
+  /** Extract normalized usage from the provider response, when available. */
+  extractUsage(data: unknown): LlmUsage | null;
 }

@@ -30,6 +30,7 @@ import { judgeWorkerObservations } from '../judge/judge.js';
 import { hasLLMApiKey, judgeObservationWithLLM } from '../llm.js';
 import { mergeLedgerEntries } from '../ledger.js';
 import type { Blackboard } from '../a2a/blackboard.js';
+import { approximateTokenCount, type CostTracker } from '../coverage/cost-tracker.js';
 
 type StagehandToolSet = NonNullable<Parameters<Stagehand['agent']>[0]>['tools'];
 
@@ -173,6 +174,8 @@ async function materializeObservedFindings(input: {
   actionRecorder: ActionRecorder;
   judgeConfig?: JudgeConfig;
   judgeModel?: string;
+  costTracker?: CostTracker;
+  costLabel?: string;
 }) {
   return judgeWorkerObservations({
     observations: input.observations,
@@ -182,7 +185,10 @@ async function materializeObservedFindings(input: {
     judgeText:
       input.judgeConfig?.enabled !== false && input.judgeModel && hasLLMApiKey(input.judgeModel)
         ? (prompt, timeoutMs) =>
-            judgeObservationWithLLM(input.judgeModel as string, prompt, timeoutMs)
+            judgeObservationWithLLM(input.judgeModel as string, prompt, timeoutMs, {
+              costTracker: input.costTracker,
+              costLabel: input.costLabel ?? 'judge:observation',
+            })
         : undefined,
   });
 }
@@ -201,6 +207,8 @@ async function materializeObservedFindingsSafe(input: {
   actionRecorder: WorkerSetup['actionRecorder'];
   judgeConfig?: JudgeConfig;
   judgeModel?: string;
+  costTracker?: CostTracker;
+  costLabel?: string;
 }): Promise<Awaited<ReturnType<typeof materializeObservedFindings>>> {
   try {
     return await materializeObservedFindings(input);
@@ -220,6 +228,7 @@ async function buildWorkerExecutionResult(input: {
   followupRequests: WorkerSetup['followupRequests'];
   discoveredEdges: WorkerSetup['discoveredEdges'];
   observedApiEndpoints?: ObservedApiEndpoint[];
+  costTracker?: CostTracker;
   stagehandResult?: unknown;
   outcome: WorkerResult['outcome'];
   summary: string;
@@ -230,6 +239,8 @@ async function buildWorkerExecutionResult(input: {
     actionRecorder: input.actionRecorder,
     judgeConfig: input.judgeConfig,
     judgeModel: input.model,
+    costTracker: input.costTracker,
+    costLabel: `worker:${input.task.id}:judge`,
   });
   const stagehandActions = input.stagehandResult
     ? await safeStagehandActions(input.stagehandResult)
@@ -276,6 +287,9 @@ async function runStagehandExecute(input: {
   agent: WorkerSetup['agent'];
   args: StagehandAgentExecuteArgs;
   timeoutMs?: number;
+  model?: string;
+  costTracker?: CostTracker;
+  costLabel?: string;
 }): Promise<StagehandAgentExecuteOutcome> {
   const execute = input.agent.execute as unknown as (
     args: StagehandAgentExecuteArgs
@@ -283,7 +297,9 @@ async function runStagehandExecute(input: {
   const timeoutMs = input.timeoutMs;
   if (!timeoutMs || timeoutMs <= 0) {
     try {
-      return { kind: 'completed', result: await execute(input.args) };
+      const result = await execute(input.args);
+      recordStagehandCost(input, result);
+      return { kind: 'completed', result };
     } catch (error) {
       return { kind: 'error', error };
     }
@@ -291,7 +307,10 @@ async function runStagehandExecute(input: {
 
   const controller = new AbortController();
   const executePromise = execute({ ...input.args, signal: controller.signal }).then(
-    (result) => ({ kind: 'completed' as const, result }),
+    (result) => {
+      recordStagehandCost(input, result);
+      return { kind: 'completed' as const, result };
+    },
     (error) => ({ kind: 'error' as const, error })
   );
 
@@ -310,6 +329,79 @@ async function runStagehandExecute(input: {
   return outcome;
 }
 
+function recordStagehandCost(
+  input: {
+    args: StagehandAgentExecuteArgs;
+    model?: string;
+    costTracker?: CostTracker;
+    costLabel?: string;
+  },
+  result: unknown
+): void {
+  if (!input.model || !input.costTracker) {
+    return;
+  }
+  const usage = extractStagehandUsage(result);
+  let output: string;
+  try {
+    output = typeof result === 'string' ? result : JSON.stringify(result ?? '');
+  } catch {
+    output = '';
+  }
+  input.costTracker.record(
+    input.model,
+    usage?.inputTokens ?? approximateTokenCount(input.args.instruction),
+    usage?.outputTokens ?? approximateTokenCount(output),
+    input.costLabel ?? 'worker:stagehand',
+    { source: usage ? 'reported' : 'estimated' }
+  );
+}
+
+function extractStagehandUsage(
+  result: unknown
+): { inputTokens: number; outputTokens: number } | null {
+  const usage = (
+    result as {
+      usage?: {
+        promptTokens?: unknown;
+        completionTokens?: unknown;
+        prompt_tokens?: unknown;
+        completion_tokens?: unknown;
+        inputTokens?: unknown;
+        outputTokens?: unknown;
+      };
+    }
+  ).usage;
+  if (!usage) {
+    return null;
+  }
+
+  const inputTokens =
+    typeof usage.promptTokens === 'number'
+      ? usage.promptTokens
+      : typeof usage.prompt_tokens === 'number'
+        ? usage.prompt_tokens
+        : typeof usage.inputTokens === 'number'
+          ? usage.inputTokens
+          : undefined;
+  const outputTokens =
+    typeof usage.completionTokens === 'number'
+      ? usage.completionTokens
+      : typeof usage.completion_tokens === 'number'
+        ? usage.completion_tokens
+        : typeof usage.outputTokens === 'number'
+          ? usage.outputTokens
+          : undefined;
+  if (inputTokens === undefined && outputTokens === undefined) {
+    return null;
+  }
+
+  return {
+    inputTokens: inputTokens ?? 0,
+    outputTokens: outputTokens ?? 0,
+  };
+}
+
 export interface ExploreAreaOptions {
   appDescription: string;
   model: string;
@@ -326,6 +418,7 @@ export interface ExploreAreaOptions {
   history?: WorkerHistoryContext;
   judgeConfig?: JudgeConfig;
   safetyGuard?: SafetyGuardLike;
+  costTracker?: CostTracker;
 }
 
 export async function exploreArea(
@@ -349,6 +442,7 @@ export async function exploreArea(
     history,
     judgeConfig,
     safetyGuard,
+    costTracker,
   } = opts;
   // Classify the page and capture fingerprint before starting the worker
   const page = stagehand.context.pages()[0];
@@ -382,11 +476,25 @@ export async function exploreArea(
       safetyGuard,
     });
 
+  const instruction = `Explore the "${area.name}" area of this application. Interact with all visible elements, test forms, check edge cases, and report any issues you find using the log_finding tool. Take screenshots before logging findings and include the evidenceId. Use mark_control_exercised after each interaction to track coverage.`;
+
   try {
     const result = await agent.execute({
-      instruction: `Explore the "${area.name}" area of this application. Interact with all visible elements, test forms, check edge cases, and report any issues you find using the log_finding tool. Take screenshots before logging findings and include the evidenceId. Use mark_control_exercised after each interaction to track coverage.`,
+      instruction,
       maxSteps: stepsPerArea,
     });
+    recordStagehandCost(
+      {
+        args: {
+          instruction,
+          maxSteps: stepsPerArea,
+        },
+        model,
+        costTracker,
+        costLabel: `area:${area.name}:stagehand`,
+      },
+      result
+    );
 
     const stepCount =
       'actions' in result && Array.isArray(result.actions) ? result.actions.length : 0;
@@ -397,6 +505,8 @@ export async function exploreArea(
       actionRecorder,
       judgeConfig,
       judgeModel: model,
+      costTracker,
+      costLabel: `area:${area.name}:judge`,
     });
     const stagehandActions = await safeStagehandActions(result);
     const explorationLedger = mergeLedgerEntries({
@@ -433,6 +543,8 @@ export async function exploreArea(
         actionRecorder,
         judgeConfig,
         judgeModel: model,
+        costTracker,
+        costLabel: `area:${area.name}:judge`,
       });
     } catch {
       // Judge failed to materialize findings; return empty findings array
@@ -483,6 +595,7 @@ export interface ExecuteWorkerTaskOptions {
   judgeConfig?: JudgeConfig;
   visionContext?: string;
   safetyGuard?: SafetyGuardLike;
+  costTracker?: CostTracker;
   /** A2A multi-agent context (optional). */
   a2aContext?: {
     agentRole: AgentRole;
@@ -514,6 +627,7 @@ export async function executeWorkerTask(
     judgeConfig,
     visionContext,
     safetyGuard,
+    costTracker,
     a2aContext,
   } = opts;
   const {
@@ -563,6 +677,9 @@ export async function executeWorkerTask(
         maxSteps: task.maxSteps,
       },
       timeoutMs,
+      model,
+      costTracker,
+      costLabel: `worker:${task.id}:stagehand`,
     });
 
     if (executeOutcome.kind === 'completed') {
@@ -577,6 +694,7 @@ export async function executeWorkerTask(
         followupRequests,
         discoveredEdges,
         observedApiEndpoints,
+        costTracker,
         stagehandResult: executeOutcome.result,
         outcome: 'completed',
         summary: `Completed ${task.workerType} task: ${task.objective}`,
@@ -595,6 +713,7 @@ export async function executeWorkerTask(
         followupRequests,
         discoveredEdges,
         observedApiEndpoints,
+        costTracker,
         outcome: 'timed-out',
         summary: timeoutMs ? `Timed out after ${timeoutMs}ms` : 'Timed out',
       });
@@ -615,6 +734,7 @@ export async function executeWorkerTask(
       followupRequests,
       discoveredEdges,
       observedApiEndpoints,
+      costTracker,
       outcome: 'failed',
       summary: message,
     });
@@ -631,6 +751,7 @@ export async function executeWorkerTask(
       followupRequests,
       discoveredEdges,
       observedApiEndpoints,
+      costTracker,
       outcome: 'failed',
       summary: message,
     });

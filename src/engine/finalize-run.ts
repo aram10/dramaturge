@@ -20,11 +20,12 @@ export interface FinalizeRunOptions {
 }
 
 function recordRemainingBlindSpots(ctx: EngineContext, remaining: FrontierItem[]): void {
+  const reason = ctx.partialReason === 'cost-budget-exceeded' ? 'cost-budget' : 'time-budget';
   for (const item of remaining) {
     ctx.globalCoverage.addBlindSpot({
       nodeId: item.nodeId,
       summary: `Not reached: ${item.objective}`,
-      reason: 'time-budget',
+      reason,
       severity: item.priority > 0.7 ? 'high' : 'low',
     });
   }
