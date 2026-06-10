@@ -168,6 +168,12 @@ function setOutput(name, value) {
   }
 }
 
+export function writeStepSummary(markdown, stepSummaryPath = process.env.GITHUB_STEP_SUMMARY) {
+  if (stepSummaryPath) {
+    appendFileSync(stepSummaryPath, markdown, 'utf-8');
+  }
+}
+
 function main() {
   const reportBaseDir = process.argv[2];
   const failOnSeverity = process.argv[3] || '';
@@ -195,6 +201,7 @@ function main() {
   // Write the PR-comment markdown next to the report
   const summaryPath = join(reportDir, 'pr-comment.md');
   writeFileSync(summaryPath, markdown, 'utf-8');
+  writeStepSummary(markdown);
 
   // Check severity threshold
   const exceeded = checkSeverityThreshold(maxSeverity, failOnSeverity);

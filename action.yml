@@ -37,6 +37,13 @@ inputs:
     description: 'Post a summary comment on the PR'
     required: false
     default: 'true'
+  comment-key:
+    description: >
+      Optional suffix for the sticky PR comment marker. Set this when running
+      multiple Dramaturge jobs in a matrix so comments do not overwrite each
+      other. Use letters, numbers, dots, underscores, or hyphens.
+    required: false
+    default: ''
   report-dir:
     description: 'Directory for report output (overrides config value)'
     required: false
@@ -99,7 +106,16 @@ runs:
 
     - name: Install Dramaturge
       shell: bash
-      run: npm install -g dramaturge@${{ inputs.dramaturge-version }}
+      env:
+        DRAMATURGE_VERSION: ${{ inputs.dramaturge-version }}
+      run: |
+        case "$DRAMATURGE_VERSION" in
+          ''|*[!A-Za-z0-9._+~^-]*)
+            echo "::error::Invalid dramaturge-version input"
+            exit 1
+            ;;
+        esac
+        npm install -g "dramaturge@${DRAMATURGE_VERSION}"
 
     - name: Install Playwright browsers
       shell: bash
@@ -155,17 +171,28 @@ runs:
     - name: Post PR comment
       if: always() && inputs.post-comment == 'true' && github.event_name == 'pull_request' && steps.config.outputs.json-output-enabled == 'true' && steps.parse.outcome == 'success'
       uses: actions/github-script@v7
+      env:
+        SUMMARY_PATH: ${{ steps.parse.outputs.summary-path }}
+        COMMENT_KEY: ${{ inputs.comment-key }}
       with:
         script: |
           const fs = require('fs');
-          const summaryPath = '${{ steps.parse.outputs.summary-path }}';
+          const summaryPath = process.env.SUMMARY_PATH || '';
           if (!summaryPath || !fs.existsSync(summaryPath)) {
             core.info('No summary file found, skipping PR comment');
             return;
           }
           const summary = fs.readFileSync(summaryPath, 'utf-8');
 
-          const marker = '<!-- dramaturge-report -->';
+          const commentKey = process.env.COMMENT_KEY || '';
+          if (!/^[A-Za-z0-9._-]*$/.test(commentKey)) {
+            core.setFailed('Invalid comment-key input. Use only letters, numbers, dots, underscores, or hyphens.');
+            return;
+          }
+
+          const marker = commentKey
+            ? `<!-- dramaturge-report:${commentKey} -->`
+            : '<!-- dramaturge-report -->';
           const body = marker + '\n' + summary;
 
           // Paginate through all comments to find an existing marker
