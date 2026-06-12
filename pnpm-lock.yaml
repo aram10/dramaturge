@@ -16,10 +16,10 @@ importers:
     dependencies:
       '@axe-core/playwright':
         specifier: ^4.11.1
-        version: 4.11.3(playwright-core@1.59.1)
+        version: 4.11.3(playwright-core@1.60.0)
       '@browserbasehq/stagehand':
         specifier: ^3.2.0
-        version: 3.4.0(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(patchright-core@1.59.4)(playwright-core@1.59.1)(zod@4.4.3)
+        version: 3.4.0(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(patchright-core@1.59.4)(playwright-core@1.60.0)(zod@4.4.3)
       ajv:
         specifier: ^8.18.0
         version: 8.20.0
@@ -31,7 +31,7 @@ importers:
         version: 7.2.0
       playwright:
         specifier: ^1.58.2
-        version: 1.59.1
+        version: 1.60.0
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
@@ -1956,13 +1956,13 @@ packages:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
 
-  playwright-core@1.59.1:
-    resolution: {integrity: sha512-HBV/RJg81z5BiiZ9yPzIiClYV/QMsDCKUyogwH9p3MCP6IYjUFu/MActgYAvK0oWyV9NlwM3GLBjADyWgydVyg==}
+  playwright-core@1.60.0:
+    resolution: {integrity: sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==}
     engines: {node: '>=18'}
     hasBin: true
 
-  playwright@1.59.1:
-    resolution: {integrity: sha512-C8oWjPR3F81yljW9o5OxcWzfh6avkVwDD2VYdwIGqTkl+OGFISgypqzfu7dOe4QNLL2aqcWBmI3PMtLIK233lw==}
+  playwright@1.60.0:
+    resolution: {integrity: sha512-hheHdokM8cdqCb0lcE3s+zT4t4W+vvjpGxsZlDnikarzx8tSzMebh3UiFtgqwFwnTnjYQcsyMF8ei2mCO/tpeA==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -2667,10 +2667,10 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@axe-core/playwright@4.11.3(playwright-core@1.59.1)':
+  '@axe-core/playwright@4.11.3(playwright-core@1.60.0)':
     dependencies:
       axe-core: 4.11.4
-      playwright-core: 1.59.1
+      playwright-core: 1.60.0
 
   '@babel/helper-string-parser@7.27.1': {}
 
@@ -2699,7 +2699,7 @@ snapshots:
     transitivePeerDependencies:
       - encoding
 
-  '@browserbasehq/stagehand@3.4.0(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(patchright-core@1.59.4)(playwright-core@1.59.1)(zod@4.4.3)':
+  '@browserbasehq/stagehand@3.4.0(@cfworker/json-schema@4.1.1)(@opentelemetry/api@1.9.0)(deepmerge@4.3.1)(patchright-core@1.59.4)(playwright-core@1.60.0)(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 2.0.3
       '@anthropic-ai/sdk': 0.39.0
@@ -2737,7 +2737,7 @@ snapshots:
       chrome-launcher: 1.2.1
       ollama-ai-provider-v2: 1.5.5(zod@4.4.3)
       patchright-core: 1.59.4
-      playwright-core: 1.59.1
+      playwright-core: 1.60.0
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - '@opentelemetry/api'
@@ -4399,11 +4399,11 @@ snapshots:
 
   pkce-challenge@5.0.1: {}
 
-  playwright-core@1.59.1: {}
+  playwright-core@1.60.0: {}
 
-  playwright@1.59.1:
+  playwright@1.60.0:
     dependencies:
-      playwright-core: 1.59.1
+      playwright-core: 1.60.0
     optionalDependencies:
       fsevents: 2.3.2
 
