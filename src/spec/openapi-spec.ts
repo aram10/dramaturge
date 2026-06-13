@@ -17,6 +17,14 @@ function asObject(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* '/' */) {
+    end--;
+  }
+  return value.slice(0, end);
+}
+
 function firstContentSchema(
   container: Record<string, unknown> | undefined,
   components?: Record<string, unknown>
@@ -159,14 +167,14 @@ function extractServerBasePath(servers: unknown): string {
     // Relative server URL (e.g. '/api/v1'): use it directly.
     pathname = url;
   }
-  const trimmed = pathname.replace(/\/+$/, '');
+  const trimmed = trimTrailingSlashes(pathname);
   if (trimmed === '' || trimmed === '/') return '';
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
 function joinRoute(basePath: string, route: string): string {
   if (!basePath) return route;
-  const left = basePath.replace(/\/+$/, '');
+  const left = trimTrailingSlashes(basePath);
   const right = route.startsWith('/') ? route : `/${route}`;
   return `${left}${right}`;
 }
