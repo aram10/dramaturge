@@ -65,6 +65,7 @@
     "prepare": "husky",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "check:licenses": "node scripts/check-license-headers.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
