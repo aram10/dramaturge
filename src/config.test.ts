@@ -731,3 +731,92 @@ describe('resolveOutputFormats', () => {
     expect(loaded.output.format).toEqual(['markdown', 'sarif']);
   });
 });
+
+describe('loadConfig strict validation and env interpolation', () => {
+  function writeConfig(body: Record<string, unknown>): string {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(configPath, JSON.stringify(body));
+    return configPath;
+  }
+
+  it('rejects unknown top-level keys with a did-you-mean suggestion (#223)', () => {
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: 'app',
+      auth: { type: 'none' },
+      modls: { worker: 'anthropic/claude-haiku-4-5' },
+    });
+    expect(() => loadConfig(configPath)).toThrow(/did you mean "models"/);
+  });
+
+  it('rejects unknown nested model keys (#223)', () => {
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: 'app',
+      auth: { type: 'none' },
+      models: { worker: 'anthropic/claude-haiku-4-5', wrkers: {} },
+    });
+    expect(() => loadConfig(configPath)).toThrow(/Invalid config file/);
+  });
+
+  it('rejects an unknown model provider prefix (#224)', () => {
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: 'app',
+      auth: { type: 'none' },
+      models: { worker: 'foo/bar' },
+    });
+    expect(() => loadConfig(configPath)).toThrow(/Unknown model provider prefix/);
+  });
+
+  it('accepts a bare model name and a known provider prefix (#224)', () => {
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: 'app',
+      auth: { type: 'none' },
+      models: { planner: 'claude-sonnet-4-6', worker: 'openai/gpt-4.1' },
+    });
+    const loaded = loadConfig(configPath);
+    expect(loaded.models.worker).toBe('openai/gpt-4.1');
+  });
+
+  it('accepts an api worker model and agent mode (#223)', () => {
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: 'app',
+      auth: { type: 'none' },
+      models: {
+        worker: 'anthropic/claude-haiku-4-5',
+        workers: { api: 'openai/gpt-4.1' },
+        agentModes: { api: 'dom' },
+      },
+    });
+    const loaded = loadConfig(configPath);
+    expect(loaded.models.workers?.api).toBe('openai/gpt-4.1');
+    expect(loaded.models.agentModes?.api).toBe('dom');
+  });
+
+  it('reports all missing environment variables at once (#249)', () => {
+    delete process.env.MISSING_ONE;
+    delete process.env.MISSING_TWO;
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: '${MISSING_ONE} and ${MISSING_TWO}',
+      auth: { type: 'none' },
+    });
+    expect(() => loadConfig(configPath)).toThrow(
+      /MISSING_ONE.*MISSING_TWO|MISSING_TWO.*MISSING_ONE/
+    );
+  });
+
+  it('supports a $${VAR} escape for a literal token (#249)', () => {
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: 'literal $${HOME} stays',
+      auth: { type: 'none' },
+    });
+    const loaded = loadConfig(configPath);
+    expect(loaded.appDescription).toBe('literal ${HOME} stays');
+  });
+});

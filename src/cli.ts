@@ -938,6 +938,14 @@ async function runRunCommand(
 ): Promise<number> {
   let config: LoadedDramaturgeConfig;
 
+  if (parsedArgs.url && parsedArgs.configPath) {
+    throw new Error(
+      'Cannot combine a positional/`--url` target with `--config`. ' +
+        'Use either inline mode (a target URL) or file mode (`--config <path>`), not both. ' +
+        'To override the target URL from a config file, edit `targetUrl` in the config.'
+    );
+  }
+
   if (parsedArgs.url && !parsedArgs.configPath) {
     // Inline mode: build config from CLI args
     const inlineArgs: InlineRunArgs = {

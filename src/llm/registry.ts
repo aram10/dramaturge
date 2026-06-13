@@ -76,6 +76,46 @@ function detectPrefix(model: string): ProviderId {
 }
 
 /**
+ * Whether `model` carries an explicit, recognised provider prefix
+ * (e.g. `openai/gpt-4.1`). Bare model strings without a slash return false
+ * because they implicitly resolve to the default (Anthropic) provider.
+ */
+function hasKnownPrefix(model: string): boolean {
+  const lower = model.toLowerCase();
+  for (const key of PROVIDERS.keys()) {
+    if (lower.startsWith(`${key}/`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Validate a configured model string (#224).
+ *
+ * A model string is valid when it is either:
+ *   - bare (no `/`), resolving to the default Anthropic provider, or
+ *   - prefixed with a recognised provider id (`openai/…`, `openrouter/…`, …).
+ *
+ * A model that contains a `/` whose first segment is **not** a known provider
+ * id (e.g. `gpt-4o/turbo`, `foo/bar`) is almost always a typo or an
+ * unsupported provider; silently falling back to Anthropic would send the bad
+ * name upstream and fail confusingly. Returns the offending prefix when the
+ * string is invalid, or `undefined` when it is acceptable.
+ */
+export function unknownModelPrefix(model: string): string | undefined {
+  const trimmed = model.trim();
+  if (!trimmed.includes('/')) return undefined;
+  if (hasKnownPrefix(trimmed)) return undefined;
+  return trimmed.slice(0, trimmed.indexOf('/'));
+}
+
+/**
+ * The set of recognised provider ids, for diagnostics and error messages.
+ */
+export function knownProviderIds(): ProviderId[] {
+  return [...PROVIDERS.keys()];
+}
+
+/**
  * Check whether **any** provider has its required API key(s) configured,
  * or — if a specific model is given — whether that model's provider is ready.
  */
