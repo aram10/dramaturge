@@ -387,6 +387,23 @@ const AutoCaptureSchema = z
     networkErrorMinStatus: 400,
   });
 
+const AutoValidateSchema = z
+  .object({
+    /** Replay high-impact findings to validate them before reporting (#137). */
+    enabled: z.boolean().default(false),
+    /** Severities considered high-impact and validated. */
+    severities: z
+      .array(z.enum(['Critical', 'Major', 'Minor', 'Trivial']))
+      .default(['Critical', 'Major']),
+    /** Maximum number of findings to validate per run (bounds cost). */
+    maxFindings: z.number().int().min(1).max(100).default(10),
+  })
+  .default({
+    enabled: false,
+    severities: ['Critical', 'Major'],
+    maxFindings: 10,
+  });
+
 const BrowserSchema = z
   .object({
     headless: z.boolean().default(false),
@@ -702,6 +719,7 @@ export const ConfigSchema = z
     adversarial: AdversarialSchema,
     judge: JudgeSchema,
     autoCapture: AutoCaptureSchema,
+    autoValidate: AutoValidateSchema,
     browser: BrowserSchema,
     llm: LlmSchema,
     concurrency: ConcurrencySchema,

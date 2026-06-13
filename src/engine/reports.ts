@@ -12,6 +12,8 @@ import { renderJunit } from '../report/junit.js';
 import { renderSarif } from '../report/sarif.js';
 import { writeGeneratedPlaywrightTests } from '../report/test-gen.js';
 import { writeFindingReplayManifests } from '../repro/manifest.js';
+import { validateHighImpactFindings } from '../repro/auto-validate.js';
+import { createLiveReplayAdapter } from '../repro/live-replay.js';
 import { resolveOutputFormats } from '../config.js';
 import { hasLLMApiKey } from '../llm.js';
 import type { DiffSummary } from '../types.js';
@@ -53,12 +55,12 @@ export function buildAreaResults(ctx: EngineContext): AreaResult[] {
   return results;
 }
 
-export function writeReports(
+export async function writeReports(
   ctx: EngineContext,
   startTime: Date,
   areaResults: AreaResult[],
   remaining: FrontierItem[]
-): void {
+): Promise<void> {
   const config = ctx.config;
   const blindSpots = ctx.globalCoverage.getBlindSpots();
   const stateGraphMermaid = ctx.graph.nodeCount() > 0 ? ctx.graph.toMermaid() : undefined;
@@ -120,6 +122,7 @@ export function writeReports(
       workflowComparison: ctx.workflowAutomata?.comparison,
     }
   );
+  await autoValidateHighImpactFindings(ctx, runResult);
   const generatedTests = writeGeneratedPlaywrightTests(ctx.outputDir, runResult);
   const replayManifestPaths = writeFindingReplayManifests(ctx.outputDir, runResult, {
     authProfile: ctx.activeAuthProfile,
@@ -149,6 +152,40 @@ export function writeReports(
       count: replayManifestPaths.length,
       path: join(ctx.outputDir, 'findings'),
     });
+  }
+}
+
+async function autoValidateHighImpactFindings(
+  ctx: EngineContext,
+  runResult: RunResult
+): Promise<void> {
+  const config = ctx.config.autoValidate;
+  if (!config?.enabled) {
+    return;
+  }
+  try {
+    const adapter = createLiveReplayAdapter({
+      config: ctx.config,
+      ...(ctx.activeAuthProfile ? { profile: ctx.activeAuthProfile } : {}),
+    });
+    const summary = await validateHighImpactFindings(runResult, {
+      adapter,
+      severities: config.severities,
+      maxFindings: config.maxFindings,
+      ...(ctx.activeAuthProfile ? { authProfile: ctx.activeAuthProfile } : {}),
+    });
+    if (summary.validated > 0) {
+      ctx.logger?.info('Auto-validated high-impact findings', {
+        validated: summary.validated,
+        confirmed: summary.confirmed,
+        unconfirmed: summary.unconfirmed,
+        flaky: summary.flaky,
+        unavailable: summary.unavailable,
+      });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    ctx.logger?.warn('Auto-validation of high-impact findings failed', { message });
   }
 }
 

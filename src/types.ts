@@ -226,6 +226,11 @@ export interface RunResult {
   workflowAutomaton?: WorkflowAutomaton;
   /** Comparison summary against prior role/run workflow automata. */
   workflowComparison?: WorkflowAutomatonComparison;
+  /**
+   * Replay-validation results for high-impact findings, keyed by finding
+   * signature (#137). Present when auto-validation is enabled.
+   */
+  replayValidations?: Record<string, ReplayValidation>;
 }
 
 export type ConfirmationVerdict =
@@ -234,6 +239,28 @@ export type ConfirmationVerdict =
   | 'cannot_confirm'
   | 'changed_surface'
   | 'new_related_issue';
+
+/**
+ * Outcome of auto-validating a high-impact finding by replaying its minimal
+ * action trace in a fresh browser context before reporting (#137).
+ *
+ *   - `confirmed`   — the finding still reproduces.
+ *   - `unconfirmed` — replay completed but the issue could not be reproduced.
+ *   - `flaky`       — behavior changed or a different issue surfaced on replay.
+ *   - `unavailable` — replay could not be constructed or run (no trace,
+ *                     blocked step, or adapter error). Never silently dropped.
+ */
+export type ReplayValidationStatus = 'confirmed' | 'unconfirmed' | 'flaky' | 'unavailable';
+
+export interface ReplayValidation {
+  status: ReplayValidationStatus;
+  verdict: ConfirmationVerdict;
+  confidence: FindingConfidence;
+  actionsCompleted: number;
+  actionsRequested: number;
+  durationMs: number;
+  detail?: string;
+}
 
 export interface ConfirmationResult {
   findingId: string;

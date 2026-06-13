@@ -373,7 +373,7 @@ export async function runEngine(
       startMs: Date.now(),
     });
 
-    finalizeRun(ctx, {
+    await finalizeRun(ctx, {
       startTime,
       tasksExecuted: loopResult.tasksExecuted,
       warmStartApplied: warmStartState.warmStartApplied,
