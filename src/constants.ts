@@ -92,6 +92,13 @@ export const DEFAULT_REDACT_TRUNCATE_LENGTH = 320;
 /** Shorter truncation length for specific redacted fields. */
 export const SHORT_REDACT_TRUNCATE_LENGTH = 160;
 
+/**
+ * Maximum response/request body size (in characters) that will be JSON-parsed
+ * when observing API traffic. Beyond this the raw text is truncated instead, so
+ * a hostile server cannot force an unbounded JSON.parse (#233).
+ */
+export const MAX_BODY_PARSE_LENGTH = 100_000;
+
 /** Default LLM request timeout in milliseconds. */
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
 

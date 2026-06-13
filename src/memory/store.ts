@@ -83,11 +83,6 @@ function cloneObservedApiSample(sample: ObservedApiRequestSample): ObservedApiRe
 
 function cloneObservedEndpoint(endpoint: ObservedApiEndpoint): ObservedApiEndpoint {
   const samples = endpoint.samples?.map((sample) => cloneObservedApiSample(sample)) ?? [];
-  const responses =
-    endpoint.responses?.map((response) => ({
-      status: response.status,
-      ...(response.body !== undefined ? { body: response.body } : {}),
-    })) ?? [];
 
   return {
     route: endpoint.route,
@@ -95,7 +90,6 @@ function cloneObservedEndpoint(endpoint: ObservedApiEndpoint): ObservedApiEndpoi
     statuses: [...endpoint.statuses],
     failures: [...endpoint.failures],
     ...(samples.length > 0 ? { samples } : {}),
-    ...(responses.length > 0 ? { responses } : {}),
   };
 }
 
@@ -118,27 +112,6 @@ function uniqueObservedSamples(samples: ObservedApiRequestSample[]): ObservedApi
     }
     seen.add(signature);
     results.push(cloneObservedApiSample(sample));
-  }
-
-  return results;
-}
-
-function uniqueObservedResponses(
-  responses: NonNullable<ObservedApiEndpoint['responses']>
-): NonNullable<ObservedApiEndpoint['responses']> {
-  const seen = new Set<string>();
-  const results: NonNullable<ObservedApiEndpoint['responses']> = [];
-
-  for (const response of responses) {
-    const signature = JSON.stringify([response.status, response.body ?? null]);
-    if (seen.has(signature)) {
-      continue;
-    }
-    seen.add(signature);
-    results.push({
-      status: response.status,
-      ...(response.body !== undefined ? { body: response.body } : {}),
-    });
   }
 
   return results;
@@ -356,15 +329,6 @@ export class MemoryStore {
         } else {
           delete existing.samples;
         }
-        const mergedResponses = uniqueObservedResponses([
-          ...(existing.responses ?? []),
-          ...(endpoint.responses ?? []),
-        ]);
-        if (mergedResponses.length > 0) {
-          existing.responses = mergedResponses;
-        } else {
-          delete existing.responses;
-        }
         existing.lastSeenAt = runAt;
         existing.runCount += 1;
         continue;
@@ -376,7 +340,6 @@ export class MemoryStore {
         statuses: uniqueNumbers(endpoint.statuses),
         failures: uniqueSortedStrings(endpoint.failures),
         ...(endpoint.samples ? { samples: uniqueObservedSamples(endpoint.samples) } : {}),
-        ...(endpoint.responses ? { responses: uniqueObservedResponses(endpoint.responses) } : {}),
         firstSeenAt: runAt,
         lastSeenAt: runAt,
         runCount: 1,
@@ -554,14 +517,6 @@ export class MemoryStore {
       ...(record.samples
         ? {
             samples: record.samples.map((sample) => cloneObservedApiSample(sample)),
-          }
-        : {}),
-      ...(record.responses
-        ? {
-            responses: record.responses.map((response) => ({
-              status: response.status,
-              ...(response.body !== undefined ? { body: response.body } : {}),
-            })),
           }
         : {}),
     }));

@@ -63,10 +63,12 @@ describe('buildApiContractArtifacts', () => {
           methods: ['POST'],
           statuses: [201],
           failures: [],
-          responses: [
+          samples: [
             {
+              method: 'POST',
               status: 201,
-              body: { ok: true },
+              url: 'https://example.com/api/widgets',
+              responseBody: { ok: true },
             },
           ],
         },

@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { ApiReplayRequest, ApiReplayResponse, ApiRequestContextLike } from './types.js';
+import { MAX_BODY_PARSE_LENGTH } from '../constants.js';
 
 async function resolveHeaders(
   response: Awaited<ReturnType<ApiRequestContextLike['fetch']>>
@@ -18,6 +19,12 @@ function normalizeHeaders(headers: Record<string, string>): Record<string, strin
 function parseResponseBody(contentType: string | undefined, text: string): unknown {
   if (!text) {
     return undefined;
+  }
+
+  // Cap before parsing so an oversize/hostile response can't force an unbounded
+  // JSON.parse (#233).
+  if (text.length > MAX_BODY_PARSE_LENGTH) {
+    return text.slice(0, MAX_BODY_PARSE_LENGTH);
   }
 
   if (contentType?.includes('json')) {

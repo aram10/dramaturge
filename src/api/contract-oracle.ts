@@ -62,7 +62,7 @@ function buildObservedMethodSlices(observed: ObservedApiEndpoint): ObservedMetho
     method,
     statuses: observed.statuses,
     failures: observed.failures,
-    responses: observed.responses ?? [],
+    responses: [],
   }));
 }
 

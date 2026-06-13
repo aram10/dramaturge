@@ -81,6 +81,26 @@ describe('buildDiffContextFromFiles', () => {
     expect(ctx.affectedRouteFamilies).toContain('/users');
     expect(ctx.affectedRouteFamilies).not.toContain('/settings');
   });
+
+  it('does not match routes as substrings of file segments (#234)', () => {
+    const files: DiffFileEntry[] = [{ path: 'app/users/page.tsx', status: 'modified' }];
+    const hints = makeRepoHints({ routes: ['/user', '/users'] });
+
+    const ctx = buildDiffContextFromFiles('origin/main', files, hints);
+
+    // '/user' must NOT match the file under app/users/ (substring over-scoping).
+    expect(ctx.affectedRoutes).toContain('/users');
+    expect(ctx.affectedRoutes).not.toContain('/user');
+  });
+
+  it('does not match a purely-parameter route against every file (#234)', () => {
+    const files: DiffFileEntry[] = [{ path: 'src/pages/dashboard/index.tsx', status: 'modified' }];
+    const hints = makeRepoHints({ routes: ['/:id'] });
+
+    const ctx = buildDiffContextFromFiles('origin/main', files, hints);
+
+    expect(ctx.affectedRoutes).toEqual([]);
+  });
 });
 
 describe('isNodeAffectedByDiff', () => {
