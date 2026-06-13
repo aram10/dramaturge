@@ -60,7 +60,6 @@ describe('executeWorkerTask', () => {
         timeoutMs: 1_000,
         agentMode: 'dom',
         screenshotsEnabled: false,
-        stagnationThreshold: 0,
         mission: {
           appDescription: 'Example app',
           destructiveActionsAllowed: false,
@@ -132,7 +131,6 @@ describe('executeWorkerTask', () => {
         screenshotDir: 'C:/tmp/screenshots',
         agentMode: 'dom',
         screenshotsEnabled: false,
-        stagnationThreshold: 0,
         mission: {
           appDescription: 'Example app',
           destructiveActionsAllowed: false,
@@ -189,7 +187,6 @@ describe('executeWorkerTask', () => {
         screenshotDir: 'C:/tmp/screenshots',
         agentMode: 'dom',
         screenshotsEnabled: false,
-        stagnationThreshold: 0,
         mission: {
           appDescription: 'Example app',
           destructiveActionsAllowed: false,

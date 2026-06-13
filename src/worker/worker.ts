@@ -6,8 +6,6 @@ import type { AdversarialConfig, JudgeConfig } from '../config.js';
 import { createWorkerTools } from './tools.js';
 import { buildWorkerSystemPrompt } from './prompts.js';
 import type {
-  Area,
-  AreaResult,
   Evidence,
   PageType,
   WorkerTask,
@@ -18,9 +16,6 @@ import type {
   AgentRole,
 } from '../types.js';
 import { CoverageTracker } from '../coverage/tracker.js';
-import { StagnationTracker } from './stagnation.js';
-import { captureFingerprint } from '../graph/fingerprint.js';
-import { classifyPage } from '../planner/page-classifier.js';
 import type { RepoHints } from '../adaptation/types.js';
 import { ActionRecorder } from './action-recorder.js';
 import type { WorkerHistoryContext } from '../memory/types.js';
@@ -60,7 +55,6 @@ function initWorker(
     agentMode: 'cua' | 'dom';
     model: string;
     screenshotsEnabled: boolean;
-    stagnationThreshold: number;
     appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
     repoHints?: RepoHints;
     contractSummary?: string[];
@@ -103,9 +97,6 @@ function initWorker(
   });
   actionRecorder.start();
 
-  const stagnationTracker =
-    opts.stagnationThreshold > 0 ? new StagnationTracker(opts.stagnationThreshold) : undefined;
-
   const tools = createWorkerTools({
     observations,
     screenshots,
@@ -117,7 +108,6 @@ function initWorker(
     followupRequests,
     discoveredEdges,
     screenshotsEnabled: opts.screenshotsEnabled,
-    stagnationTracker,
     findingContext: {
       stateId: opts.stateId,
       objective: opts.objectiveDescription
@@ -310,169 +300,12 @@ async function runStagehandExecute(input: {
   return outcome;
 }
 
-export interface ExploreAreaOptions {
-  appDescription: string;
-  model: string;
-  stepsPerArea: number;
-  screenshotDir: string;
-  agentMode?: 'cua' | 'dom';
-  screenshotsEnabled?: boolean;
-  stagnationThreshold?: number;
-  appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
-  repoHints?: RepoHints;
-  contractSummary?: string[];
-  observedApiEndpoints?: ObservedApiEndpoint[];
-  mission?: MissionConfig;
-  history?: WorkerHistoryContext;
-  judgeConfig?: JudgeConfig;
-  safetyGuard?: SafetyGuardLike;
-}
-
-export async function exploreArea(
-  stagehand: Stagehand,
-  area: Area,
-  opts: ExploreAreaOptions
-): Promise<AreaResult> {
-  const {
-    appDescription,
-    model,
-    stepsPerArea,
-    screenshotDir,
-    agentMode = 'cua',
-    screenshotsEnabled = true,
-    stagnationThreshold = 0,
-    appContext,
-    repoHints,
-    contractSummary,
-    observedApiEndpoints,
-    mission,
-    history,
-    judgeConfig,
-    safetyGuard,
-  } = opts;
-  // Classify the page and capture fingerprint before starting the worker
-  const page = stagehand.context.pages()[0];
-  let pageType: PageType = 'unknown';
-  let fingerprint;
-  try {
-    [pageType, fingerprint] = await Promise.all([classifyPage(page), captureFingerprint(page)]);
-  } catch {
-    // Page classification or fingerprinting failed; continue with defaults
-  }
-
-  const { observations, screenshots, evidence, coverageTracker, actionRecorder, agent } =
-    initWorker(stagehand, {
-      screenshotDir,
-      areaName: area.name,
-      appDescription,
-      objectiveLabel: area.name,
-      objectiveDescription: area.description,
-      pageType,
-      agentMode,
-      model,
-      screenshotsEnabled,
-      stagnationThreshold,
-      appContext,
-      repoHints,
-      contractSummary,
-      observedApiEndpoints,
-      mission,
-      history,
-      judgeConfig,
-      safetyGuard,
-    });
-
-  try {
-    const result = await agent.execute({
-      instruction: `Explore the "${area.name}" area of this application. Interact with all visible elements, test forms, check edge cases, and report any issues you find using the log_finding tool. Take screenshots before logging findings and include the evidenceId. Use mark_control_exercised after each interaction to track coverage.`,
-      maxSteps: stepsPerArea,
-    });
-
-    const stepCount =
-      'actions' in result && Array.isArray(result.actions) ? result.actions.length : 0;
-
-    const findings = await materializeObservedFindings({
-      observations,
-      evidence,
-      actionRecorder,
-      judgeConfig,
-      judgeModel: model,
-    });
-    const stagehandActions = await safeStagehandActions(result);
-    const explorationLedger = mergeLedgerEntries({
-      actionRecorderActions: actionRecorder.getActions(),
-      stagehandActions,
-      evidence,
-      findings,
-      observedApiEndpoints,
-      context: { areaName: area.name },
-    });
-
-    return {
-      name: area.name,
-      url: area.url,
-      steps: stepCount,
-      findings,
-      replayableActions: actionRecorder.getActions(),
-      screenshots,
-      evidence,
-      coverage: coverageTracker.snapshot(),
-      pageType,
-      fingerprint,
-      explorationLedger,
-      status: 'explored' as const,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    let findings: Awaited<ReturnType<typeof materializeObservedFindings>> = [];
-    try {
-      findings = await materializeObservedFindings({
-        observations,
-        evidence,
-        actionRecorder,
-        judgeConfig,
-        judgeModel: model,
-      });
-    } catch {
-      // Judge failed to materialize findings; return empty findings array
-    }
-
-    const explorationLedger = mergeLedgerEntries({
-      actionRecorderActions: actionRecorder.getActions(),
-      evidence,
-      findings,
-      observedApiEndpoints,
-      context: { areaName: area.name },
-    });
-
-    return {
-      name: area.name,
-      url: area.url,
-      steps: 0,
-      findings,
-      replayableActions: actionRecorder.getActions(),
-      screenshots,
-      evidence,
-      coverage: coverageTracker.snapshot(),
-      pageType,
-      fingerprint,
-      explorationLedger,
-      status: 'failed',
-      failureReason: message,
-    };
-  } finally {
-    actionRecorder.stop();
-  }
-}
-
 export interface ExecuteWorkerTaskOptions {
   model: string;
   screenshotDir: string;
   timeoutMs?: number;
   agentMode?: 'cua' | 'dom';
   screenshotsEnabled?: boolean;
-  stagnationThreshold?: number;
   appContext?: { knownPatterns?: string[]; ignoredBehaviors?: string[]; notBugs?: string[] };
   repoHints?: RepoHints;
   contractSummary?: string[];
@@ -503,7 +336,6 @@ export async function executeWorkerTask(
     timeoutMs,
     agentMode = 'cua',
     screenshotsEnabled = true,
-    stagnationThreshold = 0,
     appContext,
     repoHints,
     contractSummary,
@@ -533,7 +365,6 @@ export async function executeWorkerTask(
     agentMode,
     model,
     screenshotsEnabled,
-    stagnationThreshold,
     appContext,
     repoHints,
     contractSummary,

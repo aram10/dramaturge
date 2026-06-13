@@ -108,6 +108,7 @@ describe('runPlannerLoop', () => {
       },
       graph: {
         nodeCount: () => 0,
+        getAllNodes: () => [],
       },
       logger: {
         info: vi.fn(),

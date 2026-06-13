@@ -329,16 +329,12 @@ export async function runPlannerLoop(
       });
     }
 
-    try {
-      const rootNode = findRootNode(ctx);
-      if (rootNode) {
-        assignPageNodeOwner(ctx, 'primary', rootNode.id);
-      }
-      await ctx.page.goto(ctx.config.targetUrl);
-    } catch {
-      ctx.logger?.warn('Failed to navigate back to root URL', {
-        targetUrl: ctx.config.targetUrl,
-      });
+    // Reassign the primary page's error owner to root between batches so pending
+    // browser errors flush. The per-task navigateTo handles repositioning, so we
+    // no longer eagerly navigate the primary page back to root here (#242).
+    const rootNode = findRootNode(ctx);
+    if (rootNode) {
+      assignPageNodeOwner(ctx, 'primary', rootNode.id);
     }
   }
 

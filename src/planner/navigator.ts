@@ -34,9 +34,16 @@ export class Navigator {
   ): Promise<NavigationResult> {
     const node = graph.getNode(nodeId);
 
-    // Fast path: direct URL
+    // Fast path: direct URL. Wrap goto so transient timeouts/net errors flow
+    // through the same { success: false } path as fingerprint mismatches,
+    // letting the retry/blind-spot machinery handle them uniformly (#198).
     if (node.url) {
-      await page.goto(this.resolveUrl(node.url, rootUrl));
+      try {
+        await page.goto(this.resolveUrl(node.url, rootUrl));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { success: false, reason: `Navigation failed: ${message}` };
+      }
       await waitForPageStable(page);
       return this.verifyArrival(node, page);
     }
@@ -51,7 +58,12 @@ export class Navigator {
     }
 
     // Start from the root URL
-    await page.goto(rootUrl);
+    try {
+      await page.goto(rootUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, reason: `Navigation to root failed: ${message}` };
+    }
     await waitForPageStable(page);
 
     for (const edge of path) {
@@ -103,12 +115,21 @@ export class Navigator {
       if (signaturesEqual(currentFp.signature, node.fingerprint.signature)) {
         return { success: true };
       }
-      // Soft match only when both pages are path-only states. This keeps
+      // Soft match when both pages are path-only states. This keeps
       // dynamic pages tolerant without collapsing meaningful query/UI states.
       if (
         currentFp.normalizedPath === node.fingerprint.normalizedPath &&
         hasPathOnlyStateSignature(currentFp.signature) &&
         hasPathOnlyStateSignature(node.fingerprint.signature)
+      ) {
+        return { success: true };
+      }
+      // Relaxed match: same path and identical active UI markers. Dynamic content
+      // (rotating titles/counters) or volatile query params shouldn't fail an
+      // otherwise-correct arrival (#219).
+      if (
+        currentFp.normalizedPath === node.fingerprint.normalizedPath &&
+        uiMarkersEqual(currentFp.signature.uiMarkers, node.fingerprint.signature.uiMarkers)
       ) {
         return { success: true };
       }
@@ -146,4 +167,10 @@ export class Navigator {
   private resolveUrl(url: string, rootUrl: string): string {
     return new URL(url, rootUrl).href;
   }
+}
+
+/** True when two normalized UI-marker lists are identical (same members, same order). */
+function uiMarkersEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((marker, index) => marker === b[index]);
 }

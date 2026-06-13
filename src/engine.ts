@@ -289,6 +289,7 @@ export async function runEngine(
     errorCollector,
     pageNodeOwners: new Map(),
     completedTaskIds: new Set(),
+    followupTracking: new Map(),
     workerPool,
     repoHints,
     contractIndex,

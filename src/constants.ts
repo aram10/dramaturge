@@ -35,6 +35,12 @@ export const LLM_RETRY_MAX_DELAY_MS = 8000;
 /** Priority decay factor applied when requeuing a failed/blocked frontier item. */
 export const REQUEUE_PRIORITY_DECAY = 0.8;
 
+/**
+ * Max follow-up tasks a single node may spawn across the run. Caps self-sustaining
+ * follow-up loops that would otherwise starve genuinely new exploration (#221).
+ */
+export const MAX_FOLLOWUPS_PER_NODE = 8;
+
 /** Delay (ms) after a non-URL navigation action to let the page settle. */
 export const NAV_SETTLE_DELAY_MS = 500;
 

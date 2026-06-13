@@ -124,6 +124,36 @@ describe('captureFingerprint', () => {
     expect(fingerprint.heading).toBe('');
     expect(fingerprint.dialogTitles).toEqual([]);
   });
+
+  it('ignores volatile numeric counters in the title/heading when hashing (#219)', async () => {
+    const withCount = await captureFingerprint(
+      createMockPage({
+        url: 'https://example.com/inbox',
+        title: 'Inbox (3)',
+        heading: 'You have 3 messages',
+      }) as any
+    );
+    const withDifferentCount = await captureFingerprint(
+      createMockPage({
+        url: 'https://example.com/inbox',
+        title: 'Inbox (47)',
+        heading: 'You have 47 messages',
+      }) as any
+    );
+
+    expect(withCount.hash).toBe(withDifferentCount.hash);
+  });
+
+  it('still distinguishes pages whose non-numeric title differs (#219)', async () => {
+    const inbox = await captureFingerprint(
+      createMockPage({ url: 'https://example.com/x', title: 'Inbox (3)' }) as any
+    );
+    const archive = await captureFingerprint(
+      createMockPage({ url: 'https://example.com/x', title: 'Archive (3)' }) as any
+    );
+
+    expect(inbox.hash).not.toBe(archive.hash);
+  });
 });
 
 function makeFingerprint(overrides: Partial<PageFingerprint> = {}): PageFingerprint {

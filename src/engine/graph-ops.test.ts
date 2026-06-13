@@ -3,7 +3,12 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { StateGraph } from '../graph/state-graph.js';
-import { assignPageNodeOwner, expandGraph, flushOwnedBrowserErrors } from './graph-ops.js';
+import {
+  assignPageNodeOwner,
+  expandGraph,
+  flushOwnedBrowserErrors,
+  routeFollowups,
+} from './graph-ops.js';
 
 vi.mock('../graph/fingerprint.js', () => ({
   captureFingerprint: vi.fn().mockResolvedValue({
@@ -354,5 +359,57 @@ describe('expandGraph restrictToChanged', () => {
 
     // Should still add the node because scope is empty → no restriction
     expect(graph.nodeCount()).toBe(2);
+  });
+});
+
+describe('routeFollowups (#221)', () => {
+  function makeFollowupCtx() {
+    const enqueue = vi.fn();
+    return {
+      ctx: {
+        followupTracking: new Map(),
+        frontier: { enqueue },
+        planner: { routeFollowup: (f: any, nodeId: string) => ({ ...f, nodeId }) },
+        logger: { info: vi.fn() },
+      } as any,
+      enqueue,
+    };
+  }
+
+  function makeResult(followups: Array<{ type: string; reason: string }>) {
+    return { followupRequests: followups } as any;
+  }
+
+  it('caps follow-ups per node at MAX_FOLLOWUPS_PER_NODE', () => {
+    const { ctx, enqueue } = makeFollowupCtx();
+    const followups = Array.from({ length: 20 }, (_, i) => ({
+      type: 'navigation',
+      reason: `unique reason ${i}`,
+    }));
+
+    routeFollowups(ctx, 'node-1', makeResult(followups));
+
+    expect(enqueue).toHaveBeenCalledTimes(8);
+  });
+
+  it('dedupes follow-ups with the same normalized type:reason', () => {
+    const { ctx, enqueue } = makeFollowupCtx();
+    const followups = [
+      { type: 'navigation', reason: 'Retry login' },
+      { type: 'navigation', reason: '  retry login  ' },
+      { type: 'navigation', reason: 'RETRY LOGIN' },
+    ];
+
+    routeFollowups(ctx, 'node-1', makeResult(followups));
+
+    expect(enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('tracks caps independently per source node', () => {
+    const { ctx, enqueue } = makeFollowupCtx();
+    routeFollowups(ctx, 'node-a', makeResult([{ type: 'form', reason: 'a' }]));
+    routeFollowups(ctx, 'node-b', makeResult([{ type: 'form', reason: 'a' }]));
+
+    expect(enqueue).toHaveBeenCalledTimes(2);
   });
 });

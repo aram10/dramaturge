@@ -93,7 +93,6 @@ const SMOKE_BUDGET = {
   maxStepsPerTask: 20,
   maxFrontierSize: 30,
   maxStateNodes: 10,
-  stagnationThreshold: 5,
   costLimitUsd: 0,
 };
 
@@ -108,7 +107,6 @@ const MEDIUM_BUDGET = {
   maxStepsPerTask: 40,
   maxFrontierSize: 100,
   maxStateNodes: 30,
-  stagnationThreshold: 6,
   costLimitUsd: 0,
 };
 
@@ -123,7 +121,6 @@ const THOROUGH_BUDGET = {
   maxStepsPerTask: 60,
   maxFrontierSize: 300,
   maxStateNodes: 80,
-  stagnationThreshold: 8,
   costLimitUsd: 0,
 };
 

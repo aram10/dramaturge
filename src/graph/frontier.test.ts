@@ -80,6 +80,23 @@ describe('FrontierQueue', () => {
       q.enqueue(makeItem({ status: 'in-progress' }));
       expect(q.dequeueHighest()).toBeUndefined();
     });
+
+    it('evicts dequeued items so they do not accumulate (#217)', () => {
+      const q = new FrontierQueue();
+      q.enqueueMany([
+        makeItem({ id: 'a', priority: 0.3 }),
+        makeItem({ id: 'b', priority: 0.6 }),
+        makeItem({ id: 'c', priority: 0.9 }),
+      ]);
+
+      q.dequeueHighest();
+      q.dequeueHighest();
+      q.dequeueHighest();
+
+      // All three were spliced out; nothing lingers as in-progress.
+      expect(q.snapshot()).toHaveLength(0);
+      expect(q.dequeueHighest()).toBeUndefined();
+    });
   });
 
   describe('requeue', () => {

@@ -144,9 +144,7 @@ describe('executeFrontierItem', () => {
             crud: 'dom',
           },
         },
-        budget: {
-          stagnationThreshold: 7,
-        },
+        budget: {},
         output: {
           screenshots: false,
         },
@@ -245,7 +243,6 @@ describe('executeFrontierItem', () => {
         timeoutMs: 12_345,
         agentMode: 'dom',
         screenshotsEnabled: false,
-        stagnationThreshold: 7,
         appContext: {
           knownPatterns: ['401s are expected before login'],
         },
@@ -442,9 +439,7 @@ describe('executeFrontierItem', () => {
           worker: 'anthropic/claude-haiku-4-5',
           agentMode: 'dom',
         },
-        budget: {
-          stagnationThreshold: 3,
-        },
+        budget: {},
         output: {
           screenshots: true,
         },
@@ -559,9 +554,7 @@ describe('executeFrontierItem', () => {
           worker: 'anthropic/claude-haiku-4-5',
           agentMode: 'dom',
         },
-        budget: {
-          stagnationThreshold: 3,
-        },
+        budget: {},
         output: {
           screenshots: true,
         },
@@ -714,9 +707,7 @@ describe('executeFrontierItem', () => {
           worker: 'anthropic/claude-haiku-4-5',
           agentMode: 'cua',
         },
-        budget: {
-          stagnationThreshold: 3,
-        },
+        budget: {},
         output: {
           screenshots: true,
         },

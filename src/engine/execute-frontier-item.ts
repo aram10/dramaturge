@@ -273,7 +273,6 @@ async function runMainWorkerTask(
       timeoutMs: taskTimeoutMs,
       agentMode: resolveAgentMode(ctx.config, item.workerType),
       screenshotsEnabled: ctx.config.output.screenshots,
-      stagnationThreshold: ctx.config.budget.stagnationThreshold ?? 0,
       appContext: ctx.config.appContext,
       repoHints: ctx.repoHints,
       contractSummary: ctx.contractIndex ? summarizeContractIndex(ctx.contractIndex) : undefined,

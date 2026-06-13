@@ -81,7 +81,6 @@ describe('normalizeConfigPaths', () => {
           maxStepsPerTask: 40,
           maxFrontierSize: 200,
           maxStateNodes: 50,
-          stagnationThreshold: 8,
         },
         autoCapture: {
           consoleErrors: true,

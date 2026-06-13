@@ -57,10 +57,24 @@ export async function captureFingerprint(page: StagehandPage): Promise<PageFinge
 
   const signature = buildStateSignature(url, uiMarkers);
   const normalizedPath = signature.pathname;
-  const hashInput = [buildStateSignatureKey(signature), title, heading, ...dialogTitles].join('|');
+  // Strip volatile numeric runs from the title/heading before hashing so dynamic
+  // counters ('Inbox (3)') don't fragment a page into a new node per visit (#219).
+  const stableTitle = stripVolatileCounters(title);
+  const stableHeading = stripVolatileCounters(heading);
+  const hashInput = [
+    buildStateSignatureKey(signature),
+    stableTitle,
+    stableHeading,
+    ...dialogTitles,
+  ].join('|');
   const hash = createHash('sha256').update(hashInput).digest('hex').slice(0, 12);
 
   return { normalizedPath, signature, title, heading, dialogTitles, hash };
+}
+
+/** Replace runs of digits with a placeholder so counters don't destabilize hashes. */
+function stripVolatileCounters(value: string): string {
+  return value.replace(/\d+/g, '#');
 }
 
 export function isDuplicateState(fingerprint: PageFingerprint, visited: Set<string>): boolean {

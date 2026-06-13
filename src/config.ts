@@ -330,13 +330,10 @@ const BudgetSchema = z
     maxStepsPerTask: z.number().int().min(5).default(40),
     maxFrontierSize: z.number().int().min(10).default(200),
     maxStateNodes: z.number().int().min(5).default(50),
-    /** Abort a worker after this many consecutive steps with no findings, controls, or edges (0 = disabled). */
-    stagnationThreshold: z.number().int().min(0).default(8),
     /**
      * Maximum estimated LLM cost in USD before stopping the run (0 = unlimited).
-     * Experimental — the engine does not yet enforce this automatically.
-     * Use `CostTracker` from `src/coverage/cost-tracker.ts` to track spend and
-     * check `overBudget` in a custom integration.
+     * Enforced by the engine: when exceeded, the run stops dequeuing new tasks
+     * and the report is marked partial (reason: cost-budget-exceeded).
      */
     costLimitUsd: z.number().min(0).default(0),
   })
@@ -345,7 +342,6 @@ const BudgetSchema = z
     maxStepsPerTask: 40,
     maxFrontierSize: 200,
     maxStateNodes: 50,
-    stagnationThreshold: 8,
     costLimitUsd: 0,
   });
 
