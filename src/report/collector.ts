@@ -24,20 +24,71 @@ const SEVERITY_ORDER: Record<FindingSeverity, number> = {
   Trivial: 3,
 };
 
+/**
+ * Build a stable signature for grouping/deduplicating findings across runs
+ * (#207). The signature is derived from durable dimensions only:
+ *
+ *   - category
+ *   - normalized route (path only; query/hash and trailing slash stripped)
+ *   - rule id when present (e.g. the axe rule on accessibility findings)
+ *   - text with volatile measured values (pixel counts, millisecond timings,
+ *     percentages, raw numbers) collapsed to a placeholder
+ *
+ * Severity is intentionally excluded, and measured values are normalized, so
+ * the same underlying issue produces the same signature run over run instead
+ * of a fresh one each time (which previously broke dedup, suppression, and the
+ * cross-run finding history).
+ */
 export function buildFindingGroupKey(input: {
   category: string;
-  severity: string;
   title: string;
   expected: string;
   actual: string;
+  route?: string;
+  meta?: { repro?: { route?: string } };
 }): string {
+  const route = normalizeSignatureRoute(input.route ?? input.meta?.repro?.route);
+  const ruleId = extractRuleId(input.expected) ?? extractRuleId(input.actual);
   return JSON.stringify([
     input.category,
-    input.severity,
-    input.title,
-    input.expected,
-    input.actual,
+    route,
+    ruleId ?? stabilizeSignatureText(input.title),
+    stabilizeSignatureText(input.expected),
+    stabilizeSignatureText(input.actual),
   ]);
+}
+
+/** Normalize a route to its path, dropping query/hash and trailing slashes. */
+function normalizeSignatureRoute(route?: string): string {
+  if (!route) return '';
+  let path = route;
+  try {
+    path = new URL(route).pathname;
+  } catch {
+    const queryIndex = path.search(/[?#]/);
+    if (queryIndex >= 0) path = path.slice(0, queryIndex);
+  }
+  path = path.replace(/\/+$/, '');
+  return path.length > 0 ? path.toLowerCase() : '/';
+}
+
+/** Extract an axe/rule identifier embedded in finding text, when present. */
+function extractRuleId(text: string): string | undefined {
+  const match = text.match(/\brule\s+([a-z][a-z0-9-]+)/i);
+  return match ? `rule:${match[1].toLowerCase()}` : undefined;
+}
+
+/**
+ * Collapse volatile measured values so two reports of the same issue with
+ * different measurements share a signature. Numbers (including decimals and
+ * common units) become `#`, and whitespace/case are normalized.
+ */
+function stabilizeSignatureText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\d[\d,.]*\s*(px|pixels|ms|s|%|kb|mb)?/g, '#')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function mergeUniqueStrings(...arrays: Array<string[] | undefined>): string[] {

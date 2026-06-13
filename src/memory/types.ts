@@ -68,6 +68,11 @@ export interface MemorySnapshot {
 
 export interface WorkerHistoryContext {
   suppressedFindings: string[];
+  /**
+   * Titles of active (not suppressed/dismissed) recurring findings on this
+   * route, surfaced so workers can re-check known bugs (#252).
+   */
+  recurringFindings: string[];
   flakyPageNotes: string[];
   navigationHints: string[];
   authHints: string[];
@@ -76,6 +81,7 @@ export interface WorkerHistoryContext {
 
 export interface PlannerMemorySignals {
   hasSuppressedFindings: boolean;
+  hasRecurringFindings: boolean;
   hasFlakyPageNotes: boolean;
   hasNavigationHints: boolean;
   hasApiHints: boolean;

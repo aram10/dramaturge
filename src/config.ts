@@ -324,10 +324,16 @@ const JudgeSchema = z
   .object({
     enabled: z.boolean().default(true),
     requestTimeoutMs: z.number().int().min(100).default(15_000),
+    /** Drop findings the judge rejects instead of shipping them (#206). */
+    dropRejected: z.boolean().default(true),
+    /** Minimum confidence a finding must carry to be reported (#206). */
+    minConfidence: z.enum(['low', 'medium', 'high']).default('low'),
   })
   .default({
     enabled: true,
     requestTimeoutMs: 15_000,
+    dropRejected: true,
+    minConfidence: 'low',
   });
 
 const MissionSchema = z

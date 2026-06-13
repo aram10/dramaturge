@@ -12,6 +12,7 @@ import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/t
 import type {
   FlakyPageInput,
   HistoricalApiEndpointRecord,
+  HistoricalFindingRecord,
   MemoryRouteMatchInput,
   MemorySnapshot,
   NavigationMemorySnapshot,
@@ -21,6 +22,14 @@ import type {
 
 const STORE_FILE = 'memory.json';
 const CURRENT_MEMORY_VERSION = 1 as const;
+
+/**
+ * Upper bound on retained finding-history entries (#207). Without a cap the
+ * history grew by one entry per run forever. When the cap is exceeded the
+ * oldest (least-recently-seen) non-suppressed entries are evicted first;
+ * suppressed/dismissed entries are retained so triage decisions survive.
+ */
+const MAX_FINDING_HISTORY_ENTRIES = 1000;
 
 function createEmptySnapshot(): MemorySnapshot {
   return {
@@ -33,6 +42,29 @@ function createEmptySnapshot(): MemorySnapshot {
     },
     observedApiCatalog: [],
   };
+}
+
+/**
+ * Bound the finding history to {@link MAX_FINDING_HISTORY_ENTRIES} (#207).
+ * Suppressed/dismissed entries are always retained (triage decisions must
+ * survive); among the remaining entries the least-recently-seen are evicted
+ * first.
+ */
+function evictFindingHistory(snapshot: MemorySnapshot): void {
+  const entries = Object.values(snapshot.findingHistory);
+  if (entries.length <= MAX_FINDING_HISTORY_ENTRIES) {
+    return;
+  }
+
+  const retained = entries.filter((entry) => entry.suppressed || entry.dismissedAt);
+  const evictable = entries
+    .filter((entry) => !entry.suppressed && !entry.dismissedAt)
+    .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
+
+  const budget = Math.max(0, MAX_FINDING_HISTORY_ENTRIES - retained.length);
+  const kept = [...retained, ...evictable.slice(0, budget)];
+
+  snapshot.findingHistory = Object.fromEntries(kept.map((entry) => [entry.signature, entry]));
 }
 
 function normalizeRoute(urlOrPath?: string): string | undefined {
@@ -150,7 +182,9 @@ function matchesRoute(
 }
 
 export function buildFindingSignature(
-  finding: Pick<RawFinding, 'category' | 'severity' | 'title' | 'expected' | 'actual'>
+  finding: Pick<RawFinding, 'category' | 'title' | 'expected' | 'actual'> & {
+    meta?: { repro?: { route?: string } };
+  }
 ): string {
   return buildFindingGroupKey(finding);
 }
@@ -228,6 +262,7 @@ export class MemoryStore {
       };
     }
 
+    evictFindingHistory(snapshot);
     this.persist(snapshot);
   }
 
@@ -406,11 +441,19 @@ export class MemoryStore {
 
   getWorkerContext(input: MemoryRouteMatchInput): WorkerHistoryContext {
     const snapshot = this.getSnapshot();
+    const onRoute = (record: HistoricalFindingRecord): boolean =>
+      record.recentRoutes.length === 0 ||
+      record.recentRoutes.some((route) => matchesRoute(input, route));
+
     const matchingFindings = Object.values(snapshot.findingHistory).filter(
+      (record) => (record.suppressed || record.dismissedAt) && onRoute(record)
+    );
+    // Active recurring findings (seen in 2+ runs, not suppressed/dismissed) are
+    // fed back so workers re-check known bugs rather than rediscovering them
+    // from scratch (#252).
+    const recurringFindings = Object.values(snapshot.findingHistory).filter(
       (record) =>
-        (record.suppressed || record.dismissedAt) &&
-        (record.recentRoutes.length === 0 ||
-          record.recentRoutes.some((route) => matchesRoute(input, route)))
+        !record.suppressed && !record.dismissedAt && record.runCount >= 2 && onRoute(record)
     );
     const matchingFlakyPages = snapshot.flakyPages.filter((record) =>
       matchesRoute(input, record.route, record.fingerprintHash)
@@ -420,6 +463,7 @@ export class MemoryStore {
 
     return {
       suppressedFindings: matchingFindings.map((record) => record.title),
+      recurringFindings: recurringFindings.map((record) => record.title),
       flakyPageNotes: matchingFlakyPages.map((record) => record.note),
       navigationHints,
       authHints: [...snapshot.authHints.successfulLoginRoutes],
@@ -431,6 +475,7 @@ export class MemoryStore {
     const workerContext = this.getWorkerContext(input);
     return {
       hasSuppressedFindings: workerContext.suppressedFindings.length > 0,
+      hasRecurringFindings: workerContext.recurringFindings.length > 0,
       hasFlakyPageNotes: workerContext.flakyPageNotes.length > 0,
       hasNavigationHints:
         workerContext.navigationHints.length > 0 || workerContext.authHints.length > 0,

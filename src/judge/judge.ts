@@ -30,6 +30,15 @@ function buildDeterministicDecision(observation: Observation): JudgeDecision {
   };
 }
 
+const CONFIDENCE_RANK = { low: 0, medium: 1, high: 2 } as const;
+
+function meetsConfidenceThreshold(
+  confidence: JudgeDecision['confidence'],
+  minConfidence: 'low' | 'medium' | 'high'
+): boolean {
+  return CONFIDENCE_RANK[confidence ?? 'medium'] >= CONFIDENCE_RANK[minConfidence];
+}
+
 function materializeFinding(
   observation: Observation,
   decision: JudgeDecision,
@@ -64,6 +73,22 @@ function materializeFinding(
   };
 }
 
+function deriveDisposition(
+  decision: JudgeDecision,
+  llmJudged: boolean,
+  graderResult: ReturnType<typeof runDeterministicGraders>
+): NonNullable<JudgeDecision['disposition']> {
+  if (decision.disposition !== undefined) {
+    return decision.disposition;
+  }
+  // The LLM judge is the higher authority: when it ran we honour its decision.
+  // Only the deterministic fast path (no LLM judge available) quarantines an
+  // explicitly disconfirmed, low-confidence observation (#206).
+  return !llmJudged && graderResult.anyRejected && graderResult.combinedConfidence === 'low'
+    ? 'rejected'
+    : 'confirmed';
+}
+
 export async function judgeWorkerObservations(
   input: JudgeWorkerObservationsInput
 ): Promise<RawFinding[]> {
@@ -84,12 +109,14 @@ export async function judgeWorkerObservations(
     const deterministicFullyConfident =
       graderResult.combinedConfidence === 'high' && graderResult.allConfirmed;
 
+    let llmJudged = false;
     if (!deterministicFullyConfident && input.config?.enabled !== false && input.judgeText) {
       try {
         decision = await input.judgeText(
           buildJudgePrompt(observation, traceBundle),
           input.config?.requestTimeoutMs ?? 15_000
         );
+        llmJudged = true;
       } catch {
         decision = {
           ...decision,
@@ -104,6 +131,19 @@ export async function judgeWorkerObservations(
     // Append deterministic grader notes to final decision
     if (graderNotes.length > 0) {
       decision.alternativesConsidered = [...decision.alternativesConsidered, ...graderNotes];
+    }
+
+    // Derive a disposition (#206).
+    decision.disposition = deriveDisposition(decision, llmJudged, graderResult);
+
+    const dropRejected = input.config?.dropRejected !== false;
+    if (decision.disposition === 'rejected' && dropRejected) {
+      continue;
+    }
+
+    const minConfidence = input.config?.minConfidence ?? 'low';
+    if (!meetsConfidenceThreshold(decision.confidence, minConfidence)) {
+      continue;
     }
 
     const finding = materializeFinding(observation, decision, traceBundle);

@@ -47,22 +47,24 @@ describe('collectFindings', () => {
     expect(result.map((f) => f.severity)).toEqual(['Critical', 'Major', 'Minor', 'Trivial']);
   });
 
-  it('groups findings with same title and severity across areas', () => {
+  it('groups findings with the same signature across areas regardless of severity', () => {
+    // Severity is intentionally excluded from the grouping signature (#207) so
+    // the same underlying issue is not split by a volatile severity label.
     const area1 = makeAreaResult('page A', [makeFinding('Major', 'Bug', 'Shared error message')]);
     const area2 = makeAreaResult('page B', [makeFinding('Major', 'Bug', 'Shared error message')]);
     const area3 = makeAreaResult('page C', [
-      makeFinding('Minor', 'Bug', 'Shared error message'), // different severity — kept
+      makeFinding('Minor', 'Bug', 'Shared error message'), // different severity — still grouped
     ]);
 
     const result = collectFindings([area1, area2, area3]);
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(1);
     expect(result[0].severity).toBe('Major');
-    expect(result[1].severity).toBe('Minor');
-    expect(result[0].occurrenceCount).toBe(2);
-    expect(result[0].impactedAreas).toEqual(['page A', 'page B']);
+    expect(result[0].occurrenceCount).toBe(3);
+    expect(result[0].impactedAreas).toEqual(['page A', 'page B', 'page C']);
     expect(result[0].occurrences.map((occurrence) => occurrence.area)).toEqual([
       'page A',
       'page B',
+      'page C',
     ]);
   });
 
