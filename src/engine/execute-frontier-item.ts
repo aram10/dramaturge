@@ -114,6 +114,24 @@ async function runApiWorkerPath(deps: ApiWorkerPathDeps): Promise<WorkerResult> 
   return result;
 }
 
+async function safeScan(
+  ctx: EngineContext,
+  label: string,
+  areaName: string,
+  scan: () => Promise<{ findings: RawFinding[]; evidence: Evidence[] }>
+): Promise<{ findings: RawFinding[]; evidence: Evidence[] }> {
+  try {
+    return await scan();
+  } catch (err) {
+    // A failing preflight scan must never abort the task; log and skip it.
+    ctx.logger?.warn(`${label} failed`, {
+      areaName,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { findings: [], evidence: [] };
+  }
+}
+
 async function runPreflightScans(
   page: StagehandPage,
   ctx: EngineContext,
@@ -126,84 +144,66 @@ async function runPreflightScans(
   const route = node.url ?? ctx.config.targetUrl;
 
   if (hasEvaluate(page)) {
-    try {
-      const accessibility = await runAccessibilityScan(page, areaName, route);
-      preflightFindings.push(...accessibility.findings);
-      preflightEvidence.push(...accessibility.evidence);
-    } catch (err) {
-      ctx.logger?.warn('Accessibility scan failed', {
-        areaName,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const results: Array<{ findings: RawFinding[]; evidence: Evidence[] }> = [];
+
+    results.push(
+      await safeScan(ctx, 'Accessibility scan', areaName, () =>
+        runAccessibilityScan(page, areaName, route)
+      )
+    );
 
     if (ctx.config.visualRegression.enabled) {
-      try {
-        const visualRegression = await runVisualRegressionScan(page, {
-          areaName,
-          route,
-          fingerprintHash: node.fingerprint.hash,
-          baselineDir: ctx.config.visualRegression.baselineDir,
-          outputDir: ctx.outputDir,
-          diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
-          includeAA: ctx.config.visualRegression.includeAA,
-          fullPage: ctx.config.visualRegression.fullPage,
-          maskSelectors: ctx.config.visualRegression.maskSelectors,
-          memoryStore: ctx.memoryStore,
-        });
-        preflightFindings.push(...visualRegression.findings);
-        preflightEvidence.push(...visualRegression.evidence);
-      } catch (err) {
-        ctx.logger?.warn('Visual regression scan failed', {
-          areaName,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      results.push(
+        await safeScan(ctx, 'Visual regression scan', areaName, () =>
+          runVisualRegressionScan(page, {
+            areaName,
+            route,
+            fingerprintHash: node.fingerprint.hash,
+            baselineDir: ctx.config.visualRegression.baselineDir,
+            outputDir: ctx.outputDir,
+            diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
+            includeAA: ctx.config.visualRegression.includeAA,
+            fullPage: ctx.config.visualRegression.fullPage,
+            maskSelectors: ctx.config.visualRegression.maskSelectors,
+            memoryStore: ctx.memoryStore,
+          })
+        )
+      );
     }
 
     if (ctx.config.webVitals.enabled) {
-      try {
-        const vitals = await collectWebVitals(page);
-        const webVitalsResult = evaluateWebVitals(
-          vitals,
-          route,
-          areaName,
-          ctx.config.webVitals.thresholds
-        );
-        preflightFindings.push(...webVitalsResult.findings);
-        preflightEvidence.push(...webVitalsResult.evidence);
-      } catch (err) {
-        ctx.logger?.warn('Web vitals scan failed', {
-          areaName,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      results.push(
+        await safeScan(ctx, 'Web vitals scan', areaName, async () => {
+          const vitals = await collectWebVitals(page);
+          return evaluateWebVitals(vitals, route, areaName, ctx.config.webVitals.thresholds);
+        })
+      );
     }
 
     // Responsive regression requires visual regression infrastructure (baselines, pixel diff)
     if (ctx.config.responsiveRegression.enabled && ctx.config.visualRegression.enabled) {
-      try {
-        const responsive = await runMultiViewportVisualRegression(page, {
-          areaName,
-          route,
-          fingerprintHash: node.fingerprint.hash,
-          baselineDir: ctx.config.visualRegression.baselineDir,
-          outputDir: ctx.outputDir,
-          diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
-          includeAA: ctx.config.visualRegression.includeAA,
-          fullPage: ctx.config.visualRegression.fullPage,
-          maskSelectors: ctx.config.visualRegression.maskSelectors,
-          breakpoints: ctx.config.responsiveRegression.breakpoints,
-          memoryStore: ctx.memoryStore,
-        });
-        preflightFindings.push(...responsive.findings);
-        preflightEvidence.push(...responsive.evidence);
-      } catch (err) {
-        ctx.logger?.warn('Responsive regression scan failed', {
-          areaName,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      results.push(
+        await safeScan(ctx, 'Responsive regression scan', areaName, () =>
+          runMultiViewportVisualRegression(page, {
+            areaName,
+            route,
+            fingerprintHash: node.fingerprint.hash,
+            baselineDir: ctx.config.visualRegression.baselineDir,
+            outputDir: ctx.outputDir,
+            diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
+            includeAA: ctx.config.visualRegression.includeAA,
+            fullPage: ctx.config.visualRegression.fullPage,
+            maskSelectors: ctx.config.visualRegression.maskSelectors,
+            breakpoints: ctx.config.responsiveRegression.breakpoints,
+            memoryStore: ctx.memoryStore,
+          })
+        )
+      );
+    }
+
+    for (const result of results) {
+      preflightFindings.push(...result.findings);
+      preflightEvidence.push(...result.evidence);
     }
   }
 
