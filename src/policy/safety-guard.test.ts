@@ -48,6 +48,53 @@ describe('SafetyGuard', () => {
     });
   });
 
+  describe('origin scoping', () => {
+    it('blocks cross-origin URLs once an allowed origin is seeded', () => {
+      const guard = new SafetyGuard(createDefaultSafetyConfig(true));
+      guard.allowOrigin('https://app.example.com/start');
+
+      expect(guard.checkUrl('https://app.example.com/dashboard')).toBeNull();
+      expect(guard.checkUrl('https://evil.example.net/steal')).not.toBeNull();
+    });
+
+    it('treats a different port or scheme as a separate origin', () => {
+      const guard = new SafetyGuard(createDefaultSafetyConfig(true));
+      guard.allowOrigin('https://app.example.com');
+
+      expect(guard.checkUrl('https://app.example.com:8443/admin')).not.toBeNull();
+      expect(guard.checkUrl('http://app.example.com/admin')).not.toBeNull();
+    });
+
+    it('allows any origin when allowCrossOrigin is enabled', () => {
+      const config: SafetyGuardConfig = {
+        ...createDefaultSafetyConfig(true),
+        allowCrossOrigin: true,
+      };
+      const guard = new SafetyGuard(config);
+      guard.allowOrigin('https://app.example.com');
+
+      expect(guard.checkUrl('https://evil.example.net/steal')).toBeNull();
+    });
+
+    it('permits cross-origin URLs that match an explicit allowed pattern', () => {
+      const config: SafetyGuardConfig = {
+        ...createDefaultSafetyConfig(true),
+        allowedUrlPatterns: ['https://cdn.example.net/**'],
+      };
+      const guard = new SafetyGuard(config);
+      guard.allowOrigin('https://app.example.com');
+
+      expect(guard.checkUrl('https://cdn.example.net/asset.js')).toBeNull();
+    });
+
+    it('ignores non-http origins such as about:blank', () => {
+      const guard = new SafetyGuard(createDefaultSafetyConfig(true));
+      guard.allowOrigin('https://app.example.com');
+
+      expect(guard.checkUrl('about:blank')).toBeNull();
+    });
+  });
+
   describe('checkRequest', () => {
     it('blocks DELETE requests when destructive actions are disabled', () => {
       const guard = new SafetyGuard(createDefaultSafetyConfig(false));

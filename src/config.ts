@@ -513,6 +513,8 @@ const SafetyPolicySchema = z
     enabled: z.boolean().default(true),
     allowedUrlPatterns: z.array(z.string()).default([]),
     blockedUrlPatterns: z.array(z.string()).default([]),
+    allowedOrigins: z.array(z.string()).default([]),
+    allowCrossOrigin: z.boolean().default(false),
     blockDestructiveRequests: z.boolean().optional(),
     destructiveActionKeywords: z
       .array(z.string())
@@ -535,6 +537,8 @@ const SafetyPolicySchema = z
     enabled: true,
     allowedUrlPatterns: [],
     blockedUrlPatterns: [],
+    allowedOrigins: [],
+    allowCrossOrigin: false,
     destructiveActionKeywords: [
       'delete',
       'remove',
@@ -572,6 +576,8 @@ const PolicySchema = z
       enabled: true,
       allowedUrlPatterns: [],
       blockedUrlPatterns: [],
+      allowedOrigins: [],
+      allowCrossOrigin: false,
       destructiveActionKeywords: [
         'delete',
         'remove',

@@ -17,6 +17,15 @@ export interface SafetyGuardConfig {
   allowedUrlPatterns: string[];
   /** URL patterns the agent must never visit or interact with. */
   blockedUrlPatterns: string[];
+  /**
+   * Origins (scheme + host + port) the agent is permitted to reach. When this is
+   * non-empty and `allowCrossOrigin` is false, any URL whose origin is not listed
+   * is blocked unless it matches an explicit `allowedUrlPatterns` entry. This is
+   * auto-seeded from the target URL so exploration cannot wander off-site.
+   */
+  allowedOrigins: string[];
+  /** Disable origin scoping entirely (allow navigation/requests to any origin). */
+  allowCrossOrigin: boolean;
   /** Block destructive HTTP methods (currently DELETE requests). */
   blockDestructiveRequests: boolean;
   /** Patterns in button/link text that indicate destructive actions. */
@@ -29,6 +38,8 @@ export interface SafetyGuardPolicyOptions {
   enabled: boolean;
   allowedUrlPatterns: string[];
   blockedUrlPatterns: string[];
+  allowedOrigins?: string[];
+  allowCrossOrigin?: boolean;
   blockDestructiveRequests?: boolean;
   destructiveActionKeywords: string[];
   maxAuditEntries: number;
@@ -61,6 +72,8 @@ export function createDefaultSafetyConfig(destructiveActionsAllowed: boolean): S
   return {
     allowedUrlPatterns: [],
     blockedUrlPatterns: [],
+    allowedOrigins: [],
+    allowCrossOrigin: false,
     blockDestructiveRequests: !destructiveActionsAllowed,
     destructiveActionKeywords: DEFAULT_DESTRUCTIVE_KEYWORDS,
     maxAuditEntries: DEFAULT_AUDIT_LOG_LIMIT,
@@ -75,6 +88,8 @@ export function createSafetyConfigFromPolicy(
   return {
     allowedUrlPatterns: policy.allowedUrlPatterns,
     blockedUrlPatterns: policy.blockedUrlPatterns,
+    allowedOrigins: policy.allowedOrigins ?? defaults.allowedOrigins,
+    allowCrossOrigin: policy.allowCrossOrigin ?? defaults.allowCrossOrigin,
     blockDestructiveRequests: policy.blockDestructiveRequests ?? defaults.blockDestructiveRequests,
     destructiveActionKeywords:
       policy.destructiveActionKeywords.length > 0
@@ -84,12 +99,32 @@ export function createSafetyConfigFromPolicy(
   };
 }
 
+/** Extract the origin (scheme + host + port) from a URL, or null if unparseable. */
+export function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
 export class SafetyGuard {
   private readonly config: SafetyGuardConfig;
   private readonly auditLog: SafetyAuditEntry[] = [];
 
   constructor(config: SafetyGuardConfig) {
     this.config = config;
+  }
+
+  /**
+   * Add an origin to the allowed set (used to seed the target origin so the agent
+   * is confined to the site under test by default).
+   */
+  allowOrigin(url: string): void {
+    const origin = originOf(url);
+    if (origin && !this.config.allowedOrigins.includes(origin)) {
+      this.config.allowedOrigins.push(origin);
+    }
   }
 
   /**
@@ -108,7 +143,8 @@ export class SafetyGuard {
       }
     }
 
-    // Check allowed patterns (if any are set, only those are allowed)
+    // Check allowed patterns (if any are set, only those are allowed). An explicit
+    // match is an opt-in that also bypasses origin scoping below.
     if (this.config.allowedUrlPatterns.length > 0) {
       const isAllowed = this.config.allowedUrlPatterns.some((pattern) =>
         matchesUrlPattern(url, pathname, pattern)
@@ -118,9 +154,35 @@ export class SafetyGuard {
         this.log(url, 'navigate', reason, true);
         return reason;
       }
+      this.log(url, 'navigate', 'allowed', false);
+      return null;
+    }
+
+    // Origin scoping: confine the agent to the allowed origins (seeded from the
+    // target URL) unless cross-origin access is explicitly permitted.
+    const originReason = this.checkOrigin(url);
+    if (originReason) {
+      this.log(url, 'navigate', originReason, true);
+      return originReason;
     }
 
     this.log(url, 'navigate', 'allowed', false);
+    return null;
+  }
+
+  /** Returns a reason string if the URL's origin is out of scope, else null. */
+  private checkOrigin(url: string): string | null {
+    if (this.config.allowCrossOrigin || this.config.allowedOrigins.length === 0) {
+      return null;
+    }
+    const origin = originOf(url);
+    // Non-HTTP(S) URLs (about:, data:, blank, relative) carry no foreign origin.
+    if (!origin || !/^https?:$/i.test(new URL(url).protocol)) {
+      return null;
+    }
+    if (!this.config.allowedOrigins.includes(origin)) {
+      return `Cross-origin URL not in allowed origins: ${origin}`;
+    }
     return null;
   }
 

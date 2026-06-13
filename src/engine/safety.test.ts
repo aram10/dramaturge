@@ -6,9 +6,11 @@ import type { DramaturgeConfig } from '../config.js';
 import { attachSafetyRequestGuard, createSafetyGuardForConfig } from './safety.js';
 
 function makeConfig(
-  overrides: Partial<DramaturgeConfig['policy']['safety']> = {}
+  overrides: Partial<DramaturgeConfig['policy']['safety']> = {},
+  targetUrl = 'https://example.com'
 ): DramaturgeConfig {
   return {
+    targetUrl,
     policy: {
       expectedResponses: [],
       ignoredConsolePatterns: [],
@@ -16,6 +18,8 @@ function makeConfig(
         enabled: true,
         allowedUrlPatterns: [],
         blockedUrlPatterns: [],
+        allowedOrigins: [],
+        allowCrossOrigin: false,
         destructiveActionKeywords: ['delete'],
         maxAuditEntries: 500,
         ...overrides,
@@ -48,6 +52,13 @@ describe('createSafetyGuardForConfig', () => {
     expect(guard?.checkUrl('https://example.com/app/dashboard')).toBeNull();
     expect(guard?.checkUrl('https://example.com/app/admin/users')).not.toBeNull();
     expect(guard?.checkUrl('https://example.com/marketing')).not.toBeNull();
+  });
+
+  it('seeds the target origin so the agent cannot navigate off-site', () => {
+    const guard = createSafetyGuardForConfig(makeConfig({}, 'https://app.example.com/start'));
+
+    expect(guard?.checkUrl('https://app.example.com/dashboard')).toBeNull();
+    expect(guard?.checkUrl('https://evil.example.net/phish')).not.toBeNull();
   });
 
   it('uses mission destructive-action opt-in when policy does not override request blocking', () => {
@@ -117,6 +128,35 @@ describe('attachSafetyRequestGuard', () => {
 
     expect(routeCalls.abort).toHaveBeenCalledTimes(1);
     expect(routeCalls.continue).toHaveBeenCalledTimes(1);
+  });
+
+  it('gates cross-origin XHR/fetch but allows same-origin and static subresources', async () => {
+    const guard = createSafetyGuardForConfig(makeConfig({}, 'https://example.com'));
+    routeCalls.abort.mockClear();
+    routeCalls.continue.mockClear();
+    let handler: ((route: RouteHarness) => Promise<void>) | undefined;
+    const page = {
+      route: vi.fn((_pattern: string, next: (route: RouteHarness) => Promise<void>) => {
+        handler = next;
+        return Promise.resolve();
+      }),
+    };
+
+    await attachSafetyRequestGuard(page, guard);
+
+    // Cross-origin data request is blocked.
+    await handler?.(
+      makeRoute('GET', { url: 'https://evil.example.net/collect', resourceType: 'fetch' })
+    );
+    // Same-origin XHR is allowed.
+    await handler?.(makeRoute('GET', { url: 'https://example.com/api/data', resourceType: 'xhr' }));
+    // Cross-origin static asset (script) is not origin-gated.
+    await handler?.(
+      makeRoute('GET', { url: 'https://cdn.example.net/app.js', resourceType: 'script' })
+    );
+
+    expect(routeCalls.abort).toHaveBeenCalledTimes(1);
+    expect(routeCalls.continue).toHaveBeenCalledTimes(2);
   });
 });
 

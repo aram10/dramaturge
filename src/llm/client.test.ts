@@ -291,4 +291,71 @@ describe('client', () => {
       expect(body.messages[1].content[0].image_url.url).toContain('data:image/png;base64,');
     });
   });
+
+  describe('transient failure retries', () => {
+    it('retries on HTTP 429 and then succeeds', async () => {
+      process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'rate limited' })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ content: [{ type: 'text', text: 'recovered' }] }),
+        });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      const result = await sendChatCompletion({
+        model: 'anthropic/claude-sonnet-4-6',
+        system: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+        requestTimeoutMs: 5000,
+      });
+
+      expect(result).toBe('recovered');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry on a non-retryable HTTP 401', async () => {
+      process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 401, text: async () => 'unauthorized' });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      await expect(
+        sendChatCompletion({
+          model: 'anthropic/claude-sonnet-4-6',
+          system: 'sys',
+          messages: [{ role: 'user', content: 'Hi' }],
+          maxTokens: 100,
+          requestTimeoutMs: 5000,
+        })
+      ).rejects.toThrow('401');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives up after exhausting retries on persistent 5xx errors', async () => {
+      process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 503, text: async () => 'unavailable' });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      await expect(
+        sendChatCompletion({
+          model: 'anthropic/claude-sonnet-4-6',
+          system: 'sys',
+          messages: [{ role: 'user', content: 'Hi' }],
+          maxTokens: 100,
+          requestTimeoutMs: 5000,
+        })
+      ).rejects.toThrow('503');
+      // Initial attempt plus MAX_LLM_RETRIES (3) retries.
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    });
+  });
 });
