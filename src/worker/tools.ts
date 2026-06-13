@@ -198,6 +198,7 @@ function buildTakeScreenshotTool(ctx: ToolContext) {
       screenshots.set(screenshotId, buffer);
       const filename = `${screenshotId}.png`;
       try {
+        mkdirSync(screenshotDir, { recursive: true });
         writeFileSync(join(screenshotDir, filename), buffer);
       } catch (writeError) {
         const msg = writeError instanceof Error ? writeError.message : String(writeError);
@@ -351,7 +352,9 @@ export function createWorkerTools(opts: CreateWorkerToolsOptions) {
     blackboard,
     agentId,
   } = opts;
-  mkdirSync(screenshotDir, { recursive: true });
+  // The screenshot directory is created lazily in take_screenshot, only when a
+  // screenshot is actually written to disk. Creating it eagerly here would leave
+  // empty directories when screenshots are disabled or never captured.
   const breadcrumbs: string[] = [];
   const rememberBreadcrumb = (value: string) => {
     breadcrumbs.push(value);
