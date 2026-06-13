@@ -68,7 +68,9 @@ function normalizeSignatureRoute(route?: string): string {
     const queryIndex = path.search(/[?#]/);
     if (queryIndex >= 0) path = path.slice(0, queryIndex);
   }
-  path = path.replace(/\/+$/, '');
+  let end = path.length;
+  while (end > 0 && path.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  path = path.slice(0, end);
   return path.length > 0 ? path.toLowerCase() : '/';
 }
 
