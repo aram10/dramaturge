@@ -87,6 +87,26 @@ describe('captureAuthStateViaUserConfirmation', () => {
     expect(mocks.browser.close).toHaveBeenCalled();
   });
 
+  it('restricts the saved state file to owner-only permissions', async () => {
+    if (process.platform === 'win32') {
+      return; // POSIX mode bits are not enforced on Windows
+    }
+    const { writeFileSync, statSync } = await import('node:fs');
+    const outputPath = resolve(testDir, 'state.json');
+    // Make the mocked storageState actually create the file so chmod can apply.
+    mocks.context.storageState.mockImplementationOnce(async ({ path }: { path: string }) => {
+      writeFileSync(path, '{}', { mode: 0o644 });
+    });
+    const io = makeIo();
+
+    await captureAuthStateViaUserConfirmation(
+      { loginUrl: 'https://example.com/login', outputPath },
+      io
+    );
+
+    expect(statSync(outputPath).mode & 0o777).toBe(0o600);
+  });
+
   it('creates the parent directory if it does not exist', async () => {
     const outputPath = resolve(testDir, 'nested', 'deep', 'state.json');
     const io = makeIo();

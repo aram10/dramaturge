@@ -392,6 +392,32 @@ describe('createDramaturgeMcpServer', () => {
     }
   });
 
+  it('rejects a path-traversal runId instead of resolving outside cwd', async () => {
+    const server = createDramaturgeMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+    });
+
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'get_findings',
+        arguments: { runId: '../../etc' },
+      },
+    });
+
+    expect(isRecord(response) && isRecord(response.result)).toBe(true);
+    if (isRecord(response) && isRecord(response.result)) {
+      expect(response.result.isError).toBe(true);
+      const content = response.result.content;
+      const text = Array.isArray(content) && isRecord(content[0]) ? content[0].text : '';
+      // Schema validation rejects the traversal sequence before any path resolution.
+      expect(typeof text === 'string' && text).not.toContain('/etc');
+    }
+  });
+
   it('sources version from package.json in the initialize response', async () => {
     const server = createDramaturgeMcpServer({
       cwd: testDir,

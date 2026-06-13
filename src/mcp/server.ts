@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { request as playwrightRequest } from 'playwright';
 import { z } from 'zod';
 import {
@@ -46,6 +46,20 @@ const REGISTRY_DIR = '.dramaturge';
 const REGISTRY_FILE = 'mcp-runs.json';
 const FOCUS_MODE_ENUM = z.enum(FOCUS_MODES);
 
+// runId is interpolated into filesystem paths, so it must not contain path
+// separators or traversal sequences. Allow a conservative identifier charset.
+const RUN_ID_RE = /^[A-Za-z0-9._-]+$/;
+const RunIdSchema = z
+  .string()
+  .min(1)
+  .regex(RUN_ID_RE, 'runId may only contain letters, numbers, dot, underscore, and hyphen')
+  .refine(
+    (value) => value !== '.' && value !== '..' && !value.includes('/') && !value.includes('\\'),
+    {
+      message: 'runId must not be a path traversal sequence',
+    }
+  );
+
 const RunExplorationArgsSchema = z
   .object({
     targetUrl: z.string().url(),
@@ -53,7 +67,7 @@ const RunExplorationArgsSchema = z
     config: z.record(z.string(), z.unknown()).optional(),
     profile: z.string().min(1).optional(),
     diffRef: z.string().min(1).optional(),
-    runId: z.string().min(1).optional(),
+    runId: RunIdSchema.optional(),
   })
   .strict();
 
@@ -64,13 +78,13 @@ const TestPageArgsSchema = z
     configPath: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     profile: z.string().min(1).optional(),
-    runId: z.string().min(1).optional(),
+    runId: RunIdSchema.optional(),
   })
   .strict();
 
 const ReadRunArgsSchema = z
   .object({
-    runId: z.string().min(1),
+    runId: RunIdSchema,
   })
   .strict();
 
@@ -412,20 +426,18 @@ function buildConfigForExecution(
   if (options.configPath) {
     const loaded = deps.loadConfig(options.configPath);
     const { _meta, ...loadedConfig } = loaded;
-    const merged = mergeRecords(loadedConfig, {
-      targetUrl: options.targetUrl,
-      ...(options.baseOverrides ?? {}),
-      ...(options.configOverrides ?? {}),
-    });
+    const overrideLayer = mergeRecords(
+      mergeRecords({ targetUrl: options.targetUrl }, options.baseOverrides ?? {}),
+      options.configOverrides ?? {}
+    );
+    const merged = mergeRecords(loadedConfig, overrideLayer);
     return normalizeMergedConfig(merged, _meta);
   }
 
   const inline = buildInlineBaseConfig(deps.cwd, options.targetUrl);
   const { _meta, ...inlineConfig } = inline;
-  const merged = mergeRecords(inlineConfig, {
-    ...(options.baseOverrides ?? {}),
-    ...(options.configOverrides ?? {}),
-  });
+  const overrideLayer = mergeRecords(options.baseOverrides ?? {}, options.configOverrides ?? {});
+  const merged = mergeRecords(inlineConfig, overrideLayer);
   return normalizeMergedConfig(merged, _meta);
 }
 
@@ -436,7 +448,12 @@ function resolveStoredRunDir(cwd: string, runId: string): string {
     return registeredDir;
   }
 
-  const absolute = resolve(cwd, runId);
+  const base = resolve(cwd);
+  const absolute = resolve(base, runId);
+  // Defense in depth: even with a validated runId, never resolve outside cwd.
+  if (absolute !== base && !absolute.startsWith(base + sep)) {
+    throw new Error(`Unknown Dramaturge MCP run: ${runId}`);
+  }
   if (existsSync(join(absolute, 'report.json'))) {
     return absolute;
   }
