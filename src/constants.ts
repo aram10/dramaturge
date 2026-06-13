@@ -23,6 +23,15 @@ export const TRUNCATE_MERMAID_LABEL = 60;
 /** Max retry attempts before marking a frontier task unreachable. */
 export const MAX_NAV_RETRIES = 2;
 
+/** Max retry attempts for transient (429 / 5xx / network) LLM request failures. */
+export const MAX_LLM_RETRIES = 3;
+
+/** Base delay (ms) for exponential backoff between retried LLM requests. */
+export const LLM_RETRY_BASE_DELAY_MS = 500;
+
+/** Cap (ms) on the exponential backoff delay between retried LLM requests. */
+export const LLM_RETRY_MAX_DELAY_MS = 8000;
+
 /** Priority decay factor applied when requeuing a failed/blocked frontier item. */
 export const REQUEUE_PRIORITY_DECAY = 0.8;
 

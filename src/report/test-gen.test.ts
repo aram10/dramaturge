@@ -424,4 +424,67 @@ describe('generatePlaywrightTests', () => {
     );
     expect(generated[0]?.content).not.toContain('await page.locator(');
   });
+
+  it('sanitizes newline injection in action summaries used as comments', () => {
+    const generated = generatePlaywrightTests(
+      makeResult({
+        areaResults: [
+          {
+            name: 'Injected',
+            url: 'https://example.com/injected',
+            steps: 1,
+            findings: [
+              {
+                ref: 'fid-inject',
+                category: 'Bug',
+                severity: 'Major',
+                title: 'Injection attempt',
+                stepsToReproduce: ['Open page'],
+                expected: 'safe',
+                actual: 'unsafe',
+                meta: {
+                  source: 'agent',
+                  confidence: 'medium',
+                  repro: {
+                    objective: 'inject',
+                    route: 'https://example.com/injected',
+                    breadcrumbs: ['Open page'],
+                    actionIds: ['act-evil'],
+                    evidenceIds: [],
+                  },
+                },
+              },
+            ],
+            replayableActions: [
+              {
+                id: 'act-evil',
+                kind: 'click',
+                // No selector forces the summary into a comment; embedded line
+                // terminators must not escape the comment into live code.
+                summary:
+                  'click thing\nawait page.evaluate(() => process.exit(1));\u2028malicious();',
+                source: 'page',
+                status: 'worked',
+                timestamp: '2026-03-25T10:01:01Z',
+              },
+            ],
+            screenshots: new Map(),
+            evidence: [],
+            coverage: { controlsDiscovered: 1, controlsExercised: 0, events: [] },
+            pageType: 'list',
+            status: 'explored',
+          },
+        ],
+      })
+    );
+
+    const content = generated[0]!.content;
+    // The payload must remain confined to a single comment line, never on its own
+    // line as executable code.
+    expect(content).not.toMatch(/\n\s*await page\.evaluate/);
+    expect(content).not.toMatch(/\n\s*malicious\(\);/);
+    expect(content).toContain(
+      '// click thing await page.evaluate(() => process.exit(1)); malicious();'
+    );
+  });
 });

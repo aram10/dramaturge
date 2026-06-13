@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { request as playwrightRequest } from 'playwright';
 import { z } from 'zod';
 import {
@@ -46,6 +46,20 @@ const REGISTRY_DIR = '.dramaturge';
 const REGISTRY_FILE = 'mcp-runs.json';
 const FOCUS_MODE_ENUM = z.enum(FOCUS_MODES);
 
+// runId is interpolated into filesystem paths, so it must not contain path
+// separators or traversal sequences. Allow a conservative identifier charset.
+const RUN_ID_RE = /^[A-Za-z0-9._-]+$/;
+const RunIdSchema = z
+  .string()
+  .min(1)
+  .regex(RUN_ID_RE, 'runId may only contain letters, numbers, dot, underscore, and hyphen')
+  .refine(
+    (value) => value !== '.' && value !== '..' && !value.includes('/') && !value.includes('\\'),
+    {
+      message: 'runId must not be a path traversal sequence',
+    }
+  );
+
 const RunExplorationArgsSchema = z
   .object({
     targetUrl: z.string().url(),
@@ -53,7 +67,7 @@ const RunExplorationArgsSchema = z
     config: z.record(z.string(), z.unknown()).optional(),
     profile: z.string().min(1).optional(),
     diffRef: z.string().min(1).optional(),
-    runId: z.string().min(1).optional(),
+    runId: RunIdSchema.optional(),
   })
   .strict();
 
@@ -64,13 +78,13 @@ const TestPageArgsSchema = z
     configPath: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     profile: z.string().min(1).optional(),
-    runId: z.string().min(1).optional(),
+    runId: RunIdSchema.optional(),
   })
   .strict();
 
 const ReadRunArgsSchema = z
   .object({
-    runId: z.string().min(1),
+    runId: RunIdSchema,
   })
   .strict();
 
@@ -412,20 +426,18 @@ function buildConfigForExecution(
   if (options.configPath) {
     const loaded = deps.loadConfig(options.configPath);
     const { _meta, ...loadedConfig } = loaded;
-    const merged = mergeRecords(loadedConfig, {
-      targetUrl: options.targetUrl,
-      ...(options.baseOverrides ?? {}),
-      ...(options.configOverrides ?? {}),
-    });
+    const overrideLayer = mergeRecords(
+      mergeRecords({ targetUrl: options.targetUrl }, options.baseOverrides ?? {}),
+      options.configOverrides ?? {}
+    );
+    const merged = mergeRecords(loadedConfig, overrideLayer);
     return normalizeMergedConfig(merged, _meta);
   }
 
   const inline = buildInlineBaseConfig(deps.cwd, options.targetUrl);
   const { _meta, ...inlineConfig } = inline;
-  const merged = mergeRecords(inlineConfig, {
-    ...(options.baseOverrides ?? {}),
-    ...(options.configOverrides ?? {}),
-  });
+  const overrideLayer = mergeRecords(options.baseOverrides ?? {}, options.configOverrides ?? {});
+  const merged = mergeRecords(inlineConfig, overrideLayer);
   return normalizeMergedConfig(merged, _meta);
 }
 
@@ -436,7 +448,12 @@ function resolveStoredRunDir(cwd: string, runId: string): string {
     return registeredDir;
   }
 
-  const absolute = resolve(cwd, runId);
+  const base = resolve(cwd);
+  const absolute = resolve(base, runId);
+  // Defense in depth: even with a validated runId, never resolve outside cwd.
+  if (absolute !== base && !absolute.startsWith(base + sep)) {
+    throw new Error(`Unknown Dramaturge MCP run: ${runId}`);
+  }
   if (existsSync(join(absolute, 'report.json'))) {
     return absolute;
   }
@@ -734,13 +751,16 @@ function encodeMessage(message: JsonRpcSuccessResponse | JsonRpcErrorResponse): 
   return `Content-Length: ${Buffer.byteLength(body, 'utf8')}\r\n\r\n${body}`;
 }
 
-function tryParseMessage(
-  rawBuffer: Uint8Array<ArrayBufferLike>
-): { message: JsonRpcRequest; remaining: Uint8Array<ArrayBufferLike> } | undefined {
+type ParseResult =
+  | { status: 'message'; message: JsonRpcRequest; remaining: Uint8Array<ArrayBufferLike> }
+  | { status: 'incomplete' }
+  | { status: 'error'; remaining: Uint8Array<ArrayBufferLike> };
+
+function tryParseMessage(rawBuffer: Uint8Array<ArrayBufferLike>): ParseResult {
   const buffer = Buffer.from(rawBuffer);
   const headerEnd = buffer.indexOf('\r\n\r\n');
   if (headerEnd === -1) {
-    return undefined;
+    return { status: 'incomplete' };
   }
 
   const headerText = buffer.subarray(0, headerEnd).toString('utf8');
@@ -748,24 +768,37 @@ function tryParseMessage(
     .split('\r\n')
     .find((line) => line.toLowerCase().startsWith('content-length:'));
   if (!contentLengthLine) {
-    throw new Error('Missing Content-Length header');
+    // Malformed framing: we cannot locate the body, so drop the buffer rather
+    // than spinning on it forever.
+    return { status: 'error', remaining: new Uint8Array() };
   }
 
   const contentLength = Number.parseInt(contentLengthLine.split(':')[1]?.trim() ?? '', 10);
   if (!Number.isFinite(contentLength) || contentLength < 0) {
-    throw new Error('Invalid Content-Length header');
+    return { status: 'error', remaining: new Uint8Array() };
   }
 
   const bodyStart = headerEnd + 4;
   const bodyEnd = bodyStart + contentLength;
   if (buffer.length < bodyEnd) {
-    return undefined;
+    return { status: 'incomplete' };
   }
 
   const rawBody = buffer.subarray(bodyStart, bodyEnd).toString('utf8');
+  const remaining = Buffer.from(buffer.subarray(bodyEnd));
+  try {
+    return { status: 'message', message: JSON.parse(rawBody) as JsonRpcRequest, remaining };
+  } catch {
+    // The body framing was valid, so skip past this frame and keep serving.
+    return { status: 'error', remaining };
+  }
+}
+
+function parseErrorResponse(): JsonRpcErrorResponse {
   return {
-    message: JSON.parse(rawBody) as JsonRpcRequest,
-    remaining: Buffer.from(buffer.subarray(bodyEnd)),
+    jsonrpc: '2.0',
+    id: null,
+    error: { code: -32700, message: 'Parse error' },
   };
 }
 
@@ -782,10 +815,15 @@ export async function runMcpServer(overrides: Partial<McpServerDependencies> = {
 
     while (true) {
       const parsed = tryParseMessage(buffer);
-      if (!parsed) {
+      if (parsed.status === 'incomplete') {
         break;
       }
       buffer = parsed.remaining;
+      if (parsed.status === 'error') {
+        // A malformed frame must never crash the server; report and recover.
+        deps.stdout.write(encodeMessage(parseErrorResponse()));
+        continue;
+      }
       const response = await server.handleRequest(parsed.message);
       if (response) {
         deps.stdout.write(encodeMessage(response));

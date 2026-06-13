@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { BrowserSessionLike, StorageStatePage } from '../browser/page-interface.js';
 import { getPrimaryPage } from '../browser/page-interface.js';
@@ -73,8 +73,14 @@ export async function authenticateInteractive({
   await waitForSuccess(page, indicator, manualTimeoutMs);
   console.log('  Manual login detected — saving state for reuse.');
 
-  // 3. Persist storage state
+  // 3. Persist storage state (contains live session tokens — owner-only perms)
   const storageState = await captureStorageState(browser, targetUrl);
-  mkdirSync(dirname(stateFile), { recursive: true });
-  writeFileSync(stateFile, JSON.stringify(storageState, null, 2));
+  mkdirSync(dirname(stateFile), { recursive: true, mode: 0o700 });
+  writeFileSync(stateFile, JSON.stringify(storageState, null, 2), { mode: 0o600 });
+  // writeFileSync only applies mode on creation; tighten an existing file too.
+  try {
+    chmodSync(stateFile, 0o600);
+  } catch {
+    // best-effort (e.g. Windows)
+  }
 }

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { writeFileAtomic } from './utils/atomic-file.js';
 import { z } from 'zod';
 import type {
   Checkpoint,
@@ -347,7 +348,7 @@ export function saveCheckpoint(input: SaveCheckpointInput): void {
   };
 
   const path = join(outputDir, CHECKPOINT_FILE);
-  writeFileSync(path, JSON.stringify(checkpoint), 'utf-8');
+  writeFileAtomic(path, JSON.stringify(checkpoint));
 }
 
 export function loadCheckpoint(runDir: string): Checkpoint | null {
@@ -355,13 +356,13 @@ export function loadCheckpoint(runDir: string): Checkpoint | null {
   if (!existsSync(path)) return null;
 
   const raw = readFileSync(path, 'utf-8');
-  let data: Checkpoint;
   try {
-    data = checkpointSchema.parse(JSON.parse(raw)) as Checkpoint;
+    return checkpointSchema.parse(JSON.parse(raw)) as Checkpoint;
   } catch {
-    throw new Error(`Failed to parse or validate checkpoint JSON: ${path}`);
+    // A corrupt or partially written checkpoint must not crash a resume; treat
+    // it as absent so the engine starts a fresh run instead.
+    return null;
   }
-  return data;
 }
 
 /** Hydrate graph, frontier, and coverage from a checkpoint; returns findings/evidence maps. */

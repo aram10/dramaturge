@@ -122,5 +122,9 @@ export function emitEngineEvent<E extends EngineEventName>(
   payload: EngineEventMap[E][0]
 ): void {
   if (!emitter) return;
-  (emitter.emit as (event: E, payload: EngineEventMap[E][0]) => boolean)(event, payload);
+  try {
+    (emitter.emit as (event: E, payload: EngineEventMap[E][0]) => boolean)(event, payload);
+  } catch {
+    // A misbehaving event listener must never crash the engine loop.
+  }
 }

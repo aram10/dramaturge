@@ -247,4 +247,20 @@ describe('emitEngineEvent', () => {
 
     expect(handler).toHaveBeenCalledWith(payload);
   });
+
+  it('does not propagate errors thrown by a listener', () => {
+    const emitter = new EngineEventEmitter();
+    emitter.on('run:start', () => {
+      throw new Error('listener boom');
+    });
+
+    expect(() =>
+      emitEngineEvent(emitter, 'run:start', {
+        targetUrl: 'https://example.com',
+        timestamp: '2026-01-01T00:00:00Z',
+        budget: { timeLimitSeconds: 300, maxStepsPerTask: 20 },
+        concurrency: 1,
+      })
+    ).not.toThrow();
+  });
 });

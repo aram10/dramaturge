@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chromium } from 'playwright';
 
@@ -54,6 +54,7 @@ export async function captureAuthStateViaSuccessUrl(
 
     ensureParentDir(outputPath);
     await context.storageState({ path: outputPath });
+    restrictFilePermissions(outputPath);
     io.log(`Saved browser state to ${outputPath}`);
 
     return { outputPath, timedOut };
@@ -99,6 +100,7 @@ export async function captureAuthStateViaUserConfirmation(
       if (confirmed) {
         ensureParentDir(outputPath);
         await context.storageState({ path: outputPath });
+        restrictFilePermissions(outputPath);
         io.log(`Saved browser state to ${outputPath}`);
         return { outputPath, confirmed: true };
       }
@@ -120,6 +122,19 @@ export async function captureAuthStateViaUserConfirmation(
 function ensureParentDir(filePath: string): void {
   const dir = dirname(filePath);
   if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+    // Auth-state files hold live session cookies/tokens; keep the directory
+    // owner-only so other users on shared/CI hosts cannot read them.
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+}
+
+// The storage-state JSON contains live session tokens. Playwright writes the
+// file itself, so restrict permissions to the owner after the write. chmod is a
+// best-effort no-op on platforms (e.g. Windows) that ignore POSIX modes.
+function restrictFilePermissions(filePath: string): void {
+  try {
+    chmodSync(filePath, 0o600);
+  } catch {
+    // best-effort
   }
 }

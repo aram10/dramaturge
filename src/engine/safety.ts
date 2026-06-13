@@ -51,7 +51,11 @@ export function createSafetyGuardForConfig(
         destructiveActionsAllowed
       )
     : createDefaultSafetyConfig(destructiveActionsAllowed);
-  return new SafetyGuard(guardConfig);
+  const guard = new SafetyGuard(guardConfig);
+  // Confine exploration to the target origin by default so the agent cannot wander
+  // off-site (e.g. an adversarial worker following an external link).
+  guard.allowOrigin(config.targetUrl);
+  return guard;
 }
 
 function sanitizeUrl(raw: string): string {
@@ -108,7 +112,11 @@ function shouldCheckRequestUrl(request: RequestLike): boolean {
     return true;
   }
 
-  return request.resourceType?.() === 'document';
+  // Gate document loads plus programmatic data requests (XHR/fetch) so a
+  // cross-origin call cannot bypass origin scoping; static subresources
+  // (scripts, styles, images, fonts) are allowed to load from any origin.
+  const resourceType = request.resourceType?.();
+  return resourceType === 'document' || resourceType === 'xhr' || resourceType === 'fetch';
 }
 
 function attachPageUrlGuard(

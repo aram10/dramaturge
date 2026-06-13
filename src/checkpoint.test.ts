@@ -145,7 +145,7 @@ describe('Checkpoint', () => {
     expect(loaded.graphSnapshot.nodes).toHaveLength(1);
   });
 
-  it('loadCheckpoint rejects structurally invalid checkpoint files', () => {
+  it('loadCheckpoint returns null for structurally invalid checkpoint files', () => {
     const cpPath = join(tmpDir, 'checkpoint.json');
     const invalidCheckpoint = {
       version: 1,
@@ -160,7 +160,16 @@ describe('Checkpoint', () => {
 
     writeFileSync(cpPath, JSON.stringify(invalidCheckpoint), 'utf-8');
 
-    expect(() => loadCheckpoint(tmpDir)).toThrow(/Failed to parse or validate checkpoint JSON/);
+    // A corrupt/partial checkpoint must be treated as absent so a resume falls
+    // back to a fresh run rather than crashing.
+    expect(loadCheckpoint(tmpDir)).toBeNull();
+  });
+
+  it('loadCheckpoint returns null for non-JSON checkpoint content', () => {
+    const cpPath = join(tmpDir, 'checkpoint.json');
+    writeFileSync(cpPath, '{ this is not valid json', 'utf-8');
+
+    expect(loadCheckpoint(tmpDir)).toBeNull();
   });
 
   it('hydrateFromCheckpoint restores graph, frontier, and findings', () => {

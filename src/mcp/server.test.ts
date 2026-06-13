@@ -392,6 +392,32 @@ describe('createDramaturgeMcpServer', () => {
     }
   });
 
+  it('rejects a path-traversal runId instead of resolving outside cwd', async () => {
+    const server = createDramaturgeMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+    });
+
+    const response = await server.handleRequest({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'get_findings',
+        arguments: { runId: '../../etc' },
+      },
+    });
+
+    expect(isRecord(response) && isRecord(response.result)).toBe(true);
+    if (isRecord(response) && isRecord(response.result)) {
+      expect(response.result.isError).toBe(true);
+      const content = response.result.content;
+      const text = Array.isArray(content) && isRecord(content[0]) ? content[0].text : '';
+      // Schema validation rejects the traversal sequence before any path resolution.
+      expect(typeof text === 'string' && text).not.toContain('/etc');
+    }
+  });
+
   it('sources version from package.json in the initialize response', async () => {
     const server = createDramaturgeMcpServer({
       cwd: testDir,
@@ -514,5 +540,38 @@ describe('runMcpServer — stdio framing', () => {
     await serverDone;
 
     expect(chunks).toHaveLength(0);
+  });
+
+  it('recovers from a malformed frame and keeps serving subsequent messages', async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const chunks: Buffer[] = [];
+    stdout.on('data', (c: Buffer) => chunks.push(c));
+
+    const serverDone = runMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+      stdin,
+      stdout,
+      stderr: new PassThrough(),
+      generateRunId: () => 'test-run',
+    });
+
+    // A frame whose body is not valid JSON, followed by a well-formed request.
+    const badBody = '{ not json';
+    const badFrame = Buffer.from(
+      `Content-Length: ${Buffer.byteLength(badBody, 'utf8')}\r\n\r\n${badBody}`,
+      'utf8'
+    );
+    stdin.write(badFrame);
+    stdin.write(frame({ jsonrpc: '2.0', id: 7, method: 'ping' }));
+    stdin.end();
+
+    await serverDone;
+
+    const output = Buffer.concat(chunks).toString('utf8');
+    // Parse error reported for the bad frame, and the good request still served.
+    expect(output).toContain('-32700');
+    expect(output).toContain('"id":7');
   });
 });

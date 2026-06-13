@@ -95,6 +95,26 @@ describe('isSensitiveKey', () => {
     });
   });
 
+  describe('detects concatenated all-lowercase sensitive keys', () => {
+    const concatenatedKeys = [
+      'csrftoken',
+      'sessionid',
+      'phpsessid',
+      'passwd',
+      'pwd',
+      'private_key',
+      'access_key',
+      'privatekey',
+      'accesskey',
+      'clientsecret',
+      'bearertoken',
+    ];
+
+    it.each(concatenatedKeys)('returns true for "%s"', (key) => {
+      expect(isSensitiveKey(key)).toBe(true);
+    });
+  });
+
   describe('returns false for non-sensitive keys', () => {
     const safeKeys = [
       'content-type',
