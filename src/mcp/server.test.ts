@@ -541,4 +541,37 @@ describe('runMcpServer — stdio framing', () => {
 
     expect(chunks).toHaveLength(0);
   });
+
+  it('recovers from a malformed frame and keeps serving subsequent messages', async () => {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const chunks: Buffer[] = [];
+    stdout.on('data', (c: Buffer) => chunks.push(c));
+
+    const serverDone = runMcpServer({
+      cwd: testDir,
+      runEngine: vi.fn(),
+      stdin,
+      stdout,
+      stderr: new PassThrough(),
+      generateRunId: () => 'test-run',
+    });
+
+    // A frame whose body is not valid JSON, followed by a well-formed request.
+    const badBody = '{ not json';
+    const badFrame = Buffer.from(
+      `Content-Length: ${Buffer.byteLength(badBody, 'utf8')}\r\n\r\n${badBody}`,
+      'utf8'
+    );
+    stdin.write(badFrame);
+    stdin.write(frame({ jsonrpc: '2.0', id: 7, method: 'ping' }));
+    stdin.end();
+
+    await serverDone;
+
+    const output = Buffer.concat(chunks).toString('utf8');
+    // Parse error reported for the bad frame, and the good request still served.
+    expect(output).toContain('-32700');
+    expect(output).toContain('"id":7');
+  });
 });

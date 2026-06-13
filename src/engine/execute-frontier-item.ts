@@ -126,56 +126,84 @@ async function runPreflightScans(
   const route = node.url ?? ctx.config.targetUrl;
 
   if (hasEvaluate(page)) {
-    const accessibility = await runAccessibilityScan(page, areaName, route);
-    preflightFindings.push(...accessibility.findings);
-    preflightEvidence.push(...accessibility.evidence);
+    try {
+      const accessibility = await runAccessibilityScan(page, areaName, route);
+      preflightFindings.push(...accessibility.findings);
+      preflightEvidence.push(...accessibility.evidence);
+    } catch (err) {
+      ctx.logger?.warn('Accessibility scan failed', {
+        areaName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     if (ctx.config.visualRegression.enabled) {
-      const visualRegression = await runVisualRegressionScan(page, {
-        areaName,
-        route,
-        fingerprintHash: node.fingerprint.hash,
-        baselineDir: ctx.config.visualRegression.baselineDir,
-        outputDir: ctx.outputDir,
-        diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
-        includeAA: ctx.config.visualRegression.includeAA,
-        fullPage: ctx.config.visualRegression.fullPage,
-        maskSelectors: ctx.config.visualRegression.maskSelectors,
-        memoryStore: ctx.memoryStore,
-      });
-      preflightFindings.push(...visualRegression.findings);
-      preflightEvidence.push(...visualRegression.evidence);
+      try {
+        const visualRegression = await runVisualRegressionScan(page, {
+          areaName,
+          route,
+          fingerprintHash: node.fingerprint.hash,
+          baselineDir: ctx.config.visualRegression.baselineDir,
+          outputDir: ctx.outputDir,
+          diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
+          includeAA: ctx.config.visualRegression.includeAA,
+          fullPage: ctx.config.visualRegression.fullPage,
+          maskSelectors: ctx.config.visualRegression.maskSelectors,
+          memoryStore: ctx.memoryStore,
+        });
+        preflightFindings.push(...visualRegression.findings);
+        preflightEvidence.push(...visualRegression.evidence);
+      } catch (err) {
+        ctx.logger?.warn('Visual regression scan failed', {
+          areaName,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     if (ctx.config.webVitals.enabled) {
-      const vitals = await collectWebVitals(page);
-      const webVitalsResult = evaluateWebVitals(
-        vitals,
-        route,
-        areaName,
-        ctx.config.webVitals.thresholds
-      );
-      preflightFindings.push(...webVitalsResult.findings);
-      preflightEvidence.push(...webVitalsResult.evidence);
+      try {
+        const vitals = await collectWebVitals(page);
+        const webVitalsResult = evaluateWebVitals(
+          vitals,
+          route,
+          areaName,
+          ctx.config.webVitals.thresholds
+        );
+        preflightFindings.push(...webVitalsResult.findings);
+        preflightEvidence.push(...webVitalsResult.evidence);
+      } catch (err) {
+        ctx.logger?.warn('Web vitals scan failed', {
+          areaName,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     // Responsive regression requires visual regression infrastructure (baselines, pixel diff)
     if (ctx.config.responsiveRegression.enabled && ctx.config.visualRegression.enabled) {
-      const responsive = await runMultiViewportVisualRegression(page, {
-        areaName,
-        route,
-        fingerprintHash: node.fingerprint.hash,
-        baselineDir: ctx.config.visualRegression.baselineDir,
-        outputDir: ctx.outputDir,
-        diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
-        includeAA: ctx.config.visualRegression.includeAA,
-        fullPage: ctx.config.visualRegression.fullPage,
-        maskSelectors: ctx.config.visualRegression.maskSelectors,
-        breakpoints: ctx.config.responsiveRegression.breakpoints,
-        memoryStore: ctx.memoryStore,
-      });
-      preflightFindings.push(...responsive.findings);
-      preflightEvidence.push(...responsive.evidence);
+      try {
+        const responsive = await runMultiViewportVisualRegression(page, {
+          areaName,
+          route,
+          fingerprintHash: node.fingerprint.hash,
+          baselineDir: ctx.config.visualRegression.baselineDir,
+          outputDir: ctx.outputDir,
+          diffPixelRatioThreshold: ctx.config.visualRegression.diffPixelRatioThreshold,
+          includeAA: ctx.config.visualRegression.includeAA,
+          fullPage: ctx.config.visualRegression.fullPage,
+          maskSelectors: ctx.config.visualRegression.maskSelectors,
+          breakpoints: ctx.config.responsiveRegression.breakpoints,
+          memoryStore: ctx.memoryStore,
+        });
+        preflightFindings.push(...responsive.findings);
+        preflightEvidence.push(...responsive.evidence);
+      } catch (err) {
+        ctx.logger?.warn('Responsive regression scan failed', {
+          areaName,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 
