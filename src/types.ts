@@ -42,6 +42,17 @@ export interface Evidence {
   path?: string;
   timestamp: string;
   areaName?: string;
+  /**
+   * Structured network details for `network-error` evidence, captured at
+   * observation time (#251). Carrying the status/URL here avoids reverse-
+   * engineering them from the human-readable `summary` string, which is
+   * lossy (any 3-digit number could be misread as a status code).
+   */
+  network?: {
+    url: string;
+    status: number;
+    method?: string;
+  };
   /** Stable raw finding refs collected during runtime; renderers map these to display IDs. */
   relatedFindingIds: string[];
 }

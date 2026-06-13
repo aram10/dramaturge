@@ -155,7 +155,8 @@ export class BrowserErrorCollector {
       summary: string,
       timestamp: string,
       finding: Omit<RawFinding, 'evidenceIds' | 'meta'>,
-      metaFactory?: (evidenceIds: string[]) => RawFinding['meta']
+      metaFactory?: (evidenceIds: string[]) => RawFinding['meta'],
+      evidenceExtra?: Pick<Evidence, 'network'>
     ) => {
       const evidenceId = `ev-${shortId()}`;
       const findingRef = `fid-${shortId()}`;
@@ -164,6 +165,7 @@ export class BrowserErrorCollector {
         type: evidenceType,
         summary,
         timestamp,
+        ...(evidenceExtra ?? {}),
         relatedFindingIds: [findingRef],
       });
       findings.push({
@@ -288,7 +290,8 @@ export class BrowserErrorCollector {
             confidence: first.status === 0 || first.status >= 500 ? 'high' : 'medium',
             breadcrumbs: [`auto-captured ${first.method} ${pathname} -> ${statusLabel}`],
             evidenceIds,
-          })
+          }),
+        { network: { url: first.url, status: first.status, method: first.method } }
       );
     }
 
