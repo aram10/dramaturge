@@ -298,7 +298,9 @@ export function buildAgentRoleSection(agentRole?: AgentRole, blackboardSummary?:
   parts.push(getAgentRoleGuidance(agentRole));
 
   if (blackboardSummary) {
-    parts.push(`\n## Team Blackboard\n${blackboardSummary}`);
+    parts.push(
+      `\n## Team Blackboard\n${wrapUntrustedPromptContent('TEAM BLACKBOARD', blackboardSummary)}`
+    );
   }
 
   return parts.join('\n');

@@ -24,8 +24,33 @@ export function truncateString(value: string, max = DEFAULT_REDACT_TRUNCATE_LENG
 const SENSITIVE_KEY_RE =
   /(^|-)authorization($|-)|(^|-)auth($|-)|(^|-)cookies?($|-)|(^|-)password($|-)|(^|-)secret($|-)|(^|-)token($|-)|(^|-)session($|-)|(^|-)api-key($|-)|(^|-)apikey($|-)|(^|-)csrf($|-)|(^|-)xsrf($|-)/;
 
+// Concatenated, all-lowercase forms that the hyphen-delimited regex above misses
+// (e.g. Django/PHP defaults). Matched as substrings against the raw lowercased key
+// after stripping separators, so 'csrftoken', 'sessionid', 'phpsessid', etc. are caught.
+const SENSITIVE_SUBSTRINGS = [
+  'authorization',
+  'password',
+  'passwd',
+  'pwd',
+  'secret',
+  'csrftoken',
+  'xsrftoken',
+  'sessionid',
+  'sessid',
+  'phpsessid',
+  'privatekey',
+  'accesskey',
+  'apikey',
+  'bearer',
+];
+
+function hasSensitiveSubstring(key: string): boolean {
+  const compact = key.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  return SENSITIVE_SUBSTRINGS.some((needle) => compact.includes(needle));
+}
+
 export function isSensitiveKey(key: string): boolean {
-  return SENSITIVE_KEY_RE.test(normalizeSensitiveKey(key));
+  return SENSITIVE_KEY_RE.test(normalizeSensitiveKey(key)) || hasSensitiveSubstring(key);
 }
 
 export function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {

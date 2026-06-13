@@ -43,24 +43,24 @@ function renderAction(action: ReplayableAction): string | null {
     case 'close':
       return action.selector
         ? `await page.locator(${escapeString(action.selector)}).click();`
-        : `// ${action.summary}`;
+        : `// ${sanitizeCommentText(action.summary)}`;
     case 'input':
       if (action.redacted) {
-        return `// ${action.summary} (redacted value omitted)`;
+        return `// ${sanitizeCommentText(action.summary)} (redacted value omitted)`;
       }
       if (!action.selector) {
-        return `// ${action.summary}`;
+        return `// ${sanitizeCommentText(action.summary)}`;
       }
       if (action.value != null) {
         return `await page.locator(${escapeString(action.selector)}).fill(${escapeString(action.value)});`;
       }
-      return `// ${action.summary}`;
+      return `// ${sanitizeCommentText(action.summary)}`;
     case 'keydown':
       return action.key
         ? `await page.keyboard.press(${escapeString(action.key)});`
-        : `// ${action.summary}`;
+        : `// ${sanitizeCommentText(action.summary)}`;
     default:
-      return `// ${action.summary}`;
+      return `// ${sanitizeCommentText(action.summary)}`;
   }
 }
 
@@ -80,7 +80,9 @@ function selectActionsById(
 }
 
 function sanitizeCommentText(value: string): string {
-  return value.replace(/[\r\n]+/g, ' ');
+  // Collapse any line terminator (including U+2028/U+2029, which terminate lines
+  // in JS source) so untrusted text cannot end a `//` comment and inject code.
+  return value.replace(/[\r\n\u2028\u2029]+/g, ' ');
 }
 
 interface TestFileContext {
