@@ -102,6 +102,18 @@ function deriveVerdict(options: {
   ) {
     return 'new_related_issue';
   }
+  // #209: a finding with no machine-checkable oracle (no console/network/a11y
+  // oracle, no visual baseline, and no re-derived expected/actual observation)
+  // cannot be proven fixed by replay — there was simply nothing to check.
+  // Report cannot_confirm so a CI gate does not declare it fixed by default.
+  const hasOracleBasis =
+    options.oracleSummary.originalCount > 0 ||
+    options.oracleSummary.hasCurrentFailures ||
+    options.visualDiffRatio !== undefined ||
+    Boolean(options.observedNow?.actual && options.observedNow.expected);
+  if (!hasOracleBasis) {
+    return 'cannot_confirm';
+  }
   return 'fixed';
 }
 

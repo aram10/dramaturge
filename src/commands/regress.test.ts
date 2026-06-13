@@ -169,7 +169,7 @@ describe('runRegressCommand', () => {
     expect(output).toContain('// filename: BUG-001__create-dialog-never-opens.spec.ts');
     expect(output).toContain('@dramaturge-spec-version 1');
     expect(output).toContain('@dramaturge-finding BUG-001');
-    expect(output).toContain('@dramaturge-signature ["Bug","Major"');
+    expect(output).toContain('@dramaturge-signature ["Bug","/checkout"');
     expect(output).toContain('@dramaturge-origin-run 2026-05-20T18:00:00.000Z');
     expect(output).toContain('@dramaturge-source-report dramaturge-reports');
     expect(output).toContain('import { test, expect } from "@playwright/test";');

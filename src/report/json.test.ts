@@ -109,7 +109,7 @@ describe('renderJson', () => {
                 breadcrumbs: ['click create button -> worked'],
                 actionIds: ['act-2'],
                 evidenceIds: ['ev-2'],
-                route: 'https://example.com/settings',
+                route: 'https://example.com/manage/knowledge-bases',
               },
             },
           },
