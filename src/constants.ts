@@ -107,3 +107,10 @@ export const JUDGE_LLM_TIMEOUT_MS = 15_000;
 
 /** Visual diff ratio threshold used to classify changed surfaces. */
 export const VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD = 0.05;
+
+/**
+ * Minimum number of times a route must record sub-threshold visual jitter
+ * before it is treated as flaky for cross-run classification (#230). A single
+ * below-threshold pixel diff is not enough signal to suppress findings.
+ */
+export const MIN_FLAKY_PAGE_COUNT = 2;

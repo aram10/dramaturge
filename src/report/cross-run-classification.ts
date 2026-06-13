@@ -4,6 +4,7 @@
 import type { Finding, FindingCategory, FindingSeverity } from '../types.js';
 import type { HistoricalFindingRecord, HistoricalFlakyPageRecord } from '../memory/types.js';
 import { buildFindingGroupKey } from './collector.js';
+import { MIN_FLAKY_PAGE_COUNT } from '../constants.js';
 
 export type CrossRunStatus = 'new' | 'recurring' | 'resolved' | 'flaky' | 'suppressed';
 
@@ -57,9 +58,23 @@ function isSuppressedRecord(record?: HistoricalFindingRecord): boolean {
   return Boolean(record?.suppressed || record?.dismissedAt);
 }
 
+/**
+ * The category whose findings a flaky-page record is allowed to suppress.
+ * Flaky pages are only ever recorded from sub-threshold visual jitter
+ * (source: 'visual-regression'), so flakiness must be scoped to visual
+ * findings — a functional Bug on a page with minor pixel jitter must not be
+ * de-emphasized (#230).
+ */
+const FLAKY_SUPPRESSIBLE_CATEGORY: FindingCategory = 'Visual Glitch';
+
 function buildFlakyRouteSet(flakyPages: HistoricalFlakyPageRecord[]): Set<string> {
   const flakyRoutes = new Set<string>();
   for (const page of flakyPages) {
+    // Require a minimum flaky count before a route influences classification
+    // so a one-off below-threshold diff does not taint the page (#230).
+    if (page.count < MIN_FLAKY_PAGE_COUNT) {
+      continue;
+    }
     const route = normalizeRoute(page.route);
     if (route) {
       flakyRoutes.add(route);
@@ -70,6 +85,12 @@ function buildFlakyRouteSet(flakyPages: HistoricalFlakyPageRecord[]): Set<string
 
 function findingIsFlaky(finding: Finding, flakyRoutes: Set<string>): boolean {
   if (flakyRoutes.size === 0) {
+    return false;
+  }
+  // Flaky suppression is scoped to the category that was actually flaky
+  // (visual). Functional/a11y/perf findings are never suppressed by visual
+  // jitter on the same route (#230).
+  if (finding.category !== FLAKY_SUPPRESSIBLE_CATEGORY) {
     return false;
   }
   const candidateRoutes = new Set<string>();
