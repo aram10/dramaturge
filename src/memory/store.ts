@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { writeFileAtomic } from '../utils/atomic-file.js';
 import type { DramaturgeConfig } from '../config.js';
 import type { AreaResult, RawFinding, RunMemoryMeta } from '../types.js';
 import type { StateGraph } from '../graph/state-graph.js';
@@ -192,14 +193,17 @@ export class MemoryStore {
       if (!existsSync(path)) {
         this.snapshot = createEmptySnapshot();
       } else {
-        let raw: MemorySnapshot;
+        let raw: MemorySnapshot | undefined;
         try {
           raw = JSON.parse(readFileSync(path, 'utf-8')) as MemorySnapshot;
         } catch {
-          throw new Error(`Failed to parse memory store JSON: ${path}`);
+          raw = undefined;
         }
-        if (raw.version !== CURRENT_MEMORY_VERSION) {
-          throw new Error(`Unsupported memory snapshot version: ${raw.version}`);
+        if (!raw || raw.version !== CURRENT_MEMORY_VERSION) {
+          // A corrupt, partial, or version-incompatible store must not crash the
+          // engine; start from a fresh snapshot instead.
+          this.snapshot = createEmptySnapshot();
+          return this.snapshot;
         }
         this.snapshot = {
           ...createEmptySnapshot(),
@@ -565,8 +569,7 @@ export class MemoryStore {
 
   private persist(snapshot: MemorySnapshot): void {
     snapshot.updatedAt = new Date().toISOString();
-    mkdirSync(this.dir, { recursive: true });
-    writeFileSync(this.storePath(), JSON.stringify(snapshot, null, 2), 'utf-8');
+    writeFileAtomic(this.storePath(), JSON.stringify(snapshot, null, 2));
     this.snapshot = snapshot;
   }
 
