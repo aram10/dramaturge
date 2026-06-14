@@ -13,7 +13,11 @@
  */
 
 import type { BlackboardEntry, BlackboardEntryKind } from './types.js';
-import { shortId } from '../constants.js';
+import {
+  shortId,
+  DEFAULT_BLACKBOARD_SUMMARY_ENTRIES,
+  BLACKBOARD_PREVIEW_MAX_LEN,
+} from '../constants.js';
 
 const DEFAULT_BLACKBOARD_ENTRY_LIMIT = 500;
 
@@ -127,7 +131,7 @@ export class Blackboard {
   }
 
   /** Produce a compact text summary for LLM context windows. */
-  summarize(maxEntries = 20): string {
+  summarize(maxEntries = DEFAULT_BLACKBOARD_SUMMARY_ENTRIES): string {
     const recent = this.entries.slice(-maxEntries);
     if (recent.length === 0) return 'No entries on the blackboard yet.';
 
@@ -137,7 +141,7 @@ export class Blackboard {
           ? e.data.title
           : typeof e.data.summary === 'string'
             ? e.data.summary
-            : JSON.stringify(e.data).slice(0, 80);
+            : JSON.stringify(e.data).slice(0, BLACKBOARD_PREVIEW_MAX_LEN);
       return `[${e.kind}] (${e.agentId}) ${dataPreview}`;
     });
 

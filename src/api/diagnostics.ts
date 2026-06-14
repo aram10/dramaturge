@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { shortId } from '../constants.js';
+import { shortId, MAX_DIAGNOSTICS_FAILURES_SHOWN } from '../constants.js';
 import type { Evidence } from '../types.js';
 
 const MAX_RECENT_FAILURES = 5;
@@ -51,7 +51,7 @@ export function buildApiProbeDiagnosticsEvidence(
     return undefined;
   }
 
-  const failureTail = diagnostics.recentFailures.slice(-3).join(' | ');
+  const failureTail = diagnostics.recentFailures.slice(-MAX_DIAGNOSTICS_FAILURES_SHOWN).join(' | ');
 
   return {
     id: `ev-${shortId()}`,

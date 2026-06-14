@@ -3,6 +3,7 @@
 
 import { execFileSync } from 'node:child_process';
 import type { DiffFileEntry } from './types.js';
+import { GIT_DIFF_TIMEOUT_MS } from '../constants.js';
 
 /**
  * Status letter → DiffFileEntry["status"] mapping.
@@ -56,7 +57,7 @@ export function getChangedFiles(baseRef: string, repoRoot: string): DiffFileEntr
       cwd: repoRoot,
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 30_000,
+      timeout: GIT_DIFF_TIMEOUT_MS,
     });
     return parseDiffNameStatus(output);
   } catch {

@@ -4,6 +4,7 @@
 import { chmodSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { chromium } from 'playwright';
+import { AUTH_SETTLE_DELAY_MS, MAX_AUTH_CONFIRM_ATTEMPTS } from '../constants.js';
 
 export interface AuthStateCaptureIo {
   log: (message: string) => void;
@@ -45,7 +46,7 @@ export async function captureAuthStateViaSuccessUrl(
       await page.waitForURL(options.successUrl, {
         timeout: options.timeoutMs,
       });
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(AUTH_SETTLE_DELAY_MS);
       io.log('Login detected. Saving browser state...');
     } catch {
       timedOut = true;
@@ -74,7 +75,7 @@ export async function captureAuthStateViaUserConfirmation(
   }
 
   const outputPath = resolve(options.outputPath);
-  const maxAttempts = options.maxAttempts ?? 3;
+  const maxAttempts = options.maxAttempts ?? MAX_AUTH_CONFIRM_ATTEMPTS;
 
   const browser = await chromium.launch({ headless: false });
   try {

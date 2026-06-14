@@ -5,6 +5,7 @@ import type { Stagehand } from '@browserbasehq/stagehand';
 import { createHash } from 'node:crypto';
 import type { PageFingerprint } from '../types.js';
 import { buildStateSignature, buildStateSignatureKey } from './state-signature.js';
+import { FINGERPRINT_HASH_LEN } from '../constants.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
@@ -67,7 +68,7 @@ export async function captureFingerprint(page: StagehandPage): Promise<PageFinge
     stableHeading,
     ...dialogTitles,
   ].join('|');
-  const hash = createHash('sha256').update(hashInput).digest('hex').slice(0, 12);
+  const hash = createHash('sha256').update(hashInput).digest('hex').slice(0, FINGERPRINT_HASH_LEN);
 
   return { normalizedPath, signature, title, heading, dialogTitles, hash };
 }

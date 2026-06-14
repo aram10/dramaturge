@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { SuccessIndicatorPage } from '../browser/page-interface.js';
+import { SUCCESS_POLL_TIMEOUT_MS, SUCCESS_POLL_INTERVAL_MS, MS_PER_SECOND } from '../constants.js';
 
 export type IndicatorType = 'url' | 'selector' | 'text';
 export type UrlMatchMode = 'exact' | 'prefix';
@@ -61,7 +62,7 @@ export function matchesUrlIndicator(currentUrl: string, indicator: ParsedIndicat
 export async function waitForSuccess(
   page: SuccessIndicatorPage,
   indicator: ParsedIndicator,
-  timeoutMs: number = 30_000
+  timeoutMs: number = SUCCESS_POLL_TIMEOUT_MS
 ): Promise<void> {
   const start = Date.now();
 
@@ -87,10 +88,10 @@ export async function waitForSuccess(
 
   while (Date.now() - start < timeoutMs) {
     if (await poll()) return;
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, SUCCESS_POLL_INTERVAL_MS));
   }
 
   throw new Error(
-    `Authentication failed: success indicator "${indicator.type}:${indicator.value}" not detected within ${timeoutMs / 1000}s.`
+    `Authentication failed: success indicator "${indicator.type}:${indicator.value}" not detected within ${timeoutMs / MS_PER_SECOND}s.`
   );
 }

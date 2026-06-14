@@ -3,7 +3,13 @@
 
 import type { LLMTaskProposal, WorkerType } from './types.js';
 import type { JudgeDecision } from './judge/types.js';
-import { DEFAULT_LLM_TIMEOUT_MS, JUDGE_LLM_TIMEOUT_MS } from './constants.js';
+import {
+  DEFAULT_LLM_TIMEOUT_MS,
+  JUDGE_LLM_TIMEOUT_MS,
+  LLM_PROPOSAL_MAX_TOKENS,
+  DEFAULT_PROPOSAL_PRIORITY,
+  JUDGE_MAX_TOKENS,
+} from './constants.js';
 import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from './prompt-safety.js';
 import { hasConfiguredProvider, sendChatCompletion } from './llm/index.js';
 
@@ -25,7 +31,7 @@ async function callLLM(
   model: string,
   system: string,
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
-  maxTokens = 1024,
+  maxTokens = LLM_PROPOSAL_MAX_TOKENS,
   requestTimeoutMs = DEFAULT_LLM_TIMEOUT_MS
 ): Promise<string> {
   return sendChatCompletion({ model, system, messages, maxTokens, requestTimeoutMs });
@@ -67,7 +73,7 @@ Propose testing tasks for this page.`;
       model,
       system,
       [{ role: 'user', content: userPrompt }],
-      1024,
+      LLM_PROPOSAL_MAX_TOKENS,
       requestTimeoutMs
     );
 
@@ -98,7 +104,10 @@ Propose testing tasks for this page.`;
             workerType: wt as WorkerType,
             objective: p.objective,
             reason: p.reason,
-            priority: typeof p.priority === 'number' ? Math.max(0, Math.min(1, p.priority)) : 0.5,
+            priority:
+              typeof p.priority === 'number'
+                ? Math.max(0, Math.min(1, p.priority))
+                : DEFAULT_PROPOSAL_PRIORITY,
           });
         }
       }
@@ -134,7 +143,7 @@ ${wrapUntrustedPromptContent('JUDGE INPUT', prompt)}`;
     model,
     system,
     [{ role: 'user', content: safePrompt }],
-    512,
+    JUDGE_MAX_TOKENS,
     requestTimeoutMs
   );
   const jsonStr = extractJsonFromResponse(raw);

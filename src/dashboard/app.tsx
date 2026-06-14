@@ -20,6 +20,7 @@ import {
   applyA2AMessage,
   applyA2ABlackboard,
 } from './state.js';
+import { PROGRESS_BAR_WIDTH } from '../constants.js';
 
 // --- Utility helpers ---
 
@@ -30,7 +31,7 @@ function formatElapsed(ms: number): string {
   return `${m}m ${s.toString().padStart(2, '0')}s`;
 }
 
-function progressBar(ratio: number, width: number = 20): string {
+function progressBar(ratio: number, width: number = PROGRESS_BAR_WIDTH): string {
   const filled = Math.round(ratio * width);
   const empty = width - filled;
   return '█'.repeat(filled) + '░'.repeat(empty);

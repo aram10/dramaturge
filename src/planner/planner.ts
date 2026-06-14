@@ -17,6 +17,12 @@ import {
   MAX_STABLE_SELECTORS_IN_PLANNER,
   MAX_API_ENDPOINTS_IN_PLANNER,
   MAX_LOGIN_ROUTES_IN_PLANNER,
+  SEED_TASK_PRIORITY,
+  API_PROPOSAL_PRIORITY,
+  ADVERSARIAL_PROPOSAL_PRIORITY,
+  DEFAULT_DIFF_PRIORITY_BOOST,
+  CRITICAL_FLOW_PRIORITY_BOOST,
+  FOLLOWUP_TASK_PRIORITY,
   shortId,
 } from '../constants.js';
 import { computePriority, type PriorityContext } from './priority.js';
@@ -178,7 +184,7 @@ function buildRepoAwareSeedProposal(
     workerType: 'navigation',
     objective: `Use repo-aware hints to probe likely routes and controls from this page: ${repoHintSummary}`,
     reason: 'Repo-aware navigation seed',
-    priority: 0.85,
+    priority: SEED_TASK_PRIORITY,
   };
 }
 
@@ -196,7 +202,7 @@ function buildApiProposal(
       .map((endpoint) => `${endpoint.methods.join('/') || 'ANY'} ${endpoint.route}`)
       .join(', ')}`,
     reason: 'API-aware follow-up for this page',
-    priority: 0.78,
+    priority: API_PROPOSAL_PRIORITY,
   };
 }
 
@@ -210,14 +216,14 @@ function buildAdversarialProposal(
     workerType: 'adversarial',
     objective: `Probe edge cases, stale-state behavior, and replay/idempotency risks for ${node.title ?? node.pageType}${node.url ? ` at ${node.url}` : ''}`,
     reason: 'Low-priority adversarial coverage pass',
-    priority: 0.35,
+    priority: ADVERSARIAL_PROPOSAL_PRIORITY,
   };
 }
 
 export class Planner {
   private workerTypesPerNode = new Map<string, Set<WorkerType>>();
   /** Configurable diff priority boost; set from config.diffAware.priorityBoost. */
-  diffPriorityBoost = 0.3;
+  diffPriorityBoost = DEFAULT_DIFF_PRIORITY_BOOST;
 
   /**
    * Propose tasks for a newly discovered state node.
@@ -319,7 +325,7 @@ export class Planner {
           node.title,
           node.pageType
         )
-          ? 0.2
+          ? CRITICAL_FLOW_PRIORITY_BOOST
           : 0;
 
         return {
@@ -383,7 +389,7 @@ export class Planner {
       nodeId: request.targetNodeId ?? sourceNodeId,
       workerType: request.type,
       objective: request.reason,
-      priority: 0.8,
+      priority: FOLLOWUP_TASK_PRIORITY,
       reason: `Follow-up from finding: ${request.relatedFindingId ?? 'general'}`,
       retryCount: 0,
       createdAt: new Date().toISOString(),

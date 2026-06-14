@@ -6,6 +6,7 @@ import { buildFindingGroupKey, collectFindings } from './collector.js';
 import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
 import type { DiffContext } from '../diff/types.js';
 import { ledgerSummary } from '../ledger.js';
+import { MAX_ANOMALIES_IN_REPORT, MAX_AUDIT_ENTRIES_IN_REPORT } from '../constants.js';
 
 function escapeTableCell(text: string): string {
   return text
@@ -375,7 +376,7 @@ function renderWorkflowAutomataSection(result: RunResult): string[] {
   ];
   if (automaton.anomalies.length > 0) {
     lines.push('', '### Workflow anomalies', '');
-    for (const anomaly of automaton.anomalies.slice(0, 12)) {
+    for (const anomaly of automaton.anomalies.slice(0, MAX_ANOMALIES_IN_REPORT)) {
       lines.push(
         `- **${escapeMarkdownInline(anomaly.severity)}** ${escapeMarkdownInline(anomaly.summary)}`
       );
@@ -498,7 +499,7 @@ function renderSafetyAuditSection(result: RunResult): string[] {
       '| Time | Blocked | Action | URL | Reason |',
       '|------|---------|--------|-----|--------|'
     );
-    for (const entry of result.safetyAudit.entries.slice(-10)) {
+    for (const entry of result.safetyAudit.entries.slice(-MAX_AUDIT_ENTRIES_IN_REPORT)) {
       lines.push(
         `| ${escapeTableCell(entry.timestamp)} | ${entry.blocked ? 'yes' : 'no'} | ${escapeTableCell(entry.action)} | ${escapeTableCell(entry.url)} | ${escapeTableCell(entry.reason)} |`
       );

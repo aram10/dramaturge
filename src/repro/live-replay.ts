@@ -9,6 +9,7 @@ import type { DramaturgeConfig } from '../config.js';
 import type { ReplayableAction } from '../types.js';
 import type { FindingReplayManifest } from './manifest.js';
 import type { CurrentOracleObservation, ManifestReplayResult, ReplayAdapter } from './replayer.js';
+import { REPLAY_SETTLE_TIMEOUT_MS, DEFAULT_NETWORK_ERROR_MIN_STATUS } from '../constants.js';
 
 export interface LiveReplayOptions {
   config?: DramaturgeConfig;
@@ -43,7 +44,9 @@ function blockedStep(
 }
 
 async function settlePage(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => undefined);
+  await page
+    .waitForLoadState('networkidle', { timeout: REPLAY_SETTLE_TIMEOUT_MS })
+    .catch(() => undefined);
 }
 
 async function replayAction(page: Page, action: ReplayableAction): Promise<void> {
@@ -85,7 +88,7 @@ async function replayAction(page: Page, action: ReplayableAction): Promise<void>
 function attachOracleCollectors(
   manifest: FindingReplayManifest,
   page: Page,
-  networkErrorMinStatus = 400
+  networkErrorMinStatus = DEFAULT_NETWORK_ERROR_MIN_STATUS
 ): { observed: CurrentOracleObservation; detach: () => void } {
   const observed: CurrentOracleObservation = {
     consoleErrors: [],

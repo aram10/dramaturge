@@ -7,6 +7,7 @@ import type { Evidence, FrontierItem, RawFinding, StateNode, WorkerResult } from
 import { hasEvaluate, hasRequestContext, hasScreenshot } from '../browser/page-interface.js';
 import type { EngineContext } from './context.js';
 import { executeApiWorkerTask } from '../api/worker.js';
+import { BLACKBOARD_SUMMARY_LIMIT } from '../constants.js';
 import { executeWorkerTask, type ExecuteWorkerTaskOptions } from '../worker/worker.js';
 import { runAccessibilityScan } from '../coverage/accessibility.js';
 import { runVisualRegressionScan } from '../coverage/visual-regression.js';
@@ -75,7 +76,7 @@ function resolveA2AContext(
         agentRole,
         agentId: agentCard.id,
         blackboard: ctx.blackboard,
-        blackboardSummary: ctx.blackboard.summarize(10),
+        blackboardSummary: ctx.blackboard.summarize(BLACKBOARD_SUMMARY_LIMIT),
       };
     }
   }

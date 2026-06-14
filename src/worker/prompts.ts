@@ -16,6 +16,8 @@ import {
   MAX_API_ENDPOINTS_IN_WORKER,
   MAX_LOGIN_ROUTES_IN_WORKER,
   MAX_CALLBACK_ROUTES_IN_WORKER,
+  MAX_CONTRACT_SUMMARIES_IN_WORKER,
+  MAX_OBSERVED_API_IN_WORKER,
 } from '../constants.js';
 
 interface AppContext {
@@ -180,7 +182,7 @@ function buildContractSummarySection(contractSummary?: string[]): string {
     'Contract Expectations',
     'CONTRACT EXPECTATIONS',
     contractSummary
-      .slice(0, 6)
+      .slice(0, MAX_CONTRACT_SUMMARIES_IN_WORKER)
       .map((summary) => `- ${summary}`)
       .join('\n')
   );
@@ -193,7 +195,7 @@ function buildObservedApiSection(observedApiEndpoints?: ObservedApiEndpoint[]): 
     'Observed API Traffic',
     'OBSERVED API TRAFFIC',
     observedApiEndpoints
-      .slice(0, 6)
+      .slice(0, MAX_OBSERVED_API_IN_WORKER)
       .map((endpoint) => formatObservedApiEndpoint(endpoint))
       .join('\n')
   );
@@ -241,7 +243,9 @@ function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
     if (parts.length === 0) parts.push('## Historical Notes');
     parts.push('Historical API hints:');
     parts.push(
-      ...history.apiHints.slice(0, 4).map((endpoint) => formatObservedApiEndpoint(endpoint))
+      ...history.apiHints
+        .slice(0, MAX_API_ENDPOINTS_IN_WORKER)
+        .map((endpoint) => formatObservedApiEndpoint(endpoint))
     );
   }
 

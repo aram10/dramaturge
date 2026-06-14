@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { buildAutoCaptureFindingMeta } from "../repro/repro.js";
-import { shortId } from "../constants.js";
+import { shortId, A11Y_MAX_SELECTORS } from "../constants.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
 
 interface AccessibilityNodeResult {
@@ -50,7 +50,7 @@ export function buildAccessibilityArtifacts(input: {
     const selectors = violation.nodes.flatMap((node) =>
       node.target.map((target) => (typeof target === "string" ? target : JSON.stringify(target)))
     );
-    const selectorSummary = selectors.slice(0, 3).join(", ");
+    const selectorSummary = selectors.slice(0, A11Y_MAX_SELECTORS).join(", ");
     const failureSummary = violation.nodes
       .map((node) => node.failureSummary)
       .filter((summary): summary is string => Boolean(summary));

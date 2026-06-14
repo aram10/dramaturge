@@ -6,6 +6,14 @@ import { readFileSync } from 'node:fs';
 import { parseJsoncObject } from './utils/jsonc.js';
 import { getConfigFileContext, normalizeConfigPaths, type ConfigWithMeta } from './config-paths.js';
 import { unknownModelPrefix, knownProviderIds } from './llm/registry.js';
+import {
+  DEFAULT_LLM_TIMEOUT_MS,
+  JUDGE_LLM_TIMEOUT_MS,
+  DEFAULT_DIFF_PRIORITY_BOOST,
+  VISUAL_MINOR_RATIO,
+  DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS,
+  BOOTSTRAP_POLL_INTERVAL_MS,
+} from './constants.js';
 
 /**
  * Zod schema for a model string that rejects unknown provider prefixes (#224).
@@ -213,7 +221,7 @@ const VisualRegressionSchema = z
   .object({
     enabled: z.boolean().default(false),
     baselineDir: z.string().default('./.dramaturge/visual-baselines'),
-    diffPixelRatioThreshold: z.number().min(0).max(1).default(0.01),
+    diffPixelRatioThreshold: z.number().min(0).max(1).default(VISUAL_MINOR_RATIO),
     includeAA: z.boolean().default(false),
     fullPage: z.boolean().default(true),
     maskSelectors: z.array(z.string()).default([]),
@@ -221,7 +229,7 @@ const VisualRegressionSchema = z
   .default({
     enabled: false,
     baselineDir: './.dramaturge/visual-baselines',
-    diffPixelRatioThreshold: 0.01,
+    diffPixelRatioThreshold: VISUAL_MINOR_RATIO,
     includeAA: false,
     fullPage: true,
     maskSelectors: [],
@@ -279,14 +287,14 @@ const VisionAnalysisSchema = z
     /** Maximum tokens for the vision model response. */
     maxResponseTokens: z.number().int().min(64).default(1024),
     /** Request timeout in milliseconds for vision API calls. */
-    requestTimeoutMs: z.number().int().min(1000).default(30_000),
+    requestTimeoutMs: z.number().int().min(1000).default(DEFAULT_LLM_TIMEOUT_MS),
   })
   .default({
     enabled: false,
     model: 'anthropic/claude-sonnet-4-20250514',
     fullPage: false,
     maxResponseTokens: 1024,
-    requestTimeoutMs: 30_000,
+    requestTimeoutMs: DEFAULT_LLM_TIMEOUT_MS,
   });
 
 const ApiTestingSchema = z
@@ -324,7 +332,7 @@ const AdversarialSchema = z
 const JudgeSchema = z
   .object({
     enabled: z.boolean().default(true),
-    requestTimeoutMs: z.number().int().min(100).default(15_000),
+    requestTimeoutMs: z.number().int().min(100).default(JUDGE_LLM_TIMEOUT_MS),
     /** Drop findings the judge rejects instead of shipping them (#206). */
     dropRejected: z.boolean().default(true),
     /** Minimum confidence a finding must carry to be reported (#206). */
@@ -332,7 +340,7 @@ const JudgeSchema = z
   })
   .default({
     enabled: true,
-    requestTimeoutMs: 15_000,
+    requestTimeoutMs: JUDGE_LLM_TIMEOUT_MS,
     dropRejected: true,
     minConfidence: 'low',
   });
@@ -415,10 +423,10 @@ const BrowserSchema = z
 
 const LlmSchema = z
   .object({
-    requestTimeoutMs: z.number().int().min(100).default(30_000),
+    requestTimeoutMs: z.number().int().min(100).default(DEFAULT_LLM_TIMEOUT_MS),
   })
   .default({
-    requestTimeoutMs: 30_000,
+    requestTimeoutMs: DEFAULT_LLM_TIMEOUT_MS,
   });
 
 const ConcurrencySchema = z
@@ -459,12 +467,12 @@ const DiffAwareSchema = z
     /** When true, restrict exploration to only areas matching the detected diff. */
     restrictToChanged: z.boolean().default(false),
     /** Priority boost applied to state graph nodes matching changed areas (0-1). */
-    priorityBoost: z.number().min(0).max(1).default(0.3),
+    priorityBoost: z.number().min(0).max(1).default(DEFAULT_DIFF_PRIORITY_BOOST),
   })
   .default({
     enabled: false,
     restrictToChanged: false,
-    priorityBoost: 0.3,
+    priorityBoost: DEFAULT_DIFF_PRIORITY_BOOST,
   });
 
 const RepoContextSchema = z
@@ -511,6 +519,10 @@ const BootstrapSchema = z
     readyUrl: z.string().optional(),
     readyIndicator: z.string().optional(),
     timeoutSeconds: z.number().int().min(5).default(120),
+    /** Timeout (ms) for each readiness probe request. */
+    readyRequestTimeoutMs: z.number().int().min(100).default(DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS),
+    /** Interval (ms) between readiness polls. */
+    pollIntervalMs: z.number().int().min(50).default(BOOTSTRAP_POLL_INTERVAL_MS),
   })
   .refine((value) => value.mode !== 'trusted' || value.args.length === 0, {
     message:

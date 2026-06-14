@@ -11,6 +11,7 @@ import {
   captureStorageState,
   type BrowserStorageState,
 } from './storage-state.js';
+import { CACHED_AUTH_VALIDATION_TIMEOUT_MS } from '../constants.js';
 
 /**
  * Interactive auth strategy: tries cached browser state first, falling back to
@@ -52,7 +53,7 @@ export async function authenticateInteractive({
 
       // Quick check — 10 s timeout
       const page = getPrimaryPage(browser, 'interactive authentication');
-      await waitForSuccess(page, indicator, 10_000);
+      await waitForSuccess(page, indicator, CACHED_AUTH_VALIDATION_TIMEOUT_MS);
       console.log('  Cached state is still valid.');
       return;
     } catch {

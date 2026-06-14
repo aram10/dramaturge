@@ -3,6 +3,7 @@
 
 import type { Stagehand } from '@browserbasehq/stagehand';
 import type { PageType } from '../types.js';
+import { FORM_PAGE_MIN_INPUTS } from '../constants.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
@@ -108,7 +109,7 @@ function classifyFromSignals(s: ClassificationSignals): PageType {
   }
 
   // Form pages (many inputs, few or no tables)
-  if (s.formCount > 0 && s.inputCount >= 3 && s.tableCount === 0) {
+  if (s.formCount > 0 && s.inputCount >= FORM_PAGE_MIN_INPUTS && s.tableCount === 0) {
     return 'form';
   }
 
