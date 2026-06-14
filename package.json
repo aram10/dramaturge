@@ -66,6 +66,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "check:licenses": "node scripts/check-license-headers.mjs",
+    "sync:issues": "node scripts/sync-github-issues.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

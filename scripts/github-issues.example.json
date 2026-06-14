@@ -1,0 +1,27 @@
+{
+  "label": "sync:managed",
+  "issues": [
+    {
+      "key": "flaky-page-detection-threshold",
+      "title": "Make flaky-page detection threshold configurable",
+      "body": "The memory subsystem hard-codes the threshold for marking a page as flaky.\n\nExpose it through the Zod config schema so runs can tune sensitivity per target.\n\n- [ ] Add config field with a sensible default\n- [ ] Thread it into the flaky-page tracker\n- [ ] Cover with a unit test",
+      "labels": ["enhancement", "memory"],
+      "state": "open"
+    },
+    {
+      "key": "adversarial-rate-limit-docs",
+      "title": "Document rate-limit guidance for adversarial workers",
+      "body": "Adversarial workers can issue bursts of requests during injection and race-condition probes.\n\nAdd docs describing how to throttle them safely against shared or production-like targets.",
+      "labels": ["documentation", "adversarial"],
+      "state": "open",
+      "assignees": ["aram10"]
+    },
+    {
+      "key": "legacy-spike-task",
+      "title": "Spike: prototype the old reporting format",
+      "body": "Superseded by the current Markdown/JSON report generator. Closing as no longer needed.",
+      "labels": ["spike"],
+      "state": "closed"
+    }
+  ]
+}
