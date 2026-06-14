@@ -10,9 +10,13 @@ import type {
   StateDiscoveredEvent,
   ProgressEvent,
   ErrorEvent,
+  A2ATaskEvent,
+  A2AMessageEvent,
+  A2ABlackboardEvent,
 } from '../engine/event-stream.js';
 import type { AgentRole } from '../types.js';
-import type { A2ATaskStatus, BlackboardEntryKind } from '../a2a/types.js';
+
+export type { A2ATaskEvent, A2AMessageEvent, A2ABlackboardEvent };
 
 // --- Activity feed item ---
 
@@ -50,27 +54,7 @@ export interface AgentStatus {
   currentStatus: 'idle' | 'working' | 'completed';
 }
 
-// --- A2A event payloads ---
-
-export interface A2ATaskEvent {
-  taskId: string;
-  agentId: string;
-  agentRole: AgentRole;
-  status: A2ATaskStatus;
-  objective: string;
-}
-
-export interface A2AMessageEvent {
-  fromAgent: string;
-  toAgent: string;
-  text: string;
-}
-
-export interface A2ABlackboardEvent {
-  kind: BlackboardEntryKind;
-  agentId: string;
-  summary: string;
-}
+// --- A2A event payloads (re-exported from event-stream.js) ---
 
 // --- Dashboard state ---
 
@@ -277,7 +261,9 @@ export function applyA2ATask(
   const agents = ensureAgent(state.agents, evt.agentId, evt.agentRole);
   const agent = agents[evt.agentId];
 
-  const isAssignment = evt.status === 'submitted' || evt.status === 'working';
+  // Count an assignment exactly once per task — on its initial 'submitted'
+  // transition — so that the subsequent 'working' update does not double-count.
+  const isAssignment = evt.status === 'submitted';
   const isCompletion = evt.status === 'completed';
 
   agents[evt.agentId] = {
@@ -299,7 +285,12 @@ export function applyA2ATask(
 
   return {
     ...pushActivity(
-      { ...state, a2aEnabled: true, agents, a2aTasksTotal: state.a2aTasksTotal + 1 },
+      {
+        ...state,
+        a2aEnabled: true,
+        agents,
+        a2aTasksTotal: isAssignment ? state.a2aTasksTotal + 1 : state.a2aTasksTotal,
+      },
       'a2a-task',
       text,
       now
