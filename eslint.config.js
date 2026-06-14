@@ -60,6 +60,23 @@ export default [
       'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }],
       complexity: ['warn', { max: 20 }],
       'max-depth': ['warn', { max: 4 }],
+
+      // Discourage bare magic numbers in source logic. Named constants belong in
+      // src/constants.ts (invariants) or config.ts (operator-tunable knobs). Warn
+      // (not error) so the long tail beyond the curated catalog surfaces without
+      // blocking CI; tests and framework fixtures are exempt below / via ignores.
+      '@typescript-eslint/no-magic-numbers': [
+        'warn',
+        {
+          ignore: [-1, 0, 1, 2],
+          ignoreArrayIndexes: true,
+          ignoreDefaultValues: true,
+          enforceConst: true,
+          ignoreEnums: true,
+          ignoreNumericLiteralTypes: true,
+          ignoreReadonlyClassProperties: true,
+        },
+      ],
     },
   },
   {
@@ -72,6 +89,8 @@ export default [
       // settings are intentionally relaxed here.
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      // Test files use literal fixtures and assertions freely.
+      '@typescript-eslint/no-magic-numbers': 'off',
     },
   },
 ];

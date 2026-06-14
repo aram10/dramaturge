@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadConfig, resolveOutputFormats } from './config.js';
 import { parseJsoncObject } from './utils/jsonc.js';
+import { DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS, BOOTSTRAP_POLL_INTERVAL_MS } from './constants.js';
 
 const tempDirs: string[] = [];
 
@@ -123,6 +124,8 @@ describe('loadConfig', () => {
       timeoutSeconds: 90,
       mode: 'trusted',
       args: [],
+      readyRequestTimeoutMs: DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS,
+      pollIntervalMs: BOOTSTRAP_POLL_INTERVAL_MS,
     });
   });
 
