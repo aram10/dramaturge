@@ -64,8 +64,19 @@ export async function initWorkerPool(
 
   if (failures.length > 0) {
     await closeWorkerPool(sessions);
-    const reason = failures[0];
-    throw reason instanceof Error ? reason : new Error(String(reason));
+    const messages = failures.map((reason) =>
+      reason instanceof Error ? reason.message : String(reason)
+    );
+    const summary =
+      failures.length === 1
+        ? messages[0]
+        : `${failures.length} worker(s) failed to initialize: ${messages.join('; ')}`;
+    const aggregated = new Error(summary);
+    // Preserve the first underlying error for debugging via the standard cause chain.
+    if (failures[0] instanceof Error) {
+      aggregated.cause = failures[0];
+    }
+    throw aggregated;
   }
 
   return sessions;

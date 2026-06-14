@@ -765,6 +765,8 @@ describe('loadConfig strict validation and env interpolation', () => {
       targetUrl: 'https://example.com',
       appDescription: 'app',
       auth: { type: 'none' },
+      // `stpsPerArea` is an intentional typo of the valid `stepsPerArea` key;
+      // the strict schema must reject it rather than silently ignoring it.
       exploration: { maxAreasToExplore: 5, stpsPerArea: 40 },
     });
     expect(() => loadConfig(configPath)).toThrow(/Invalid config file/);

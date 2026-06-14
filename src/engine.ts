@@ -483,7 +483,8 @@ function subscribeA2AToEventStream(options: {
     if (typeof entry.data.summary === 'string') return entry.data.summary;
     if (typeof entry.data.title === 'string') return entry.data.title;
     if (typeof entry.data.objective === 'string') return entry.data.objective;
-    return JSON.stringify(entry.data).slice(0, 60);
+    const serialized = JSON.stringify(entry.data);
+    return serialized.length > 60 ? `${serialized.slice(0, 60)}…` : serialized;
   };
 
   const unsubBlackboard = blackboard.subscribe('*', (entry) => {
