@@ -233,12 +233,11 @@ function desiredLabels(issue, markerLabel) {
 }
 
 async function githubRequest(options, method, path, body) {
-  const authScheme = 'Bea' + 'rer';
   const response = await fetch(`${API_ROOT}${path}`, {
     method,
     headers: {
       Accept: 'application/vnd.github+json',
-      Authorization: `${authScheme} ${options.token}`,
+      Authorization: `Bearer ${options.token}`,
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'dramaturge-sync-github-issues',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
