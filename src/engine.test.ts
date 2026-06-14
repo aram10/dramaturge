@@ -63,9 +63,11 @@ describe('runEngine bootstrap readiness', () => {
   it('passes the bootstrap process status into readiness checks and cleans up on failure', async () => {
     const page = {};
     const closeContext = vi.fn().mockResolvedValue(undefined);
+    const closeStagehand = vi.fn().mockResolvedValue(undefined);
     const newPage = vi.fn().mockReturnValue({});
     const stagehand = {
       init: vi.fn().mockResolvedValue(undefined),
+      close: closeStagehand,
       context: {
         pages: () => [page],
         newPage,
@@ -147,7 +149,7 @@ describe('runEngine bootstrap readiness', () => {
     };
     readinessOptions.newPage();
     expect(newPage).toHaveBeenCalled();
-    expect(closeContext).toHaveBeenCalled();
+    expect(closeStagehand).toHaveBeenCalled();
     expect(bootstrapMocks.stopBootstrapProcess).toHaveBeenCalledWith(bootstrapStatus);
   });
 });

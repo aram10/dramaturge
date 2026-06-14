@@ -40,6 +40,7 @@ import {
 import { emitEngineEvent, type EngineEventEmitter } from './engine/event-stream.js';
 import { adaptStagehand } from './browser/page-interface.js';
 import { createEngineLogger } from './engine/logger.js';
+import type { EngineLogger } from './engine/logger.js';
 import { finalizeRun } from './engine/finalize-run.js';
 import { runPlannerLoop } from './engine/main-loop.js';
 import {
@@ -387,10 +388,49 @@ export async function runEngine(
     logger.error('Fatal engine error', { message });
     throw error;
   } finally {
-    errorCollector.detach();
-    trafficObserver.detach();
-    await closeWorkerPool(workerPool);
-    await stagehand.context.close();
-    stopBootstrapProcess(bootstrapProcess);
+    await teardownEngineRun({
+      errorCollector,
+      trafficObserver,
+      workerPool,
+      stagehand,
+      bootstrapProcess,
+      logger,
+    });
   }
+}
+
+interface TeardownEngineRunOptions {
+  errorCollector: BrowserErrorCollector;
+  trafficObserver: NetworkTrafficObserver;
+  workerPool: WorkerSession[];
+  stagehand: ReturnType<typeof createStagehand>;
+  bootstrapProcess: BootstrapStatus | undefined;
+  logger: EngineLogger;
+}
+
+/**
+ * Tear down a run's resources. Each step is guarded so that a failure in one
+ * does not prevent the others from running — in particular, the user's
+ * bootstrap dev-server must always be stopped even if browser teardown throws.
+ */
+async function teardownEngineRun(options: TeardownEngineRunOptions): Promise<void> {
+  const { errorCollector, trafficObserver, workerPool, stagehand, bootstrapProcess, logger } =
+    options;
+
+  const runTeardownStep = async (label: string, step: () => void | Promise<void>) => {
+    try {
+      await step();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn('Engine teardown step failed', { step: label, message });
+    }
+  };
+
+  await runTeardownStep('error-collector-detach', () => errorCollector.detach());
+  await runTeardownStep('traffic-observer-detach', () => trafficObserver.detach());
+  await runTeardownStep('close-worker-pool', () => closeWorkerPool(workerPool));
+  // Close the whole Stagehand instance (browser + context), not just the
+  // context, so the primary browser process is not left running.
+  await runTeardownStep('close-primary-browser', () => stagehand.close());
+  await runTeardownStep('stop-bootstrap', () => stopBootstrapProcess(bootstrapProcess));
 }

@@ -760,6 +760,16 @@ describe('loadConfig strict validation and env interpolation', () => {
     expect(() => loadConfig(configPath)).toThrow(/Invalid config file/);
   });
 
+  it('rejects unknown keys in the exploration section (#223)', () => {
+    const configPath = writeConfig({
+      targetUrl: 'https://example.com',
+      appDescription: 'app',
+      auth: { type: 'none' },
+      exploration: { maxAreasToExplore: 5, stpsPerArea: 40 },
+    });
+    expect(() => loadConfig(configPath)).toThrow(/Invalid config file/);
+  });
+
   it('rejects an unknown model provider prefix (#224)', () => {
     const configPath = writeConfig({
       targetUrl: 'https://example.com',
