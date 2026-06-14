@@ -1,4 +1,78 @@
 {
   "label": "sync:managed",
-  "issues": []
+  "issues": [],
+  "manage": [
+    {
+      "number": 201,
+      "state": "closed",
+      "commentKey": "h4-resolved",
+      "comment": "Resolved on main and verified against the current tree. engine.ts now calls stagehand.close() with each teardown step isolated (src/engine.ts:427), and the worker pool uses Promise.allSettled, closing already-started sessions on partial failure (src/engine/worker-pool.ts:38). The browser/process leak (H4) no longer reproduces. Closing."
+    },
+    {
+      "number": 219,
+      "state": "closed",
+      "commentKey": "m3-resolved",
+      "comment": "Resolved. fingerprint.ts strips volatile numeric counters before hashing, so a title like 'Inbox (3)' no longer fragments a page into a new node per visit (src/graph/fingerprint.ts:60-77), and navigator.ts relaxes verifyArrival to path + UI markers. Fingerprint instability (M3) is fixed. Closing."
+    },
+    {
+      "number": 233,
+      "state": "closed",
+      "commentKey": "m17-resolved",
+      "comment": "Resolved (de83ccf). The traffic observer builds its sample before record(), caps the response body before JSON.parse in both the observer and api/replay.ts, and drops dead responses. The traffic-observer defect (M17) is fixed. Closing."
+    },
+    {
+      "number": 254,
+      "state": "closed",
+      "commentKey": "l13-resolved",
+      "comment": "Resolved. The diff invocation uses the array form execFileSync('git', ['diff', ..., baseRef]), so there is no shell-injection surface, and the AJV compiled-validator cache is LRU-bounded at 256 entries (src/spec/ajv.ts:25). Diff injection / AJV cache growth (L13) is fixed. Closing."
+    },
+    {
+      "number": 229,
+      "state": "closed",
+      "commentKey": "m13-resolved",
+      "comment": "Resolved (f0c6bac). MessageBus delivery wraps each handler in try/catch over a snapshot of [...handlers] (src/a2a/message-bus.ts:85-86), and terminal Coordinator tasks are evicted into a bounded map. The MessageBus/Coordinator defect (M13) is fixed. Closing."
+    },
+    {
+      "number": 225,
+      "state": "closed",
+      "commentKey": "m9-resolved",
+      "comment": "Resolved (af2fe96). The dashboard subscribes to a2a:task events (src/dashboard/app.tsx) and cli.ts wraps runEngine in a try/finally cleanup. The dashboard A2A panel defect (M9) is fixed. Closing."
+    },
+    {
+      "number": 239,
+      "state": "closed",
+      "commentKey": "m23-mostly-resolved",
+      "comment": "Mostly resolved: format:check now passes (was 71 files) and lint exits 0 (31 warnings). Caveat for the record: before treating the gate as fully hardened, confirm CI enforces eslint --max-warnings 0 and un-ignores scripts/ and action/. Closing because the prettier/lint gate (M23) is green; the hardening caveat can be tracked separately if desired."
+    },
+    {
+      "number": 259,
+      "state": "closed",
+      "commentKey": "sd2-complete",
+      "comment": "Epic complete. Sub-findings H9/H10/L9/L11 landed via 1e0d160 (contradicted-finding rejection, stable signatures, recurring-finding surfacing), and the verdict field shipped (src/judge/judge.ts:58). 'Make the judge judge' (SD2) is done. Closing."
+    },
+    {
+      "number": 260,
+      "state": "closed",
+      "commentKey": "sd3-complete",
+      "comment": "Epic complete. All four sub-findings (CR2/M16/M12/M15) landed via e7b266c / 0e4b9cf / 6f2fdc9. The safety-boundary epic (SD3) is done. Closing."
+    },
+    {
+      "number": 262,
+      "state": "closed",
+      "commentKey": "sd5-complete",
+      "comment": "Epic complete. H11/H16 landed via da50da1 (atomic writes + load-or-fresh). The remaining ledger work is arguably separate and is tracked under #255. The durability epic (SD5) is done. Closing."
+    },
+    {
+      "number": 200,
+      "state": "open",
+      "commentKey": "h3-still-valid",
+      "comment": "Triage: confirmed still valid against the current tree and is the highest-value open bug. CostTracker.record() has no production callers, so execute-frontier-item.ts reads getRecords(), which is always empty (src/engine/execute-frontier-item.ts:102), and the frontier loop performs no overBudget check. The cost budget (H3) is never enforced, and as a side effect the Cost section in reports always shows ~$0 -- a credibility issue. Keeping open."
+    },
+    {
+      "number": 211,
+      "state": "open",
+      "commentKey": "h14-still-valid",
+      "comment": "Triage: confirmed still valid. The benchmark runner reads a different directory than the engine writes to (the engine writes results under output.dir/), so the runner finds nothing. The benchmark-runner directory mismatch (H14) is still present. Keeping open."
+    }
+  ]
 }

@@ -37,6 +37,42 @@ Edit the manifest, review the dry-run, then apply.
 `scripts/github-issues.example.json` shows all three operations (add, modify,
 close) together.
 
+## Managing pre-existing issues (`manage`)
+
+Issues that already exist and were **not** created by this script (e.g. the
+review batch #200–#262) are addressed by **number**, in a separate `manage`
+array:
+
+```jsonc
+{
+  "label": "sync:managed",
+  "issues": [],
+  "manage": [
+    {
+      "number": 201, // REQUIRED: the existing issue number
+      "state": "closed", // optional: "open" or "closed"
+      "labels": ["wontfix"], // optional: ADDITIVE — never strips existing labels
+      "commentKey": "h4-resolved", // optional: stable id for the comment marker
+      "comment": "Resolved on main. ... Closing." // optional: posted at most once
+    }
+  ]
+}
+```
+
+Idempotency for `manage` entries:
+
+- **state** — only changed when the live state differs from the desired one
+  (so an already-open issue you keep open is a no-op).
+- **labels** — additive; the script only adds missing labels and never removes
+  human-applied ones.
+- **comment** — each comment embeds `<!-- sync-comment: <commentKey> -->`. The
+  comment is posted only if that marker is not already present, so re-running
+  never duplicates it. Comments are posted **before** any state change, so a
+  closing rationale lands ahead of the close event.
+
+This is how the script "closes some, modifies others, and keeps the rest open"
+across an existing tracker without ever touching issues you manage by hand.
+
 ### Identity & idempotency
 
 Each managed issue is tracked two ways:
@@ -51,10 +87,12 @@ Each managed issue is tracked two ways:
 
 | Situation                                            | Action                |
 | ---------------------------------------------------- | --------------------- |
-| `key` in manifest, not on GitHub                     | **create** the issue  |
-| `key` in manifest and on GitHub, fields differ       | **update** the issue  |
-| `key` in manifest with `"state": "closed"`           | ensure issue closed   |
+| `issues[].key` in manifest, not on GitHub            | **create** the issue  |
+| `issues[].key` in manifest and on GitHub, fields differ | **update** the issue |
+| `issues[].key` with `"state": "closed"`              | ensure issue closed   |
 | Managed issue whose `key` was removed from manifest  | **close** it (prune)  |
+| `manage[]` entry, live state differs                 | **update** state      |
+| `manage[]` entry with a new `comment`                | **post** comment once |
 | Everything already matches                           | no-op                 |
 
 Pruning (closing issues that left the manifest) is on by default; pass

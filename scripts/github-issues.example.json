@@ -23,5 +23,20 @@
       "labels": ["spike"],
       "state": "closed"
     }
+  ],
+  "manage": [
+    {
+      "number": 123,
+      "state": "closed",
+      "commentKey": "fixed-on-main",
+      "comment": "Resolved on main (commit abc1234). Verified against the current tree. Closing."
+    },
+    {
+      "number": 124,
+      "state": "open",
+      "labels": ["confirmed"],
+      "commentKey": "still-valid",
+      "comment": "Triage: confirmed still reproducible. Keeping open."
+    }
   ]
 }

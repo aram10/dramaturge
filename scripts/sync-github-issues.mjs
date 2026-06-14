@@ -15,13 +15,19 @@
 //      (<!-- sync-key: <key> -->). The key — not the title — is the identity,
 //      so titles and bodies can be edited freely without losing the link.
 //
-// Reconciliation rules:
+// Reconciliation rules (key-based "issues"):
 //   - Manifest key not yet on GitHub        -> create the issue (adding new ones)
 //   - Manifest key already on GitHub, drift  -> patch title/body/labels/state/...
 //                                               (modifying others)
 //   - Managed issue whose key left manifest  -> close it (closing some), unless
 //                                               --no-prune is passed
 //   - Manifest entry with "state": "closed"  -> ensure the issue is closed
+//
+// Pre-existing issues ("manage"): issues the script did not create are addressed
+// by number. Each manage entry can set the issue state (open/closed), add labels
+// (additive — human labels are never stripped), and post a one-time explanatory
+// comment. Comments carry a marker (<!-- sync-comment: <commentKey> -->) so they
+// are posted at most once, keeping the operation idempotent.
 //
 // Safety: the script is DRY-RUN by default and only prints the plan. Pass
 // --apply to perform writes. A token with `repo`/`issues:write` scope is
@@ -47,6 +53,7 @@ const REPO_ROOT = resolve(SCRIPT_DIR, '..');
 const DEFAULT_MANIFEST = resolve(SCRIPT_DIR, 'github-issues.json');
 const DEFAULT_MARKER_LABEL = 'sync:managed';
 const KEY_COMMENT_PREFIX = 'sync-key:';
+const COMMENT_MARKER_PREFIX = 'sync-comment:';
 const API_ROOT = 'https://api.github.com';
 
 function parseArgs(argv) {
@@ -133,6 +140,14 @@ function extractKey(body) {
   return match ? match[1] : null;
 }
 
+function commentMarker(commentKey) {
+  return `<!-- ${COMMENT_MARKER_PREFIX} ${commentKey} -->`;
+}
+
+function manageCommentKey(entry) {
+  return entry.commentKey ?? `sync-${entry.number}`;
+}
+
 function composeBody(issue) {
   // The marker comment is the durable identity. We keep it on its own trailing
   // line so the rendered issue stays clean.
@@ -175,6 +190,40 @@ function validateManifest(manifest) {
     }
     if (issue.state && issue.state !== 'open' && issue.state !== 'closed') {
       throw new Error(`Issue "${issue.key}" has invalid state "${issue.state}".`);
+    }
+  }
+
+  validateManageEntries(manifest.manage);
+}
+
+// "manage" entries operate on pre-existing issues addressed by number (issues
+// the script did not itself create). They support an idempotent state change
+// plus a one-time explanatory comment, and additive labels.
+function validateManageEntries(manage) {
+  if (manage === undefined) {
+    return;
+  }
+  if (!Array.isArray(manage)) {
+    throw new Error('Manifest "manage" must be an array when present.');
+  }
+
+  const seenNumbers = new Set();
+  for (const entry of manage) {
+    if (!Number.isInteger(entry.number) || entry.number <= 0) {
+      throw new Error('Every manage entry requires a positive integer "number".');
+    }
+    if (seenNumbers.has(entry.number)) {
+      throw new Error(`Duplicate manage number: #${entry.number}`);
+    }
+    seenNumbers.add(entry.number);
+    if (entry.state && entry.state !== 'open' && entry.state !== 'closed') {
+      throw new Error(`Manage entry #${entry.number} has invalid state "${entry.state}".`);
+    }
+    if (entry.comment !== undefined && typeof entry.comment !== 'string') {
+      throw new Error(`Manage entry #${entry.number} "comment" must be a string.`);
+    }
+    if (entry.labels !== undefined && !Array.isArray(entry.labels)) {
+      throw new Error(`Manage entry #${entry.number} "labels" must be an array.`);
     }
   }
 }
@@ -225,6 +274,38 @@ async function fetchManagedIssues(options, repo, markerLabel) {
   return issues;
 }
 
+async function fetchIssueComments(options, repo, number) {
+  const comments = [];
+  for (let page = 1; ; page++) {
+    const batch = await githubRequest(
+      options,
+      'GET',
+      `/repos/${repo}/issues/${number}/comments?per_page=100&page=${page}`
+    );
+    comments.push(...batch);
+    if (batch.length < 100) {
+      break;
+    }
+  }
+  return comments;
+}
+
+async function fetchManageContext(options, repo, manage) {
+  const context = new Map();
+  for (const entry of manage ?? []) {
+    let issue;
+    try {
+      issue = await githubRequest(options, 'GET', `/repos/${repo}/issues/${entry.number}`);
+    } catch (error) {
+      console.error(`  warning: could not fetch #${entry.number}: ${error.message}`);
+      continue;
+    }
+    const comments = entry.comment ? await fetchIssueComments(options, repo, entry.number) : [];
+    context.set(entry.number, { issue, comments });
+  }
+  return context;
+}
+
 function diffIssue(existing, issue, markerLabel) {
   const changes = {};
   if (existing.title !== issue.title) {
@@ -268,7 +349,7 @@ function buildPlan(manifest, managedIssues, markerLabel, prune) {
     }
   }
 
-  const plan = { create: [], update: [], close: [] };
+  const plan = { create: [], update: [], close: [], comment: [] };
   const manifestKeys = new Set();
 
   for (const issue of manifest.issues) {
@@ -295,6 +376,93 @@ function buildPlan(manifest, managedIssues, markerLabel, prune) {
   return plan;
 }
 
+function manageDiff(existing, entry) {
+  const changes = {};
+
+  const desiredState = entry.state ?? existing.state;
+  if (existing.state !== desiredState) {
+    changes.state = desiredState;
+  }
+
+  if (entry.labels && entry.labels.length > 0) {
+    const existingLabels = (existing.labels ?? []).map((label) =>
+      typeof label === 'string' ? label : label.name
+    );
+    const missing = entry.labels.filter((label) => !existingLabels.includes(label));
+    if (missing.length > 0) {
+      // Labels are additive for pre-existing issues — never strip human-applied labels.
+      changes.labels = Array.from(new Set([...existingLabels, ...entry.labels]));
+    }
+  }
+
+  return changes;
+}
+
+// Build the plan for pre-existing issues. `context` maps issue number ->
+// { issue, comments }. Entries with no fetched data (e.g. a deleted issue) are
+// skipped. Comments are only planned when their marker is absent — idempotent.
+function buildManagePlan(manifest, context) {
+  const plan = { update: [], comment: [] };
+
+  for (const entry of manifest.manage ?? []) {
+    const data = context.get(entry.number);
+    if (!data) {
+      continue;
+    }
+
+    if (entry.comment) {
+      const key = manageCommentKey(entry);
+      const marker = commentMarker(key);
+      const alreadyPosted = (data.comments ?? []).some((c) => (c.body ?? '').includes(marker));
+      if (!alreadyPosted) {
+        plan.comment.push({
+          number: entry.number,
+          commentKey: key,
+          body: `${entry.comment.trim()}\n\n${marker}`,
+        });
+      }
+    }
+
+    const changes = manageDiff(data.issue, entry);
+    if (Object.keys(changes).length > 0) {
+      plan.update.push({ number: entry.number, key: `#${entry.number}`, changes });
+    }
+  }
+
+  return plan;
+}
+
+// Token-less preview: assume every manage entry needs its declared action.
+function buildManagePlanPreview(manifest) {
+  const plan = { update: [], comment: [] };
+
+  for (const entry of manifest.manage ?? []) {
+    if (entry.comment) {
+      const key = manageCommentKey(entry);
+      plan.comment.push({
+        number: entry.number,
+        commentKey: key,
+        body: `${entry.comment.trim()}\n\n${commentMarker(key)}`,
+      });
+    }
+    if (entry.state) {
+      plan.update.push({
+        number: entry.number,
+        key: `#${entry.number}`,
+        changes: { state: entry.state },
+      });
+    }
+  }
+
+  return plan;
+}
+
+function mergeManagePlan(plan, managePlan) {
+  plan.update.push(...managePlan.update);
+  plan.comment.push(...managePlan.comment);
+  return plan;
+}
+
 function describePlan(plan) {
   const lines = [];
   for (const issue of plan.create) {
@@ -306,6 +474,9 @@ function describePlan(plan) {
   }
   for (const item of plan.close) {
     lines.push(`  CLOSE   #${item.number} [${item.key}] ${item.title}`);
+  }
+  for (const item of plan.comment ?? []) {
+    lines.push(`  COMMENT #${item.number} [${item.commentKey}]`);
   }
   return lines;
 }
@@ -325,6 +496,15 @@ async function applyPlan(options, repo, plan, markerLabel) {
       });
     }
     console.log(`  created #${created.number} [${issue.key}]`);
+  }
+
+  // Post explanatory comments before state changes so a closing rationale lands
+  // ahead of the close event.
+  for (const item of plan.comment ?? []) {
+    await githubRequest(options, 'POST', `/repos/${repo}/issues/${item.number}/comments`, {
+      body: item.body,
+    });
+    console.log(`  commented #${item.number} [${item.commentKey}]`);
   }
 
   for (const item of plan.update) {
@@ -368,6 +548,14 @@ async function main() {
 
   const managedIssues = options.token ? await fetchManagedIssues(options, repo, markerLabel) : [];
   const plan = buildPlan(manifest, managedIssues, markerLabel, options.prune);
+
+  if (options.token) {
+    const context = await fetchManageContext(options, repo, manifest.manage);
+    mergeManagePlan(plan, buildManagePlan(manifest, context));
+  } else {
+    mergeManagePlan(plan, buildManagePlanPreview(manifest));
+  }
+
   const lines = describePlan(plan);
 
   if (lines.length === 0) {
@@ -397,4 +585,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   });
 }
 
-export { buildPlan, diffIssue, extractKey, composeBody, validateManifest, desiredLabels };
+export {
+  buildPlan,
+  buildManagePlan,
+  buildManagePlanPreview,
+  manageDiff,
+  diffIssue,
+  extractKey,
+  composeBody,
+  commentMarker,
+  validateManifest,
+  desiredLabels,
+};
