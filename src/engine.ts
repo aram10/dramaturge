@@ -40,6 +40,7 @@ import {
 import { emitEngineEvent, type EngineEventEmitter } from './engine/event-stream.js';
 import { adaptStagehand } from './browser/page-interface.js';
 import { createEngineLogger } from './engine/logger.js';
+import type { EngineLogger } from './engine/logger.js';
 import { finalizeRun } from './engine/finalize-run.js';
 import { runPlannerLoop } from './engine/main-loop.js';
 import {
@@ -51,6 +52,7 @@ import { attachSafetyRequestGuard, createSafetyGuardForConfig } from './engine/s
 import { Blackboard } from './a2a/blackboard.js';
 import { MessageBus } from './a2a/message-bus.js';
 import { Coordinator } from './a2a/coordinator.js';
+import type { BlackboardEntry, A2AMessage } from './a2a/types.js';
 import type { WorkflowAutomataRuntimeState } from './workflow-automata/types.js';
 
 function resolveBudget(config: DramaturgeConfig): BudgetConfig {
@@ -245,21 +247,8 @@ export async function runEngine(
   );
 
   // A2A multi-agent coordination layer (optional)
-  let blackboard: Blackboard | undefined;
-  let messageBus: MessageBus | undefined;
-  let coordinator: Coordinator | undefined;
-
-  if (config.a2a.enabled) {
-    blackboard = new Blackboard({ maxEntries: config.a2a.maxBlackboardEntries });
-    messageBus = new MessageBus({ maxHistory: config.a2a.maxMessageHistory });
-    coordinator = new Coordinator({ blackboard, messageBus });
-    coordinator.diffPriorityBoost = config.diffAware.priorityBoost;
-    logger.info('A2A multi-agent mode enabled', {
-      agents: coordinator.listAgents().length,
-      blackboardMaxEntries: config.a2a.maxBlackboardEntries,
-      messageBusMaxHistory: config.a2a.maxMessageHistory,
-    });
-  }
+  const a2a = setupA2ALayer({ config, eventStream, logger });
+  const { blackboard, messageBus, coordinator, a2aUnsubscribers } = a2a;
 
   // Use the coordinator in the planner role when A2A is enabled.
   const planner = coordinator ?? new Planner();
@@ -387,10 +376,138 @@ export async function runEngine(
     logger.error('Fatal engine error', { message });
     throw error;
   } finally {
-    errorCollector.detach();
-    trafficObserver.detach();
-    await closeWorkerPool(workerPool);
-    await stagehand.context.close();
-    stopBootstrapProcess(bootstrapProcess);
+    await teardownEngineRun({
+      errorCollector,
+      trafficObserver,
+      workerPool,
+      stagehand,
+      bootstrapProcess,
+      logger,
+      a2aUnsubscribers,
+    });
   }
+}
+
+interface TeardownEngineRunOptions {
+  errorCollector: BrowserErrorCollector;
+  trafficObserver: NetworkTrafficObserver;
+  workerPool: WorkerSession[];
+  stagehand: ReturnType<typeof createStagehand>;
+  bootstrapProcess: BootstrapStatus | undefined;
+  logger: EngineLogger;
+  a2aUnsubscribers: Array<() => void>;
+}
+
+/**
+ * Tear down a run's resources. Each step is guarded so that a failure in one
+ * does not prevent the others from running — in particular, the user's
+ * bootstrap dev-server must always be stopped even if browser teardown throws.
+ */
+async function teardownEngineRun(options: TeardownEngineRunOptions): Promise<void> {
+  const { errorCollector, trafficObserver, workerPool, stagehand, bootstrapProcess, logger } =
+    options;
+
+  const runTeardownStep = async (label: string, step: () => void | Promise<void>) => {
+    try {
+      await step();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn('Engine teardown step failed', { step: label, message });
+    }
+  };
+
+  for (const [i, unsubscribe] of options.a2aUnsubscribers.entries()) {
+    await runTeardownStep(`a2a-unsubscribe-${i}`, () => unsubscribe());
+  }
+  await runTeardownStep('error-collector-detach', () => errorCollector.detach());
+  await runTeardownStep('traffic-observer-detach', () => trafficObserver.detach());
+  await runTeardownStep('close-worker-pool', () => closeWorkerPool(workerPool));
+  // Close the whole Stagehand instance (browser + context), not just the
+  // context, so the primary browser process is not left running.
+  await runTeardownStep('close-primary-browser', () => stagehand.close());
+  await runTeardownStep('stop-bootstrap', () => stopBootstrapProcess(bootstrapProcess));
+}
+
+/**
+ * Construct the optional A2A multi-agent coordination layer and bridge its
+ * blackboard/message-bus activity into the engine event stream. Returns
+ * `undefined` collaborators when A2A is disabled.
+ */
+function setupA2ALayer(options: {
+  config: DramaturgeConfig;
+  eventStream: EngineEventEmitter | undefined;
+  logger: EngineLogger;
+}): {
+  blackboard: Blackboard | undefined;
+  messageBus: MessageBus | undefined;
+  coordinator: Coordinator | undefined;
+  a2aUnsubscribers: Array<() => void>;
+} {
+  const { config, eventStream, logger } = options;
+  if (!config.a2a.enabled) {
+    return {
+      blackboard: undefined,
+      messageBus: undefined,
+      coordinator: undefined,
+      a2aUnsubscribers: [],
+    };
+  }
+
+  const blackboard = new Blackboard({ maxEntries: config.a2a.maxBlackboardEntries });
+  const messageBus = new MessageBus({ maxHistory: config.a2a.maxMessageHistory });
+  const coordinator = new Coordinator({ blackboard, messageBus });
+  coordinator.diffPriorityBoost = config.diffAware.priorityBoost;
+  const a2aUnsubscribers = subscribeA2AToEventStream({ eventStream, blackboard, messageBus });
+  logger.info('A2A multi-agent mode enabled', {
+    agents: coordinator.listAgents().length,
+    blackboardMaxEntries: config.a2a.maxBlackboardEntries,
+    messageBusMaxHistory: config.a2a.maxMessageHistory,
+  });
+
+  return { blackboard, messageBus, coordinator, a2aUnsubscribers };
+}
+
+/**
+ * Bridge the A2A blackboard and message bus into the engine event stream so
+ * the terminal dashboard's multi-agent panel can render live coordination
+ * activity. Returns unsubscribe functions to be invoked during teardown.
+ */
+function subscribeA2AToEventStream(options: {
+  eventStream: EngineEventEmitter | undefined;
+  blackboard: Blackboard;
+  messageBus: MessageBus;
+}): Array<() => void> {
+  const { eventStream, blackboard, messageBus } = options;
+
+  const summarizeEntry = (entry: BlackboardEntry): string => {
+    if (typeof entry.data.summary === 'string') return entry.data.summary;
+    if (typeof entry.data.title === 'string') return entry.data.title;
+    if (typeof entry.data.objective === 'string') return entry.data.objective;
+    const serialized = JSON.stringify(entry.data);
+    return serialized.length > 60 ? `${serialized.slice(0, 60)}…` : serialized;
+  };
+
+  const unsubBlackboard = blackboard.subscribe('*', (entry) => {
+    emitEngineEvent(eventStream, 'a2a:blackboard', {
+      kind: entry.kind,
+      agentId: entry.agentId,
+      summary: summarizeEntry(entry),
+    });
+  });
+
+  const messageText = (message: A2AMessage): string =>
+    message.parts
+      .filter((part): part is { kind: 'text'; text: string } => part.kind === 'text')
+      .map((part) => part.text)
+      .join(' ') || '(non-text message)';
+
+  const unsubMessages = messageBus.onAny((message) => {
+    emitEngineEvent(eventStream, 'a2a:message', {
+      fromAgent: message.fromAgent,
+      toAgent: message.toAgent,
+      text: messageText(message).slice(0, 80),
+    });
+  });
+
+  return [unsubBlackboard, unsubMessages];
 }

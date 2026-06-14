@@ -20,9 +20,19 @@ import { Planner } from '../planner/planner.js';
 import type { ProposeTasksOptions, ProposeTasksWithLLMOptions } from '../planner/planner.js';
 import type { StateGraph } from '../graph/state-graph.js';
 
+const DEFAULT_MAX_RETAINED_TERMINAL_TASKS = 100;
+
+const TERMINAL_TASK_STATUSES: ReadonlySet<A2ATaskStatus> = new Set([
+  'completed',
+  'failed',
+  'canceled',
+]);
+
 export interface CoordinatorDeps {
   blackboard: Blackboard;
   messageBus: MessageBus;
+  /** Maximum number of terminal (completed/failed/canceled) tasks to retain. */
+  maxRetainedTerminalTasks?: number;
 }
 
 /**
@@ -37,11 +47,22 @@ export interface CoordinatorDeps {
 export class Coordinator {
   private deps: CoordinatorDeps;
   private activeTasks = new Map<string, A2ATask>();
+  /**
+   * Bounded, insertion-ordered ring of terminal tasks. Terminal tasks are
+   * evicted from activeTasks so the live map cannot grow unbounded over a long
+   * run; the most recent ones remain queryable via getTask for reporting.
+   */
+  private terminalTasks = new Map<string, A2ATask>();
+  private readonly maxRetainedTerminalTasks: number;
   private agents: ReadonlyMap<AgentRole, AgentCard>;
   private planner: Planner;
 
   constructor(deps: CoordinatorDeps) {
     this.deps = deps;
+    this.maxRetainedTerminalTasks = Math.max(
+      1,
+      deps.maxRetainedTerminalTasks ?? DEFAULT_MAX_RETAINED_TERMINAL_TASKS
+    );
     this.agents = new Map(Object.entries(AGENT_CARDS) as [AgentRole, AgentCard][]);
     this.planner = new Planner();
   }
@@ -128,7 +149,7 @@ export class Coordinator {
    * Update task status through the A2A lifecycle.
    */
   updateTaskStatus(taskId: string, status: A2ATaskStatus, message?: A2AMessage): void {
-    const task = this.activeTasks.get(taskId);
+    const task = this.activeTasks.get(taskId) ?? this.terminalTasks.get(taskId);
     if (!task) return;
 
     task.status = status;
@@ -140,6 +161,12 @@ export class Coordinator {
 
     if (message) {
       task.messages.push(message);
+    }
+
+    // Once a task reaches a terminal state, move it out of the live map into a
+    // bounded ring so activeTasks cannot grow without limit over a long run.
+    if (TERMINAL_TASK_STATUSES.has(status)) {
+      this.retireTask(taskId, task);
     }
 
     // Post status change to blackboard
@@ -156,6 +183,19 @@ export class Coordinator {
     );
   }
 
+  /** Move a task from the live map to the bounded terminal ring. */
+  private retireTask(taskId: string, task: A2ATask): void {
+    this.activeTasks.delete(taskId);
+    // Re-insert to keep most-recent ordering for eviction.
+    this.terminalTasks.delete(taskId);
+    this.terminalTasks.set(taskId, task);
+    while (this.terminalTasks.size > this.maxRetainedTerminalTasks) {
+      const oldest = this.terminalTasks.keys().next().value;
+      if (oldest === undefined) break;
+      this.terminalTasks.delete(oldest);
+    }
+  }
+
   /**
    * Record a completed task and post findings to the blackboard
    * for the Reviewer and Reporter agents to observe.
@@ -163,7 +203,7 @@ export class Coordinator {
   completeTask(taskId: string, summary: string, findingsCount: number): void {
     this.updateTaskStatus(taskId, 'completed');
 
-    const task = this.activeTasks.get(taskId);
+    const task = this.getTask(taskId);
     if (!task) return;
 
     // Post completion summary to blackboard
@@ -212,9 +252,9 @@ export class Coordinator {
     );
   }
 
-  /** Get an active task by its A2A task id. */
+  /** Get an active or recently-terminated task by its A2A task id. */
   getTask(taskId: string): A2ATask | undefined {
-    return this.activeTasks.get(taskId);
+    return this.activeTasks.get(taskId) ?? this.terminalTasks.get(taskId);
   }
 
   /** Get all active tasks. */

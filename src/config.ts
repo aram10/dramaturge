@@ -149,6 +149,7 @@ const ExplorationSchema = z
     stepsPerArea: z.number().int().min(1).default(40),
     totalTimeout: z.number().int().min(1).default(900),
   })
+  .strict()
   .default({
     maxAreasToExplore: 10,
     stepsPerArea: 40,

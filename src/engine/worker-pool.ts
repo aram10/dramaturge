@@ -32,7 +32,10 @@ export async function initWorkerPool(
   sharedState?: BrowserStorageState
 ): Promise<WorkerSession[]> {
   if (count <= 0) return [];
-  return Promise.all(
+  // Use allSettled so that a single worker that fails to initialize does not
+  // orphan the browser instances that already launched successfully. Any
+  // started instances are closed before the aggregated error is rethrown.
+  const results = await Promise.allSettled(
     Array.from({ length: count }, async (_, index) => {
       const sh = createStagehand(config);
       await sh.init();
@@ -48,12 +51,43 @@ export async function initWorkerPool(
       return { key, stagehand: sh, page };
     })
   );
+
+  const sessions: WorkerSession[] = [];
+  const failures: unknown[] = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      sessions.push(result.value);
+    } else {
+      failures.push(result.reason);
+    }
+  }
+
+  if (failures.length > 0) {
+    await closeWorkerPool(sessions);
+    const messages = failures.map((reason) =>
+      reason instanceof Error ? reason.message : String(reason)
+    );
+    const summary =
+      failures.length === 1
+        ? messages[0]
+        : `${failures.length} worker(s) failed to initialize: ${messages.join('; ')}`;
+    const aggregated = new Error(summary);
+    // Preserve the first underlying error for debugging via the standard cause chain.
+    if (failures[0] instanceof Error) {
+      aggregated.cause = failures[0];
+    }
+    throw aggregated;
+  }
+
+  return sessions;
 }
 
 export async function closeWorkerPool(pool: WorkerSession[]): Promise<void> {
   for (const worker of pool) {
     try {
-      await worker.stagehand.context.close();
+      // Close the whole Stagehand instance (browser + context), not just the
+      // context, so the underlying browser process is not left running.
+      await worker.stagehand.close();
     } catch (error) {
       console.warn(
         `Worker pool cleanup error: ${error instanceof Error ? error.message : String(error)}`

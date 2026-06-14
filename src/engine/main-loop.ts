@@ -18,8 +18,31 @@ import {
 import { emitEngineEvent } from './event-stream.js';
 import type { WorkerSession } from './worker-pool.js';
 import { updateWorkflowAutomataRuntime } from '../workflow-automata/planner-adapter.js';
+import type { A2ATaskStatus } from '../a2a/types.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
+
+/**
+ * Emit an A2A task lifecycle transition into the engine event stream so the
+ * dashboard's multi-agent panel can render it. No-op when A2A is disabled.
+ */
+function emitA2ATaskEvent(
+  ctx: EngineContext,
+  item: FrontierItem,
+  taskId: string,
+  status: A2ATaskStatus
+): void {
+  if (!ctx.coordinator) return;
+  const agentId = ctx.coordinator.getTask(taskId)?.assignedAgent;
+  if (!agentId) return;
+  emitEngineEvent(ctx.eventStream, 'a2a:task', {
+    taskId,
+    agentId,
+    agentRole: ctx.coordinator.resolveAgentRole(item.workerType),
+    status,
+    objective: item.objective,
+  });
+}
 
 interface BatchTaskResult {
   item: FrontierItem;
@@ -132,7 +155,9 @@ async function processTaskBatch(
     if (ctx.coordinator) {
       const a2aTask = ctx.coordinator.assignTask(item);
       a2aTaskId = a2aTask.id;
+      emitA2ATaskEvent(ctx, item, a2aTaskId, 'submitted');
       ctx.coordinator.updateTaskStatus(a2aTaskId, 'working');
+      emitA2ATaskEvent(ctx, item, a2aTaskId, 'working');
     }
     a2aTaskIds[index] = a2aTaskId;
 
@@ -161,6 +186,7 @@ async function processTaskBatch(
       // A2A: Mark task as failed
       if (a2aTaskId && ctx.coordinator) {
         ctx.coordinator.updateTaskStatus(a2aTaskId, 'failed');
+        emitA2ATaskEvent(ctx, item, a2aTaskId, 'failed');
       }
     } else if (a2aTaskId && ctx.coordinator) {
       // A2A: Update task status based on actual worker outcome
@@ -169,9 +195,11 @@ async function processTaskBatch(
         const findingsCount = result.result.findings?.length ?? 0;
         const summary = `${item.workerType} task on ${item.objective}`;
         ctx.coordinator.completeTask(a2aTaskId, summary, findingsCount);
+        emitA2ATaskEvent(ctx, item, a2aTaskId, 'completed');
       } else {
         // 'failed', 'blocked', and 'timed-out' all map to A2A 'failed' status
         ctx.coordinator.updateTaskStatus(a2aTaskId, 'failed');
+        emitA2ATaskEvent(ctx, item, a2aTaskId, 'failed');
       }
     }
 
@@ -192,6 +220,7 @@ async function processTaskBatch(
     const a2aTaskId = a2aTaskIds[index];
     if (a2aTaskId && ctx.coordinator) {
       ctx.coordinator.updateTaskStatus(a2aTaskId, 'failed');
+      emitA2ATaskEvent(ctx, item, a2aTaskId, 'failed');
     }
 
     return {

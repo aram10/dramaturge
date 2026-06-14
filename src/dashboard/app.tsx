@@ -4,8 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import type { EngineEventEmitter } from '../engine/event-stream.js';
-import type { Blackboard } from '../a2a/blackboard.js';
-import type { MessageBus } from '../a2a/message-bus.js';
 import {
   type DashboardState,
   type AgentStatus,
@@ -18,6 +16,7 @@ import {
   applyStateDiscovered,
   applyProgress,
   applyError,
+  applyA2ATask,
   applyA2AMessage,
   applyA2ABlackboard,
 } from './state.js';
@@ -216,17 +215,11 @@ function AgentPanel({
 
 export interface DashboardProps {
   eventStream: EngineEventEmitter;
-  blackboard?: Blackboard;
-  messageBus?: MessageBus;
 }
 
 const ACTIVITY_LINES = 15;
 
-export function Dashboard({
-  eventStream,
-  blackboard,
-  messageBus,
-}: DashboardProps): React.ReactElement {
+export function Dashboard({ eventStream }: DashboardProps): React.ReactElement {
   const [state, setState] = useState<DashboardState>(initialDashboardState);
 
   useEffect(() => {
@@ -245,6 +238,12 @@ export function Dashboard({
     const onProgress = (evt: Parameters<typeof applyProgress>[1]) =>
       setState((s) => applyProgress(s, evt));
     const onError = (evt: Parameters<typeof applyError>[1]) => setState((s) => applyError(s, evt));
+    const onA2ATask = (evt: Parameters<typeof applyA2ATask>[1]) =>
+      setState((s) => applyA2ATask(s, evt));
+    const onA2AMessage = (evt: Parameters<typeof applyA2AMessage>[1]) =>
+      setState((s) => applyA2AMessage(s, evt));
+    const onA2ABlackboard = (evt: Parameters<typeof applyA2ABlackboard>[1]) =>
+      setState((s) => applyA2ABlackboard(s, evt));
 
     eventStream.on('run:start', onRunStart);
     eventStream.on('run:end', onRunEnd);
@@ -254,47 +253,9 @@ export function Dashboard({
     eventStream.on('state:discovered', onStateDiscovered);
     eventStream.on('progress', onProgress);
     eventStream.on('run:error', onError);
-
-    const cleanups: (() => void)[] = [];
-
-    // Wire A2A blackboard subscription
-    if (blackboard) {
-      const unsub = blackboard.subscribe('*', (entry) => {
-        const summary =
-          typeof entry.data.summary === 'string'
-            ? entry.data.summary
-            : typeof entry.data.title === 'string'
-              ? entry.data.title
-              : JSON.stringify(entry.data).slice(0, 60);
-        setState((s) =>
-          applyA2ABlackboard(s, {
-            kind: entry.kind,
-            agentId: entry.agentId,
-            summary,
-          })
-        );
-      });
-      cleanups.push(unsub);
-    }
-
-    // Wire A2A message bus subscription
-    if (messageBus) {
-      const unsub = messageBus.onAny((msg) => {
-        const text =
-          msg.parts
-            .filter((p): p is { kind: 'text'; text: string } => p.kind === 'text')
-            .map((p) => p.text)
-            .join(' ') || '(non-text message)';
-        setState((s) =>
-          applyA2AMessage(s, {
-            fromAgent: msg.fromAgent,
-            toAgent: msg.toAgent,
-            text: text.slice(0, 80),
-          })
-        );
-      });
-      cleanups.push(unsub);
-    }
+    eventStream.on('a2a:task', onA2ATask);
+    eventStream.on('a2a:message', onA2AMessage);
+    eventStream.on('a2a:blackboard', onA2ABlackboard);
 
     return () => {
       eventStream.off('run:start', onRunStart);
@@ -305,9 +266,11 @@ export function Dashboard({
       eventStream.off('state:discovered', onStateDiscovered);
       eventStream.off('progress', onProgress);
       eventStream.off('run:error', onError);
-      for (const cleanup of cleanups) cleanup();
+      eventStream.off('a2a:task', onA2ATask);
+      eventStream.off('a2a:message', onA2AMessage);
+      eventStream.off('a2a:blackboard', onA2ABlackboard);
     };
-  }, [eventStream, blackboard, messageBus]);
+  }, [eventStream]);
 
   return (
     <Box flexDirection="column" paddingX={1}>

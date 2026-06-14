@@ -171,4 +171,34 @@ describe('Blackboard', () => {
     expect(bb.size()).toBe(2);
     expect(bb.all().map((entry) => entry.data.title)).toEqual(['Bug 2', 'Bug 3']);
   });
+
+  it('isolates subscriber exceptions so later subscribers still receive entries', () => {
+    const bb = new Blackboard();
+    const received: string[] = [];
+
+    bb.subscribe('finding', () => {
+      throw new Error('subscriber boom');
+    });
+    bb.subscribe('finding', (entry) => {
+      received.push(String(entry.data.title));
+    });
+
+    expect(() => bb.post('finding', 'agent-a', { title: 'Bug 1' })).not.toThrow();
+    expect(received).toEqual(['Bug 1']);
+  });
+
+  it('does not break when a subscriber unsubscribes during notification', () => {
+    const bb = new Blackboard();
+    const received: string[] = [];
+
+    const unsub = bb.subscribe('finding', () => {
+      unsub();
+    });
+    bb.subscribe('finding', (entry) => {
+      received.push(String(entry.data.title));
+    });
+
+    expect(() => bb.post('finding', 'agent-a', { title: 'Bug 1' })).not.toThrow();
+    expect(received).toEqual(['Bug 1']);
+  });
 });

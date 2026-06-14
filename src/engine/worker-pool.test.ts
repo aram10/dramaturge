@@ -21,7 +21,7 @@ vi.mock('../auth/storage-state.js', () => ({
   applyStorageState: applyStorageStateMock,
 }));
 
-import { createStagehand, initWorkerPool } from './worker-pool.js';
+import { createStagehand, initWorkerPool, closeWorkerPool } from './worker-pool.js';
 
 describe('worker-pool', () => {
   beforeEach(() => {
@@ -32,6 +32,7 @@ describe('worker-pool', () => {
     stagehandCtor.mockImplementation(function StagehandMock(this: any, options: unknown) {
       this.options = options;
       this.init = vi.fn().mockResolvedValue(undefined);
+      this.close = vi.fn().mockResolvedValue(undefined);
       this.context = {
         pages: () => [{ name: 'page' }],
         close: vi.fn().mockResolvedValue(undefined),
@@ -126,6 +127,7 @@ describe('worker-pool', () => {
               };
             })
         );
+        this.close = vi.fn().mockResolvedValue(undefined);
         this.context = {
           pages: () => [{ name: 'page-1' }],
           close: vi.fn().mockResolvedValue(undefined),
@@ -133,6 +135,7 @@ describe('worker-pool', () => {
       } as any)
       .mockImplementationOnce(function StagehandMock(this: any) {
         this.init = vi.fn().mockResolvedValue(undefined);
+        this.close = vi.fn().mockResolvedValue(undefined);
         this.context = {
           pages: () => [{ name: 'page-2' }],
           close: vi.fn().mockResolvedValue(undefined),
@@ -160,5 +163,62 @@ describe('worker-pool', () => {
     const pool = await initPromise;
     expect(pool).toHaveLength(2);
     expect(authenticateMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes the whole Stagehand instance (browser + context) on cleanup', async () => {
+    const errorCollector = { attach: vi.fn() };
+    const pool = await initWorkerPool(
+      {
+        targetUrl: 'https://example.com/app',
+        models: { planner: 'anthropic/claude-sonnet-4-6' },
+        browser: { headless: false },
+      } as any,
+      1,
+      errorCollector as any
+    );
+
+    await closeWorkerPool(pool);
+
+    expect(pool[0].stagehand.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes already-initialized instances when one worker fails to init', async () => {
+    const firstClose = vi.fn().mockResolvedValue(undefined);
+
+    stagehandCtor.mockReset();
+    stagehandCtor
+      .mockImplementationOnce(function StagehandMock(this: any) {
+        this.init = vi.fn().mockResolvedValue(undefined);
+        this.close = firstClose;
+        this.context = {
+          pages: () => [{ name: 'page-1' }],
+          close: vi.fn().mockResolvedValue(undefined),
+        };
+      } as any)
+      .mockImplementationOnce(function StagehandMock(this: any) {
+        this.init = vi.fn().mockRejectedValue(new Error('init boom'));
+        this.close = vi.fn().mockResolvedValue(undefined);
+        this.context = {
+          pages: () => [{ name: 'page-2' }],
+          close: vi.fn().mockResolvedValue(undefined),
+        };
+      } as any);
+
+    const errorCollector = { attach: vi.fn() };
+
+    await expect(
+      initWorkerPool(
+        {
+          targetUrl: 'https://example.com/app',
+          models: { planner: 'anthropic/claude-sonnet-4-6' },
+          browser: { headless: false },
+        } as any,
+        2,
+        errorCollector as any
+      )
+    ).rejects.toThrow('init boom');
+
+    // The successfully-initialized first worker must be closed, not orphaned.
+    expect(firstClose).toHaveBeenCalledTimes(1);
   });
 });

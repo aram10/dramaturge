@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { EventEmitter } from 'node:events';
-import type { WorkerResult, FindingSeverity, WorkerType } from '../types.js';
+import type { WorkerResult, FindingSeverity, WorkerType, AgentRole } from '../types.js';
+import type { A2ATaskStatus, BlackboardEntryKind } from '../a2a/types.js';
 
 // --- Event payload types ---
 
@@ -84,6 +85,31 @@ export interface LogEvent {
   context?: Record<string, unknown>;
 }
 
+// --- A2A event payloads ---
+
+/** A coordinator task lifecycle transition, surfaced to the dashboard. */
+export interface A2ATaskEvent {
+  taskId: string;
+  agentId: string;
+  agentRole: AgentRole;
+  status: A2ATaskStatus;
+  objective: string;
+}
+
+/** An inter-agent message, surfaced to the dashboard. */
+export interface A2AMessageEvent {
+  fromAgent: string;
+  toAgent: string;
+  text: string;
+}
+
+/** A blackboard entry, surfaced to the dashboard. */
+export interface A2ABlackboardEvent {
+  kind: BlackboardEntryKind;
+  agentId: string;
+  summary: string;
+}
+
 // --- Event map ---
 
 export interface EngineEventMap {
@@ -97,6 +123,9 @@ export interface EngineEventMap {
   checkpoint: [CheckpointEvent];
   'run:error': [ErrorEvent];
   log: [LogEvent];
+  'a2a:task': [A2ATaskEvent];
+  'a2a:message': [A2AMessageEvent];
+  'a2a:blackboard': [A2ABlackboardEvent];
 }
 
 export type EngineEventName = keyof EngineEventMap;

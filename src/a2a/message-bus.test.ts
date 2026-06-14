@@ -176,4 +176,36 @@ describe('MessageBus', () => {
       { kind: 'text', text: 'msg3' },
     ]);
   });
+
+  it('isolates handler exceptions so later handlers still receive the message', () => {
+    const bus = new MessageBus();
+    const received: string[] = [];
+
+    bus.onAny(() => {
+      throw new Error('handler boom');
+    });
+    bus.onAny((message) => {
+      const part = message.parts[0];
+      if (part.kind === 'text') received.push(part.text);
+    });
+
+    expect(() => bus.sendText('agent-a', '*', 'hello')).not.toThrow();
+    expect(received).toEqual(['hello']);
+  });
+
+  it('does not break when a handler unsubscribes during delivery', () => {
+    const bus = new MessageBus();
+    const received: string[] = [];
+
+    const unsub = bus.onAny(() => {
+      unsub();
+    });
+    bus.onAny((message) => {
+      const part = message.parts[0];
+      if (part.kind === 'text') received.push(part.text);
+    });
+
+    expect(() => bus.sendText('agent-a', 'agent-b', 'hello')).not.toThrow();
+    expect(received).toEqual(['hello']);
+  });
 });

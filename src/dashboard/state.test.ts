@@ -281,9 +281,21 @@ describe('applyA2ATask', () => {
     expect(state.activity[0].timestamp).toBe(5000);
   });
 
-  it('increments completed count on completed task', () => {
+  it('counts a task once across its submitted → working → completed lifecycle', () => {
     let state = applyA2ATask(
       initialDashboardState(),
+      {
+        taskId: 'a2a-1',
+        agentId: 'agent-tester',
+        agentRole: 'tester',
+        status: 'submitted',
+        objective: 'Test form',
+      },
+      1000
+    );
+
+    state = applyA2ATask(
+      state,
       {
         taskId: 'a2a-1',
         agentId: 'agent-tester',
@@ -291,7 +303,7 @@ describe('applyA2ATask', () => {
         status: 'working',
         objective: 'Test form',
       },
-      1000
+      1500
     );
 
     state = applyA2ATask(
@@ -306,10 +318,11 @@ describe('applyA2ATask', () => {
       2000
     );
 
+    // The 'working' transition must not double-count the assignment.
     expect(state.agents['agent-tester'].tasksAssigned).toBe(1);
     expect(state.agents['agent-tester'].tasksCompleted).toBe(1);
     expect(state.agents['agent-tester'].currentStatus).toBe('completed');
-    expect(state.a2aTasksTotal).toBe(2);
+    expect(state.a2aTasksTotal).toBe(1);
   });
 
   it('uses correct status icons in activity text', () => {

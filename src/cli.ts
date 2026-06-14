@@ -983,17 +983,21 @@ async function runRunCommand(
     attachCliListeners(eventStream, dependencies.log);
   }
 
-  await dependencies.runEngine(config, {
-    resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
-    eventStream,
-    diffRef: parsedArgs.diffRef,
-    profile: parsedArgs.profile,
-  });
-
-  if (dashboardHandle) {
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    dashboardHandle.cleanup();
-    await dashboardHandle.waitUntilExit;
+  try {
+    await dependencies.runEngine(config, {
+      resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
+      eventStream,
+      diffRef: parsedArgs.diffRef,
+      profile: parsedArgs.profile,
+    });
+  } finally {
+    // Always unmount the dashboard, even if the engine throws, so the Ink
+    // instance does not leave the terminal in a mounted/raw state.
+    if (dashboardHandle) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      dashboardHandle.cleanup();
+      await dashboardHandle.waitUntilExit;
+    }
   }
 
   return 0;
