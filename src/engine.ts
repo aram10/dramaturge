@@ -416,9 +416,9 @@ async function teardownEngineRun(options: TeardownEngineRunOptions): Promise<voi
     }
   };
 
-  await runTeardownStep('a2a-unsubscribe', () => {
-    for (const unsubscribe of options.a2aUnsubscribers) unsubscribe();
-  });
+  for (const [i, unsubscribe] of options.a2aUnsubscribers.entries()) {
+    await runTeardownStep(`a2a-unsubscribe-${i}`, () => unsubscribe());
+  }
   await runTeardownStep('error-collector-detach', () => errorCollector.detach());
   await runTeardownStep('traffic-observer-detach', () => trafficObserver.detach());
   await runTeardownStep('close-worker-pool', () => closeWorkerPool(workerPool));

@@ -176,6 +176,7 @@ export type {
 } from './api/types.js';
 export type { ContractIndex } from './spec/contract-index.js';
 export { renderDashboard } from './dashboard/render.js';
+export type { RenderDashboardOptions } from './dashboard/render.js';
 export { createDramaturgeMcpServer, runMcpServer } from './mcp/server.js';
 export type { DramaturgeMcpServer, McpServerDependencies } from './mcp/server.js';
 export type {
