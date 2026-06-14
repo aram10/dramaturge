@@ -58,19 +58,28 @@ export class Blackboard {
     this.entries.push(entry);
     this.trimEntries();
 
-    // Notify kind-specific subscribers
-    const kindSubs = this.subscribers.get(kind);
-    if (kindSubs) {
-      for (const fn of kindSubs) fn(entry);
-    }
-
-    // Notify wildcard subscribers
-    const wildcardSubs = this.subscribers.get('*');
-    if (wildcardSubs) {
-      for (const fn of wildcardSubs) fn(entry);
-    }
+    // Notify kind-specific subscribers, then wildcard subscribers. Each
+    // subscriber is invoked over a snapshot and wrapped so a handler that
+    // mutates the subscriber list or throws (e.g. the dashboard) does not
+    // abort delivery to the remaining subscribers or propagate to the poster.
+    this.notify(this.subscribers.get(kind), entry);
+    this.notify(this.subscribers.get('*'), entry);
 
     return entry;
+  }
+
+  private notify(
+    subscribers: Array<(entry: BlackboardEntry) => void> | undefined,
+    entry: BlackboardEntry
+  ): void {
+    if (!subscribers || subscribers.length === 0) return;
+    for (const fn of [...subscribers]) {
+      try {
+        fn(entry);
+      } catch {
+        // Subscriber failures must not break blackboard posting.
+      }
+    }
   }
 
   /** Subscribe to entries of a specific kind (or "*" for all). */

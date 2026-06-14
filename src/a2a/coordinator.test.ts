@@ -174,6 +174,31 @@ describe('Coordinator', () => {
       expect(active).toHaveLength(1);
       expect(active[0].assignedAgent).toBe('agent-security');
     });
+
+    it('retains terminal tasks via getTask but bounds the retained set', () => {
+      const blackboard = new Blackboard();
+      const messageBus = new MessageBus();
+      const coordinator = new Coordinator({
+        blackboard,
+        messageBus,
+        maxRetainedTerminalTasks: 2,
+      });
+
+      const ids: string[] = [];
+      for (let i = 0; i < 5; i += 1) {
+        const task = coordinator.assignTask(makeItem({ id: `t${i}` }));
+        ids.push(task.id);
+        coordinator.completeTask(task.id, `done ${i}`, 0);
+      }
+
+      // Terminal tasks were evicted from the live map entirely.
+      expect(coordinator.getActiveTasks()).toHaveLength(0);
+      // Only the two most-recent terminal tasks remain queryable.
+      expect(coordinator.getTask(ids[0])).toBeUndefined();
+      expect(coordinator.getTask(ids[2])).toBeUndefined();
+      expect(coordinator.getTask(ids[3])?.status).toBe('completed');
+      expect(coordinator.getTask(ids[4])?.status).toBe('completed');
+    });
   });
 
   describe('broadcastDirective', () => {

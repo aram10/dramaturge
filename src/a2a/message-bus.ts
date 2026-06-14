@@ -59,20 +59,36 @@ export class MessageBus {
 
     if (toAgent === '*') {
       // Broadcast
-      for (const handler of this.broadcastHandlers) handler(message);
+      this.deliver(this.broadcastHandlers, message);
       for (const [, handlers] of this.handlers) {
-        for (const handler of handlers) handler(message);
+        this.deliver(handlers, message);
       }
     } else {
       // Point-to-point delivery
-      const targetHandlers = this.handlers.get(toAgent) ?? [];
-      for (const handler of targetHandlers) handler(message);
+      this.deliver(this.handlers.get(toAgent), message);
 
       // Broadcast listeners also see point-to-point messages
-      for (const handler of this.broadcastHandlers) handler(message);
+      this.deliver(this.broadcastHandlers, message);
     }
 
     return message;
+  }
+
+  /**
+   * Invoke each handler over a snapshot of the list so that a handler that
+   * subscribes/unsubscribes during notification does not mutate the array
+   * being iterated, and so that one throwing handler (e.g. the dashboard) does
+   * not abort delivery to the remaining handlers or propagate to the sender.
+   */
+  private deliver(handlers: MessageHandler[] | undefined, message: A2AMessage): void {
+    if (!handlers || handlers.length === 0) return;
+    for (const handler of [...handlers]) {
+      try {
+        handler(message);
+      } catch {
+        // Subscriber failures must not break message delivery.
+      }
+    }
   }
 
   /** Convenience: send a text-only message. */
