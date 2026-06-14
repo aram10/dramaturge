@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { redactSensitiveValue, sanitizeHeaders, truncateString } from '../redaction.js';
+import { MAX_BODY_PARSE_LENGTH } from '../constants.js';
 
 export interface ObservedApiRequestSample {
   method: string;
@@ -19,10 +20,6 @@ export interface ObservedApiEndpoint {
   statuses: number[];
   failures: string[];
   samples?: ObservedApiRequestSample[];
-  responses?: Array<{
-    status: number;
-    body?: unknown;
-  }>;
 }
 
 const MAX_SAMPLES_PER_ENDPOINT = 8;
@@ -141,14 +138,6 @@ export class NetworkTrafficObserver {
             })),
           }
         : {}),
-      ...(endpoint.responses && endpoint.responses.length > 0
-        ? {
-            responses: endpoint.responses.map((response) => ({
-              status: response.status,
-              body: response.body,
-            })),
-          }
-        : {}),
     }));
   }
 
@@ -225,7 +214,6 @@ export class NetworkTrafficObserver {
       statuses: [],
       failures: [],
       samples: [],
-      responses: [],
     };
 
     current.methods = uniqueSorted([...current.methods, input.method.toUpperCase()]);
@@ -343,6 +331,11 @@ function parseResponseBody(contentType: string | undefined, text: string): unkno
 }
 
 function parseBody(contentType: string | undefined, text: string): unknown {
+  // Cap before parsing so a hostile/huge response can't force an unbounded
+  // JSON.parse; oversize bodies are recorded as truncated text instead (#233).
+  if (text.length > MAX_BODY_PARSE_LENGTH) {
+    return truncateString(text);
+  }
   if (contentType?.includes('json')) {
     try {
       return redactSensitiveValue(JSON.parse(text));

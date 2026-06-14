@@ -8,6 +8,8 @@ import {
   hasConfiguredProvider,
   detectProviderFromEnv,
   allProviders,
+  unknownModelPrefix,
+  knownProviderIds,
 } from './registry.js';
 
 describe('registry', () => {
@@ -21,6 +23,7 @@ describe('registry', () => {
     savedEnv.AZURE_AI_ENDPOINT = process.env.AZURE_AI_ENDPOINT;
     savedEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
     savedEnv.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+    savedEnv.DRAMATURGE_GITHUB_MODELS = process.env.DRAMATURGE_GITHUB_MODELS;
     savedEnv.OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL;
     savedEnv.OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
     savedEnv.OPENAI_COMPATIBLE_BASE_URL = process.env.OPENAI_COMPATIBLE_BASE_URL;
@@ -33,6 +36,7 @@ describe('registry', () => {
     delete process.env.AZURE_AI_ENDPOINT;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.GITHUB_TOKEN;
+    delete process.env.DRAMATURGE_GITHUB_MODELS;
     delete process.env.OLLAMA_BASE_URL;
     delete process.env.OLLAMA_API_KEY;
     delete process.env.OPENAI_COMPATIBLE_BASE_URL;
@@ -141,8 +145,10 @@ describe('registry', () => {
       expect(hasConfiguredProvider('openrouter/anthropic/claude-3.5-sonnet')).toBe(true);
     });
 
-    it('checks GitHub token', () => {
+    it('requires explicit opt-in for GitHub Models even when GITHUB_TOKEN is set (#204)', () => {
       process.env.GITHUB_TOKEN = 'gho_test';
+      expect(hasConfiguredProvider('github/openai/gpt-4.1')).toBe(false);
+      process.env.DRAMATURGE_GITHUB_MODELS = '1';
       expect(hasConfiguredProvider('github/openai/gpt-4.1')).toBe(true);
     });
 
@@ -185,8 +191,10 @@ describe('registry', () => {
       expect(detectProviderFromEnv()).toBe('openrouter');
     });
 
-    it('detects github when only github token is set', () => {
+    it('detects github only when the token and opt-in flag are both set (#204)', () => {
       process.env.GITHUB_TOKEN = 'gho_test';
+      expect(detectProviderFromEnv()).toBe('anthropic');
+      process.env.DRAMATURGE_GITHUB_MODELS = 'true';
       expect(detectProviderFromEnv()).toBe('github');
     });
 
@@ -221,6 +229,30 @@ describe('registry', () => {
         'ollama',
         'custom',
       ]);
+    });
+  });
+
+  describe('unknownModelPrefix (#224)', () => {
+    it('returns undefined for bare model names', () => {
+      expect(unknownModelPrefix('claude-haiku-4-5')).toBeUndefined();
+      expect(unknownModelPrefix('gpt-4.1')).toBeUndefined();
+    });
+
+    it('returns undefined for known provider prefixes', () => {
+      expect(unknownModelPrefix('openai/gpt-4.1')).toBeUndefined();
+      expect(unknownModelPrefix('openrouter/anthropic/claude-3.5-sonnet')).toBeUndefined();
+      expect(unknownModelPrefix('github/openai/gpt-4.1')).toBeUndefined();
+    });
+
+    it('returns the offending prefix for unknown providers', () => {
+      expect(unknownModelPrefix('foo/bar')).toBe('foo');
+      expect(unknownModelPrefix('gpt-4o/turbo')).toBe('gpt-4o');
+    });
+  });
+
+  describe('knownProviderIds', () => {
+    it('lists every registered provider id', () => {
+      expect(knownProviderIds()).toEqual([...allProviders().keys()]);
     });
   });
 });

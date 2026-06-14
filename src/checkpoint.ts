@@ -123,6 +123,13 @@ const evidenceSchema = z.object({
   path: z.string().optional(),
   timestamp: z.string(),
   areaName: z.string().optional(),
+  network: z
+    .object({
+      url: z.string(),
+      status: z.number(),
+      method: z.string().optional(),
+    })
+    .optional(),
   relatedFindingIds: z.array(z.string()),
 });
 

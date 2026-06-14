@@ -102,6 +102,24 @@ describe('StateGraph', () => {
       const result = graph.findByFingerprint(makeFp('zzz'));
       expect(result).toBeUndefined();
     });
+
+    it('falls back to the stable signature key when the hash drifts (#219)', () => {
+      const graph = new StateGraph();
+      const original = makeFp('hash-v1');
+      const node = graph.addNode({ fingerprint: original, pageType: 'list', depth: 0 });
+
+      // Same path/query/uiMarkers but a drifted hash (e.g. rotating title/counter).
+      const drifted: PageFingerprint = {
+        ...original,
+        hash: 'hash-v2',
+        title: 'Inbox (7)',
+      };
+      drifted.normalizedPath = original.normalizedPath;
+      drifted.signature = original.signature;
+
+      const found = graph.findByFingerprint(drifted);
+      expect(found).toBe(node);
+    });
   });
 
   describe('addEdge', () => {
@@ -131,6 +149,39 @@ describe('StateGraph', () => {
       expect(edge.toNodeId).toBe(b.id);
       expect(edge.actionLabel).toBe('Click Create');
       expect(edge.outcome).toBe('success');
+    });
+
+    it('dedupes edges with the same (from, to, actionLabel) (#218)', () => {
+      const graph = new StateGraph();
+      const a = graph.addNode({ fingerprint: makeFp('a'), pageType: 'dashboard', depth: 0 });
+      const b = graph.addNode({ fingerprint: makeFp('b'), pageType: 'form', depth: 1 });
+      const discoveredEdge: DiscoveredEdge = {
+        actionLabel: 'Click Create',
+        navigationHint: { selector: '#create-btn' },
+        targetFingerprint: makeFp('b'),
+        targetPageType: 'form',
+      };
+
+      const first = graph.addEdge(a.id, b.id, discoveredEdge);
+      const second = graph.addEdge(a.id, b.id, discoveredEdge);
+      expect(second).toBe(first);
+      expect(graph.getAllEdges()).toHaveLength(1);
+    });
+
+    it('keeps distinct edges when the action label differs (#218)', () => {
+      const graph = new StateGraph();
+      const a = graph.addNode({ fingerprint: makeFp('a'), pageType: 'dashboard', depth: 0 });
+      const b = graph.addNode({ fingerprint: makeFp('b'), pageType: 'form', depth: 1 });
+      const base: DiscoveredEdge = {
+        actionLabel: 'Click Create',
+        navigationHint: { selector: '#create-btn' },
+        targetFingerprint: makeFp('b'),
+        targetPageType: 'form',
+      };
+
+      graph.addEdge(a.id, b.id, base);
+      graph.addEdge(a.id, b.id, { ...base, actionLabel: 'Open menu' });
+      expect(graph.getAllEdges()).toHaveLength(2);
     });
   });
 

@@ -104,6 +104,21 @@ function extractNetworkFailure(
   };
 }
 
+/**
+ * Derive a network-failure oracle for a network-error evidence item. Prefers
+ * the structured `network` field captured at observation time (#251); only
+ * falls back to regex-parsing the human-readable summary for older evidence
+ * that predates structured capture.
+ */
+function networkFailureFromEvidence(
+  item: Evidence
+): { urlPattern: string; status: number } | undefined {
+  if (item.network) {
+    return { urlPattern: item.network.url, status: item.network.status };
+  }
+  return extractNetworkFailure(item.summary);
+}
+
 function buildOracles(finding: Finding, evidence: Evidence[]): FindingReplayManifest['oracles'] {
   const consoleErrorFragments = uniqueValues(
     evidence
@@ -113,7 +128,7 @@ function buildOracles(finding: Finding, evidence: Evidence[]): FindingReplayMani
   );
   const networkFailures = evidence
     .filter((item) => item.type === 'network-error')
-    .map((item) => extractNetworkFailure(item.summary))
+    .map((item) => networkFailureFromEvidence(item))
     .filter((item): item is { urlPattern: string; status: number } => Boolean(item));
   const findingA11yRuleId = /accessibility rule ([\w-]+)/i.exec(finding.expected)?.[1];
   const a11yRuleIds = uniqueValues(

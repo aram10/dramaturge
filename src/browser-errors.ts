@@ -16,6 +16,17 @@ import { buildAutoCaptureFindingMeta } from './repro/repro.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
+function groupByKey<T>(items: readonly T[], keyFn: (item: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const key = keyFn(item);
+    const group = groups.get(key) ?? [];
+    group.push(item);
+    groups.set(key, group);
+  }
+  return groups;
+}
+
 export interface BrowserErrorCollectorOptions {
   captureConsole: boolean;
   captureConsoleWarnings: boolean;
@@ -155,7 +166,10 @@ export class BrowserErrorCollector {
       summary: string,
       timestamp: string,
       finding: Omit<RawFinding, 'evidenceIds' | 'meta'>,
-      metaFactory?: (evidenceIds: string[]) => RawFinding['meta']
+      options?: {
+        metaFactory?: (evidenceIds: string[]) => RawFinding['meta'];
+        evidenceExtra?: Pick<Evidence, 'network'>;
+      }
     ) => {
       const evidenceId = `ev-${shortId()}`;
       const findingRef = `fid-${shortId()}`;
@@ -164,24 +178,21 @@ export class BrowserErrorCollector {
         type: evidenceType,
         summary,
         timestamp,
+        ...(options?.evidenceExtra ?? {}),
         relatedFindingIds: [findingRef],
       });
       findings.push({
         ref: findingRef,
         ...finding,
         evidenceIds: [evidenceId],
-        meta: metaFactory?.([evidenceId]),
+        meta: options?.metaFactory?.([evidenceId]),
       });
     };
 
     // Group console errors by message to avoid duplicate findings
-    const consoleMsgs = new Map<string, BrowserConsoleError[]>();
-    for (const err of bucket.consoleErrors) {
-      const key = err.text.slice(0, TRUNCATE_GROUP_KEY);
-      const group = consoleMsgs.get(key) ?? [];
-      group.push(err);
-      consoleMsgs.set(key, group);
-    }
+    const consoleMsgs = groupByKey(bucket.consoleErrors, (err) =>
+      err.text.slice(0, TRUNCATE_GROUP_KEY)
+    );
 
     for (const [msg, errors] of consoleMsgs) {
       const first = errors[0];
@@ -203,14 +214,16 @@ export class BrowserErrorCollector {
           expected: 'No console errors',
           actual: `${errors.length} occurrence(s): ${msg.slice(0, TRUNCATE_GROUP_KEY)}`,
         },
-        (evidenceIds) =>
-          buildAutoCaptureFindingMeta({
-            route: first.url,
-            objective: 'Observe auto-captured browser failure',
-            confidence: first.level === 'error' ? 'high' : 'medium',
-            breadcrumbs: [`auto-captured console ${first.level}`],
-            evidenceIds,
-          })
+        {
+          metaFactory: (evidenceIds) =>
+            buildAutoCaptureFindingMeta({
+              route: first.url,
+              objective: 'Observe auto-captured browser failure',
+              confidence: first.level === 'error' ? 'high' : 'medium',
+              breadcrumbs: [`auto-captured console ${first.level}`],
+              evidenceIds,
+            }),
+        }
       );
     }
 
@@ -234,25 +247,24 @@ export class BrowserErrorCollector {
           expected: 'No uncaught exceptions',
           actual: err.message,
         },
-        (evidenceIds) =>
-          buildAutoCaptureFindingMeta({
-            route: err.url,
-            objective: 'Observe auto-captured browser failure',
-            confidence: 'high',
-            breadcrumbs: ['auto-captured uncaught exception'],
-            evidenceIds,
-          })
+        {
+          metaFactory: (evidenceIds) =>
+            buildAutoCaptureFindingMeta({
+              route: err.url,
+              objective: 'Observe auto-captured browser failure',
+              confidence: 'high',
+              breadcrumbs: ['auto-captured uncaught exception'],
+              evidenceIds,
+            }),
+        }
       );
     }
 
     // Group network errors by URL+status
-    const networkMsgs = new Map<string, BrowserNetworkError[]>();
-    for (const err of bucket.networkErrors) {
-      const key = `${err.method} ${err.url} ${err.status}`;
-      const group = networkMsgs.get(key) ?? [];
-      group.push(err);
-      networkMsgs.set(key, group);
-    }
+    const networkMsgs = groupByKey(
+      bucket.networkErrors,
+      (err) => `${err.method} ${err.url} ${err.status}`
+    );
 
     for (const [, errors] of networkMsgs) {
       const first = errors[0];
@@ -281,14 +293,19 @@ export class BrowserErrorCollector {
           expected: 'Successful HTTP response (2xx/3xx)',
           actual: `${errors.length} occurrence(s): ${first.status} ${first.statusText}`,
         },
-        (evidenceIds) =>
-          buildAutoCaptureFindingMeta({
-            route: first.url,
-            objective: 'Observe auto-captured browser failure',
-            confidence: first.status === 0 || first.status >= 500 ? 'high' : 'medium',
-            breadcrumbs: [`auto-captured ${first.method} ${pathname} -> ${statusLabel}`],
-            evidenceIds,
-          })
+        {
+          metaFactory: (evidenceIds) =>
+            buildAutoCaptureFindingMeta({
+              route: first.url,
+              objective: 'Observe auto-captured browser failure',
+              confidence: first.status === 0 || first.status >= 500 ? 'high' : 'medium',
+              breadcrumbs: [`auto-captured ${first.method} ${pathname} -> ${statusLabel}`],
+              evidenceIds,
+            }),
+          evidenceExtra: {
+            network: { url: first.url, status: first.status, method: first.method },
+          },
+        }
       );
     }
 

@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { ActionRecorder } from '../worker/action-recorder.js';
 import { renderJson } from './json.js';
+import { buildFindingGroupKey } from './collector.js';
 import type { AreaResult, RunResult } from '../types.js';
 
 function makeResult(areaResults: AreaResult[]): RunResult {
@@ -109,7 +110,7 @@ describe('renderJson', () => {
                 breadcrumbs: ['click create button -> worked'],
                 actionIds: ['act-2'],
                 evidenceIds: ['ev-2'],
-                route: 'https://example.com/settings',
+                route: 'https://example.com/manage/knowledge-bases',
               },
             },
           },
@@ -273,6 +274,62 @@ describe('renderJson', () => {
     });
     expect(report.findings[0].crossRunStatus).not.toHaveProperty('signature');
     expect(report.crossRunSummary.resolvedFindings[0]).not.toHaveProperty('signature');
+  });
+
+  it('surfaces replay validation status on findings (#137)', () => {
+    const findingForSignature: AreaResult['findings'][number] = {
+      ref: 'fid-1',
+      category: 'Bug',
+      severity: 'Major',
+      title: 'Issue',
+      stepsToReproduce: ['Step'],
+      expected: 'Expected',
+      actual: 'Actual',
+      meta: {
+        source: 'agent',
+        confidence: 'high',
+        repro: { route: '/checkout', objective: 'x', breadcrumbs: [], evidenceIds: [] },
+      },
+    };
+    const signature = buildFindingGroupKey({
+      category: findingForSignature.category,
+      title: findingForSignature.title,
+      expected: findingForSignature.expected,
+      actual: findingForSignature.actual,
+      meta: findingForSignature.meta,
+    });
+    const report = JSON.parse(
+      renderJson({
+        ...makeResult([
+          {
+            name: 'Area',
+            steps: 1,
+            findings: [findingForSignature],
+            screenshots: new Map(),
+            evidence: [],
+            coverage: { controlsDiscovered: 0, controlsExercised: 0, events: [] },
+            pageType: 'unknown',
+            status: 'explored',
+          },
+        ]),
+        replayValidations: {
+          [signature]: {
+            status: 'confirmed',
+            verdict: 'still_reproducible',
+            confidence: 'high',
+            actionsCompleted: 2,
+            actionsRequested: 2,
+            durationMs: 1200,
+          },
+        },
+      })
+    );
+
+    expect(report.findings[0].replayValidation).toMatchObject({
+      status: 'confirmed',
+      verdict: 'still_reproducible',
+      actionsCompleted: 2,
+    });
   });
 
   it('serializes safety audit summaries', () => {

@@ -128,6 +128,32 @@ describe('BrowserErrorCollector', () => {
     expect(findings[1].severity).toBe('Major'); // 500
   });
 
+  it('carries structured status/url/method on network-error evidence (#251)', () => {
+    const collector = new BrowserErrorCollector({
+      captureConsole: false,
+      captureConsoleWarnings: false,
+      captureNetwork: true,
+      networkErrorMinStatus: 400,
+    });
+    const page = createMockPage();
+    collector.attach(page as any);
+
+    page.emit('response', {
+      status: () => 503,
+      url: () => 'https://example.com/api/orders',
+      statusText: () => 'Service Unavailable',
+      request: () => ({ method: () => 'POST' }),
+    });
+
+    const { evidence } = collector.flush();
+    const networkEvidence = evidence.find((item) => item.type === 'network-error');
+    expect(networkEvidence?.network).toEqual({
+      url: 'https://example.com/api/orders',
+      status: 503,
+      method: 'POST',
+    });
+  });
+
   it('captures failed requests (dns failures, etc.)', () => {
     const collector = new BrowserErrorCollector({
       captureConsole: false,

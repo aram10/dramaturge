@@ -251,6 +251,7 @@ function makeReportContext(outputDir: string): EngineContext {
         consoleWarnings: false,
         networkErrors: false,
       },
+      autoValidate: { enabled: false, severities: ['Critical', 'Major'], maxFindings: 10 },
       memory: { enabled: false, warmStart: false },
       visualRegression: { enabled: false },
       output: { format: 'json' },
@@ -269,10 +270,10 @@ function makeReportContext(outputDir: string): EngineContext {
 }
 
 describe('writeReports', () => {
-  it('emits replay manifests alongside existing report artifacts', () => {
+  it('emits replay manifests alongside existing report artifacts', async () => {
     const outputDir = mkdtempSync(join(tmpdir(), 'dramaturge-reports-'));
     try {
-      writeReports(
+      await writeReports(
         makeReportContext(outputDir),
         new Date('2026-05-20T18:00:00.000Z'),
         [makeAreaResultForReport()],

@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-export { ConfigSchema, loadConfig, resolveAgentMode, resolveWorkerModel } from './config.js';
+export {
+  ConfigSchema,
+  loadConfig,
+  resolveAgentMode,
+  resolveWorkerModel,
+  resolveOutputFormats,
+} from './config.js';
 export type {
   ApiTestingConfig,
   AdversarialConfig,
@@ -98,11 +104,19 @@ export type {
   BrowserPageError,
   ControlAction,
   ControlOutcome,
+  ConfirmationResult,
   CoverageEvent,
   CoverageSnapshot,
   DiffSummary,
   DiscoveredEdge,
   Evidence,
+  ExplorationLedger,
+  ExplorationLedgerEvent,
+  ExplorationLedgerActionEvent,
+  ExplorationLedgerEvidenceEvent,
+  ExplorationLedgerNetworkEvent,
+  ExplorationLedgerFindingEvent,
+  ExplorationLedgerModelUsageEvent,
   Finding,
   FindingCategory,
   FindingConfidence,
@@ -110,6 +124,7 @@ export type {
   FindingOccurrence,
   FindingSeverity,
   FindingSource,
+  FindingVerdict,
   FrontierItem,
   FrontierItemStatus,
   LLMTaskProposal,
@@ -118,10 +133,14 @@ export type {
   PageFingerprint,
   PageType,
   RawFinding,
+  ReplayableAction,
+  ReplayableActionKind,
+  ReplayableActionStatus,
   ReproArtifact,
   RunConfigMeta,
   RunMemoryMeta,
   RunResult,
+  SafetyAuditSummary,
   StateEdge,
   StateNode,
   StateSignature,
@@ -195,6 +214,10 @@ export type {
 } from './spec/types.js';
 
 // Experimental multi-agent coordination API
+//
+// @experimental — the A2A protocol surface (Coordinator, Blackboard, MessageBus
+// and the agent-card helpers below) is unstable and may change or be removed in
+// a minor release. Do not depend on it for production integrations yet.
 export {
   AGENT_CARDS,
   agentRoleForWorkerType,

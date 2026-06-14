@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { RunResult, Finding } from '../types.js';
-import { collectFindings } from './collector.js';
+import { buildFindingGroupKey, collectFindings } from './collector.js';
 import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
 import type { DiffContext } from '../diff/types.js';
 import { ledgerSummary } from '../ledger.js';
@@ -146,6 +146,17 @@ function renderFindingEntry(
   if (diffScope) {
     const scope = diffScope.get(f.area) ?? 'unchanged';
     lines.push(`- **Diff scope:** ${escapeMarkdownInline(scope)}`);
+  }
+  const replayValidation = result.replayValidations?.[buildFindingGroupKey(f)];
+  if (replayValidation) {
+    const parts = [
+      `status: ${replayValidation.status}`,
+      `verdict: ${replayValidation.verdict}`,
+      `confidence: ${replayValidation.confidence}`,
+      `replayed ${replayValidation.actionsCompleted}/${replayValidation.actionsRequested} action(s)`,
+    ];
+    if (replayValidation.detail) parts.push(`detail: ${replayValidation.detail}`);
+    lines.push(`- **Replay validation:** ${escapeMarkdownInline(parts.join(' | '))}`);
   }
   lines.push(`- **Category:** ${escapeMarkdownInline(f.category)}`);
   lines.push(`- **Severity:** ${escapeMarkdownInline(f.severity)}`);

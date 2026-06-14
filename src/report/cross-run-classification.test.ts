@@ -87,8 +87,8 @@ describe('classifyFindings', () => {
     expect(result.byFindingId[finding.id].dismissalReason).toBe('false positive');
   });
 
-  it('marks findings as flaky when their route matches a flaky page', () => {
-    const finding = makeFinding();
+  it('marks visual findings as flaky when their route matches a flaky page', () => {
+    const finding = makeFinding({ category: 'Visual Glitch' });
     const flakyPages: HistoricalFlakyPageRecord[] = [
       {
         key: 'k1',
@@ -104,6 +104,44 @@ describe('classifyFindings', () => {
 
     expect(result.summary.flaky).toBe(1);
     expect(result.byFindingId[finding.id].status).toBe('flaky');
+  });
+
+  it('does not flag non-visual findings as flaky on a flaky route (#230)', () => {
+    const finding = makeFinding({ category: 'Bug' });
+    const flakyPages: HistoricalFlakyPageRecord[] = [
+      {
+        key: 'k1',
+        route: '/dash',
+        note: 'intermittent',
+        source: 'visual-regression',
+        firstSeenAt: '2026-01-01T00:00:00.000Z',
+        lastSeenAt: '2026-02-01T00:00:00.000Z',
+        count: 3,
+      },
+    ];
+    const result = classifyFindings([finding], {}, flakyPages);
+
+    expect(result.summary.flaky).toBe(0);
+    expect(result.byFindingId[finding.id].status).toBe('new');
+  });
+
+  it('requires a minimum flaky count before suppressing visual findings (#230)', () => {
+    const finding = makeFinding({ category: 'Visual Glitch' });
+    const flakyPages: HistoricalFlakyPageRecord[] = [
+      {
+        key: 'k1',
+        route: '/dash',
+        note: 'one-off below-threshold jitter',
+        source: 'visual-regression',
+        firstSeenAt: '2026-01-01T00:00:00.000Z',
+        lastSeenAt: '2026-02-01T00:00:00.000Z',
+        count: 1,
+      },
+    ];
+    const result = classifyFindings([finding], {}, flakyPages);
+
+    expect(result.summary.flaky).toBe(0);
+    expect(result.byFindingId[finding.id].status).toBe('new');
   });
 
   it('suppressed status wins over flaky', () => {

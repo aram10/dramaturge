@@ -2,11 +2,18 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { EngineContext } from './context.js';
-import type { WorkerResult } from '../types.js';
+import type {
+  WorkerResult,
+  StateNode,
+  DiscoveredEdge,
+  PageFingerprint,
+  PageType,
+} from '../types.js';
 import { captureFingerprint } from '../graph/fingerprint.js';
 import { classifyPage } from '../planner/page-classifier.js';
 import { emitEngineEvent } from './event-stream.js';
 import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
+import { MAX_FOLLOWUPS_PER_NODE } from '../constants.js';
 
 function appendToNodeMap<T>(map: Map<string, T[]>, nodeId: string, items: T[]): void {
   const existing = map.get(nodeId) ?? [];
@@ -59,64 +66,79 @@ export async function expandGraph(
     }
 
     const existing = ctx.graph.findByFingerprint(fingerprint);
-    if (!existing) {
-      // When restrictToChanged is enabled and the diff scope is non-empty,
-      // skip nodes outside the diff scope. If the scope is empty (no repo
-      // hints or no matched routes), fall through to avoid stalling exploration.
-      const diffHasScope =
-        ctx.diffContext &&
-        (ctx.diffContext.affectedRoutes.length > 0 ||
-          ctx.diffContext.affectedApiEndpoints.length > 0 ||
-          ctx.diffContext.affectedRouteFamilies.length > 0);
-      if (
-        diffHasScope &&
-        ctx.config.diffAware.restrictToChanged &&
-        ctx.diffContext &&
-        !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext)
-      ) {
-        continue;
-      }
-
-      const newNode = ctx.graph.addNode({
-        fingerprint,
-        pageType,
-        url: edge.navigationHint.url,
-        depth: sourceNode.depth + 1,
-        navigationHint: edge.navigationHint,
-      });
-      ctx.graph.addEdge(sourceNodeId, newNode.id, edge);
-
-      const newTasks = useLLMPlanner
-        ? await ctx.planner.proposeTasksWithLLM(newNode, ctx.graph, {
-            plannerModel: ctx.config.models.planner,
-            mission: ctx.mission,
-            repoHints: ctx.repoHints,
-            llmRequestTimeoutMs: ctx.config.llm.requestTimeoutMs,
-            memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
-            diffContext: ctx.diffContext,
-          })
-        : ctx.planner.proposeTasks(newNode, ctx.graph, {
-            mission: ctx.mission,
-            repoHints: ctx.repoHints,
-            memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
-            diffContext: ctx.diffContext,
-          });
-      ctx.frontier.enqueueMany(newTasks);
-      ctx.logger?.info('Discovered new state', {
-        nodeId: newNode.id,
-        pageType: newNode.pageType,
-        tasksAdded: newTasks.length,
-      });
-
-      emitEngineEvent(ctx.eventStream, 'state:discovered', {
-        nodeId: newNode.id,
-        url: edge.navigationHint.url,
-        pageType: newNode.pageType,
-        depth: newNode.depth,
-        totalStates: ctx.graph.nodeCount(),
-      });
+    if (existing) {
+      // Rediscovered a known state from a different source: record the cross-link
+      // so BFS pathfinding knows the alternate route. addEdge dedupes on
+      // (from, to, actionLabel) (#218).
+      ctx.graph.addEdge(sourceNodeId, existing.id, edge);
+      continue;
     }
+    await registerNewState(ctx, sourceNode, { edge, fingerprint, pageType }, useLLMPlanner);
   }
+}
+
+async function registerNewState(
+  ctx: EngineContext,
+  sourceNode: StateNode,
+  target: { edge: DiscoveredEdge; fingerprint: PageFingerprint; pageType: PageType },
+  useLLMPlanner: boolean
+): Promise<void> {
+  const { edge, fingerprint, pageType } = target;
+  // When restrictToChanged is enabled and the diff scope is non-empty,
+  // skip nodes outside the diff scope. If the scope is empty (no repo
+  // hints or no matched routes), fall through to avoid stalling exploration.
+  const diffHasScope =
+    ctx.diffContext &&
+    (ctx.diffContext.affectedRoutes.length > 0 ||
+      ctx.diffContext.affectedApiEndpoints.length > 0 ||
+      ctx.diffContext.affectedRouteFamilies.length > 0);
+  if (
+    diffHasScope &&
+    ctx.config.diffAware.restrictToChanged &&
+    ctx.diffContext &&
+    !isNodeAffectedByDiff(edge.navigationHint.url, ctx.diffContext)
+  ) {
+    return;
+  }
+
+  const newNode = ctx.graph.addNode({
+    fingerprint,
+    pageType,
+    url: edge.navigationHint.url,
+    depth: sourceNode.depth + 1,
+    navigationHint: edge.navigationHint,
+  });
+  ctx.graph.addEdge(sourceNode.id, newNode.id, edge);
+
+  const newTasks = useLLMPlanner
+    ? await ctx.planner.proposeTasksWithLLM(newNode, ctx.graph, {
+        plannerModel: ctx.config.models.planner,
+        mission: ctx.mission,
+        repoHints: ctx.repoHints,
+        llmRequestTimeoutMs: ctx.config.llm.requestTimeoutMs,
+        memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
+        diffContext: ctx.diffContext,
+      })
+    : ctx.planner.proposeTasks(newNode, ctx.graph, {
+        mission: ctx.mission,
+        repoHints: ctx.repoHints,
+        memorySignals: ctx.memoryStore?.getPlannerSignals(newNode),
+        diffContext: ctx.diffContext,
+      });
+  ctx.frontier.enqueueMany(newTasks);
+  ctx.logger?.info('Discovered new state', {
+    nodeId: newNode.id,
+    pageType: newNode.pageType,
+    tasksAdded: newTasks.length,
+  });
+
+  emitEngineEvent(ctx.eventStream, 'state:discovered', {
+    nodeId: newNode.id,
+    url: edge.navigationHint.url,
+    pageType: newNode.pageType,
+    depth: newNode.depth,
+    totalStates: ctx.graph.nodeCount(),
+  });
 }
 
 async function resolveEdgeFingerprint(
@@ -163,6 +185,26 @@ export function routeFollowups(
   result: WorkerResult
 ): void {
   for (const followup of result.followupRequests) {
+    const tracking = ctx.followupTracking.get(sourceNodeId) ?? {
+      count: 0,
+      reasons: new Set<string>(),
+    };
+    // Cap follow-ups per node and dedupe by normalized reason so self-sustaining
+    // follow-up loops can't starve genuinely new exploration (#221).
+    if (tracking.count >= MAX_FOLLOWUPS_PER_NODE) {
+      ctx.logger?.info('Follow-up cap reached for node; dropping request', {
+        nodeId: sourceNodeId,
+        reason: followup.reason,
+      });
+      continue;
+    }
+    const normalizedReason = `${followup.type}:${followup.reason.trim().toLowerCase()}`;
+    if (tracking.reasons.has(normalizedReason)) {
+      continue;
+    }
+    tracking.reasons.add(normalizedReason);
+    tracking.count += 1;
+    ctx.followupTracking.set(sourceNodeId, tracking);
     ctx.frontier.enqueue(ctx.planner.routeFollowup(followup, sourceNodeId));
   }
 }

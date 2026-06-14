@@ -86,3 +86,12 @@ describe('validateJsonSchema', () => {
     expect(bad.errors.length).toBeGreaterThan(0);
   });
 });
+
+describe('validateJsonSchema defensive compile (#210)', () => {
+  it('treats an unresolvable $ref schema as non-blocking (ok:true) instead of throwing', () => {
+    const schema = { $ref: '#/components/schemas/DoesNotExist' } as unknown as JsonSchema;
+
+    expect(() => validateJsonSchema(schema, { any: 'value' })).not.toThrow();
+    expect(validateJsonSchema(schema, { any: 'value' })).toEqual({ ok: true, errors: [] });
+  });
+});

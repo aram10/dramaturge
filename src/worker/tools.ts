@@ -8,7 +8,6 @@ import type { WorkerToolPage } from '../browser/page-interface.js';
 import type { Evidence, CoverageEvent, FollowupRequest, DiscoveredEdge } from '../types.js';
 import { shortId, MAX_BREADCRUMBS } from '../constants.js';
 import type { CoverageTracker } from '../coverage/tracker.js';
-import type { StagnationTracker } from './stagnation.js';
 import type { ActionRecorder } from './action-recorder.js';
 import type { Observation } from '../judge/types.js';
 import type { Blackboard } from '../a2a/blackboard.js';
@@ -80,7 +79,6 @@ const PostToBlackboardSchema = z.object({
 });
 
 export interface WorkerToolOptions {
-  stagnationTracker?: StagnationTracker;
   findingContext?: {
     stateId?: string;
     objective?: string;
@@ -114,7 +112,6 @@ interface ToolContext {
   followupRequests: FollowupRequest[];
   discoveredEdges: DiscoveredEdge[];
   screenshotsEnabled: boolean;
-  stagnationTracker?: StagnationTracker;
   findingContext?: { stateId?: string; objective?: string };
   actionRecorder?: ActionRecorder;
   breadcrumbs: string[];
@@ -122,15 +119,7 @@ interface ToolContext {
 }
 
 function buildLogFindingTool(ctx: ToolContext) {
-  const {
-    observations,
-    evidence,
-    findingContext,
-    actionRecorder,
-    stagnationTracker,
-    page,
-    breadcrumbs,
-  } = ctx;
+  const { observations, evidence, findingContext, actionRecorder, page, breadcrumbs } = ctx;
   return {
     description:
       'Report a bug, UX concern, accessibility, performance, or visual issue. Attach evidence IDs from take_screenshot calls.',
@@ -157,7 +146,6 @@ function buildLogFindingTool(ctx: ToolContext) {
           }
         }
       }
-      stagnationTracker?.recordStep({ findings: 1, newControls: 0, edges: 0 });
       return {
         logged: true,
         observationId,
@@ -198,6 +186,7 @@ function buildTakeScreenshotTool(ctx: ToolContext) {
       screenshots.set(screenshotId, buffer);
       const filename = `${screenshotId}.png`;
       try {
+        mkdirSync(screenshotDir, { recursive: true });
         writeFileSync(join(screenshotDir, filename), buffer);
       } catch (writeError) {
         const msg = writeError instanceof Error ? writeError.message : String(writeError);
@@ -231,7 +220,7 @@ function buildTakeScreenshotTool(ctx: ToolContext) {
 }
 
 function buildMarkControlExercisedTool(ctx: ToolContext) {
-  const { coverageTracker, actionRecorder, stagnationTracker, rememberBreadcrumb } = ctx;
+  const { coverageTracker, actionRecorder, rememberBreadcrumb } = ctx;
   return {
     description: 'Report interaction with a UI control for coverage tracking.',
     inputSchema: MarkControlExercisedSchema,
@@ -245,7 +234,6 @@ function buildMarkControlExercisedTool(ctx: ToolContext) {
       coverageTracker.recordEvent(event);
       rememberBreadcrumb(`${input.action} ${input.controlId} -> ${input.outcome}`);
       actionRecorder?.recordControlAction(input.controlId, input.action, input.outcome);
-      stagnationTracker?.recordStep({ findings: 0, newControls: 1, edges: 0 });
       return {
         recorded: true,
         controlId: input.controlId,
@@ -272,7 +260,7 @@ function buildRequestFollowupTool(ctx: ToolContext) {
 }
 
 function buildReportDiscoveredEdgeTool(ctx: ToolContext) {
-  const { discoveredEdges, actionRecorder, stagnationTracker, rememberBreadcrumb } = ctx;
+  const { discoveredEdges, actionRecorder, rememberBreadcrumb } = ctx;
   return {
     description:
       'Report a navigation target (link, button, action) leading to a different page/state.',
@@ -305,7 +293,6 @@ function buildReportDiscoveredEdgeTool(ctx: ToolContext) {
         source: 'worker-tool',
         status: 'recorded',
       });
-      stagnationTracker?.recordStep({ findings: 0, newControls: 0, edges: 1 });
       return { reported: true, message: `Discovered edge: ${input.actionLabel}` };
     },
   };
@@ -345,13 +332,14 @@ export function createWorkerTools(opts: CreateWorkerToolsOptions) {
     followupRequests = [],
     discoveredEdges = [],
     screenshotsEnabled = true,
-    stagnationTracker,
     findingContext,
     actionRecorder,
     blackboard,
     agentId,
   } = opts;
-  mkdirSync(screenshotDir, { recursive: true });
+  // The screenshot directory is created lazily in take_screenshot, only when a
+  // screenshot is actually written to disk. Creating it eagerly here would leave
+  // empty directories when screenshots are disabled or never captured.
   const breadcrumbs: string[] = [];
   const rememberBreadcrumb = (value: string) => {
     breadcrumbs.push(value);
@@ -370,7 +358,6 @@ export function createWorkerTools(opts: CreateWorkerToolsOptions) {
     followupRequests,
     discoveredEdges,
     screenshotsEnabled,
-    stagnationTracker,
     findingContext,
     actionRecorder,
     breadcrumbs,

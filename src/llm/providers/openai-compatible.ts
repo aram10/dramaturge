@@ -38,6 +38,32 @@ export interface OpenAICompatibleConfig {
    * base-URL env var (e.g. Ollama) can supply a custom predicate here.
    */
   isConfigured?: () => boolean;
+  /**
+   * When true, the adapter emits `max_completion_tokens` instead of
+   * `max_tokens` for model IDs that require it (OpenAI o-series and gpt-5
+   * family reject the legacy `max_tokens`). Self-hosted OpenAI-compatible
+   * backends (Ollama, vLLM) leave this false and keep `max_tokens`. Defaults
+   * to false (#224).
+   */
+  useMaxCompletionTokensForNewModels?: boolean;
+}
+
+/**
+ * OpenAI's o-series (o1/o3/o4…) and gpt-5 family reject the legacy `max_tokens`
+ * field and require `max_completion_tokens` (#224).
+ */
+export function requiresMaxCompletionTokens(modelId: string): boolean {
+  const id = modelId.toLowerCase();
+  return /^(o\d|gpt-5)/.test(id);
+}
+
+function tokenLimitField(
+  useNewModels: boolean,
+  modelId: string
+): 'max_tokens' | 'max_completion_tokens' {
+  return useNewModels && requiresMaxCompletionTokens(modelId)
+    ? 'max_completion_tokens'
+    : 'max_tokens';
 }
 
 function extractText(data: unknown): string {
@@ -53,6 +79,7 @@ function extractText(data: unknown): string {
 export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): LLMProviderAdapter {
   const includeModel = config.includeModelInBody !== false;
   const requiresApiKey = config.requiresApiKey !== false;
+  const useNewTokenField = config.useMaxCompletionTokensForNewModels === true;
 
   function resolveAuthHeaders(requestKind: 'models' | 'vision models'): Record<string, string> {
     const key = config.getApiKey();
@@ -99,7 +126,7 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
       const baseUrl = resolveBaseUrl();
 
       const body: Record<string, unknown> = {
-        max_tokens: options.maxTokens,
+        [tokenLimitField(useNewTokenField, options.model)]: options.maxTokens,
         messages: [
           { role: 'system', content: options.system },
           ...options.messages.map((m) => ({ role: m.role, content: m.content })),
@@ -132,7 +159,7 @@ export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): 
       const baseUrl = resolveBaseUrl();
 
       const body: Record<string, unknown> = {
-        max_tokens: options.maxTokens,
+        [tokenLimitField(useNewTokenField, options.model)]: options.maxTokens,
         messages: [
           { role: 'system', content: options.system },
           {
@@ -175,4 +202,5 @@ export const openaiProvider: LLMProviderAdapter = createOpenAICompatibleProvider
   getApiKey: () => process.env.OPENAI_API_KEY,
   getBaseUrl: () => process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
   buildAuthHeaders: (key) => ({ authorization: `Bearer ${key}` }),
+  useMaxCompletionTokensForNewModels: true,
 });

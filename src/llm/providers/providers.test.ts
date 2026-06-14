@@ -23,6 +23,7 @@ describe('provider adapters', () => {
     savedEnv.AZURE_AI_ENDPOINT = process.env.AZURE_AI_ENDPOINT;
     savedEnv.OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
     savedEnv.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+    savedEnv.DRAMATURGE_GITHUB_MODELS = process.env.DRAMATURGE_GITHUB_MODELS;
     savedEnv.OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL;
     savedEnv.OLLAMA_API_KEY = process.env.OLLAMA_API_KEY;
     savedEnv.OPENAI_COMPATIBLE_BASE_URL = process.env.OPENAI_COMPATIBLE_BASE_URL;
@@ -32,6 +33,7 @@ describe('provider adapters', () => {
     delete process.env.OLLAMA_API_KEY;
     delete process.env.OPENAI_COMPATIBLE_BASE_URL;
     delete process.env.OPENAI_COMPATIBLE_API_KEY;
+    delete process.env.DRAMATURGE_GITHUB_MODELS;
   });
 
   afterEach(() => {
@@ -144,6 +146,34 @@ describe('provider adapters', () => {
       });
       const body = req.body as Record<string, unknown>;
       expect(body.model).toBe('gpt-4.1');
+    });
+
+    it('uses max_tokens for legacy models (#224)', () => {
+      process.env.OPENAI_API_KEY = 'test';
+      const req = openaiProvider.buildChatRequest({
+        model: 'gpt-4.1',
+        system: 'sys',
+        messages: [{ role: 'user', content: 'Hi' }],
+        maxTokens: 100,
+      });
+      const body = req.body as Record<string, unknown>;
+      expect(body.max_tokens).toBe(100);
+      expect(body.max_completion_tokens).toBeUndefined();
+    });
+
+    it('uses max_completion_tokens for gpt-5 and o-series models (#224)', () => {
+      process.env.OPENAI_API_KEY = 'test';
+      for (const model of ['gpt-5-mini', 'o3', 'o1-preview']) {
+        const req = openaiProvider.buildChatRequest({
+          model,
+          system: 'sys',
+          messages: [{ role: 'user', content: 'Hi' }],
+          maxTokens: 100,
+        });
+        const body = req.body as Record<string, unknown>;
+        expect(body.max_completion_tokens).toBe(100);
+        expect(body.max_tokens).toBeUndefined();
+      }
     });
   });
 
@@ -316,6 +346,28 @@ describe('provider adapters', () => {
         maxTokens: 100,
       });
       expect(req.headers.authorization).toBe('Bearer gho_test-token');
+    });
+
+    it('is not configured from GITHUB_TOKEN alone without opt-in (#204)', () => {
+      process.env.GITHUB_TOKEN = 'gho_test-token';
+      delete process.env.DRAMATURGE_GITHUB_MODELS;
+      expect(githubModelsProvider.isConfigured()).toBe(false);
+    });
+
+    it('is configured only when GITHUB_TOKEN and the opt-in flag are both set (#204)', () => {
+      process.env.GITHUB_TOKEN = 'gho_test-token';
+      process.env.DRAMATURGE_GITHUB_MODELS = 'true';
+      expect(githubModelsProvider.isConfigured()).toBe(true);
+      process.env.DRAMATURGE_GITHUB_MODELS = '1';
+      expect(githubModelsProvider.isConfigured()).toBe(true);
+      process.env.DRAMATURGE_GITHUB_MODELS = 'false';
+      expect(githubModelsProvider.isConfigured()).toBe(false);
+    });
+
+    it('is not configured by the opt-in flag without a token (#204)', () => {
+      delete process.env.GITHUB_TOKEN;
+      process.env.DRAMATURGE_GITHUB_MODELS = 'true';
+      expect(githubModelsProvider.isConfigured()).toBe(false);
     });
   });
 

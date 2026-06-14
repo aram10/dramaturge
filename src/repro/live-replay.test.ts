@@ -426,7 +426,7 @@ describe('createLiveReplayAdapter', () => {
     expect(result.oracleComparison.networkFailuresCurrent).toBe(1);
   });
 
-  it('ignores unrelated runtime noise when original oracles are absent', async () => {
+  it('ignores unrelated runtime noise but cannot confirm without an oracle (#209)', async () => {
     const harness = makeFakePage({
       consoleOnClick: 'unrelated ad script error',
       requestFailedOnClick: 'https://example.com/ad.js',
@@ -439,7 +439,7 @@ describe('createLiveReplayAdapter', () => {
       })
     );
 
-    expect(result.verdict).toBe('fixed');
+    expect(result.verdict).toBe('cannot_confirm');
     expect(result.oracleComparison.consoleErrorsCurrent).toBe(0);
     expect(result.oracleComparison.networkFailuresCurrent).toBe(0);
     expect(result.evidence.screenshotRef).toBeUndefined();

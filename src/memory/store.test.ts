@@ -246,10 +246,56 @@ describe('MemoryStore', () => {
     ]);
     expect(plannerSignals).toEqual({
       hasSuppressedFindings: true,
+      hasRecurringFindings: false,
       hasFlakyPageNotes: true,
       hasNavigationHints: true,
       hasApiHints: true,
     });
+  });
+
+  it('surfaces active recurring findings as worker context after repeat runs', () => {
+    const finding: RawFinding = {
+      category: 'Bug',
+      severity: 'Major',
+      title: 'Checkout total ignores discount code',
+      stepsToReproduce: ['Open checkout', 'Apply a discount code'],
+      expected: 'Total reflects the discount',
+      actual: 'Total is unchanged',
+    };
+
+    const store = new MemoryStore(tempDir);
+    // Same finding seen across two separate runs → runCount becomes 2.
+    store.recordRunFindings('2026-03-27T12:00:00.000Z', [
+      makeAreaResult('Checkout', 'https://example.com/settings', finding),
+    ]);
+    store.recordRunFindings('2026-03-28T12:00:00.000Z', [
+      makeAreaResult('Checkout', 'https://example.com/settings', finding),
+    ]);
+
+    const context = store.getWorkerContext({
+      url: 'https://example.com/settings',
+      fingerprint: makeFingerprint('settings-fingerprint', '/settings'),
+      pageType: 'settings',
+    });
+    const signals = store.getPlannerSignals({
+      url: 'https://example.com/settings',
+      fingerprint: makeFingerprint('settings-fingerprint', '/settings'),
+      pageType: 'settings',
+    });
+
+    expect(context.recurringFindings).toContain('Checkout total ignores discount code');
+    expect(context.suppressedFindings).toHaveLength(0);
+    expect(signals.hasRecurringFindings).toBe(true);
+
+    // Once suppressed, a recurring finding is no longer surfaced as active.
+    store.markFindingSuppressed(buildFindingSignature(finding), 'Known accepted behavior');
+    const afterSuppress = store.getWorkerContext({
+      url: 'https://example.com/settings',
+      fingerprint: makeFingerprint('settings-fingerprint', '/settings'),
+      pageType: 'settings',
+    });
+    expect(afterSuppress.recurringFindings).toHaveLength(0);
+    expect(afterSuppress.suppressedFindings).toContain('Checkout total ignores discount code');
   });
 
   it('persists API request samples across reloads', () => {

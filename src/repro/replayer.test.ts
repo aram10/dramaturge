@@ -156,6 +156,21 @@ describe('evaluateReplayConfirmation', () => {
     expect(result.verdict).toBe('new_related_issue');
   });
 
+  it('returns cannot_confirm when the finding has no machine-checkable oracle (#209)', () => {
+    const manifest = makeManifest({ oracles: {}, finding: { ...makeManifest().finding } });
+    const result = evaluateReplayConfirmation(
+      manifest,
+      buildStaticReplayResult(manifest, {
+        consoleErrors: [],
+        networkFailures: [],
+        a11yRuleIds: [],
+      })
+    );
+
+    expect(result.verdict).toBe('cannot_confirm');
+    expect(result.confidence).toBe('low');
+  });
+
   it('returns cannot_confirm when replay stops on a blocked action', () => {
     const manifest = makeManifest({
       replay: {

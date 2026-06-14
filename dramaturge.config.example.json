@@ -103,6 +103,15 @@
     "requestTimeoutMs": 15000
   },
 
+  // Optionally re-run replay on high-impact (Critical/Major) findings before
+  // reports are written, attaching a replayValidation status (confirmed,
+  // unconfirmed, flaky, unavailable). Disabled by default.
+  // "autoValidate": {
+  //   "enabled": true,
+  //   "severities": ["Critical", "Major"],
+  //   "maxFindings": 10
+  // },
+
   // Optional repo-aware scanning. "auto" uses a Next.js adapter when it
   // detects that structure and otherwise falls back to a generic adapter.
   // "repoContext": {

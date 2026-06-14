@@ -183,4 +183,100 @@ describe('judgeWorkerObservations', () => {
       )
     ).toBe(true);
   });
+
+  it('quarantines deterministically rejected findings when no LLM judge is available (#206)', async () => {
+    const findings = await judgeWorkerObservations({
+      observations: [
+        {
+          id: 'obs-5',
+          category: 'Bug',
+          severity: 'Minor',
+          title: 'Console error on load',
+          stepsToReproduce: ['Load page'],
+          expected: 'No console errors',
+          actual: 'A console error appears',
+          evidenceIds: [],
+          route: '/dashboard',
+          objective: 'Test page load',
+          breadcrumbs: [],
+          actionIds: [],
+        },
+      ],
+      evidence: [],
+      actions: [],
+      // No judgeText → deterministic fast path. The console-error grader
+      // disconfirms (claims a console error with no linked evidence) at low
+      // confidence, so the finding is rejected and dropped.
+      config: { enabled: true, requestTimeoutMs: 10_000 },
+    });
+
+    expect(findings).toHaveLength(0);
+  });
+
+  it('keeps rejected findings when dropRejected is false (#206)', async () => {
+    const findings = await judgeWorkerObservations({
+      observations: [
+        {
+          id: 'obs-6',
+          category: 'Bug',
+          severity: 'Minor',
+          title: 'Console error on load',
+          stepsToReproduce: ['Load page'],
+          expected: 'No console errors',
+          actual: 'A console error appears',
+          evidenceIds: [],
+          route: '/dashboard',
+          objective: 'Test page load',
+          breadcrumbs: [],
+          actionIds: [],
+        },
+      ],
+      evidence: [],
+      actions: [],
+      config: {
+        enabled: true,
+        requestTimeoutMs: 10_000,
+        dropRejected: false,
+        minConfidence: 'low',
+      },
+    });
+
+    expect(findings).toHaveLength(1);
+  });
+
+  it('drops findings below the configured minConfidence (#206)', async () => {
+    const judgeText = vi.fn().mockResolvedValue({
+      hypothesis: 'The form should submit successfully',
+      observation: 'Form submission failed',
+      alternativesConsidered: [],
+      suggestedVerification: [],
+      confidence: 'low',
+    });
+
+    const findings = await judgeWorkerObservations({
+      observations: [
+        {
+          id: 'obs-7',
+          category: 'Bug',
+          severity: 'Major',
+          title: 'Form fails silently',
+          stepsToReproduce: ['Click submit'],
+          expected: 'Success message',
+          actual: 'Nothing happens',
+          evidenceIds: [],
+          route: '/form',
+          objective: 'Test form submission',
+          breadcrumbs: [],
+          actionIds: [],
+        },
+      ],
+      evidence: [],
+      actions: [],
+      config: { enabled: true, requestTimeoutMs: 10_000, minConfidence: 'high' },
+      judgeText,
+    });
+
+    expect(judgeText).toHaveBeenCalled();
+    expect(findings).toHaveLength(0);
+  });
 });

@@ -41,6 +41,12 @@ export interface JudgeDecision {
   alternativesConsidered: string[];
   suggestedVerification: string[];
   confidence?: FindingConfidence;
+  /**
+   * The judge's disposition for the observation (#206). `rejected` findings are
+   * quarantined (dropped from reports unless `judge.dropRejected` is false);
+   * `uncertain` ships with reduced confidence; `confirmed` ships normally.
+   */
+  disposition?: 'confirmed' | 'rejected' | 'uncertain';
 }
 
 export interface JudgeWorkerObservationsInput {

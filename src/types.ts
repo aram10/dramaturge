@@ -42,6 +42,17 @@ export interface Evidence {
   path?: string;
   timestamp: string;
   areaName?: string;
+  /**
+   * Structured network details for `network-error` evidence, captured at
+   * observation time (#251). Carrying the status/URL here avoids reverse-
+   * engineering them from the human-readable `summary` string, which is
+   * lossy (any 3-digit number could be misread as a status code).
+   */
+  network?: {
+    url: string;
+    status: number;
+    method?: string;
+  };
   /** Stable raw finding refs collected during runtime; renderers map these to display IDs. */
   relatedFindingIds: string[];
 }
@@ -215,6 +226,11 @@ export interface RunResult {
   workflowAutomaton?: WorkflowAutomaton;
   /** Comparison summary against prior role/run workflow automata. */
   workflowComparison?: WorkflowAutomatonComparison;
+  /**
+   * Replay-validation results for high-impact findings, keyed by finding
+   * signature (#137). Present when auto-validation is enabled.
+   */
+  replayValidations?: Record<string, ReplayValidation>;
 }
 
 export type ConfirmationVerdict =
@@ -223,6 +239,28 @@ export type ConfirmationVerdict =
   | 'cannot_confirm'
   | 'changed_surface'
   | 'new_related_issue';
+
+/**
+ * Outcome of auto-validating a high-impact finding by replaying its minimal
+ * action trace in a fresh browser context before reporting (#137).
+ *
+ *   - `confirmed`   — the finding still reproduces.
+ *   - `unconfirmed` — replay completed but the issue could not be reproduced.
+ *   - `flaky`       — behavior changed or a different issue surfaced on replay.
+ *   - `unavailable` — replay could not be constructed or run (no trace,
+ *                     blocked step, or adapter error). Never silently dropped.
+ */
+export type ReplayValidationStatus = 'confirmed' | 'unconfirmed' | 'flaky' | 'unavailable';
+
+export interface ReplayValidation {
+  status: ReplayValidationStatus;
+  verdict: ConfirmationVerdict;
+  confidence: FindingConfidence;
+  actionsCompleted: number;
+  actionsRequested: number;
+  durationMs: number;
+  detail?: string;
+}
 
 export interface ConfirmationResult {
   findingId: string;

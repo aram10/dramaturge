@@ -142,6 +142,7 @@ describe('buildWorkerSystemPrompt', () => {
       pageType: 'settings',
       history: {
         suppressedFindings: ['Known spinner jitter on autosave toast'],
+        recurringFindings: [],
         flakyPageNotes: ['Relative timestamps refresh every second near the header'],
         navigationHints: ['Known transition: Settings -> Members via role=button[name=Members]'],
         authHints: ['Successful login has historically started at /login'],
@@ -347,6 +348,7 @@ describe('buildWorkerSystemPrompt', () => {
       ],
       history: {
         suppressedFindings: [payload],
+        recurringFindings: [],
         flakyPageNotes: [],
         navigationHints: [],
         authHints: [],

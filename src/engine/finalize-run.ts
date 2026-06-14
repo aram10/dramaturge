@@ -30,7 +30,7 @@ function recordRemainingBlindSpots(ctx: EngineContext, remaining: FrontierItem[]
   }
 }
 
-export function finalizeRun(ctx: EngineContext, options: FinalizeRunOptions): void {
+export async function finalizeRun(ctx: EngineContext, options: FinalizeRunOptions): Promise<void> {
   const {
     startTime,
     tasksExecuted,
@@ -84,7 +84,7 @@ export function finalizeRun(ctx: EngineContext, options: FinalizeRunOptions): vo
   }
 
   finalizeWorkflowAutomata(ctx);
-  writeReports(ctx, startTime, areaResults, remaining);
+  await writeReports(ctx, startTime, areaResults, remaining);
 
   const blindSpots = ctx.globalCoverage.getBlindSpots();
   const totalFindings = [...ctx.findingsByNode.values()].reduce(

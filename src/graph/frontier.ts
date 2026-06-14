@@ -19,13 +19,17 @@ export class FrontierQueue {
   }
 
   /**
-   * Remove and return the highest-priority pending item. O(n) scan from front.
+   * Remove and return the highest-priority pending item. The item is spliced out
+   * of the queue so completed/in-progress items don't accumulate and degrade
+   * dequeue to O(total-ever-enqueued). Callers retain the reference and may
+   * re-add it via requeue() on failure (#217).
    */
   dequeueHighest(): FrontierItem | undefined {
     for (let i = 0; i < this.items.length; i++) {
       if (this.items[i].status === 'pending') {
-        this.items[i].status = 'in-progress';
-        return this.items[i];
+        const [item] = this.items.splice(i, 1);
+        item.status = 'in-progress';
+        return item;
       }
     }
     return undefined;

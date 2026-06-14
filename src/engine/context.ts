@@ -63,6 +63,8 @@ export interface EngineContext {
   errorCollector: BrowserErrorCollector;
   pageNodeOwners: Map<string, string>;
   completedTaskIds: Set<string>;
+  /** Per-node follow-up tracking: caps and dedupes follow-up requests (#221). */
+  followupTracking: Map<string, { count: number; reasons: Set<string> }>;
   workerPool: WorkerSession[];
   repoHints?: RepoHints;
   contractIndex?: ContractIndex;

@@ -213,6 +213,15 @@ function buildHistoricalContextSection(history?: WorkerHistoryContext): string {
     );
   }
 
+  if (history.recurringFindings.length > 0) {
+    if (parts.length === 0) parts.push('## Historical Notes');
+    parts.push(
+      `Known recurring issues on this route from prior runs — re-check whether they still reproduce: ${history.recurringFindings.join(
+        ' | '
+      )}`
+    );
+  }
+
   if (history.flakyPageNotes.length > 0) {
     if (parts.length === 0) parts.push('## Historical Notes');
     parts.push(`Historically dynamic page notes: ${history.flakyPageNotes.join(' | ')}`);

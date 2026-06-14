@@ -10,6 +10,7 @@ import type {
   DiscoveredEdge,
 } from '../types.js';
 import { shortId, TRUNCATE_MERMAID_LABEL } from '../constants.js';
+import { buildStateSignatureKey } from './state-signature.js';
 
 export interface AddNodeInit {
   url?: string;
@@ -26,6 +27,8 @@ export class StateGraph {
   private nodes = new Map<string, StateNode>();
   private edges = new Map<string, StateEdge>();
   private fingerprintIndex = new Map<string, string>();
+  /** Second-level dedupe: maps a stable signature key to a node id (#219). */
+  private signatureIndex = new Map<string, string>();
 
   addNode(init: AddNodeInit): StateNode {
     const id = `node-${shortId()}`;
@@ -47,6 +50,7 @@ export class StateGraph {
     };
     this.nodes.set(id, node);
     this.fingerprintIndex.set(init.fingerprint.hash, id);
+    this.signatureIndex.set(buildStateSignatureKey(init.fingerprint.signature), id);
     return node;
   }
 
@@ -58,10 +62,18 @@ export class StateGraph {
 
   findByFingerprint(fp: PageFingerprint): StateNode | undefined {
     const nodeId = this.fingerprintIndex.get(fp.hash);
-    return nodeId ? this.nodes.get(nodeId) : undefined;
+    if (nodeId) return this.nodes.get(nodeId);
+    // Second-level lookup: a stable signature key collapses dynamic pages whose
+    // exact hash drifts (rotating titles/counters) into the same node (#219).
+    const sigNodeId = this.signatureIndex.get(buildStateSignatureKey(fp.signature));
+    return sigNodeId ? this.nodes.get(sigNodeId) : undefined;
   }
 
   addEdge(fromId: string, toId: string, edge: DiscoveredEdge): StateEdge {
+    // Dedupe on (from, to, actionLabel) so rediscovering a known state from a
+    // different source doesn't create duplicate parallel edges (#218).
+    const existing = this.findEdge(fromId, toId, edge.actionLabel);
+    if (existing) return existing;
     const id = `edge-${shortId()}`;
     const stateEdge: StateEdge = {
       id,
@@ -74,6 +86,20 @@ export class StateGraph {
     };
     this.edges.set(id, stateEdge);
     return stateEdge;
+  }
+
+  /** Find an existing edge matching (from, to, actionLabel), if any. */
+  private findEdge(fromId: string, toId: string, actionLabel: string): StateEdge | undefined {
+    for (const edge of this.edges.values()) {
+      if (
+        edge.fromNodeId === fromId &&
+        edge.toNodeId === toId &&
+        edge.actionLabel === actionLabel
+      ) {
+        return edge;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -145,6 +171,7 @@ export class StateGraph {
   restoreNode(node: StateNode): void {
     this.nodes.set(node.id, node);
     this.fingerprintIndex.set(node.fingerprint.hash, node.id);
+    this.signatureIndex.set(buildStateSignatureKey(node.fingerprint.signature), node.id);
   }
 
   /** Restore an edge from a checkpoint (used during resume). */

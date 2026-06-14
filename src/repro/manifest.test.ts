@@ -123,6 +123,40 @@ describe('finding replay manifests', () => {
     expect(manifest.oracles.networkFailures).toEqual([{ urlPattern: '/api/orders', status: 500 }]);
   });
 
+  it('prefers structured network evidence over regex-parsed summaries (#251)', () => {
+    const result = makeRunResult({
+      areaResults: [
+        {
+          name: 'Checkout',
+          url: 'https://example.com/checkout',
+          steps: 2,
+          findings: [makeFinding()],
+          replayableActions: [makeAction()],
+          screenshots: new Map(),
+          evidence: [
+            makeEvidence(),
+            makeEvidence({
+              id: 'ev-2',
+              type: 'network-error',
+              // A noisy summary whose first 3-digit number (503ms) is NOT the
+              // status code — regex parsing would mis-read it as status 503.
+              summary: 'POST /api/orders took 503 ms before returning 500',
+              network: { url: 'https://example.com/api/orders', status: 500, method: 'POST' },
+            }),
+          ],
+          coverage: { controlsDiscovered: 1, controlsExercised: 1, events: [] },
+          pageType: 'form',
+          status: 'explored',
+        },
+      ],
+    });
+
+    const [manifest] = buildFindingReplayManifests(result);
+    expect(manifest.oracles.networkFailures).toEqual([
+      { urlPattern: 'https://example.com/api/orders', status: 500 },
+    ]);
+  });
+
   it('writes and loads a per-finding manifest under findings directory', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'dramaturge-manifest-'));
 

@@ -175,9 +175,33 @@ describe('runDeterministicGraders', () => {
     ];
 
     const { combinedConfidence, allConfirmed } = runDeterministicGraders(obs, evidence);
-    // Expected: medium confidence (lowest among console-error and network-error
-    // pass-through at medium, evidence-completeness at high for 2 types).
-    expect(combinedConfidence).toBe('medium');
+    // The console-error and network-error graders are non-applicable here, so
+    // only the evidence-completeness grader (high, 2 evidence types) sets the
+    // floor (#250).
+    expect(combinedConfidence).toBe('high');
     expect(allConfirmed).toBe(true);
+  });
+
+  it('flags a contradiction as rejected when a claimed console error has no evidence (#206)', () => {
+    const obs = makeObservation({
+      title: 'Console error on submit',
+      actual: 'A console error appears in the console',
+      evidenceIds: [],
+    });
+
+    const { anyRejected, combinedConfidence } = runDeterministicGraders(obs, []);
+    expect(anyRejected).toBe(true);
+    expect(combinedConfidence).toBe('low');
+  });
+
+  it('does not reject an evidence-light finding without a contradiction (#206)', () => {
+    const obs = makeObservation({
+      title: 'Button looks misaligned',
+      actual: 'The save button is a few pixels off',
+      evidenceIds: [],
+    });
+
+    const { anyRejected } = runDeterministicGraders(obs, []);
+    expect(anyRejected).toBe(false);
   });
 });

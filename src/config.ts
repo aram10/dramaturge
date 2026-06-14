@@ -5,6 +5,22 @@ import { z } from 'zod';
 import { readFileSync } from 'node:fs';
 import { parseJsoncObject } from './utils/jsonc.js';
 import { getConfigFileContext, normalizeConfigPaths, type ConfigWithMeta } from './config-paths.js';
+import { unknownModelPrefix, knownProviderIds } from './llm/registry.js';
+
+/**
+ * Zod schema for a model string that rejects unknown provider prefixes (#224).
+ * A bare model name (no `/`) or a recognised `<provider>/<model>` string passes;
+ * `foo/bar` fails fast instead of silently falling back to Anthropic.
+ */
+const ModelString = z.string().superRefine((value, ctx) => {
+  const bad = unknownModelPrefix(value);
+  if (bad) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Unknown model provider prefix "${bad}/". Known providers: ${knownProviderIds().join(', ')}. Use a bare model name for the default (Anthropic) provider.`,
+    });
+  }
+});
 
 const AuthConfigSchema = z.discriminatedUnion('type', [
   z.object({
@@ -89,11 +105,13 @@ const AuthSchema = z.union([AuthProfilesSchema, AuthConfigSchema]).default({ typ
 
 const WorkerModelsSchema = z
   .object({
-    navigation: z.string().optional(),
-    form: z.string().optional(),
-    crud: z.string().optional(),
-    adversarial: z.string().optional(),
+    navigation: ModelString.optional(),
+    form: ModelString.optional(),
+    crud: ModelString.optional(),
+    api: ModelString.optional(),
+    adversarial: ModelString.optional(),
   })
+  .strict()
   .optional();
 
 const AgentModeSchema = z.enum(['cua', 'dom']).default('cua');
@@ -103,19 +121,22 @@ const AgentModesSchema = z
     navigation: z.enum(['cua', 'dom']).optional(),
     form: z.enum(['cua', 'dom']).optional(),
     crud: z.enum(['cua', 'dom']).optional(),
+    api: z.enum(['cua', 'dom']).optional(),
     adversarial: z.enum(['cua', 'dom']).optional(),
   })
+  .strict()
   .optional();
 
 const ModelsSchema = z
   .object({
-    planner: z.string().default('anthropic/claude-sonnet-4-6'),
-    worker: z.string().default('anthropic/claude-haiku-4-5'),
-    browserOps: z.string().optional(),
+    planner: ModelString.default('anthropic/claude-sonnet-4-6'),
+    worker: ModelString.default('anthropic/claude-haiku-4-5'),
+    browserOps: ModelString.optional(),
     workers: WorkerModelsSchema,
     agentMode: AgentModeSchema,
     agentModes: AgentModesSchema,
   })
+  .strict()
   .default({
     planner: 'anthropic/claude-sonnet-4-6',
     worker: 'anthropic/claude-haiku-4-5',
@@ -303,10 +324,16 @@ const JudgeSchema = z
   .object({
     enabled: z.boolean().default(true),
     requestTimeoutMs: z.number().int().min(100).default(15_000),
+    /** Drop findings the judge rejects instead of shipping them (#206). */
+    dropRejected: z.boolean().default(true),
+    /** Minimum confidence a finding must carry to be reported (#206). */
+    minConfidence: z.enum(['low', 'medium', 'high']).default('low'),
   })
   .default({
     enabled: true,
     requestTimeoutMs: 15_000,
+    dropRejected: true,
+    minConfidence: 'low',
   });
 
 const MissionSchema = z
@@ -330,13 +357,10 @@ const BudgetSchema = z
     maxStepsPerTask: z.number().int().min(5).default(40),
     maxFrontierSize: z.number().int().min(10).default(200),
     maxStateNodes: z.number().int().min(5).default(50),
-    /** Abort a worker after this many consecutive steps with no findings, controls, or edges (0 = disabled). */
-    stagnationThreshold: z.number().int().min(0).default(8),
     /**
      * Maximum estimated LLM cost in USD before stopping the run (0 = unlimited).
-     * Experimental — the engine does not yet enforce this automatically.
-     * Use `CostTracker` from `src/coverage/cost-tracker.ts` to track spend and
-     * check `overBudget` in a custom integration.
+     * Enforced by the engine: when exceeded, the run stops dequeuing new tasks
+     * and the report is marked partial (reason: cost-budget-exceeded).
      */
     costLimitUsd: z.number().min(0).default(0),
   })
@@ -345,7 +369,6 @@ const BudgetSchema = z
     maxStepsPerTask: 40,
     maxFrontierSize: 200,
     maxStateNodes: 50,
-    stagnationThreshold: 8,
     costLimitUsd: 0,
   });
 
@@ -362,6 +385,23 @@ const AutoCaptureSchema = z
     consoleWarnings: false,
     networkErrors: true,
     networkErrorMinStatus: 400,
+  });
+
+const AutoValidateSchema = z
+  .object({
+    /** Replay high-impact findings to validate them before reporting (#137). */
+    enabled: z.boolean().default(false),
+    /** Severities considered high-impact and validated. */
+    severities: z
+      .array(z.enum(['Critical', 'Major', 'Minor', 'Trivial']))
+      .default(['Critical', 'Major']),
+    /** Maximum number of findings to validate per run (bounds cost). */
+    maxFindings: z.number().int().min(1).max(100).default(10),
+  })
+  .default({
+    enabled: false,
+    severities: ['Critical', 'Major'],
+    maxFindings: 10,
   });
 
 const BrowserSchema = z
@@ -660,36 +700,39 @@ const ExperimentalSchema = z
     workflowAutomata: WorkflowAutomataSchema.parse({}),
   }));
 
-export const ConfigSchema = z.object({
-  targetUrl: z.string().url(),
-  appDescription: z.string().min(1),
-  auth: AuthSchema,
-  models: ModelsSchema,
-  mission: MissionSchema,
-  budget: BudgetSchema,
-  exploration: ExplorationSchema,
-  output: OutputSchema,
-  memory: MemorySchema,
-  visualRegression: VisualRegressionSchema,
-  webVitals: WebVitalsSchema,
-  responsiveRegression: ResponsiveRegressionSchema,
-  visionAnalysis: VisionAnalysisSchema,
-  apiTesting: ApiTestingSchema,
-  adversarial: AdversarialSchema,
-  judge: JudgeSchema,
-  autoCapture: AutoCaptureSchema,
-  browser: BrowserSchema,
-  llm: LlmSchema,
-  concurrency: ConcurrencySchema,
-  checkpoint: CheckpointSchema,
-  appContext: AppContextSchema,
-  repoContext: RepoContextSchema,
-  diffAware: DiffAwareSchema,
-  bootstrap: BootstrapSchema,
-  policy: PolicySchema,
-  a2a: A2ASchema,
-  experimental: ExperimentalSchema,
-});
+export const ConfigSchema = z
+  .object({
+    targetUrl: z.string().url(),
+    appDescription: z.string().min(1),
+    auth: AuthSchema,
+    models: ModelsSchema,
+    mission: MissionSchema,
+    budget: BudgetSchema,
+    exploration: ExplorationSchema,
+    output: OutputSchema,
+    memory: MemorySchema,
+    visualRegression: VisualRegressionSchema,
+    webVitals: WebVitalsSchema,
+    responsiveRegression: ResponsiveRegressionSchema,
+    visionAnalysis: VisionAnalysisSchema,
+    apiTesting: ApiTestingSchema,
+    adversarial: AdversarialSchema,
+    judge: JudgeSchema,
+    autoCapture: AutoCaptureSchema,
+    autoValidate: AutoValidateSchema,
+    browser: BrowserSchema,
+    llm: LlmSchema,
+    concurrency: ConcurrencySchema,
+    checkpoint: CheckpointSchema,
+    appContext: AppContextSchema,
+    repoContext: RepoContextSchema,
+    diffAware: DiffAwareSchema,
+    bootstrap: BootstrapSchema,
+    policy: PolicySchema,
+    a2a: A2ASchema,
+    experimental: ExperimentalSchema,
+  })
+  .strict();
 
 export type DramaturgeConfig = z.infer<typeof ConfigSchema>;
 export type LoadedDramaturgeConfig = ConfigWithMeta<DramaturgeConfig>;
@@ -753,27 +796,95 @@ export function getAuthProfileNames(auth: DramaturgeConfig['auth']): string[] {
   return Object.keys(auth.profiles);
 }
 
-function interpolateEnvVars(value: unknown): unknown {
+function interpolateEnvVars(value: unknown, missing: Set<string>): unknown {
   if (typeof value === 'string') {
-    return value.replace(/\$\{(\w+)\}/g, (_match, varName: string) => {
-      const envVal = process.env[varName];
-      if (envVal === undefined) {
-        throw new Error(
-          `Environment variable ${varName} is not set (referenced in config as \${${varName}})`
-        );
+    // `$${VAR}` is an escape for a literal `${VAR}` (#249). Process escapes and
+    // real references in a single pass so an escaped token is never expanded.
+    return value.replace(
+      /\$(\$)?\{(\w+)\}/g,
+      (_match, escaped: string | undefined, varName: string) => {
+        if (escaped) {
+          return `\${${varName}}`;
+        }
+        const envVal = process.env[varName];
+        if (envVal === undefined) {
+          missing.add(varName);
+          return '';
+        }
+        return envVal;
       }
-      return envVal;
-    });
+    );
   }
   if (Array.isArray(value)) {
-    return value.map(interpolateEnvVars);
+    return value.map((item) => interpolateEnvVars(item, missing));
   }
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, interpolateEnvVars(v)])
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        k,
+        interpolateEnvVars(v, missing),
+      ])
     );
   }
   return value;
+}
+
+/**
+ * Suggest the closest known key for an unrecognised config key using a simple
+ * Levenshtein distance, for "did you mean" diagnostics (#223).
+ */
+function closestKey(unknownKey: string, candidates: string[]): string | undefined {
+  let best: string | undefined;
+  let bestDistance = Infinity;
+  for (const candidate of candidates) {
+    const distance = levenshtein(unknownKey.toLowerCase(), candidate.toLowerCase());
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+  // Only suggest when the edit distance is small relative to the key length.
+  return best !== undefined && bestDistance <= Math.max(2, Math.floor(unknownKey.length / 2))
+    ? best
+    : undefined;
+}
+
+function levenshtein(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const dist = Array.from({ length: rows }, () => new Array<number>(cols).fill(0));
+  for (let i = 0; i < rows; i++) dist[i][0] = i;
+  for (let j = 0; j < cols; j++) dist[0][j] = j;
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dist[i][j] = Math.min(dist[i - 1][j] + 1, dist[i][j - 1] + 1, dist[i - 1][j - 1] + cost);
+    }
+  }
+  return dist[rows - 1][cols - 1];
+}
+
+const TOP_LEVEL_CONFIG_KEYS = Object.keys(ConfigSchema.shape);
+
+/**
+ * Format a Zod validation error as a list of `path: message` lines, adding
+ * "did you mean" suggestions for unrecognised top-level keys (#223).
+ */
+function formatConfigError(error: z.ZodError): string {
+  const lines = error.issues.map((issue) => {
+    const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
+    if (issue.code === 'unrecognized_keys') {
+      const suggestions = issue.keys
+        .map((key) => {
+          const suggestion = closestKey(key, TOP_LEVEL_CONFIG_KEYS);
+          return suggestion ? `"${key}" (did you mean "${suggestion}"?)` : `"${key}"`;
+        })
+        .join(', ');
+      return `${path}: unknown key(s): ${suggestions}`;
+    }
+    return `${path}: ${issue.message}`;
+  });
+  return lines.join('\n');
 }
 
 export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
@@ -792,8 +903,24 @@ export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
     throw new Error(`Invalid JSON in config file: ${context.configPath}`);
   }
 
-  const interpolated = interpolateEnvVars(parsed);
-  return normalizeConfigPaths(ConfigSchema.parse(interpolated), context);
+  const missing = new Set<string>();
+  const interpolated = interpolateEnvVars(parsed, missing);
+  if (missing.size > 0) {
+    const names = [...missing].sort();
+    throw new Error(
+      `Environment variable${names.length > 1 ? 's' : ''} not set (referenced in config): ${names
+        .map((name) => `\${${name}}`)
+        .join(', ')}`
+    );
+  }
+
+  const result = ConfigSchema.safeParse(interpolated);
+  if (!result.success) {
+    throw new Error(
+      `Invalid config file: ${context.configPath}\n${formatConfigError(result.error)}`
+    );
+  }
+  return normalizeConfigPaths(result.data, context);
 }
 
 export function resolveWorkerModel(config: DramaturgeConfig, workerType: string): string {

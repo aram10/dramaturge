@@ -147,17 +147,34 @@ function fileMatchesRoute(filePath: string, route: string): boolean {
     .filter((seg) => !seg.startsWith(':') && !seg.startsWith('['))
     .map((seg) => seg.toLowerCase());
 
-  if (routeTokens.length === 0) return true; // route is purely params → any file matches
+  // A route made up entirely of params (e.g. `/:id`) has no concrete token to
+  // anchor on; matching every changed file over-scopes the run, so decline (#234).
+  if (routeTokens.length === 0) return false;
 
+  const fileSegments = toFileSegments(filePath);
+
+  // Every concrete route token must appear as a *full* path segment of the file
+  // (substring matching let `/user` match `/users/...` and over-scope) (#234).
+  return routeTokens.every((token) => fileSegments.has(token));
+}
+
+/**
+ * Split a file path into lowercased path segments, additionally indexing the
+ * basename with its extension stripped so `app/api/users/route.ts` yields
+ * `users` and `route` (not `route.ts`).
+ */
+function toFileSegments(filePath: string): Set<string> {
   const fileNorm = filePath.toLowerCase().replace(/\\/g, '/');
-
-  // All non-parameter route tokens must appear as path segments in the file
-  return routeTokens.every(
-    (token) =>
-      fileNorm.includes(`/${token}`) ||
-      fileNorm.includes(`${token}/`) ||
-      fileNorm.includes(`${token}.`)
-  );
+  const segments = fileNorm.split('/').filter(Boolean);
+  const result = new Set<string>();
+  for (const segment of segments) {
+    result.add(segment);
+    const dot = segment.indexOf('.');
+    if (dot > 0) {
+      result.add(segment.slice(0, dot));
+    }
+  }
+  return result;
 }
 
 function matchRoutes(files: DiffFileEntry[], routes: string[]): string[] {

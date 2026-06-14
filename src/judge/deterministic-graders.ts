@@ -22,10 +22,24 @@ export interface DeterministicGradeResult {
   confirmed: boolean;
   /** Confidence from the deterministic check. */
   confidence: 'low' | 'medium' | 'high';
+  /**
+   * Whether this grader actually applied to the observation. Non-applicable
+   * graders (e.g. a network grader on a finding with no status codes) are
+   * excluded from the combined-confidence floor so they no longer cap an
+   * otherwise high-confidence finding at medium (#250).
+   */
+  applicable: boolean;
   /** Human-readable explanation. */
   reason: string;
   /** Source grader that produced this result. */
   grader: string;
+  /**
+   * True when the grader found a direct contradiction between the finding's
+   * claim and the captured evidence (e.g. it claims a console error but none
+   * was recorded). Contradictions are rejection signals (#206); a merely
+   * evidence-light finding is low-confidence but not a contradiction.
+   */
+  contradiction?: boolean;
 }
 
 /**
@@ -51,6 +65,8 @@ export function gradeByConsoleErrors(
     return {
       confirmed: false,
       confidence: 'low',
+      applicable: true,
+      contradiction: true,
       reason: 'Finding mentions console errors but no console-error evidence is linked.',
       grader: 'console-error',
     };
@@ -60,6 +76,7 @@ export function gradeByConsoleErrors(
     return {
       confirmed: true,
       confidence: 'high',
+      applicable: true,
       reason: `${consoleErrors.length} console error(s) captured as evidence.`,
       grader: 'console-error',
     };
@@ -68,6 +85,7 @@ export function gradeByConsoleErrors(
   return {
     confirmed: true,
     confidence: 'medium',
+    applicable: false,
     reason: 'No console error evidence applicable — pass-through.',
     grader: 'console-error',
   };
@@ -100,6 +118,8 @@ export function gradeByNetworkErrors(
     return {
       confirmed: false,
       confidence: 'low',
+      applicable: true,
+      contradiction: true,
       reason: `Finding mentions HTTP status ${[...mentionedStatuses].join(', ')} but no network-error evidence is linked.`,
       grader: 'network-error',
     };
@@ -109,6 +129,7 @@ export function gradeByNetworkErrors(
     return {
       confirmed: true,
       confidence: 'high',
+      applicable: true,
       reason: `${networkErrors.length} network error(s) captured as evidence.`,
       grader: 'network-error',
     };
@@ -117,6 +138,7 @@ export function gradeByNetworkErrors(
   return {
     confirmed: true,
     confidence: 'medium',
+    applicable: false,
     reason: 'No network error evidence applicable — pass-through.',
     grader: 'network-error',
   };
@@ -139,6 +161,7 @@ export function gradeByEvidenceCompleteness(
     return {
       confirmed: false,
       confidence: 'low',
+      applicable: true,
       reason: 'Finding has no linked evidence.',
       grader: 'evidence-completeness',
     };
@@ -150,6 +173,7 @@ export function gradeByEvidenceCompleteness(
     return {
       confirmed: true,
       confidence: 'high',
+      applicable: true,
       reason: `Finding supported by ${types.size} evidence types: ${[...types].join(', ')}.`,
       grader: 'evidence-completeness',
     };
@@ -158,6 +182,7 @@ export function gradeByEvidenceCompleteness(
   return {
     confirmed: true,
     confidence: 'medium',
+    applicable: true,
     reason: `Finding supported by ${linkedEvidence.length} evidence item(s) of type: ${[...types].join(', ')}.`,
     grader: 'evidence-completeness',
   };
@@ -176,6 +201,7 @@ export function runDeterministicGraders(
   results: DeterministicGradeResult[];
   combinedConfidence: 'low' | 'medium' | 'high';
   allConfirmed: boolean;
+  anyRejected: boolean;
 } {
   const results = [
     gradeByConsoleErrors(observation, evidence),
@@ -184,16 +210,23 @@ export function runDeterministicGraders(
   ];
 
   const allConfirmed = results.every((r) => r.confirmed);
+  // A direct claim/evidence contradiction is an explicit rejection signal.
+  const anyRejected = results.some((r) => r.contradiction === true);
 
   const CONFIDENCE_ORDER = { low: 0, medium: 1, high: 2 } as const;
-  const lowestConfidence = results.reduce(
+  // Only applicable graders contribute to the floor so a non-applicable
+  // pass-through no longer caps an otherwise high-confidence finding (#250).
+  const applicable = results.filter((r) => r.applicable);
+  const lowestConfidence = applicable.reduce<'low' | 'medium' | 'high'>(
     (min, r) => (CONFIDENCE_ORDER[r.confidence] < CONFIDENCE_ORDER[min] ? r.confidence : min),
-    'high' as 'low' | 'medium' | 'high'
+    'high'
   );
 
   return {
     results,
-    combinedConfidence: lowestConfidence,
+    // With no applicable grader we have no deterministic signal — stay neutral.
+    combinedConfidence: applicable.length > 0 ? lowestConfidence : 'medium',
     allConfirmed,
+    anyRejected,
   };
 }

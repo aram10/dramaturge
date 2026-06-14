@@ -35,6 +35,12 @@ export const LLM_RETRY_MAX_DELAY_MS = 8000;
 /** Priority decay factor applied when requeuing a failed/blocked frontier item. */
 export const REQUEUE_PRIORITY_DECAY = 0.8;
 
+/**
+ * Max follow-up tasks a single node may spawn across the run. Caps self-sustaining
+ * follow-up loops that would otherwise starve genuinely new exploration (#221).
+ */
+export const MAX_FOLLOWUPS_PER_NODE = 8;
+
 /** Delay (ms) after a non-URL navigation action to let the page settle. */
 export const NAV_SETTLE_DELAY_MS = 500;
 
@@ -86,6 +92,13 @@ export const DEFAULT_REDACT_TRUNCATE_LENGTH = 320;
 /** Shorter truncation length for specific redacted fields. */
 export const SHORT_REDACT_TRUNCATE_LENGTH = 160;
 
+/**
+ * Maximum response/request body size (in characters) that will be JSON-parsed
+ * when observing API traffic. Beyond this the raw text is truncated instead, so
+ * a hostile server cannot force an unbounded JSON.parse (#233).
+ */
+export const MAX_BODY_PARSE_LENGTH = 100_000;
+
 /** Default LLM request timeout in milliseconds. */
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
 
@@ -94,3 +107,10 @@ export const JUDGE_LLM_TIMEOUT_MS = 15_000;
 
 /** Visual diff ratio threshold used to classify changed surfaces. */
 export const VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD = 0.05;
+
+/**
+ * Minimum number of times a route must record sub-threshold visual jitter
+ * before it is treated as flaky for cross-run classification (#230). A single
+ * below-threshold pixel diff is not enough signal to suppress findings.
+ */
+export const MIN_FLAKY_PAGE_COUNT = 2;

@@ -33,7 +33,7 @@ export function buildStabilityChecker(timeoutMs = 5000): string {
       observer.observe(document.body ?? document.documentElement, {
         childList: true,
         subtree: true,
-        attributes: true,
+        attributes: false,
       });
 
       // Start the quiet timer immediately (page may already be stable)

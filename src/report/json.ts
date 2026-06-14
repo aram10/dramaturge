@@ -2,7 +2,50 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { RunResult } from '../types.js';
-import { collectFindings } from './collector.js';
+import { buildFindingGroupKey, collectFindings } from './collector.js';
+
+type CollectedFinding = ReturnType<typeof collectFindings>[number];
+
+function buildTrace(f: CollectedFinding) {
+  const actionIds = f.meta?.repro?.actionIds ?? [];
+  const evidenceIds = f.meta?.repro?.evidenceIds ?? [];
+  if (actionIds.length === 0 && evidenceIds.length === 0) {
+    return null;
+  }
+  return { actionIds, evidenceIds };
+}
+
+function buildCrossRunStatus(f: CollectedFinding, result: RunResult) {
+  const status = result.crossRunClassification?.byFindingId[f.id];
+  if (!status) {
+    return null;
+  }
+  const { signature: _signature, ...rest } = status;
+  return rest;
+}
+
+function toJsonFinding(f: CollectedFinding, result: RunResult) {
+  return {
+    id: f.id,
+    category: f.category,
+    severity: f.severity,
+    area: f.area,
+    title: f.title,
+    stepsToReproduce: f.stepsToReproduce,
+    expected: f.expected,
+    actual: f.actual,
+    screenshot: f.screenshot ?? null,
+    evidenceIds: f.evidenceIds ?? [],
+    verdict: f.verdict ?? null,
+    trace: buildTrace(f),
+    occurrenceCount: f.occurrenceCount,
+    impactedAreas: f.impactedAreas,
+    occurrences: f.occurrences,
+    meta: f.meta ?? null,
+    replayValidation: result.replayValidations?.[buildFindingGroupKey(f)] ?? null,
+    crossRunStatus: buildCrossRunStatus(f, result),
+  };
+}
 
 export function renderJson(result: RunResult): string {
   const findings = collectFindings(result.areaResults);
@@ -45,38 +88,7 @@ export function renderJson(result: RunResult): string {
         ])
       ),
     },
-    findings: findings.map((f) => ({
-      id: f.id,
-      category: f.category,
-      severity: f.severity,
-      area: f.area,
-      title: f.title,
-      stepsToReproduce: f.stepsToReproduce,
-      expected: f.expected,
-      actual: f.actual,
-      screenshot: f.screenshot ?? null,
-      evidenceIds: f.evidenceIds ?? [],
-      verdict: f.verdict ?? null,
-      trace:
-        (f.meta?.repro?.actionIds?.length ?? 0) > 0 || (f.meta?.repro?.evidenceIds?.length ?? 0) > 0
-          ? {
-              actionIds: f.meta?.repro?.actionIds ?? [],
-              evidenceIds: f.meta?.repro?.evidenceIds ?? [],
-            }
-          : null,
-      occurrenceCount: f.occurrenceCount,
-      impactedAreas: f.impactedAreas,
-      occurrences: f.occurrences,
-      meta: f.meta ?? null,
-      crossRunStatus: (() => {
-        const status = result.crossRunClassification?.byFindingId[f.id];
-        if (!status) {
-          return null;
-        }
-        const { signature: _signature, ...sanitizedStatus } = status;
-        return sanitizedStatus;
-      })(),
-    })),
+    findings: findings.map((f) => toJsonFinding(f, result)),
     crossRunSummary: result.crossRunClassification
       ? {
           ...result.crossRunClassification.summary,
