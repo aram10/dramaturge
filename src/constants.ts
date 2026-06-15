@@ -86,6 +86,12 @@ export const MAX_BREADCRUMBS = 8;
 /** Max array elements to include when redacting/truncating arrays. */
 export const MAX_REDACTED_ARRAY_ELEMENTS = 8;
 
+/** Ellipsis appended when a string is truncated. */
+export const ELLIPSIS = '...';
+
+/** Character length of {@link ELLIPSIS}, reserved when truncating. */
+export const ELLIPSIS_LENGTH = ELLIPSIS.length;
+
 /** Default string truncation length for redacted values. */
 export const DEFAULT_REDACT_TRUNCATE_LENGTH = 320;
 

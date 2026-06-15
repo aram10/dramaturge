@@ -5,6 +5,8 @@ import {
   DEFAULT_REDACT_TRUNCATE_LENGTH,
   SHORT_REDACT_TRUNCATE_LENGTH,
   MAX_REDACTED_ARRAY_ELEMENTS,
+  ELLIPSIS,
+  ELLIPSIS_LENGTH,
 } from './constants.js';
 
 export const REDACTED_VALUE = '[REDACTED]';
@@ -18,7 +20,7 @@ function normalizeSensitiveKey(key: string): string {
 }
 
 export function truncateString(value: string, max = DEFAULT_REDACT_TRUNCATE_LENGTH): string {
-  return value.length > max ? `${value.slice(0, max - 3)}...` : value;
+  return value.length > max ? `${value.slice(0, max - ELLIPSIS_LENGTH)}${ELLIPSIS}` : value;
 }
 
 const SENSITIVE_KEY_RE =
