@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { parseJsoncObject } from './utils/jsonc.js';
 import { getConfigFileContext, normalizeConfigPaths, type ConfigWithMeta } from './config-paths.js';
 import { unknownModelPrefix, knownProviderIds } from './llm/registry.js';
+import { PRESET_NAMES, buildPreset, isPresetName } from './presets.js';
 
 /**
  * Zod schema for a model string that rejects unknown provider prefixes (#224).
@@ -888,6 +889,55 @@ function formatConfigError(error: z.ZodError): string {
   return lines.join('\n');
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Deep-merge two config fragments. Plain objects are merged recursively; arrays
+ * and primitives from `override` replace the corresponding `base` value. Used to
+ * layer an explicit user config on top of a preset so user values always win
+ * while untouched preset keys are preserved.
+ */
+function deepMergeConfig(
+  base: Record<string, unknown>,
+  override: Record<string, unknown>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...base };
+  for (const [key, overrideValue] of Object.entries(override)) {
+    const baseValue = result[key];
+    if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+      result[key] = deepMergeConfig(baseValue, overrideValue);
+    } else {
+      result[key] = overrideValue;
+    }
+  }
+  return result;
+}
+
+/**
+ * Expand a top-level `preset` key in a raw config object into the preset's
+ * bundled settings, layering the user's explicit values on top (user wins). The
+ * `preset` key is removed so the strict schema never sees it. Inputs without a
+ * `preset` key are returned unchanged.
+ */
+export function applyConfigPreset(raw: unknown): unknown {
+  if (!isPlainObject(raw) || !('preset' in raw)) {
+    return raw;
+  }
+
+  const { preset, ...rest } = raw;
+  if (!isPresetName(preset)) {
+    const provided = typeof preset === 'string' ? `"${preset}"` : JSON.stringify(preset);
+    throw new Error(
+      `preset: unknown preset ${provided}. Valid presets: ${PRESET_NAMES.join(', ')}`
+    );
+  }
+
+  const presetConfig = buildPreset(preset) as Record<string, unknown>;
+  return deepMergeConfig(presetConfig, rest);
+}
+
 export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
   const context = getConfigFileContext(configPath);
   let raw: string;
@@ -904,8 +954,16 @@ export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
     throw new Error(`Invalid JSON in config file: ${context.configPath}`);
   }
 
+  let presetApplied: unknown;
+  try {
+    presetApplied = applyConfigPreset(parsed);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid config file: ${context.configPath}\n${message}`, { cause: error });
+  }
+
   const missing = new Set<string>();
-  const interpolated = interpolateEnvVars(parsed, missing);
+  const interpolated = interpolateEnvVars(presetApplied, missing);
   if (missing.size > 0) {
     const names = [...missing].sort();
     throw new Error(
