@@ -889,6 +889,10 @@ function formatConfigError(error: z.ZodError): string {
   return lines.join('\n');
 }
 
+/**
+ * Narrow to a non-null, non-array object. Note this also matches class
+ * instances; config fragments are plain JSON objects in practice.
+ */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

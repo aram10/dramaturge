@@ -21,15 +21,19 @@ describe('isPresetName', () => {
 });
 
 describe('buildPreset', () => {
-  it('returns a fresh object each call so callers cannot mutate shared state', () => {
+  it('returns a fresh, deeply-independent object each call', () => {
     const first = buildPreset('smoke');
     const second = buildPreset('smoke');
     expect(first).not.toBe(second);
     expect(first.budget).not.toBe(second.budget);
     expect(first).toEqual(second);
+
+    // Mutating one result must not leak into another.
+    first.budget!.maxStepsPerTask = 999;
+    expect(second.budget!.maxStepsPerTask).toBe(20);
   });
 
-  it('security preset enables adversarial and api probing', () => {
+  it('security preset enables adversarial and API probing', () => {
     const preset = buildPreset('security');
     expect(preset.adversarial?.enabled).toBe(true);
     expect(preset.adversarial?.includeAuthzProbes).toBe(true);
