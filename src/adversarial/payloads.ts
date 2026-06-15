@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
+import { ADVERSARIAL_BOUNDARY_TEXT_LEN } from '../constants.js';
+
 export interface AdversarialPayloadFamily {
   id: string;
   label: string;
@@ -15,7 +17,7 @@ const SAFE_PAYLOAD_FAMILIES: AdversarialPayloadFamily[] = [
   {
     id: 'boundary-text',
     label: 'Boundary text',
-    values: ['', ' ', 'A'.repeat(256), 'line-1\nline-2'],
+    values: ['', ' ', 'A'.repeat(ADVERSARIAL_BOUNDARY_TEXT_LEN), 'line-1\nline-2'],
   },
   {
     id: 'format-edge-cases',

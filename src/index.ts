@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
+// Public API surface for the `dramaturge` package.
+//
+// This barrel is intentionally curated: it exposes the stable runtime engine,
+// configuration, LLM provider helpers, engine events, core domain types, and a
+// handful of standalone quality utilities (visual/web-vitals/cost). Deep
+// internal building blocks — repo/framework scanners, OpenAPI/spec plumbing,
+// diff parsing, API replay internals, the terminal dashboard, the MCP server,
+// the evals harness, and the speculative a2a / workflow-automata subsystems —
+// are deliberately NOT re-exported here to keep the published compatibility
+// surface small. They remain available to the CLI and internal code via their
+// own modules; promote one back into this barrel only when there is a concrete
+// external consumer for it.
+
+// --- Configuration ---
 export {
   ConfigSchema,
   loadConfig,
@@ -19,6 +33,10 @@ export type {
   LoadedDramaturgeConfig,
   WorkflowAutomataConfig,
 } from './config.js';
+export { PRESET_NAMES, buildPreset, isPresetName } from './presets.js';
+export type { PresetName } from './presets.js';
+
+// --- LLM providers ---
 export {
   resolveProvider,
   stripProviderPrefix,
@@ -31,7 +49,7 @@ export {
 } from './llm/index.js';
 export type { ChatMessage, ProviderId, LLMProviderAdapter, ProviderRequest } from './llm/index.js';
 
-// Stable runtime API
+// --- Stable runtime API ---
 export { runEngine } from './engine.js';
 export type { RunEngineOptions } from './engine.js';
 export { EngineEventEmitter, emitEngineEvent } from './engine/event-stream.js';
@@ -51,7 +69,11 @@ export type {
   ErrorEvent,
 } from './engine/event-stream.js';
 export { CATEGORY_PREFIX } from './types.js';
+
+// --- Cross-run memory ---
 export { MemoryStore, buildFindingSignature } from './memory/store.js';
+
+// --- Standalone quality utilities ---
 export { comparePngBuffers, runVisualRegressionScan } from './coverage/visual-regression.js';
 export { collectWebVitals, evaluateWebVitals } from './coverage/web-vitals.js';
 export type { WebVitalsResult, WebVitalsThresholds } from './coverage/web-vitals.js';
@@ -65,36 +87,8 @@ export type {
 } from './coverage/responsive-regression.js';
 export { CostTracker, estimateCallCost, approximateTokenCount } from './coverage/cost-tracker.js';
 export type { CostRecord, CostSummary } from './coverage/cost-tracker.js';
-export { defineEvalFixtures } from './evals/fixtures.js';
-export { summarizeEvalResults } from './evals/harness.js';
-export { scanGenericRepo } from './adaptation/generic.js';
-export { scanReactRouterRepo, canScanReactRouterRepo } from './adaptation/react-router.js';
-export { scanExpressRepo, canScanExpressRepo } from './adaptation/express.js';
-export { scanVueRouterRepo, canScanVueRouterRepo } from './adaptation/vue-router.js';
-export { scanDjangoRepo, canScanDjangoRepo } from './adaptation/django.js';
-export { scanTanStackRouterRepo, canScanTanStackRouterRepo } from './adaptation/tanstack-router.js';
-export { generatePlaywrightTests, writeGeneratedPlaywrightTests } from './report/test-gen.js';
-export { inferAssertions } from './report/assertion-inference.js';
-export {
-  createContractIndex,
-  matchContractOperation,
-  summarizeContractIndex,
-  validateOperationResponse,
-} from './spec/contract-index.js';
-export { replayApiRequest } from './api/replay.js';
-export { executeApiWorkerTask } from './api/worker.js';
-export { loadOpenApiSpec } from './spec/openapi-loader.js';
-export { buildOpenApiSpec } from './spec/openapi-spec.js';
-export { addOperation, createEmptyNormalizedSpec } from './spec/normalized-spec.js';
-export { buildRepoSpec } from './spec/repo-spec.js';
-export { buildOperationKey, getOperationSpec } from './spec/validators.js';
-export {
-  buildDiffContext,
-  buildDiffContextFromFiles,
-  isNodeAffectedByDiff,
-} from './diff/diff-hints.js';
-export { parseDiffNameStatus, getChangedFiles } from './diff/diff-parser.js';
-export type { DiffContext, DiffFileEntry } from './diff/types.js';
+
+// --- Core domain types ---
 export type {
   Area,
   AreaResult,
@@ -148,99 +142,3 @@ export type {
   WorkerTask,
   WorkerType,
 } from './types.js';
-export {
-  compareWorkflowAutomata,
-  generateWorkflowFollowups,
-  mineWorkflowAutomaton,
-  renderWorkflowAutomatonMermaid,
-} from './workflow-automata/index.js';
-export type {
-  WorkflowAction,
-  WorkflowAnomaly,
-  WorkflowAutomaton,
-  WorkflowAutomatonComparison,
-  WorkflowFollowupCandidate,
-  WorkflowGuard,
-  WorkflowState,
-  WorkflowStateKey,
-  WorkflowTraceEvent,
-  WorkflowTransition,
-} from './workflow-automata/index.js';
-export type {
-  ApiProbeTarget,
-  ApiReplayRequest,
-  ApiReplayResponse,
-  ApiRequestContextLike,
-  ApiRequestResponseLike,
-  ExecuteApiWorkerTaskInput,
-} from './api/types.js';
-export type { ContractIndex } from './spec/contract-index.js';
-export { renderDashboard } from './dashboard/render.js';
-export type { RenderDashboardOptions } from './dashboard/render.js';
-export { createDramaturgeMcpServer, runMcpServer } from './mcp/server.js';
-export type { DramaturgeMcpServer, McpServerDependencies } from './mcp/server.js';
-export type {
-  DashboardState,
-  ActivityItem,
-  ActivityKind,
-  AgentStatus,
-  A2ATaskEvent,
-  A2AMessageEvent,
-  A2ABlackboardEvent,
-} from './dashboard/state.js';
-export type {
-  EvalCaseResult,
-  EvalFailureSummary,
-  EvalSummary,
-  EvalTagBreakdown,
-} from './evals/types.js';
-export type {
-  HistoricalAuthHints,
-  HistoricalFindingRecord,
-  HistoricalFlakyPageRecord,
-  MemorySnapshot,
-  NavigationMemorySnapshot,
-  PlannerMemorySignals,
-  WorkerHistoryContext,
-} from './memory/types.js';
-export type {
-  JsonSchema,
-  NormalizedOperationSpec,
-  NormalizedParamSpec,
-  NormalizedRequestBodySpec,
-  NormalizedResponseSpec,
-  NormalizedSpecArtifact,
-  NormalizedSpecSource,
-} from './spec/types.js';
-
-// Experimental multi-agent coordination API
-//
-// @experimental — the A2A protocol surface (Coordinator, Blackboard, MessageBus
-// and the agent-card helpers below) is unstable and may change or be removed in
-// a minor release. Do not depend on it for production integrations yet.
-export {
-  AGENT_CARDS,
-  agentRoleForWorkerType,
-  agentCardForWorkerType,
-  findCapableAgents,
-  Blackboard,
-  MessageBus,
-  Coordinator,
-} from './a2a/index.js';
-export type {
-  AgentRole,
-  AgentCard,
-  AgentSkill,
-  A2AMessage,
-  A2ATask,
-  A2ATaskStatus,
-  A2ATaskStatusUpdate,
-  A2AArtifact,
-  Part,
-  TextPart,
-  DataPart,
-  FilePart,
-  BlackboardEntry,
-  BlackboardEntryKind,
-  CoordinatorDeps,
-} from './a2a/index.js';

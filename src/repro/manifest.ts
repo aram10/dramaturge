@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { Evidence, Finding, ReplayableAction, RunResult } from '../types.js';
 import { buildFindingGroupKey, collectFindings } from '../report/collector.js';
+import { TRUNCATE_SUMMARY } from '../constants.js';
 
 export interface FindingReplayManifest {
   schemaVersion: 1;
@@ -99,7 +100,7 @@ function extractNetworkFailure(
   if (!statusMatch) return undefined;
   const urlMatch = /(https?:\/\/\S+|\/[\w./:?-]+)/.exec(summary);
   return {
-    urlPattern: urlMatch?.[1] ?? summary.slice(0, 120),
+    urlPattern: urlMatch?.[1] ?? summary.slice(0, TRUNCATE_SUMMARY),
     status: Number.parseInt(statusMatch[1], 10),
   };
 }

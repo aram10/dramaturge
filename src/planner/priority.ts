@@ -5,6 +5,13 @@ import type { StateNode, WorkerType } from '../types.js';
 import type { PlannerMemorySignals } from '../memory/types.js';
 import type { DiffContext } from '../diff/types.js';
 import { isNodeAffectedByDiff } from '../diff/diff-hints.js';
+import {
+  PRIORITY_WEIGHTS,
+  REVISIT_PENALTY_DIVISOR,
+  MEMORY_SIGNAL_BOOST,
+  ADVERSARIAL_WORKER_PENALTY,
+  DEFAULT_DIFF_PRIORITY_BOOST,
+} from '../constants.js';
 
 export interface PriorityContext {
   /** Set of worker types already dispatched for this node. */
@@ -23,14 +30,7 @@ export function computePriority(
   workerType: WorkerType,
   ctx: PriorityContext
 ): number {
-  const weights = {
-    novelty: 0.3,
-    risk: 0.2,
-    coverageGap: 0.3,
-    revisitPenalty: 0.2,
-    apiGap: 0.1,
-    diffApiGap: 0.05,
-  };
+  const weights = PRIORITY_WEIGHTS;
 
   // Novelty: fraction of controls not yet exercised
   const unseenRatio =
@@ -45,16 +45,16 @@ export function computePriority(
   const coverageGap = ctx.visitedWorkerTypes.has(workerType) ? 0 : 1;
 
   // Revisit penalty: diminishing returns from re-visiting
-  const revisitPenalty = Math.min(node.timesVisited / 3, 1);
-  const historicalBoost = ctx.memory?.hasNavigationHints ? 0.05 : 0;
-  const flakyBoost = ctx.memory?.hasFlakyPageNotes ? 0.05 : 0;
-  const suppressionPenalty = ctx.memory?.hasSuppressedFindings ? 0.05 : 0;
+  const revisitPenalty = Math.min(node.timesVisited / REVISIT_PENALTY_DIVISOR, 1);
+  const historicalBoost = ctx.memory?.hasNavigationHints ? MEMORY_SIGNAL_BOOST : 0;
+  const flakyBoost = ctx.memory?.hasFlakyPageNotes ? MEMORY_SIGNAL_BOOST : 0;
+  const suppressionPenalty = ctx.memory?.hasSuppressedFindings ? MEMORY_SIGNAL_BOOST : 0;
 
-  const adversarialPenalty = workerType === 'adversarial' ? 0.2 : 0;
+  const adversarialPenalty = workerType === 'adversarial' ? ADVERSARIAL_WORKER_PENALTY : 0;
 
   const diffBoost =
     ctx.diffContext && ctx.nodeUrl && isNodeAffectedByDiff(ctx.nodeUrl, ctx.diffContext)
-      ? (ctx.diffPriorityBoost ?? 0.3)
+      ? (ctx.diffPriorityBoost ?? DEFAULT_DIFF_PRIORITY_BOOST)
       : 0;
 
   const apiGap = workerType === 'api' && !ctx.memory?.hasApiHints ? 1 : 0;

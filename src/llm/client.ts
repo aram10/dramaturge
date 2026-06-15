@@ -4,6 +4,8 @@
 import {
   TRUNCATE_GROUP_KEY,
   MAX_LLM_RETRIES,
+  HTTP_RATE_LIMITED,
+  HTTP_SERVER_ERROR_MIN,
   LLM_RETRY_BASE_DELAY_MS,
   LLM_RETRY_MAX_DELAY_MS,
 } from '../constants.js';
@@ -171,7 +173,7 @@ class TimeoutError extends Error {
 function isRetryableError(error: Error): boolean {
   if (error instanceof TimeoutError) return true;
   if (error instanceof HttpStatusError) {
-    return error.status === 429 || error.status >= 500;
+    return error.status === HTTP_RATE_LIMITED || error.status >= HTTP_SERVER_ERROR_MIN;
   }
   // Network-level fetch failures (DNS, connection reset, etc.) are transient.
   return error.name === 'TypeError' || error.name === 'FetchError';

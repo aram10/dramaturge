@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import type { ConfirmationVerdict, Evidence, Finding, FindingConfidence } from '../types.js';
+import { QUALITY_WEIGHTS, DEFAULT_PROMOTABLE_THRESHOLD } from '../constants.js';
 
 export interface FindingQualityScore {
   total: number;
@@ -39,14 +40,12 @@ export interface ScoreFindingQualityOptions {
   threshold?: number;
 }
 
-const DEFAULT_PROMOTABLE_THRESHOLD = 60;
-
 function confidencePoints(confidence: FindingConfidence): number {
   switch (confidence) {
     case 'high':
-      return 15;
+      return QUALITY_WEIGHTS.confidenceHigh;
     case 'medium':
-      return 10;
+      return QUALITY_WEIGHTS.confidenceMedium;
     case 'low':
       return 0;
   }
@@ -113,14 +112,14 @@ function buildQualityComponents(
 
 function totalQualityPoints(components: FindingQualityScore['components']): number {
   return (
-    (components.hasUrl ? 10 : 0) +
-    (components.hasReproActions ? 25 : 0) +
-    (components.hasExpectedActual ? 15 : 0) +
-    (components.hasScreenshot ? 10 : 0) +
-    (components.hasNetworkOrConsole ? 10 : 0) +
-    (components.hasA11ySource ? 5 : 0) +
+    (components.hasUrl ? QUALITY_WEIGHTS.hasUrl : 0) +
+    (components.hasReproActions ? QUALITY_WEIGHTS.hasReproActions : 0) +
+    (components.hasExpectedActual ? QUALITY_WEIGHTS.hasExpectedActual : 0) +
+    (components.hasScreenshot ? QUALITY_WEIGHTS.hasScreenshot : 0) +
+    (components.hasNetworkOrConsole ? QUALITY_WEIGHTS.hasNetworkOrConsole : 0) +
+    (components.hasA11ySource ? QUALITY_WEIGHTS.hasA11ySource : 0) +
     confidencePoints(components.confidence) +
-    (components.confirmationVerdict === 'fixed' ? 10 : 0)
+    (components.confirmationVerdict === 'fixed' ? QUALITY_WEIGHTS.confirmationFixed : 0)
   );
 }
 

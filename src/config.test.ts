@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadConfig, resolveOutputFormats } from './config.js';
 import { parseJsoncObject } from './utils/jsonc.js';
+import { DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS, BOOTSTRAP_POLL_INTERVAL_MS } from './constants.js';
 
 const tempDirs: string[] = [];
 
@@ -79,6 +80,49 @@ describe('loadConfig', () => {
     expect(config.auth).toMatchObject({ type: 'none' });
   });
 
+  it('applies a named preset from the config file and lets user values win', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "preset": "security",
+        "budget": { "globalTimeLimitSeconds": 1234 }
+      }`,
+      'utf-8'
+    );
+
+    const config = loadConfig(configPath);
+
+    // Preset bundle is applied.
+    expect(config.adversarial.enabled).toBe(true);
+    expect(config.apiTesting.enabled).toBe(true);
+    // Untouched preset budget keys survive.
+    expect(config.budget.maxStepsPerTask).toBe(40);
+    // Explicit user value overrides the preset.
+    expect(config.budget.globalTimeLimitSeconds).toBe(1234);
+    // The synthetic preset key is not part of the validated config.
+    expect((config as Record<string, unknown>).preset).toBeUndefined();
+  });
+
+  it('rejects an unknown preset name with a helpful error', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "preset": "bogus"
+      }`,
+      'utf-8'
+    );
+
+    expect(() => loadConfig(configPath)).toThrow(/unknown preset "bogus"/);
+  });
+
   it('accepts repo-aware mode and bootstrap settings', () => {
     const dir = createTempDir();
     const configPath = join(dir, 'dramaturge.config.json');
@@ -123,6 +167,37 @@ describe('loadConfig', () => {
       timeoutSeconds: 90,
       mode: 'trusted',
       args: [],
+      readyRequestTimeoutMs: DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS,
+      pollIntervalMs: BOOTSTRAP_POLL_INTERVAL_MS,
+    });
+  });
+
+  it('accepts explicit bootstrap readyRequestTimeoutMs and pollIntervalMs overrides', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": {
+          "type": "none"
+        },
+        "bootstrap": {
+          "command": "pnpm dev",
+          "readyRequestTimeoutMs": 7500,
+          "pollIntervalMs": 250
+        }
+      }`,
+      'utf-8'
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.bootstrap).toMatchObject({
+      command: 'pnpm dev',
+      readyRequestTimeoutMs: 7500,
+      pollIntervalMs: 250,
     });
   });
 

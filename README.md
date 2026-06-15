@@ -75,6 +75,33 @@ npx dramaturge auth capture --profile user
 
 For full options, see [`dramaturge.config.example.json`](./dramaturge.config.example.json) or [Configuration Reference](#configuration-reference).
 
+### Presets
+
+Rather than tuning dozens of individual settings, start from a named **preset** that bundles sensible defaults for a common scenario. Add a top-level `"preset"` key to your config file; any explicit settings you add are deep-merged on top and always win:
+
+```json
+{
+  "targetUrl": "https://your-app.example.com",
+  "appDescription": "Your application's purpose",
+  "preset": "smoke",
+  "budget": { "globalTimeLimitSeconds": 300 }
+}
+```
+
+Available presets:
+
+| Preset | Focus |
+|--------|-------|
+| `smoke` | Fast, low-budget sanity run |
+| `thorough` | Deep, long-budget exploration |
+| `security` | Adversarial + API probing (authz, injection) |
+| `accessibility` | Navigation/form coverage with responsive checks |
+| `api-contract` | API contract probing |
+| `visual` | Visual + responsive regression and vision analysis |
+| `pre-release` | Everything on — the broadest sweep |
+
+The same presets are available to the inline CLI: `dramaturge run <url> --preset smoke`.
+
 ## LLM Providers
 
 Dramaturge supports multiple providers via model-string prefixes (e.g., `anthropic/claude-sonnet-4-6`). Omitting the prefix defaults to Anthropic.

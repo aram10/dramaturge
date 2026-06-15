@@ -6,6 +6,15 @@ import { readFileSync } from 'node:fs';
 import { parseJsoncObject } from './utils/jsonc.js';
 import { getConfigFileContext, normalizeConfigPaths, type ConfigWithMeta } from './config-paths.js';
 import { unknownModelPrefix, knownProviderIds } from './llm/registry.js';
+import {
+  DEFAULT_LLM_TIMEOUT_MS,
+  JUDGE_LLM_TIMEOUT_MS,
+  DEFAULT_DIFF_PRIORITY_BOOST,
+  VISUAL_MINOR_RATIO,
+  DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS,
+  BOOTSTRAP_POLL_INTERVAL_MS,
+} from './constants.js';
+import { PRESET_NAMES, buildPreset, isPresetName } from './presets.js';
 
 /**
  * Zod schema for a model string that rejects unknown provider prefixes (#224).
@@ -213,7 +222,7 @@ const VisualRegressionSchema = z
   .object({
     enabled: z.boolean().default(false),
     baselineDir: z.string().default('./.dramaturge/visual-baselines'),
-    diffPixelRatioThreshold: z.number().min(0).max(1).default(0.01),
+    diffPixelRatioThreshold: z.number().min(0).max(1).default(VISUAL_MINOR_RATIO),
     includeAA: z.boolean().default(false),
     fullPage: z.boolean().default(true),
     maskSelectors: z.array(z.string()).default([]),
@@ -221,7 +230,7 @@ const VisualRegressionSchema = z
   .default({
     enabled: false,
     baselineDir: './.dramaturge/visual-baselines',
-    diffPixelRatioThreshold: 0.01,
+    diffPixelRatioThreshold: VISUAL_MINOR_RATIO,
     includeAA: false,
     fullPage: true,
     maskSelectors: [],
@@ -279,14 +288,14 @@ const VisionAnalysisSchema = z
     /** Maximum tokens for the vision model response. */
     maxResponseTokens: z.number().int().min(64).default(1024),
     /** Request timeout in milliseconds for vision API calls. */
-    requestTimeoutMs: z.number().int().min(1000).default(30_000),
+    requestTimeoutMs: z.number().int().min(1000).default(DEFAULT_LLM_TIMEOUT_MS),
   })
   .default({
     enabled: false,
     model: 'anthropic/claude-sonnet-4-20250514',
     fullPage: false,
     maxResponseTokens: 1024,
-    requestTimeoutMs: 30_000,
+    requestTimeoutMs: DEFAULT_LLM_TIMEOUT_MS,
   });
 
 const ApiTestingSchema = z
@@ -324,7 +333,7 @@ const AdversarialSchema = z
 const JudgeSchema = z
   .object({
     enabled: z.boolean().default(true),
-    requestTimeoutMs: z.number().int().min(100).default(15_000),
+    requestTimeoutMs: z.number().int().min(100).default(JUDGE_LLM_TIMEOUT_MS),
     /** Drop findings the judge rejects instead of shipping them (#206). */
     dropRejected: z.boolean().default(true),
     /** Minimum confidence a finding must carry to be reported (#206). */
@@ -332,7 +341,7 @@ const JudgeSchema = z
   })
   .default({
     enabled: true,
-    requestTimeoutMs: 15_000,
+    requestTimeoutMs: JUDGE_LLM_TIMEOUT_MS,
     dropRejected: true,
     minConfidence: 'low',
   });
@@ -415,10 +424,10 @@ const BrowserSchema = z
 
 const LlmSchema = z
   .object({
-    requestTimeoutMs: z.number().int().min(100).default(30_000),
+    requestTimeoutMs: z.number().int().min(100).default(DEFAULT_LLM_TIMEOUT_MS),
   })
   .default({
-    requestTimeoutMs: 30_000,
+    requestTimeoutMs: DEFAULT_LLM_TIMEOUT_MS,
   });
 
 const ConcurrencySchema = z
@@ -459,12 +468,12 @@ const DiffAwareSchema = z
     /** When true, restrict exploration to only areas matching the detected diff. */
     restrictToChanged: z.boolean().default(false),
     /** Priority boost applied to state graph nodes matching changed areas (0-1). */
-    priorityBoost: z.number().min(0).max(1).default(0.3),
+    priorityBoost: z.number().min(0).max(1).default(DEFAULT_DIFF_PRIORITY_BOOST),
   })
   .default({
     enabled: false,
     restrictToChanged: false,
-    priorityBoost: 0.3,
+    priorityBoost: DEFAULT_DIFF_PRIORITY_BOOST,
   });
 
 const RepoContextSchema = z
@@ -511,6 +520,10 @@ const BootstrapSchema = z
     readyUrl: z.string().optional(),
     readyIndicator: z.string().optional(),
     timeoutSeconds: z.number().int().min(5).default(120),
+    /** Timeout (ms) for each readiness probe request. */
+    readyRequestTimeoutMs: z.number().int().min(100).default(DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS),
+    /** Interval (ms) between readiness polls. */
+    pollIntervalMs: z.number().int().min(50).default(BOOTSTRAP_POLL_INTERVAL_MS),
   })
   .refine((value) => value.mode !== 'trusted' || value.args.length === 0, {
     message:
@@ -888,6 +901,64 @@ function formatConfigError(error: z.ZodError): string {
   return lines.join('\n');
 }
 
+/**
+ * Narrow to a non-null, non-array object. Note this also matches class
+ * instances; config fragments are plain JSON objects in practice.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Deep-merge two config fragments. Plain objects are merged recursively; arrays
+ * and primitives from `override` replace the corresponding `base` value. Used to
+ * layer an explicit user config on top of a preset so user values always win
+ * while untouched preset keys are preserved.
+ */
+const UNSAFE_MERGE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function deepMergeConfig(
+  base: Record<string, unknown>,
+  override: Record<string, unknown>
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...base };
+  for (const [key, overrideValue] of Object.entries(override)) {
+    if (UNSAFE_MERGE_KEYS.has(key)) {
+      continue;
+    }
+    const baseValue = result[key];
+    if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+      result[key] = deepMergeConfig(baseValue, overrideValue);
+    } else {
+      result[key] = overrideValue;
+    }
+  }
+  return result;
+}
+
+/**
+ * Expand a top-level `preset` key in a raw config object into the preset's
+ * bundled settings, layering the user's explicit values on top (user wins). The
+ * `preset` key is removed so the strict schema never sees it. Inputs without a
+ * `preset` key are returned unchanged.
+ */
+export function applyConfigPreset(raw: unknown): unknown {
+  if (!isPlainObject(raw) || !('preset' in raw)) {
+    return raw;
+  }
+
+  const { preset, ...rest } = raw;
+  if (!isPresetName(preset)) {
+    const provided = typeof preset === 'string' ? `"${preset}"` : JSON.stringify(preset);
+    throw new Error(
+      `preset: unknown preset ${provided}. Valid presets: ${PRESET_NAMES.join(', ')}`
+    );
+  }
+
+  const presetConfig = buildPreset(preset) as Record<string, unknown>;
+  return deepMergeConfig(presetConfig, rest);
+}
+
 export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
   const context = getConfigFileContext(configPath);
   let raw: string;
@@ -904,8 +975,16 @@ export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
     throw new Error(`Invalid JSON in config file: ${context.configPath}`);
   }
 
+  let presetApplied: unknown;
+  try {
+    presetApplied = applyConfigPreset(parsed);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid config file: ${context.configPath}\n${message}`, { cause: error });
+  }
+
   const missing = new Set<string>();
-  const interpolated = interpolateEnvVars(parsed, missing);
+  const interpolated = interpolateEnvVars(presetApplied, missing);
   if (missing.size > 0) {
     const names = [...missing].sort();
     throw new Error(

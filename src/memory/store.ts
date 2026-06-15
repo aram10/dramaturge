@@ -8,6 +8,7 @@ import type { DramaturgeConfig } from '../config.js';
 import type { AreaResult, RawFinding, RunMemoryMeta } from '../types.js';
 import type { StateGraph } from '../graph/state-graph.js';
 import { collectFindings, buildFindingGroupKey } from '../report/collector.js';
+import { MEMORY_MAX_RECENT_ROUTES, MEMORY_MAX_API_HINTS } from '../constants.js';
 import type { ObservedApiEndpoint, ObservedApiRequestSample } from '../network/traffic-observer.js';
 import type {
   FlakyPageInput,
@@ -243,7 +244,7 @@ export class MemoryStore {
         ...(existing?.recentRoutes ?? []),
         ...finding.occurrences.map((occurrence) => occurrence.route),
         finding.meta?.repro?.route,
-      ]).slice(-8);
+      ]).slice(-MEMORY_MAX_RECENT_ROUTES);
 
       snapshot.findingHistory[signature] = {
         signature,
@@ -554,7 +555,7 @@ export class MemoryStore {
         return right.record.lastSeenAt.localeCompare(left.record.lastSeenAt);
       });
 
-    return ranked.slice(0, 4).map(({ record }) => ({
+    return ranked.slice(0, MEMORY_MAX_API_HINTS).map(({ record }) => ({
       route: record.route,
       methods: [...record.methods],
       statuses: [...record.statuses],

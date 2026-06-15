@@ -2,6 +2,11 @@
   "targetUrl": "https://your-app.example.com",
   "appDescription": "Describe your app: what it does, its main features, and user roles.",
 
+  // Optional: start from a named preset bundle, then override individual
+  // settings below (your explicit values always win over the preset).
+  // Presets: smoke | thorough | security | accessibility | api-contract | visual | pre-release
+  // "preset": "smoke",
+
   "auth": {
     "type": "interactive",
     "loginUrl": "/login",

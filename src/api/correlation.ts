@@ -4,6 +4,7 @@
 import type { ObservedApiEndpoint } from '../network/traffic-observer.js';
 import { type ContractIndex } from '../spec/contract-index.js';
 import type { ApiProbeTarget } from './types.js';
+import { API_PREFIX_BOOST, API_AUTH_BOOST } from '../constants.js';
 
 interface SelectApiProbeTargetsInput {
   pageRoute: string;
@@ -45,7 +46,8 @@ function computeRouteScore(pageTokens: string[], route: string, observedBoost: n
 
   const normalizedRoute = normalizeRoutePath(route);
   const firstToken = pageTokens[0] ?? '';
-  const prefixBoost = pageTokens.length > 0 && normalizedRoute.includes(firstToken) ? 0.25 : 0;
+  const prefixBoost =
+    pageTokens.length > 0 && normalizedRoute.includes(firstToken) ? API_PREFIX_BOOST : 0;
 
   return overlap + observedBoost + prefixBoost;
 }
@@ -110,7 +112,7 @@ export function selectApiProbeTargets(input: SelectApiProbeTargetsInput): ApiPro
       operation,
       observedStatuses: [],
       source: 'contract',
-      score: routeScore + (operation.authRequired ? 0.1 : 0),
+      score: routeScore + (operation.authRequired ? API_AUTH_BOOST : 0),
     });
   }
 

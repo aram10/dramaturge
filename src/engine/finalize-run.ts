@@ -9,6 +9,7 @@ import type { EngineContext } from './context.js';
 import { emitEngineEvent } from './event-stream.js';
 import { buildAreaResults, writeReports } from './reports.js';
 import { finalizeWorkflowAutomata } from '../workflow-automata/planner-adapter.js';
+import { BLIND_SPOT_HIGH_PRIORITY_THRESHOLD } from '../constants.js';
 
 export interface FinalizeRunOptions {
   startTime: Date;
@@ -25,7 +26,7 @@ function recordRemainingBlindSpots(ctx: EngineContext, remaining: FrontierItem[]
       nodeId: item.nodeId,
       summary: `Not reached: ${item.objective}`,
       reason: 'time-budget',
-      severity: item.priority > 0.7 ? 'high' : 'low',
+      severity: item.priority > BLIND_SPOT_HIGH_PRIORITY_THRESHOLD ? 'high' : 'low',
     });
   }
 }

@@ -6,9 +6,12 @@ import type { Stagehand } from '@browserbasehq/stagehand';
 import type { DramaturgeConfig } from '../config.js';
 import { createEngineLogger } from './logger.js';
 import type { EngineLogger } from './logger.js';
-
-const BOOTSTRAP_LOG_LIMIT = 20;
-const DEFAULT_READY_REQUEST_TIMEOUT_MS = 5_000;
+import {
+  BOOTSTRAP_LOG_LIMIT,
+  MS_PER_SECOND,
+  DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS,
+  BOOTSTRAP_POLL_INTERVAL_MS,
+} from '../constants.js';
 
 type StagehandPage = ReturnType<Stagehand['context']['pages']>[number];
 
@@ -223,14 +226,17 @@ export async function waitForBootstrapReady(
   const logger = deps.logger ?? createEngineLogger(undefined, 'bootstrap');
   const sleep = deps.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   const now = deps.now ?? (() => Date.now());
-  const requestTimeoutMs = deps.requestTimeoutMs ?? DEFAULT_READY_REQUEST_TIMEOUT_MS;
+  const requestTimeoutMs =
+    deps.requestTimeoutMs ??
+    config.bootstrap.readyRequestTimeoutMs ??
+    DEFAULT_BOOTSTRAP_READY_TIMEOUT_MS;
   const newPage = deps.newPage;
 
   if (readyIndicator && !newPage) {
     throw new Error('Bootstrap readyIndicator checks require a newPage factory in dependencies.');
   }
 
-  const deadline = now() + config.bootstrap.timeoutSeconds * 1000;
+  const deadline = now() + config.bootstrap.timeoutSeconds * MS_PER_SECOND;
   while (now() < deadline) {
     if (status?.exited) {
       throw new Error(formatBootstrapFailure('Bootstrap process exited before ready', status));
@@ -261,7 +267,7 @@ export async function waitForBootstrapReady(
       return;
     }
 
-    await sleep(1000);
+    await sleep(config.bootstrap.pollIntervalMs ?? BOOTSTRAP_POLL_INTERVAL_MS);
   }
 
   throw new Error(

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { shortId } from '../constants.js';
+import { shortId, VISION_LAYOUT_DESC_MAX_LEN, VISION_MAX_COMPONENTS } from '../constants.js';
 import { hasLLMApiKey } from '../llm.js';
 import { sendVisionCompletion } from '../llm/index.js';
 import { UNTRUSTED_PROMPT_INSTRUCTION, wrapUntrustedPromptContent } from '../prompt-safety.js';
@@ -73,7 +73,7 @@ export function parseVisionResponse(raw: string): VisionPageAnalysis {
     parsed = JSON.parse(jsonStr) as Partial<VisionPageAnalysis>;
   } catch {
     return {
-      layoutDescription: raw.slice(0, 500),
+      layoutDescription: raw.slice(0, VISION_LAYOUT_DESC_MAX_LEN),
       components: [],
       anomalies: [],
     };
@@ -222,7 +222,7 @@ function buildPageDescription(analysis: VisionPageAnalysis): string {
 
   if (analysis.components.length > 0) {
     parts.push(
-      `Visible components: ${analysis.components.slice(0, 10).join(", ")}`,
+      `Visible components: ${analysis.components.slice(0, VISION_MAX_COMPONENTS).join(", ")}`,
     );
   }
 

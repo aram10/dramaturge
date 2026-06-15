@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Alex Rambasek
 
-import { shortId } from '../constants.js';
+import {
+  shortId,
+  DEFAULT_REDACT_TRUNCATE_LENGTH,
+  ELLIPSIS,
+  ELLIPSIS_LENGTH,
+  HTTP_SERVER_ERROR_MIN,
+} from '../constants.js';
 import { buildConfirmedFindingMeta } from '../repro/repro.js';
 import { redactSensitiveValue } from '../redaction.js';
 import { validateOperationResponse, type ContractIndex } from '../spec/contract-index.js';
@@ -20,14 +26,16 @@ function describeBody(body: unknown): string {
 
   try {
     const serialized = JSON.stringify(redactSensitiveValue(body));
-    return serialized.length > 320 ? `${serialized.slice(0, 317)}...` : serialized;
+    return serialized.length > DEFAULT_REDACT_TRUNCATE_LENGTH
+      ? `${serialized.slice(0, DEFAULT_REDACT_TRUNCATE_LENGTH - ELLIPSIS_LENGTH)}${ELLIPSIS}`
+      : serialized;
   } catch {
     return '[Unserializable body]';
   }
 }
 
 function severityForStatus(status: number): FindingSeverity {
-  if (status >= 500 || status === 0) {
+  if (status >= HTTP_SERVER_ERROR_MIN || status === 0) {
     return 'Major';
   }
 

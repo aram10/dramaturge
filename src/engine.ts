@@ -7,6 +7,8 @@ import { request as playwrightRequest } from 'playwright';
 import type { LoadedDramaturgeConfig, DramaturgeConfig } from './config.js';
 import { isAuthProfiles } from './config.js';
 import { resolveResumeDir } from './config-paths.js';
+import { BLACKBOARD_ENTRY_MAX_LEN, A2A_MESSAGE_TEXT_MAX_LEN } from './constants.js';
+import { truncateString } from './redaction.js';
 import type { BudgetConfig, MissionConfig, WorkerType } from './types.js';
 import { authenticate } from './auth/authenticator.js';
 import { captureStorageState } from './auth/storage-state.js';
@@ -484,7 +486,7 @@ function subscribeA2AToEventStream(options: {
     if (typeof entry.data.title === 'string') return entry.data.title;
     if (typeof entry.data.objective === 'string') return entry.data.objective;
     const serialized = JSON.stringify(entry.data);
-    return serialized.length > 60 ? `${serialized.slice(0, 60)}…` : serialized;
+    return truncateString(serialized, BLACKBOARD_ENTRY_MAX_LEN);
   };
 
   const unsubBlackboard = blackboard.subscribe('*', (entry) => {
@@ -505,7 +507,7 @@ function subscribeA2AToEventStream(options: {
     emitEngineEvent(eventStream, 'a2a:message', {
       fromAgent: message.fromAgent,
       toAgent: message.toAgent,
-      text: messageText(message).slice(0, 80),
+      text: messageText(message).slice(0, A2A_MESSAGE_TEXT_MAX_LEN),
     });
   });
 

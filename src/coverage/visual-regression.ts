@@ -6,7 +6,12 @@ import { join } from "node:path";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import { buildConfirmedFindingMeta } from "../repro/repro.js";
-import { shortId, VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD } from "../constants.js";
+import {
+  shortId,
+  VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD,
+  VISUAL_CRITICAL_RATIO,
+  VISUAL_MINOR_RATIO,
+} from "../constants.js";
 import type { VisualRegressionPage } from "../browser/page-interface.js";
 import type { Evidence, FindingSeverity, RawFinding } from "../types.js";
 import type { MemoryStore } from "../memory/store.js";
@@ -33,13 +38,13 @@ export interface VisualRegressionScanOptions {
 }
 
 function mapDiffRatioToSeverity(ratio: number): FindingSeverity {
-  if (ratio >= 0.25) {
+  if (ratio >= VISUAL_CRITICAL_RATIO) {
     return "Critical";
   }
   if (ratio >= VISUAL_CHANGED_SURFACE_RATIO_THRESHOLD) {
     return "Major";
   }
-  if (ratio >= 0.01) {
+  if (ratio >= VISUAL_MINOR_RATIO) {
     return "Minor";
   }
   return "Trivial";
