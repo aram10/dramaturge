@@ -20,7 +20,9 @@ function normalizeSensitiveKey(key: string): string {
 }
 
 export function truncateString(value: string, max = DEFAULT_REDACT_TRUNCATE_LENGTH): string {
-  return value.length > max ? `${value.slice(0, max - ELLIPSIS_LENGTH)}${ELLIPSIS}` : value;
+  if (value.length <= max) return value;
+  if (max < ELLIPSIS_LENGTH) return ELLIPSIS.slice(0, max);
+  return `${value.slice(0, max - ELLIPSIS_LENGTH)}${ELLIPSIS}`;
 }
 
 const SENSITIVE_KEY_RE =

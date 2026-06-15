@@ -41,6 +41,12 @@ describe('truncateString', () => {
   it('truncates to "..." when custom max is 3 and string exceeds it', () => {
     expect(truncateString('abcd', 3)).toBe('...');
   });
+
+  it('clamps to at most max chars when max is less than ellipsis length', () => {
+    expect(truncateString('abcd', 2)).toBe('..');
+    expect(truncateString('abcd', 1)).toBe('.');
+    expect(truncateString('abcd', 0)).toBe('');
+  });
 });
 
 describe('isSensitiveKey', () => {
