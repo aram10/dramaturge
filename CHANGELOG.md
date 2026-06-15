@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.9.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.8.0...dramaturge-v0.9.0) (2026-06-15)
+
+
+### Features
+
+* add config-file presets, slim public API, flag speculative subsystems ([f351a3e](https://github.com/aram10/dramaturge/commit/f351a3e4d5081c20c7d36b883b13a23a0c6a94e4))
+* **repro:** auto-validate high-impact findings before reporting ([#137](https://github.com/aram10/dramaturge/issues/137)) ([1840962](https://github.com/aram10/dramaturge/commit/1840962e22ba409b1098adee989d00e12474cfd0))
+* **repro:** carry structured status/url on network-error evidence ([#251](https://github.com/aram10/dramaturge/issues/251)) ([b8d2408](https://github.com/aram10/dramaturge/commit/b8d2408af4f539e31aa1865a70ae64336578578a))
+* wire A2A coordination panel into the live dashboard ([#225](https://github.com/aram10/dramaturge/issues/225)) ([af2fe96](https://github.com/aram10/dramaturge/commit/af2fe96c7d80feee46d4174ad4a2f1b4f558724d))
+
+
+### Bug Fixes
+
+* address PR review feedback on truncation and lint config ([e7ae1b3](https://github.com/aram10/dramaturge/commit/e7ae1b31a9c56c2e568bb476d3422e0d9eb57436))
+* **api:** resolve OpenAPI $ref, tighten diff route matching, drop dead responses ([de83ccf](https://github.com/aram10/dramaturge/commit/de83ccf2a50639dfa602f20027accdae23e2412e))
+* correct off-by-one truncation in engine.ts and redaction.ts ([4a80df5](https://github.com/aram10/dramaturge/commit/4a80df59a29e9b3d950ab8aa064c59c99d37b5e4))
+* **deps:** pin patched ws/uuid/hono transitive deps; refactor preflight scans ([#138](https://github.com/aram10/dramaturge/issues/138)) ([0a6d1d2](https://github.com/aram10/dramaturge/commit/0a6d1d228ef47095b56eb1f6ebd7c71c8fe896a6))
+* **durability:** atomic checkpoint/memory writes with load-or-fresh recovery (H11, H16) ([da50da1](https://github.com/aram10/dramaturge/commit/da50da1e4c3757cb2149d770396c10964baf4051))
+* **engine:** guard browser/process teardown and tighten exploration config ([2287b69](https://github.com/aram10/dramaturge/commit/2287b691fb2689736b43a061a7b0bfd5d32f9f06))
+* **engine:** nav retry, fingerprint stability, frontier eviction, follow-up caps ([a873499](https://github.com/aram10/dramaturge/commit/a87349920ad02e518c5513e2acd62a85f0a439a1))
+* isolate A2A handler exceptions and bound coordinator task retention ([#229](https://github.com/aram10/dramaturge/issues/229)) ([f0c6bac](https://github.com/aram10/dramaturge/commit/f0c6bac16d9df380ed74dda17cfd70d1c33643d7))
+* isolate a2a unsubscribers in teardown, restore deprecated renderDashboard options ([6a2d208](https://github.com/aram10/dramaturge/commit/6a2d2084fbd716f2b06c6fa4d01fa8f8e97b5277))
+* **judge,memory:** reject contradicted findings, stabilize signatures, surface recurring findings ([1e0d160](https://github.com/aram10/dramaturge/commit/1e0d1601d10822b260714ee921e32c1f09e26c3b))
+* **license:** correct GPL-3.0 SPDX headers to Apache-2.0 and add CI guard ([6583769](https://github.com/aram10/dramaturge/commit/6583769fa8fb867175e06713c04c4fb35d7c0c6d))
+* **llm,config:** opt-in GitHub Models, new-model token field, strict config, env escapes ([0de2e16](https://github.com/aram10/dramaturge/commit/0de2e161a7334521830c34b1726d930f9ce761d6))
+* prototype-pollution guard in deepMergeConfig and export buildPreset/isPresetName ([59ad4e6](https://github.com/aram10/dramaturge/commit/59ad4e667a78c1a0a20306a34b59429f71241c07))
+* **report:** avoid polynomial backtracking when trimming trailing slashes ([a9a81ce](https://github.com/aram10/dramaturge/commit/a9a81ce965d6f77660bfe19734f9d1ef40514a36))
+* **report:** scope flaky suppression to visual category + min count ([#230](https://github.com/aram10/dramaturge/issues/230)) ([78337a4](https://github.com/aram10/dramaturge/commit/78337a45060886ce299b0de000b8380c4e473207))
+* **repro:** replay reports cannot_confirm when finding has no oracle ([#209](https://github.com/aram10/dramaturge/issues/209)) ([ceb5aaf](https://github.com/aram10/dramaturge/commit/ceb5aafd5da28a205a8c9a050b66365097924184))
+* **robustness:** MCP malformed-frame recovery, preflight guards, event-emit safety (H17, M4, L2) ([f3ebf5b](https://github.com/aram10/dramaturge/commit/f3ebf5bef26555136742285257ab05fb652c8621))
+* **security:** auth-state file perms + MCP runId path-traversal & deep merge (M15, M19) ([6f2fdc9](https://github.com/aram10/dramaturge/commit/6f2fdc96f947a73db4f595797eb0342dfd5de333))
+* **security:** origin-scope exploration + LLM timeout/retry hardening (CR2, CR3) ([e7b266c](https://github.com/aram10/dramaturge/commit/e7b266c6e89489e551f7e9f664a6c02587c070ee))
+* **security:** redaction, test-gen, prompt-injection hardening (H6, H8, M16, M12) ([0e4b9cf](https://github.com/aram10/dramaturge/commit/0e4b9cfb85adc43d81253f1bb8734c89461a0bcb))
+* **spec:** avoid polynomial backtracking trimming trailing slashes ([329f096](https://github.com/aram10/dramaturge/commit/329f096be9fa7008b32b0076fdc1fe877dfca7db))
+* **worker:** create screenshot dir lazily to avoid stray dirs ([#257](https://github.com/aram10/dramaturge/issues/257)) ([0274ec4](https://github.com/aram10/dramaturge/commit/0274ec4ae5c20e02296b017be96c298bdc4b9205))
+
 ## [0.8.0](https://github.com/aram10/dramaturge/compare/dramaturge-v0.7.2...dramaturge-v0.8.0) (2026-05-26)
 
 
