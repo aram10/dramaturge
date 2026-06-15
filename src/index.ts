@@ -33,7 +33,7 @@ export type {
   LoadedDramaturgeConfig,
   WorkflowAutomataConfig,
 } from './config.js';
-export { PRESET_NAMES } from './presets.js';
+export { PRESET_NAMES, buildPreset, isPresetName } from './presets.js';
 export type { PresetName } from './presets.js';
 
 // --- LLM providers ---

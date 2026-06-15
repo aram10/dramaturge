@@ -903,12 +903,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * layer an explicit user config on top of a preset so user values always win
  * while untouched preset keys are preserved.
  */
+const UNSAFE_MERGE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function deepMergeConfig(
   base: Record<string, unknown>,
   override: Record<string, unknown>
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...base };
   for (const [key, overrideValue] of Object.entries(override)) {
+    if (UNSAFE_MERGE_KEYS.has(key)) {
+      continue;
+    }
     const baseValue = result[key];
     if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
       result[key] = deepMergeConfig(baseValue, overrideValue);
