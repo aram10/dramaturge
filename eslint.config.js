@@ -93,4 +93,10 @@ export default [
       '@typescript-eslint/no-magic-numbers': 'off',
     },
   },
+  {
+    files: ['src/constants.ts', 'src/config.ts', 'src/presets.ts'],
+    rules: {
+      '@typescript-eslint/no-magic-numbers': 'off',
+    },
+  },
 ];

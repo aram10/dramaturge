@@ -46,6 +46,7 @@ describe('truncateString', () => {
     expect(truncateString('abcd', 2)).toBe('..');
     expect(truncateString('abcd', 1)).toBe('.');
     expect(truncateString('abcd', 0)).toBe('');
+    expect(truncateString('abcd', -1)).toBe('');
   });
 });
 
