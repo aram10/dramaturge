@@ -129,6 +129,35 @@ describe('loadConfig', () => {
     });
   });
 
+  it('accepts explicit bootstrap readyRequestTimeoutMs and pollIntervalMs overrides', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      `{
+        "targetUrl": "https://example.com/app",
+        "appDescription": "Test app",
+        "auth": {
+          "type": "none"
+        },
+        "bootstrap": {
+          "command": "pnpm dev",
+          "readyRequestTimeoutMs": 7500,
+          "pollIntervalMs": 250
+        }
+      }`,
+      'utf-8'
+    );
+
+    const config = loadConfig(configPath);
+
+    expect(config.bootstrap).toMatchObject({
+      command: 'pnpm dev',
+      readyRequestTimeoutMs: 7500,
+      pollIntervalMs: 250,
+    });
+  });
+
   it('parses experimental workflow automata settings with defaults', () => {
     const dir = createTempDir();
     const configPath = join(dir, 'dramaturge.config.json');

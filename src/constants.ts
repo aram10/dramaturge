@@ -8,6 +8,13 @@ export function shortId(): string {
   return randomUUID().slice(0, 8);
 }
 
+// ---------------------------------------------------------------------------
+// Unit conversions
+// ---------------------------------------------------------------------------
+
+/** Milliseconds per second (unit conversion for human-readable durations). */
+export const MS_PER_SECOND = 1000;
+
 /** Max characters for error grouping keys (console messages, network errors). */
 export const TRUNCATE_GROUP_KEY = 200;
 
@@ -332,9 +339,6 @@ export const SUCCESS_POLL_INTERVAL_MS = 500;
 
 /** Timeout (ms) for validating cached auth state before manual fallback. */
 export const CACHED_AUTH_VALIDATION_TIMEOUT_MS = 10_000;
-
-/** Milliseconds per second (unit conversion for human-readable durations). */
-export const MS_PER_SECOND = 1000;
 
 // ---------------------------------------------------------------------------
 // Report display caps
