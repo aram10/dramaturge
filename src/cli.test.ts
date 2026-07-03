@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Alex Rambasek
 
 import { describe, expect, it, vi } from 'vitest';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { buildHelpText, parseCliArgs, runCli, attachCliListeners } from './cli.js';
 import { EngineEventEmitter } from './engine/event-stream.js';
 
@@ -526,6 +528,84 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(1);
     expect(errors).toEqual(['Error: missing config']);
+  });
+
+  describe('--fail-on-severity', () => {
+    it('exits 0 when no findings meet the threshold', async () => {
+      const outputDir = mkdtempSync(join(tmpdir(), 'dramaturge-cli-severity-'));
+      try {
+        writeFileSync(
+          join(outputDir, 'report.json'),
+          JSON.stringify({ summary: { bySeverity: { Critical: 0, Major: 0, Minor: 1, Trivial: 0 } } }),
+          'utf-8'
+        );
+        const runEngineMock = vi.fn().mockResolvedValue({ outputDir });
+        const errors: string[] = [];
+
+        const exitCode = await runCli(
+          ['run', 'https://example.com', '--fail-on-severity', 'major'],
+          {
+            loadConfig: vi.fn(),
+            runEngine: runEngineMock,
+            log: vi.fn(),
+            error: (message) => errors.push(message),
+          }
+        );
+
+        expect(exitCode).toBe(0);
+        expect(errors).toEqual([]);
+        // json format should be force-added so the severity check can run
+        const passedConfig = runEngineMock.mock.calls[0][0];
+        expect(passedConfig.output.format).toContain('json');
+      } finally {
+        rmSync(outputDir, { recursive: true, force: true });
+      }
+    });
+
+    it('exits 1 when a finding meets/exceeds the threshold', async () => {
+      const outputDir = mkdtempSync(join(tmpdir(), 'dramaturge-cli-severity-'));
+      try {
+        writeFileSync(
+          join(outputDir, 'report.json'),
+          JSON.stringify({ summary: { bySeverity: { Critical: 0, Major: 1, Minor: 0, Trivial: 0 } } }),
+          'utf-8'
+        );
+        const runEngineMock = vi.fn().mockResolvedValue({ outputDir });
+        const errors: string[] = [];
+
+        const exitCode = await runCli(
+          ['run', 'https://example.com', '--fail-on-severity', 'major'],
+          {
+            loadConfig: vi.fn(),
+            runEngine: runEngineMock,
+            log: vi.fn(),
+            error: (message) => errors.push(message),
+          }
+        );
+
+        expect(exitCode).toBe(1);
+        expect(errors[0]).toContain("findings at or above 'Major' severity");
+      } finally {
+        rmSync(outputDir, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects an invalid --fail-on-severity value', async () => {
+      const errors: string[] = [];
+
+      const exitCode = await runCli(
+        ['run', 'https://example.com', '--fail-on-severity', 'extreme'],
+        {
+          loadConfig: vi.fn(),
+          runEngine: vi.fn(),
+          log: vi.fn(),
+          error: (message) => errors.push(message),
+        }
+      );
+
+      expect(exitCode).toBe(1);
+      expect(errors[0]).toContain('Invalid severity');
+    });
   });
 
   it('forwards --profile to runEngine options', async () => {

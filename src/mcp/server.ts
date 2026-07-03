@@ -17,7 +17,7 @@ import {
 } from '../config.js';
 import { normalizeConfigPaths, type ConfigFileContext } from '../config-paths.js';
 import { buildSmokePreset, FOCUS_MODES, resolveProviderDefaults } from '../config-inline.js';
-import { runEngine, type RunEngineOptions } from '../engine.js';
+import { runEngine, type RunEngineOptions, type RunEngineResult } from '../engine.js';
 import { detectProviderFromEnv } from '../llm/index.js';
 import { replayApiRequest } from '../api/replay.js';
 import { createContractIndex, validateOperationResponse } from '../spec/contract-index.js';
@@ -168,7 +168,7 @@ type RunRegistry = Record<string, RunRegistryEntry>;
 export interface McpServerDependencies {
   cwd: string;
   loadConfig: (configPath?: string) => LoadedDramaturgeConfig;
-  runEngine: (config: DramaturgeConfig, options?: RunEngineOptions) => Promise<void>;
+  runEngine: (config: DramaturgeConfig, options?: RunEngineOptions) => Promise<RunEngineResult>;
   stdin: NodeJS.ReadableStream;
   stdout: NodeJS.WritableStream;
   stderr: NodeJS.WritableStream;

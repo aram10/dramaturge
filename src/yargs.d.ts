@@ -15,6 +15,7 @@ declare module 'yargs' {
     focus?: string[];
     format?: string;
     profile?: string;
+    failOnSeverity?: string;
     template?: string;
     url?: string;
     output?: string;

@@ -173,10 +173,15 @@ export interface RunEngineOptions {
   profile?: string;
 }
 
+export interface RunEngineResult {
+  /** Directory the run's reports, screenshots, and findings were written to. */
+  outputDir: string;
+}
+
 export async function runEngine(
   config: DramaturgeConfig,
   options: RunEngineOptions = {}
-): Promise<void> {
+): Promise<RunEngineResult> {
   const startTime = new Date();
   const timestamp = startTime.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const outputDir =
@@ -372,6 +377,8 @@ export async function runEngine(
       checkpointInterval,
       finalFrontierSnapshot: loopResult.finalFrontierSnapshot,
     });
+
+    return { outputDir };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     emitEngineEvent(eventStream, 'run:error', { message, phase: 'engine' });

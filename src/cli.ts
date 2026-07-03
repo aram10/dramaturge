@@ -4,9 +4,14 @@
 
 import { pathToFileURL } from 'node:url';
 import yargs from 'yargs';
-import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from './config.js';
+import {
+  loadConfig,
+  resolveOutputFormats,
+  type LoadedDramaturgeConfig,
+  type DramaturgeConfig,
+} from './config.js';
 import { resolveResumeDir } from './config-paths.js';
-import { runEngine, type RunEngineOptions } from './engine.js';
+import { runEngine, type RunEngineOptions, type RunEngineResult } from './engine.js';
 import { EngineEventEmitter } from './engine/event-stream.js';
 import { loadDotenv } from './env.js';
 import {
@@ -23,6 +28,12 @@ import { runTriageCommand } from './commands/triage.js';
 import { runBenchmarkCommand as runBenchmarkCommandImpl } from './commands/benchmark.js';
 import { runConfirmCommand, type ConfirmOutputFormat } from './commands/confirm.js';
 import { runRegressCommand } from './commands/regress.js';
+import {
+  computeMaxSeverity,
+  parseSeverityThreshold,
+  readReportJson,
+  severityMeetsThreshold,
+} from './report/severity-threshold.js';
 import type {
   ErrorEvent,
   FindingEvent,
@@ -31,6 +42,7 @@ import type {
   TaskStartEvent,
   TaskCompleteEvent,
 } from './engine/event-stream.js';
+import type { FindingSeverity } from './types.js';
 
 export interface ParsedCliArgs {
   command:
@@ -69,6 +81,8 @@ export interface ParsedCliArgs {
   formats?: Array<'markdown' | 'json' | 'both' | 'junit' | 'sarif'>;
   /** --profile flag for multi-role auth */
   profile?: string;
+  /** --fail-on-severity flag for `run`: exit non-zero when findings meet/exceed this severity */
+  failOnSeverity?: FindingSeverity;
   /** --template flag for init */
   initTemplate?: InitTemplate;
   /** --output flag for init */
@@ -123,7 +137,7 @@ export interface ParsedCliArgs {
 
 export interface CliDependencies {
   loadConfig: (configPath?: string) => LoadedDramaturgeConfig;
-  runEngine: (config: DramaturgeConfig, options?: RunEngineOptions) => Promise<void>;
+  runEngine: (config: DramaturgeConfig, options?: RunEngineOptions) => Promise<RunEngineResult>;
   runMcpServer?: () => Promise<void>;
   log: (message: string) => void;
   error: (message: string) => void;
@@ -158,6 +172,7 @@ Run options:
   --focus <modes>      Focus modes (repeatable / comma-separated): navigation, form, crud, api, adversarial
   --format <list>      Report formats, comma-separated: markdown, json, junit, sarif, or both (legacy alias) (e.g. markdown,sarif)
   --profile <name>     Auth profile to use (when config has multiple auth profiles)
+  --fail-on-severity <level>  Exit non-zero if any finding meets/exceeds this severity (critical, major, minor, trivial)
   --help, -h           Show this help message
 
 Init options:
@@ -209,6 +224,7 @@ Examples:
   dramaturge run https://app.example.com --preset smoke  # Quick smoke test
   dramaturge run https://app.example.com --preset security  # Security-focused scan
   dramaturge run https://app.example.com --focus api --focus adversarial  # Ad-hoc focus mix
+  dramaturge run https://app.example.com --fail-on-severity major  # Exit non-zero on major+ findings
   dramaturge mcp                                       # Expose Dramaturge as an MCP server
   dramaturge setup                                     # Interactive onboarding
   dramaturge auth capture --profile admin               # Capture storage state to .dramaturge-state/admin.json
@@ -284,6 +300,7 @@ const VALUE_FLAGS = new Set([
   '--focus',
   '--format',
   '--profile',
+  '--fail-on-severity',
   '--template',
   '--repo',
 ]);
@@ -443,6 +460,7 @@ function parseWithYargs(args: readonly string[]) {
     .option('focus', { type: 'string', array: true, coerce: parseFocusModes })
     .option('format', { type: 'string' })
     .option('profile', { type: 'string' })
+    .option('fail-on-severity', { type: 'string', coerce: parseSeverityThreshold })
     .option('template', { type: 'string', coerce: parseTemplate })
     .option('url', { type: 'string' })
     .option('output', { type: 'string' })
@@ -548,6 +566,9 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
     ...(focusModes ? { focusModes } : {}),
     ...(formats ? { formats } : {}),
     ...(argv.profile ? { profile: argv.profile } : {}),
+    ...(argv.failOnSeverity
+      ? { failOnSeverity: argv.failOnSeverity as unknown as FindingSeverity }
+      : {}),
     ...(positionalArgs.command === 'auth'
       ? {
           authSubcommand: positionalArgs.authSubcommand,
@@ -932,6 +953,52 @@ async function runBenchmarkCommand(
   );
 }
 
+/**
+ * After a `run` completes, check whether any finding meets/exceeds
+ * `threshold` and return the appropriate process exit code (`0` clean,
+ * `1` threshold met/exceeded). Mirrors the GitHub Action's
+ * `fail-on-severity` behavior for local/CI CLI invocations.
+ */
+function checkFailOnSeverity(
+  outputDir: string,
+  threshold: FindingSeverity,
+  dependencies: CliDependencies
+): number {
+  const report = readReportJson(outputDir);
+  if (!report) {
+    dependencies.log(`⚠ Could not read report.json in ${outputDir}; skipping severity check.`);
+    return 0;
+  }
+
+  const maxSeverity = computeMaxSeverity(report);
+  if (severityMeetsThreshold(maxSeverity, threshold)) {
+    dependencies.error(
+      `Dramaturge found findings at or above '${threshold}' severity (max: ${maxSeverity}).`
+    );
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
+ * When `--fail-on-severity` is set, ensure the run also emits a JSON report
+ * (in addition to whatever formats were configured) so the severity
+ * threshold can be checked after the run completes.
+ */
+function ensureJsonOutputForSeverityCheck(
+  config: LoadedDramaturgeConfig,
+  failOnSeverity: FindingSeverity | undefined
+): LoadedDramaturgeConfig {
+  if (!failOnSeverity) return config;
+  const formats = resolveOutputFormats(config.output.format);
+  if (formats.includes('json')) return config;
+  return {
+    ...config,
+    output: { ...config.output, format: [...formats, 'json'] },
+  };
+}
+
 async function runRunCommand(
   parsedArgs: ParsedCliArgs,
   dependencies: CliDependencies
@@ -972,6 +1039,8 @@ async function runRunCommand(
     }
   }
 
+  config = ensureJsonOutputForSeverityCheck(config, parsedArgs.failOnSeverity);
+
   const eventStream = new EngineEventEmitter();
 
   let dashboardHandle: { cleanup: () => void; waitUntilExit: Promise<void> } | undefined;
@@ -984,12 +1053,16 @@ async function runRunCommand(
   }
 
   try {
-    await dependencies.runEngine(config, {
+    const result = await dependencies.runEngine(config, {
       resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
       eventStream,
       diffRef: parsedArgs.diffRef,
       profile: parsedArgs.profile,
     });
+
+    if (parsedArgs.failOnSeverity && result?.outputDir) {
+      return checkFailOnSeverity(result.outputDir, parsedArgs.failOnSeverity, dependencies);
+    }
   } finally {
     // Always unmount the dashboard, even if the engine throws, so the Ink
     // instance does not leave the terminal in a mounted/raw state.
