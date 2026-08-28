@@ -32,6 +32,8 @@ export type {
   DramaturgeConfig,
   LoadedDramaturgeConfig,
   WorkflowAutomataConfig,
+  LoadConfigOptions,
+  QualityGateConfig,
 } from './config.js';
 export { PRESET_NAMES, buildPreset, isPresetName } from './presets.js';
 export type { PresetName } from './presets.js';

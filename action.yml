@@ -25,8 +25,19 @@ inputs:
   fail-on-severity:
     description: >
       Fail the step if findings at or above this severity are found.
-      Accepted values: critical, major, minor, trivial.
+      Accepted values: critical, major, minor, trivial, none.
       Leave empty to never fail on findings.
+    required: false
+    default: ''
+  scope-mode:
+    description: >
+      Exploration scope: auto scopes pull requests to their diff, diff always uses
+      diff-base, and all scans the full application. Auto preserves project config
+      outside pull requests.
+    required: false
+    default: 'auto'
+  diff-base:
+    description: 'Git ref used for diff scope. In pull requests, defaults to the base branch.'
     required: false
     default: ''
   upload-report:
@@ -115,7 +126,45 @@ runs:
         INPUT_REPORT_DIR: ${{ inputs.report-dir }}
         INPUT_FORCE_JSON_OUTPUT: ${{ inputs.force-json-output }}
         INPUT_FORCE_HEADLESS: ${{ inputs.force-headless }}
+        INPUT_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
       run: node "${{ github.action_path }}/action/prepare-config.js"
+
+    - name: Resolve exploration scope
+      id: scope
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_SCOPE_MODE: ${{ inputs.scope-mode }}
+        INPUT_DIFF_BASE: ${{ inputs.diff-base }}
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_REF: ${{ github.base_ref }}
+      run: |
+        mode="${INPUT_SCOPE_MODE,,}"
+        base="$INPUT_DIFF_BASE"
+
+        if [[ "$mode" == "auto" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            mode="diff"
+            if [[ -z "$base" && -n "$BASE_REF" ]]; then
+              git fetch --no-tags --depth=1 origin "$BASE_REF"
+              base="FETCH_HEAD"
+            fi
+          else
+            mode=""
+          fi
+        fi
+
+        if [[ "$mode" != "" && "$mode" != "all" && "$mode" != "diff" ]]; then
+          echo "::error::scope-mode must be auto, all, or diff"
+          exit 1
+        fi
+        if [[ "$mode" == "diff" && -z "$base" ]]; then
+          echo "::error::diff scope requires diff-base outside a pull request"
+          exit 1
+        fi
+
+        echo "mode=$mode" >> "$GITHUB_OUTPUT"
+        echo "base=$base" >> "$GITHUB_OUTPUT"
 
     - name: Run Dramaturge
       id: run
@@ -125,7 +174,17 @@ runs:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         GOOGLE_GENERATIVE_AI_API_KEY: ${{ inputs.google-api-key }}
-      run: dramaturge --config "${{ steps.config.outputs.config-path }}"
+        SCOPE_MODE: ${{ steps.scope.outputs.mode }}
+        DIFF_BASE: ${{ steps.scope.outputs.base }}
+      run: |
+        args=(--config "${{ steps.config.outputs.config-path }}")
+        if [[ -n "$SCOPE_MODE" ]]; then
+          args+=(--scope-mode "$SCOPE_MODE")
+        fi
+        if [[ "$SCOPE_MODE" == "diff" ]]; then
+          args+=(--diff-base "$DIFF_BASE")
+        fi
+        dramaturge "${args[@]}"
       continue-on-error: true
 
     - name: Parse results

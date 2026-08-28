@@ -57,7 +57,34 @@ describe('parseCliArgs', () => {
   it('parses --diff flag', () => {
     const result = parseCliArgs(['--diff', 'origin/main']);
     expect(result.diffRef).toBe('origin/main');
+    expect(result.scopeMode).toBe('diff');
+    expect(result.diffBase).toBe('origin/main');
     expect(result.showHelp).toBe(false);
+  });
+
+  it('parses first-class diff scope and quality-gate flags', () => {
+    const result = parseCliArgs([
+      'run',
+      '--scope-mode',
+      'diff',
+      '--diff-base',
+      'main',
+      '--fail-on-severity',
+      'Minor',
+    ]);
+    expect(result.scopeMode).toBe('diff');
+    expect(result.diffBase).toBe('main');
+    expect(result.failOnSeverity).toBe('minor');
+  });
+
+  it('rejects contradictory and invalid scope flags', () => {
+    expect(() => parseCliArgs(['--scope-mode', 'all', '--diff-base', 'main'])).toThrow(
+      'cannot be combined'
+    );
+    expect(() => parseCliArgs(['--scope-mode', 'changed'])).toThrow('Invalid scope mode');
+    expect(() => parseCliArgs(['--fail-on-severity', 'urgent'])).toThrow(
+      'Invalid failure severity'
+    );
   });
 
   it('parses --diff alongside other flags', () => {
@@ -495,6 +522,38 @@ describe('runCli', () => {
     expect(passedConfig.auth.type).toBe('none');
   });
 
+  it('turns first-class diff flags into a restricted engine run', async () => {
+    const runEngineMock = vi.fn().mockResolvedValue(undefined);
+
+    const exitCode = await runCli(
+      [
+        'run',
+        'https://example.com',
+        '--scope-mode',
+        'diff',
+        '--diff-base',
+        'origin/main',
+        '--fail-on-severity',
+        'none',
+      ],
+      {
+        loadConfig: vi.fn(),
+        runEngine: runEngineMock,
+        log: vi.fn(),
+        error: vi.fn(),
+      }
+    );
+
+    expect(exitCode).toBe(0);
+    const [passedConfig, passedOptions] = runEngineMock.mock.calls[0];
+    expect(passedConfig.diffAware).toMatchObject({
+      enabled: true,
+      baseRef: 'origin/main',
+      restrictToChanged: true,
+    });
+    expect(passedOptions.diffRef).toBe('origin/main');
+  });
+
   it('builds config with login flag', async () => {
     const runEngineMock = vi.fn().mockResolvedValue(undefined);
 
@@ -508,6 +567,98 @@ describe('runCli', () => {
     expect(exitCode).toBe(0);
     const passedConfig = runEngineMock.mock.calls[0][0];
     expect(passedConfig.auth.type).toBe('interactive');
+  });
+
+  it('uses stored preferences for inline runs and saves explicit overrides', async () => {
+    const runEngineMock = vi.fn().mockResolvedValue(undefined);
+    const saveCliPreferences = vi.fn();
+
+    await runCli(['run', 'https://example.com', '--provider', 'openai'], {
+      loadConfig: vi.fn(),
+      runEngine: runEngineMock,
+      loadCliPreferences: () => ({ version: 1, preset: 'smoke', headless: true }),
+      saveCliPreferences,
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    const passedConfig = runEngineMock.mock.calls[0][0];
+    expect(passedConfig.browser.headless).toBe(true);
+    expect(passedConfig.models.planner).toBe('openai/gpt-4.1');
+    expect(passedConfig.budget.globalTimeLimitSeconds).toBe(180);
+    expect(saveCliPreferences).toHaveBeenCalledWith({
+      preset: 'smoke',
+      headless: true,
+      provider: 'openai',
+    });
+  });
+
+  it('layers stored defaults below project config and explicit CLI flags above it', async () => {
+    const config = {
+      targetUrl: 'https://example.com',
+      diffAware: { enabled: false, restrictToChanged: false },
+      qualityGate: { failOnSeverity: 'none' },
+      _meta: { configDir: resolve('C:/tmp') },
+    } as never;
+    const loadConfig = vi.fn().mockReturnValue(config);
+
+    await runCli(['run', '--config', 'c.json', '--headless'], {
+      loadConfig,
+      runEngine: vi.fn().mockResolvedValue(undefined),
+      loadCliPreferences: () => ({ version: 1, preset: 'smoke' }),
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    expect(loadConfig).toHaveBeenCalledWith('c.json', {
+      defaults: { preset: 'smoke' },
+      overrides: { browser: { headless: true } },
+    });
+  });
+
+  it('returns exit code 2 when a completed run exceeds the finding threshold', async () => {
+    const errors: string[] = [];
+    const runEngineMock = vi.fn().mockImplementation(async (_config, options) => {
+      options.eventStream.emit('run:end', {
+        timestamp: '2026-08-28T00:00:00.000Z',
+        tasksExecuted: 1,
+        totalFindings: 2,
+        findingsBySeverity: { Critical: 0, Major: 1, Minor: 1, Trivial: 0 },
+        statesDiscovered: 1,
+        blindSpots: 0,
+        durationMs: 10,
+      });
+    });
+
+    const exitCode = await runCli(['run', 'https://example.com', '--fail-on-severity', 'major'], {
+      loadConfig: vi.fn(),
+      runEngine: runEngineMock,
+      log: vi.fn(),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('Quality gate failed');
+  });
+
+  it('allows findings when the quality gate is disabled', async () => {
+    const runEngineMock = vi.fn().mockImplementation(async (_config, options) => {
+      options.eventStream.emit('finding', {
+        taskId: 'task-1',
+        title: 'Broken checkout',
+        severity: 'Critical',
+        category: 'Bug',
+      });
+    });
+
+    const exitCode = await runCli(['run', 'https://example.com', '--fail-on-severity', 'none'], {
+      loadConfig: vi.fn(),
+      runEngine: runEngineMock,
+      log: vi.fn(),
+      error: vi.fn(),
+    });
+
+    expect(exitCode).toBe(0);
   });
 
   it('reports errors and returns a failing exit code', async () => {

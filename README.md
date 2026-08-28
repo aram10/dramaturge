@@ -6,7 +6,9 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 
-**Autonomous QA testing for web applications.** Point Dramaturge at your app and it will explore, test, and report issues—no test scripts required.
+**The autonomous QA engineer for web applications.** Dramaturge explores your app across
+functional behavior, accessibility, APIs, visual regressions, and opt-in security testing. It
+returns evidence-backed findings that can be replayed, confirmed, and promoted into durable tests.
 
 ## Quick Start
 
@@ -21,15 +23,16 @@ npx dramaturge doctor
 # If you're in CI/Docker (non-interactive) or prompts are disabled, install Chromium manually:
 # npx playwright install chromium
 
-# Generate config
-npx dramaturge auto-config
-
 # Set API key (choose one provider)
 export ANTHROPIC_API_KEY="your-key-here"
 # See LLM Providers section for other options
 
-# Run
-npx dramaturge --config dramaturge.config.json
+# Run immediately—no config file required
+npx dramaturge run https://your-app.example.com --preset smoke
+
+# Or generate a framework-aware project config
+npx dramaturge auto-config
+npx dramaturge run --config dramaturge.config.json
 ```
 
 ## What It Does
@@ -42,9 +45,11 @@ Dramaturge uses LLM-driven browser agents to autonomously test web applications:
 - **Tests APIs** — Validates contracts, auth boundaries, error responses
 - **Security testing** — OWASP scenarios, injection attacks (opt-in)
 - **Visual regression** — Pixel-diff comparison (opt-in)
-- **Provides evidence** — Screenshots, reproduction steps, network traces
+- **Validates findings** — Evidence chains, replayable actions, screenshots, and optional live replay
+- **Builds regressions** — Promotes strong findings into maintainable Playwright specs
 
-No test scripts. No brittle selectors. Works with any web framework.
+It is a full pre-production quality loop—not a pentesting-only tool. Repository adaptation detects
+framework conventions for Next.js, Django, Rails, Express, and other common stacks.
 
 ## Configuration
 
@@ -102,6 +107,31 @@ Available presets:
 
 The same presets are available to the inline CLI: `dramaturge run <url> --preset smoke`.
 
+### Diff-scoped runs
+
+Restrict a run to routes and API surfaces affected by a branch diff:
+
+```bash
+npx dramaturge run --config dramaturge.config.json \
+  --scope-mode diff --diff-base origin/main
+```
+
+`--diff origin/main` remains available as a shorthand. If changed files cannot be mapped to a
+route, Dramaturge falls back safely instead of pruning the entire run. The GitHub Action uses diff
+scope automatically for pull requests; set `scope-mode: all` to opt out.
+
+### Remembered CLI preferences
+
+Explicit, non-secret run preferences such as `--preset`, `--provider`, `--headless`, output formats,
+diff scope, and the quality-gate threshold are saved to `~/.dramaturge/cli-config.json`. API keys,
+target URLs, auth profiles, and credentials are never stored there. Precedence is:
+
+```text
+explicit CLI flags > project config > saved user preferences > built-in defaults
+```
+
+Project config therefore remains authoritative for shared repository behavior.
+
 ## LLM Providers
 
 Dramaturge supports multiple providers via model-string prefixes (e.g., `anthropic/claude-sonnet-4-6`). Omitting the prefix defaults to Anthropic.
@@ -123,7 +153,8 @@ Dramaturge supports multiple providers via model-string prefixes (e.g., `anthrop
 
 ## Confirming Fixes
 
-After fixing a bug, replay saved actions to verify:
+Every report keeps the evidence and replay actions behind its findings. After fixing a bug, replay
+those actions to verify the outcome instead of relying on a pattern match alone:
 
 ```bash
 # Confirm one finding from latest report
@@ -137,6 +168,17 @@ npx dramaturge confirm --all
 ```
 
 **Exit codes:** `0` = all fixed, `1` = issues remain, `2` = cannot confirm, `3` = needs review.
+
+For the main `run` command, the default quality gate fails on `major` or `critical` findings:
+
+```bash
+npx dramaturge run https://your-app.example.com --fail-on-severity critical
+npx dramaturge run https://your-app.example.com --fail-on-severity none
+```
+
+`run` returns `0` when the gate passes, `1` for an execution/configuration error, and `2` when the
+finding threshold is met. Configure the project default with
+`"qualityGate": { "failOnSeverity": "minor" }`.
 
 ## Building Regression Tests
 
@@ -155,6 +197,14 @@ npx dramaturge regress promote BUG-0042
 
 Quality scores consider URL context, actions, evidence, screenshots, and confidence. Only findings with replay actions and clear expected/actual differences are promotable.
 
+## Collaborative agents
+
+Optional A2A mode coordinates five specialists around a shared blackboard: the **Scout** maps the
+surface, the **Tester** exercises workflows, the **Security** agent probes safe adversarial cases,
+the **Reviewer** redirects work toward suspicious behavior, and the **Reporter** synthesizes the
+evidence. Together they behave like a QA team sharing discoveries—not isolated scanners producing
+five disconnected reports. See [A2A Multi-Agent Mode](./docs/a2a-mode.md).
+
 ## CI/CD Integration
 
 Add to `.github/workflows/qa.yml`:
@@ -165,6 +215,7 @@ Add to `.github/workflows/qa.yml`:
     config: dramaturge.config.json
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
     fail-on-severity: major
+    scope-mode: auto # diff-scoped for pull requests
 ```
 
 See [GitHub Action Reference](#github-action-reference) for all options.
@@ -239,7 +290,23 @@ See [GitHub Action Reference](#github-action-reference) for all options.
 }
 ```
 
-Formats: `"markdown"`, `"json"`, or `"both"`
+Formats: `"markdown"`, `"json"`, `"junit"`, `"sarif"`, or `"both"`.
+
+### Quality gate and diff scope
+
+```json
+{
+  "qualityGate": { "failOnSeverity": "major" },
+  "diffAware": {
+    "enabled": true,
+    "baseRef": "origin/main",
+    "restrictToChanged": true
+  }
+}
+```
+
+Quality-gate values are `critical`, `major`, `minor`, `trivial`, and `none`. CLI flags override
+these project settings for one run.
 
 ### Optional Features
 
@@ -409,6 +476,8 @@ Test public-facing pages without authentication.
 | `openai-api-key` | OpenAI API key | — |
 | `google-api-key` | Google Generative AI API key | — |
 | `fail-on-severity` | Fail if findings ≥ severity | — |
+| `scope-mode` | `auto` (PR diff), `diff`, or `all` | `auto` |
+| `diff-base` | Base ref for explicit diff scope | PR base branch |
 | `post-comment` | Post PR comment | `true` |
 | `upload-report` | Upload as artifact | `true` |
 
@@ -428,6 +497,7 @@ Test public-facing pages without authentication.
     config: dramaturge.config.json
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
     fail-on-severity: major
+    scope-mode: auto
     post-comment: true
 ```
 

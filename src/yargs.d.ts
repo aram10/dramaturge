@@ -7,6 +7,9 @@ declare module 'yargs' {
     config?: string;
     resume?: string;
     diff?: string;
+    scopeMode?: string;
+    diffBase?: string;
+    failOnSeverity?: string;
     dashboard?: boolean;
     login?: boolean;
     headless?: boolean;

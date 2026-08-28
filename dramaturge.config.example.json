@@ -143,6 +143,12 @@
     "screenshots": true
   },
 
+  // `dramaturge run` exits with code 2 when a deduplicated finding meets this
+  // threshold. Use "none" to report findings without failing the command.
+  "qualityGate": {
+    "failOnSeverity": "major"
+  },
+
   "memory": {
     "enabled": true,
     "dir": "./.dramaturge",

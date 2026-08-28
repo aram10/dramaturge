@@ -15,6 +15,7 @@ import {
   BOOTSTRAP_POLL_INTERVAL_MS,
 } from './constants.js';
 import { PRESET_NAMES, buildPreset, isPresetName } from './presets.js';
+import { FAILURE_SEVERITIES } from './severity.js';
 
 /**
  * Zod schema for a model string that rejects unknown provider prefixes (#224).
@@ -714,6 +715,16 @@ const ExperimentalSchema = z
     workflowAutomata: WorkflowAutomataSchema.parse({}),
   }));
 
+const QualityGateSchema = z
+  .object({
+    /** Make `dramaturge run` fail when a finding meets this severity threshold. */
+    failOnSeverity: z.enum(FAILURE_SEVERITIES).default('major'),
+  })
+  .strict()
+  .default({
+    failOnSeverity: 'major',
+  });
+
 export const ConfigSchema = z
   .object({
     targetUrl: z.string().url(),
@@ -745,6 +756,7 @@ export const ConfigSchema = z
     policy: PolicySchema,
     a2a: A2ASchema,
     experimental: ExperimentalSchema,
+    qualityGate: QualityGateSchema,
   })
   .strict();
 
@@ -755,6 +767,7 @@ export type AdversarialConfig = z.infer<typeof AdversarialSchema>;
 export type JudgeConfig = z.infer<typeof JudgeSchema>;
 export type VisionAnalysisConfig = z.infer<typeof VisionAnalysisSchema>;
 export type WorkflowAutomataConfig = z.infer<typeof WorkflowAutomataSchema>;
+export type QualityGateConfig = z.infer<typeof QualityGateSchema>;
 export type { ConfigFileContext, LoadedConfigMeta } from './config-paths.js';
 export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 export type AuthProfiles = z.infer<typeof AuthProfilesSchema>;
@@ -959,7 +972,22 @@ export function applyConfigPreset(raw: unknown): unknown {
   return deepMergeConfig(presetConfig, rest);
 }
 
-export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
+export interface LoadConfigOptions {
+  /** Lowest-precedence, non-secret user defaults. */
+  defaults?: Record<string, unknown>;
+  /** Highest-precedence explicit CLI overrides. */
+  overrides?: Record<string, unknown>;
+}
+
+function resolveConfigLayer(raw: unknown): Record<string, unknown> {
+  const resolved = applyConfigPreset(raw);
+  return isPlainObject(resolved) ? resolved : {};
+}
+
+export function loadConfig(
+  configPath?: string,
+  options: LoadConfigOptions = {}
+): LoadedDramaturgeConfig {
   const context = getConfigFileContext(configPath);
   let raw: string;
   try {
@@ -977,7 +1005,10 @@ export function loadConfig(configPath?: string): LoadedDramaturgeConfig {
 
   let presetApplied: unknown;
   try {
-    presetApplied = applyConfigPreset(parsed);
+    const defaults = resolveConfigLayer(options.defaults ?? {});
+    const project = resolveConfigLayer(parsed);
+    const overrides = resolveConfigLayer(options.overrides ?? {});
+    presetApplied = deepMergeConfig(deepMergeConfig(defaults, project), overrides);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Invalid config file: ${context.configPath}\n${message}`, { cause: error });

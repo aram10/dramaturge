@@ -34,6 +34,9 @@ function buildMinimalConfig(targetUrl: string): string {
         format: 'markdown',
         screenshots: true,
       },
+      qualityGate: {
+        failOnSeverity: 'major',
+      },
       browser: {
         headless: false,
       },
@@ -107,6 +110,9 @@ function buildFullConfig(targetUrl: string): string {
         dir: './dramaturge-reports',
         format: 'markdown',
         screenshots: true,
+      },
+      qualityGate: {
+        failOnSeverity: 'major',
       },
       memory: {
         enabled: true,

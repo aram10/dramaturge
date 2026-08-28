@@ -51,6 +51,10 @@ function renderHeader(
     `**Duration:** ${formatDuration(duration)} | **Areas explored:** ${exploredAreas.length} | **Total steps:** ${totalSteps}`
   );
   lines.push('');
+  lines.push(
+    '> Findings are evidence-backed observations with reproduction context. When live replay validation is enabled, each validation outcome is shown on the finding.'
+  );
+  lines.push('');
   return lines;
 }
 
