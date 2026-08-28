@@ -4,7 +4,12 @@
 
 import { pathToFileURL } from 'node:url';
 import yargs from 'yargs';
-import { loadConfig, type LoadedDramaturgeConfig, type DramaturgeConfig } from './config.js';
+import {
+  loadConfig,
+  type LoadedDramaturgeConfig,
+  type DramaturgeConfig,
+  type LoadConfigOptions,
+} from './config.js';
 import { resolveResumeDir } from './config-paths.js';
 import { runEngine, type RunEngineOptions } from './engine.js';
 import { EngineEventEmitter } from './engine/event-stream.js';
@@ -13,10 +18,18 @@ import {
   buildConfigFromArgs,
   FOCUS_MODES,
   PRESET_NAMES,
+  resolveProviderDefaults,
   type FocusMode,
   type InlineRunArgs,
   type PresetName,
 } from './config-inline.js';
+import { loadCliPreferences, saveCliPreferences, type CliPreferences } from './cli-preferences.js';
+import {
+  FAILURE_SEVERITIES,
+  emptySeverityCounts,
+  meetsSeverityThreshold,
+  type FailureSeverity,
+} from './severity.js';
 import { runDoctor } from './commands/doctor.js';
 import { runInit, type InitTemplate } from './commands/init.js';
 import { runTriageCommand } from './commands/triage.js';
@@ -51,6 +64,12 @@ export interface ParsedCliArgs {
   configPath?: string;
   resumeDir?: string;
   diffRef?: string;
+  /** First-class exploration scope. `diff` restricts traversal to changed areas. */
+  scopeMode?: 'all' | 'diff';
+  /** Git ref used by diff scope mode. */
+  diffBase?: string;
+  /** Finding severity that makes a completed run return exit code 2. */
+  failOnSeverity?: FailureSeverity;
   dashboard: boolean;
   showHelp: boolean;
   /** Positional URL for `run <url>` */
@@ -122,9 +141,11 @@ export interface ParsedCliArgs {
 }
 
 export interface CliDependencies {
-  loadConfig: (configPath?: string) => LoadedDramaturgeConfig;
+  loadConfig: (configPath?: string, options?: LoadConfigOptions) => LoadedDramaturgeConfig;
   runEngine: (config: DramaturgeConfig, options?: RunEngineOptions) => Promise<void>;
   runMcpServer?: () => Promise<void>;
+  loadCliPreferences?: () => CliPreferences;
+  saveCliPreferences?: (preferences: Omit<CliPreferences, 'version'>) => void;
   log: (message: string) => void;
   error: (message: string) => void;
 }
@@ -149,7 +170,10 @@ Commands:
 Run options:
   --config <path>      Path to config file (default: dramaturge.config.json)
   --resume <run-dir>   Resume a previous run from its output directory
-  --diff <base-ref>    Enable diff-aware mode against a git ref (e.g. origin/main)
+  --scope-mode <mode>  Exploration scope: all or diff
+  --diff-base <ref>    Git ref used by --scope-mode diff (e.g. origin/main)
+  --diff <base-ref>    Legacy shorthand for --scope-mode diff --diff-base <ref>
+  --fail-on-severity   Exit 2 for findings at/above: critical, major, minor, trivial, none
   --dashboard          Show a real-time terminal dashboard (powered by Ink)
   --login              Enable interactive auth (opens browser for sign-in)
   --headless           Run browser in headless mode
@@ -231,11 +255,14 @@ Environment variables:
   GOOGLE_GENERATIVE_AI_API_KEY   API key for Google models
 
 Dramaturge auto-loads .env files from the current directory.
+Safe run preferences are saved to ~/.dramaturge/cli-config.json (never API keys or URLs).
 `;
 
 const DEFAULT_CLI_DEPENDENCIES: CliDependencies = {
   loadConfig,
   runEngine,
+  loadCliPreferences,
+  saveCliPreferences,
   log: (message) => {
     console.log(message);
   },
@@ -273,6 +300,9 @@ const VALUE_FLAGS = new Set([
   '--config',
   '--resume',
   '--diff',
+  '--scope-mode',
+  '--diff-base',
+  '--fail-on-severity',
   '--url',
   '--output',
   '--from-report',
@@ -302,6 +332,23 @@ function parsePreset(value: string): ParsedCliArgs['preset'] {
     throw new Error(`Invalid preset: ${value}. Must be one of: ${[...VALID_PRESETS].join(', ')}`);
   }
   return value as ParsedCliArgs['preset'];
+}
+
+function parseScopeMode(value: string): ParsedCliArgs['scopeMode'] {
+  if (value !== 'all' && value !== 'diff') {
+    throw new Error(`Invalid scope mode: ${value}. Must be one of: all, diff`);
+  }
+  return value;
+}
+
+function parseFailureSeverity(value: string): FailureSeverity {
+  const normalized = value.toLowerCase();
+  if (!(FAILURE_SEVERITIES as readonly string[]).includes(normalized)) {
+    throw new Error(
+      `Invalid failure severity: ${value}. Must be one of: ${FAILURE_SEVERITIES.join(', ')}`
+    );
+  }
+  return normalized as FailureSeverity;
 }
 
 function parseTemplate(value: string): InitTemplate {
@@ -435,6 +482,9 @@ function parseWithYargs(args: readonly string[]) {
     .option('config', { type: 'string' })
     .option('resume', { type: 'string' })
     .option('diff', { type: 'string' })
+    .option('scope-mode', { type: 'string', coerce: parseScopeMode })
+    .option('diff-base', { type: 'string' })
+    .option('fail-on-severity', { type: 'string', coerce: parseFailureSeverity })
     .option('dashboard', { type: 'boolean' })
     .option('login', { type: 'boolean' })
     .option('headless', { type: 'boolean' })
@@ -524,16 +574,30 @@ export function parseCliArgs(args: readonly string[]): ParsedCliArgs {
   const initTemplate = argv.template as InitTemplate | undefined;
   const repoPath = argv.repo;
   const noScan = argv.noScan || undefined;
+  const legacyDiff = argv.diff;
+  const diffBase = argv.diffBase ?? legacyDiff;
+  const scopeMode = (argv.scopeMode ?? (legacyDiff || argv.diffBase ? 'diff' : undefined)) as
+    | ParsedCliArgs['scopeMode']
+    | undefined;
 
   if (noScan && repoPath) {
     throw new Error('--no-scan and --repo cannot be used together');
+  }
+  if (legacyDiff && argv.diffBase && legacyDiff !== argv.diffBase) {
+    throw new Error('--diff and --diff-base must name the same ref when used together');
+  }
+  if (scopeMode === 'all' && diffBase) {
+    throw new Error('--diff/--diff-base cannot be combined with --scope-mode all');
   }
 
   return {
     command: positionalArgs.command,
     configPath: argv.config,
     resumeDir: argv.resume,
-    diffRef: argv.diff,
+    diffRef: legacyDiff,
+    scopeMode,
+    diffBase,
+    failOnSeverity: argv.failOnSeverity as FailureSeverity | undefined,
     dashboard: argv.dashboard ?? false,
     showHelp: false,
     url: positionalArgs.url,
@@ -639,7 +703,7 @@ export async function runCli(
         return await runAutoConfigCommand(dependencies, parsedArgs);
 
       case 'run':
-        return await runRunCommand(parsedArgs, dependencies);
+        return await runRunCommandWithPreferences(parsedArgs, dependencies);
 
       case 'findings':
       case 'baselines':
@@ -932,9 +996,94 @@ async function runBenchmarkCommand(
   );
 }
 
-async function runRunCommand(
+type StoredRunPreferences = Omit<CliPreferences, 'version'>;
+
+function explicitRunPreferences(parsedArgs: ParsedCliArgs): StoredRunPreferences {
+  return {
+    ...(parsedArgs.provider ? { provider: parsedArgs.provider } : {}),
+    ...(parsedArgs.preset ? { preset: parsedArgs.preset } : {}),
+    ...(parsedArgs.focusModes ? { focusModes: parsedArgs.focusModes } : {}),
+    ...(parsedArgs.formats ? { formats: parsedArgs.formats } : {}),
+    ...(parsedArgs.headless !== undefined ? { headless: parsedArgs.headless } : {}),
+    ...(parsedArgs.scopeMode ? { scopeMode: parsedArgs.scopeMode } : {}),
+    ...(parsedArgs.diffBase ? { diffBase: parsedArgs.diffBase } : {}),
+    ...(parsedArgs.failOnSeverity ? { failOnSeverity: parsedArgs.failOnSeverity } : {}),
+  };
+}
+
+function preferencesToConfigLayer(preferences: StoredRunPreferences): Record<string, unknown> {
+  const layer: Record<string, unknown> = {};
+
+  if (preferences.preset) layer.preset = preferences.preset;
+  if (preferences.provider) {
+    layer.models = resolveProviderDefaults(preferences.provider);
+  }
+  if (preferences.headless !== undefined) {
+    layer.browser = { headless: preferences.headless };
+  }
+  if (preferences.formats) {
+    layer.output = {
+      format: preferences.formats.length === 1 ? preferences.formats[0] : [...preferences.formats],
+    };
+  }
+  if (preferences.focusModes) {
+    layer.mission = { focusModes: [...preferences.focusModes] };
+    if (preferences.focusModes.includes('adversarial')) {
+      layer.adversarial = { enabled: true };
+    }
+    if (preferences.focusModes.includes('api')) {
+      layer.apiTesting = { enabled: true };
+    }
+  }
+  if (preferences.scopeMode) {
+    layer.diffAware = {
+      enabled: preferences.scopeMode === 'diff',
+      restrictToChanged: preferences.scopeMode === 'diff',
+      ...(preferences.diffBase ? { baseRef: preferences.diffBase } : {}),
+    };
+  }
+  if (preferences.failOnSeverity) {
+    layer.qualityGate = { failOnSeverity: preferences.failOnSeverity };
+  }
+
+  return layer;
+}
+
+function hasProperties(value: Record<string, unknown>): boolean {
+  return Object.keys(value).length > 0;
+}
+
+async function runRunCommandWithPreferences(
   parsedArgs: ParsedCliArgs,
   dependencies: CliDependencies
+): Promise<number> {
+  const loaded = dependencies.loadCliPreferences?.() ?? { version: 1 };
+  const { version: _version, ...storedPreferences } = loaded;
+  const explicitPreferences = explicitRunPreferences(parsedArgs);
+  const exitCode = await runRunCommand(
+    parsedArgs,
+    dependencies,
+    storedPreferences,
+    explicitPreferences
+  );
+
+  if (hasProperties(explicitPreferences) && dependencies.saveCliPreferences) {
+    try {
+      dependencies.saveCliPreferences({ ...storedPreferences, ...explicitPreferences });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      dependencies.error(`Warning: could not save CLI preferences: ${message}`);
+    }
+  }
+
+  return exitCode;
+}
+
+async function runRunCommand(
+  parsedArgs: ParsedCliArgs,
+  dependencies: CliDependencies,
+  storedPreferences: StoredRunPreferences,
+  explicitPreferences: StoredRunPreferences
 ): Promise<number> {
   let config: LoadedDramaturgeConfig;
 
@@ -951,28 +1100,59 @@ async function runRunCommand(
     const inlineArgs: InlineRunArgs = {
       url: parsedArgs.url,
       login: parsedArgs.login,
-      headless: parsedArgs.headless,
-      provider: parsedArgs.provider,
-      preset: parsedArgs.preset,
-      focusModes: parsedArgs.focusModes,
-      formats: parsedArgs.formats,
+      headless: parsedArgs.headless ?? storedPreferences.headless,
+      provider: parsedArgs.provider ?? storedPreferences.provider,
+      preset: parsedArgs.preset ?? storedPreferences.preset,
+      focusModes: parsedArgs.focusModes ?? storedPreferences.focusModes,
+      formats: parsedArgs.formats ?? storedPreferences.formats,
     };
     config = buildConfigFromArgs(inlineArgs);
+    const inlineSettings = { ...storedPreferences, ...explicitPreferences };
+    config = {
+      ...config,
+      ...(inlineSettings.scopeMode
+        ? {
+            diffAware: {
+              ...config.diffAware,
+              enabled: inlineSettings.scopeMode === 'diff',
+              restrictToChanged: inlineSettings.scopeMode === 'diff',
+              ...(inlineSettings.diffBase ? { baseRef: inlineSettings.diffBase } : {}),
+            },
+          }
+        : {}),
+      qualityGate: {
+        ...config.qualityGate,
+        failOnSeverity: inlineSettings.failOnSeverity ?? config.qualityGate.failOnSeverity,
+      },
+    };
   } else {
     // File mode: load config from file (existing behavior)
-    config = dependencies.loadConfig(parsedArgs.configPath);
-    if (parsedArgs.formats && parsedArgs.formats.length > 0) {
-      config = {
-        ...config,
-        output: {
-          ...config.output,
-          format: parsedArgs.formats.length === 1 ? parsedArgs.formats[0] : [...parsedArgs.formats],
-        },
-      };
-    }
+    const defaults = preferencesToConfigLayer(storedPreferences);
+    const overrides = preferencesToConfigLayer(explicitPreferences);
+    const loadOptions =
+      hasProperties(defaults) || hasProperties(overrides) ? { defaults, overrides } : undefined;
+    config = loadOptions
+      ? dependencies.loadConfig(parsedArgs.configPath, loadOptions)
+      : dependencies.loadConfig(parsedArgs.configPath);
+  }
+
+  if (
+    config.diffAware?.enabled &&
+    config.diffAware.restrictToChanged &&
+    !config.diffAware.baseRef
+  ) {
+    throw new Error('Diff scope requires --diff-base <ref> or diffAware.baseRef in project config');
   }
 
   const eventStream = new EngineEventEmitter();
+  const observedSeverities = emptySeverityCounts();
+  let finalSeverities: typeof observedSeverities | undefined;
+  eventStream.on('finding', (event) => {
+    observedSeverities[event.severity]++;
+  });
+  eventStream.on('run:end', (event) => {
+    finalSeverities = event.findingsBySeverity;
+  });
 
   let dashboardHandle: { cleanup: () => void; waitUntilExit: Promise<void> } | undefined;
 
@@ -987,7 +1167,7 @@ async function runRunCommand(
     await dependencies.runEngine(config, {
       resumeDir: resolveResumeDir(parsedArgs.resumeDir, config),
       eventStream,
-      diffRef: parsedArgs.diffRef,
+      diffRef: config.diffAware?.enabled ? config.diffAware.baseRef : undefined,
       profile: parsedArgs.profile,
     });
   } finally {
@@ -998,6 +1178,26 @@ async function runRunCommand(
       dashboardHandle.cleanup();
       await dashboardHandle.waitUntilExit;
     }
+  }
+
+  const threshold =
+    parsedArgs.failOnSeverity ??
+    config.qualityGate?.failOnSeverity ??
+    storedPreferences.failOnSeverity ??
+    'major';
+  const severityCounts = finalSeverities ?? observedSeverities;
+  const failedCount = Object.entries(severityCounts).reduce(
+    (total, [severity, count]) =>
+      meetsSeverityThreshold(severity as keyof typeof severityCounts, threshold)
+        ? total + count
+        : total,
+    0
+  );
+  if (failedCount > 0) {
+    dependencies.error(
+      `Quality gate failed: ${failedCount} finding(s) met or exceeded the ${threshold} threshold.`
+    );
+    return 2;
   }
 
   return 0;

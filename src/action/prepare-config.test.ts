@@ -70,6 +70,7 @@ describe('prepare-config', () => {
         targetUrl: 'https://input.example.com',
         output: { format: 'both', dir: './ci-reports' },
         browser: { headless: true },
+        qualityGate: { failOnSeverity: 'none' },
       });
     });
 
@@ -88,7 +89,17 @@ describe('prepare-config', () => {
       expect(prepared).toEqual({
         output: { format: 'markdown', dir: './reports' },
         browser: { headless: false },
+        qualityGate: { failOnSeverity: 'none' },
       });
+    });
+
+    it('configures and validates the run quality gate', () => {
+      expect(applyActionOverrides({}, { failOnSeverity: 'MAJOR' }).qualityGate.failOnSeverity).toBe(
+        'major'
+      );
+      expect(() => applyActionOverrides({}, { failOnSeverity: 'urgent' })).toThrow(
+        'Invalid fail-on-severity value'
+      );
     });
   });
 

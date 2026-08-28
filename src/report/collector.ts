@@ -120,6 +120,9 @@ function mergeExistingFinding(
   occurrence: FindingOccurrence
 ): void {
   existing.occurrences.push(occurrence);
+  if (SEVERITY_ORDER[raw.severity] < SEVERITY_ORDER[existing.severity]) {
+    existing.severity = raw.severity;
+  }
   existing.impactedAreas = Array.from(new Set([...existing.impactedAreas, occurrence.area]));
   existing.occurrenceCount = existing.occurrences.length;
   existing.evidenceIds = Array.from(

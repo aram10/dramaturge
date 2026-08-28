@@ -10,6 +10,7 @@ import { emitEngineEvent } from './event-stream.js';
 import { buildAreaResults, writeReports } from './reports.js';
 import { finalizeWorkflowAutomata } from '../workflow-automata/planner-adapter.js';
 import { BLIND_SPOT_HIGH_PRIORITY_THRESHOLD } from '../constants.js';
+import { emptySeverityCounts } from '../severity.js';
 
 export interface FinalizeRunOptions {
   startTime: Date;
@@ -88,13 +89,16 @@ export async function finalizeRun(ctx: EngineContext, options: FinalizeRunOption
   await writeReports(ctx, startTime, areaResults, remaining);
 
   const blindSpots = ctx.globalCoverage.getBlindSpots();
-  const totalFindings = [...ctx.findingsByNode.values()].reduce(
-    (sum, findings) => sum + findings.length,
-    0
-  );
+  const findings = collectFindings(areaResults);
+  const findingsBySeverity = emptySeverityCounts();
+  for (const finding of findings) {
+    findingsBySeverity[finding.severity]++;
+  }
+  const totalFindings = findings.length;
   ctx.logger?.info('Run complete', {
     tasksExecuted,
     totalFindings,
+    findingsBySeverity,
     statesDiscovered: ctx.graph.nodeCount(),
     blindSpots: blindSpots.length,
     durationMs: Date.now() - startTime.getTime(),
@@ -104,6 +108,7 @@ export async function finalizeRun(ctx: EngineContext, options: FinalizeRunOption
     timestamp: new Date().toISOString(),
     tasksExecuted,
     totalFindings,
+    findingsBySeverity,
     statesDiscovered: ctx.graph.nodeCount(),
     blindSpots: blindSpots.length,
     durationMs: Date.now() - startTime.getTime(),

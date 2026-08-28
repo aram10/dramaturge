@@ -68,6 +68,22 @@ describe('collectFindings', () => {
     ]);
   });
 
+  it('promotes grouped finding severity to the highest observed severity', () => {
+    const area1 = makeAreaResult('page A', [makeFinding('Minor', 'Bug', 'Shared severity issue')]);
+    const area2 = makeAreaResult('page B', [
+      makeFinding('Critical', 'Bug', 'Shared severity issue'),
+    ]);
+
+    const result = collectFindings([area1, area2]);
+    expect(result).toHaveLength(1);
+    expect(result[0].severity).toBe('Critical');
+    expect(result[0].occurrenceCount).toBe(2);
+    expect(result[0].occurrences.map((occurrence) => occurrence.area)).toEqual([
+      'page A',
+      'page B',
+    ]);
+  });
+
   it('re-numbers IDs after sorting', () => {
     const area = makeAreaResult('test', [
       makeFinding('Minor', 'Bug', 'minor'),

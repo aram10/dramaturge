@@ -14,6 +14,7 @@
  *   INPUT_REPORT_DIR  – report directory override
  *   INPUT_FORCE_JSON_OUTPUT – whether to ensure JSON output is enabled
  *   INPUT_FORCE_HEADLESS – whether to force browser.headless=true
+ *   INPUT_FAIL_ON_SEVERITY – quality-gate threshold (empty means none)
  *   GITHUB_OUTPUT     – GitHub Actions output file
  */
 
@@ -47,12 +48,19 @@ export function parseBooleanInput(value, defaultValue) {
  *   reportDir?: string,
  *   forceJsonOutput?: boolean,
  *   forceHeadless?: boolean,
+ *   failOnSeverity?: string,
  * }} [options]
  * @returns {Record<string, any>}
  */
 export function applyActionOverrides(
   config,
-  { targetUrl = '', reportDir = '', forceJsonOutput = true, forceHeadless = true } = {}
+  {
+    targetUrl = '',
+    reportDir = '',
+    forceJsonOutput = true,
+    forceHeadless = true,
+    failOnSeverity = 'none',
+  } = {}
 ) {
   const nextConfig = { ...config };
 
@@ -89,6 +97,16 @@ export function applyActionOverrides(
     nextConfig.browser.headless = true;
   }
 
+  const normalizedThreshold = failOnSeverity.trim().toLowerCase() || 'none';
+  const validThresholds = ['critical', 'major', 'minor', 'trivial', 'none'];
+  if (!validThresholds.includes(normalizedThreshold)) {
+    throw new Error(
+      `Invalid fail-on-severity value: ${failOnSeverity}. Expected one of: ${validThresholds.join(', ')}`
+    );
+  }
+  nextConfig.qualityGate = { ...(config.qualityGate || {}) };
+  nextConfig.qualityGate.failOnSeverity = normalizedThreshold;
+
   return nextConfig;
 }
 
@@ -116,6 +134,7 @@ export function isJsonOutputEnabled(config) {
  *   reportDir?: string,
  *   forceJsonOutput?: boolean,
  *   forceHeadless?: boolean,
+ *   failOnSeverity?: string,
  *   githubOutput?: string,
  * }} [options]
  * @returns {{
@@ -131,6 +150,7 @@ export function prepareConfig({
   reportDir = '',
   forceJsonOutput = true,
   forceHeadless = true,
+  failOnSeverity = 'none',
   githubOutput = '',
 } = {}) {
   let config = {};
@@ -146,6 +166,7 @@ export function prepareConfig({
     reportDir,
     forceJsonOutput,
     forceHeadless,
+    failOnSeverity,
   });
 
   const configDir = dirname(resolvedConfigPath);
@@ -181,6 +202,7 @@ function main() {
     reportDir: process.env.INPUT_REPORT_DIR || '',
     forceJsonOutput: parseBooleanInput(process.env.INPUT_FORCE_JSON_OUTPUT, true),
     forceHeadless: parseBooleanInput(process.env.INPUT_FORCE_HEADLESS, true),
+    failOnSeverity: process.env.INPUT_FAIL_ON_SEVERITY || 'none',
     githubOutput: process.env.GITHUB_OUTPUT || '',
   });
 

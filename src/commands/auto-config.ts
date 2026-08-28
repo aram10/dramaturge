@@ -605,6 +605,9 @@ function buildConfig(
       format: 'markdown',
       screenshots: true,
     },
+    qualityGate: {
+      failOnSeverity: 'major',
+    },
     browser: {
       headless: answers.headless,
     },

@@ -769,6 +769,55 @@ describe('loadConfig', () => {
     });
     expect(effectiveReportDir).toBe(resolve(dir, 'ci-reports'));
   });
+
+  it('layers user defaults below project config and CLI overrides above it', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        targetUrl: 'https://example.com',
+        appDescription: 'Project config',
+        auth: { type: 'none' },
+        browser: { headless: false },
+        qualityGate: { failOnSeverity: 'minor' },
+      })
+    );
+
+    const loaded = loadConfig(configPath, {
+      defaults: {
+        preset: 'smoke',
+        browser: { headless: true },
+        qualityGate: { failOnSeverity: 'trivial' },
+      },
+      overrides: {
+        qualityGate: { failOnSeverity: 'critical' },
+      },
+    });
+
+    expect(loaded.browser.headless).toBe(false);
+    expect(loaded.budget.globalTimeLimitSeconds).toBe(180);
+    expect(loaded.qualityGate.failOnSeverity).toBe('critical');
+  });
+
+  it('defaults the run quality gate to major and accepts an explicit opt-out', () => {
+    const dir = createTempDir();
+    const configPath = join(dir, 'dramaturge.config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        targetUrl: 'https://example.com',
+        appDescription: 'Quality gate defaults',
+        auth: { type: 'none' },
+      })
+    );
+
+    expect(loadConfig(configPath).qualityGate.failOnSeverity).toBe('major');
+    const disabled = loadConfig(configPath, {
+      overrides: { qualityGate: { failOnSeverity: 'none' } },
+    });
+    expect(disabled.qualityGate.failOnSeverity).toBe('none');
+  });
 });
 
 describe('resolveOutputFormats', () => {

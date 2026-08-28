@@ -18,6 +18,10 @@
     "screenshots": true
   },
 
+  "qualityGate": {
+    "failOnSeverity": "major"
+  },
+
   "browser": {
     "headless": false
   }

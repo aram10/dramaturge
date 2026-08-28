@@ -1,6 +1,20 @@
 # A2A Multi-Agent Mode
 
-Dramaturge supports an optional **A2A (Agent-to-Agent) multi-agent coordination mode** based on Google's A2A protocol. When enabled, the engine routes tasks to specialized agents with distinct roles, enabling coordinated exploration and testing workflows.
+Dramaturge supports an optional **A2A (Agent-to-Agent) multi-agent coordination mode** based on Google's A2A protocol. Think of it as an autonomous QA team: specialists divide the work, publish discoveries to shared memory, and use each other's evidence to pursue deeper checks.
+
+```mermaid
+flowchart LR
+  C[Coordinator] --> S[Scout]
+  C --> T[Tester]
+  C --> X[Security]
+  S --> B[(Shared blackboard)]
+  T --> B
+  X --> B
+  B --> R[Reviewer]
+  R -->|redirects and follow-ups| C
+  B --> P[Reporter]
+  P --> O[One evidence-backed report]
+```
 
 ## Agent Roles
 
@@ -10,7 +24,7 @@ A2A mode includes five specialized agent roles:
 - **Tester** (`agent-tester`): Deep-dives into forms, CRUD flows, and API endpoints with domain-specific reasoning
 - **Security** (`agent-security`): Runs adversarial scenarios with security-domain knowledge (OWASP patterns, boundary probing)
 - **Reviewer** (`agent-reviewer`): Observes other agents in real-time and redirects them toward suspicious behaviors
-- **Reporter** (`agent-reporter`): Synthesizes findings across all agents into coherent narratives
+- **Reporter** (`agent-reporter`): Synthesizes findings and evidence across all agents into one coherent report
 
 ## Configuration
 
@@ -95,6 +109,7 @@ When A2A is enabled, workers receive additional context:
 - **Specialized reasoning**: Each agent applies domain-specific knowledge (navigation patterns, form validation heuristics, security threat models)
 - **Coordinated coverage**: Agents avoid duplicate work by observing the blackboard
 - **Dynamic prioritization**: Reviewer can redirect agents based on emerging patterns
+- **Chained discoveries**: A route found by the Scout can become a workflow test, an authorization probe, and a Reviewer-directed follow-up
 - **Comprehensive narratives**: Reporter synthesizes findings across multiple testing perspectives
 
 ## When to Use A2A

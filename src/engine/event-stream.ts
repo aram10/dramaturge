@@ -18,6 +18,8 @@ export interface RunEndEvent {
   timestamp: string;
   tasksExecuted: number;
   totalFindings: number;
+  /** Deduplicated report findings grouped by severity. */
+  findingsBySeverity?: Record<FindingSeverity, number>;
   statesDiscovered: number;
   blindSpots: number;
   durationMs: number;

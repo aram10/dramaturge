@@ -109,7 +109,7 @@ export function buildSummary(report) {
 
   const duration = meta.durationMs ? formatDuration(meta.durationMs) : 'unknown';
 
-  let md = `## \u{1F3AD} Dramaturge QA Report\n\n`;
+  let md = `## \u{1F3AD} Dramaturge Evidence-Backed QA Report\n\n`;
   md += `**Target:** ${escapeMarkdownInline(meta.targetUrl || 'unknown')}  \n`;
   md += `**Duration:** ${duration}  \n`;
 

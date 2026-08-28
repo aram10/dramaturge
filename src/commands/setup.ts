@@ -235,6 +235,9 @@ export async function runSetup(deps: SetupDependencies, args: SetupArgs = {}): P
       format: 'markdown',
       screenshots: true,
     },
+    qualityGate: {
+      failOnSeverity: 'major',
+    },
     browser: {
       headless,
     },
