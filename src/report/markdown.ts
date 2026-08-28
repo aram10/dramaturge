@@ -52,7 +52,7 @@ function renderHeader(
   );
   lines.push('');
   lines.push(
-    '> Findings are evidence-backed observations with reproduction context. When live replay validation is enabled, each validation outcome is shown on the finding.'
+    '> Findings may include evidence and reproduction context. When live replay validation is enabled, each validation outcome is shown on the finding.'
   );
   lines.push('');
   return lines;

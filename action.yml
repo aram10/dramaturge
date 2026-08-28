@@ -162,6 +162,32 @@ runs:
           echo "::error::diff scope requires diff-base outside a pull request"
           exit 1
         fi
+        if [[ "$mode" == "diff" ]]; then
+          if ! git rev-parse --verify --quiet "${base}^{commit}" >/dev/null; then
+            fetch_ref="$base"
+            if [[ "$fetch_ref" == refs/remotes/origin/* ]]; then
+              fetch_ref="${fetch_ref#refs/remotes/origin/}"
+            elif [[ "$fetch_ref" == origin/* ]]; then
+              fetch_ref="${fetch_ref#origin/}"
+            elif [[ "$fetch_ref" == refs/heads/* ]]; then
+              fetch_ref="${fetch_ref#refs/heads/}"
+            fi
+
+            if ! git fetch --no-tags --depth=1 origin "$fetch_ref"; then
+              echo "::error::Unable to fetch diff-base '$base'"
+              exit 1
+            fi
+
+            if git rev-parse --verify --quiet "${base}^{commit}" >/dev/null; then
+              :
+            elif git rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null; then
+              base="FETCH_HEAD"
+            else
+              echo "::error::Unable to resolve diff-base '$base' to a commit"
+              exit 1
+            fi
+          fi
+        fi
 
         echo "mode=$mode" >> "$GITHUB_OUTPUT"
         echo "base=$base" >> "$GITHUB_OUTPUT"
